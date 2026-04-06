@@ -37,8 +37,7 @@ export default function BillOfMaterials() {
   const [showScopeInput, setShowScopeInput] = useState(false);
   const [newScopeName, setNewScopeName] = useState("");
   
-  // Dialog states
-  const [materialDialogOpen, setMaterialDialogOpen] = useState(false);
+  // Dialog / inline states
   const [laborDialogOpen, setLaborDialogOpen] = useState(false);
   const [selectedScopeId, setSelectedScopeId] = useState<string>("");
   const [editingLabor, setEditingLabor] = useState<Labor | null>(null);
@@ -205,23 +204,32 @@ export default function BillOfMaterials() {
   };
 
   // Material operations
-  const handleMaterialSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleMaterialSubmitInline = async () => {
     if (!selectedScopeId) return;
     
+    const quantity = parseFloat(materialForm.quantity || "0");
+    const unitCost = parseFloat(materialForm.unit_cost || "0");
+    const totalCost = quantity * unitCost;
+
     const materialData = {
       scope_id: selectedScopeId,
-      material_name: materialForm.name,
+      material_name: materialForm.description || materialForm.name || "Material",
       description: materialForm.description,
-      quantity: parseFloat(materialForm.quantity),
+      quantity,
       unit: materialForm.unit,
-      unit_cost: parseFloat(materialForm.unit_cost),
-      total_cost: parseFloat(materialForm.quantity) * parseFloat(materialForm.unit_cost)
+      unit_cost: unitCost,
+      total_cost: totalCost
     };
     
-    await bomService.createMaterial(materialData);
-    setMaterialDialogOpen(false);
+    const { error } = await bomService.createMaterial(materialData);
+    if (error) {
+      console.error("Error creating material:", error);
+      alert("Error creating material: " + error.message);
+      return;
+    }
+
     resetMaterialForm();
+    setSelectedScopeId("");
     loadData();
   };
 
@@ -442,102 +450,162 @@ export default function BillOfMaterials() {
             <CardContent className="space-y-6">
               {/* Add Materials Button */}
               <div className="flex justify-center">
-                <Dialog open={materialDialogOpen && selectedScopeId === scope.id} onOpenChange={setMaterialDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button size="lg" onClick={() => { setSelectedScopeId(scope.id); resetMaterialForm(); }}>
-                      <Plus className="h-5 w-5 mr-2" />
-                      Add Materials
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Add Material</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={handleMaterialSubmit} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label>Material Name *</Label>
-                        <Input
-                          value={materialForm.name}
-                          onChange={(e) => setMaterialForm({ ...materialForm, name: e.target.value })}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Description</Label>
-                        <Input
-                          value={materialForm.description}
-                          onChange={(e) => setMaterialForm({ ...materialForm, description: e.target.value })}
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Quantity *</Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={materialForm.quantity}
-                            onChange={(e) => setMaterialForm({ ...materialForm, quantity: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Unit</Label>
-                          <Input
-                            value={materialForm.unit}
-                            onChange={(e) => setMaterialForm({ ...materialForm, unit: e.target.value })}
-                            placeholder="pcs, kg, m³"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Unit Cost *</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={materialForm.unit_cost}
-                          onChange={(e) => setMaterialForm({ ...materialForm, unit_cost: e.target.value })}
-                          required
-                        />
-                      </div>
-                      <div className="flex justify-end gap-2">
-                        <Button type="button" variant="outline" onClick={() => setMaterialDialogOpen(false)}>
-                          Cancel
-                        </Button>
-                        <Button type="submit">Add Material</Button>
-                      </div>
-                    </form>
-                  </DialogContent>
-                </Dialog>
+                <Button
+                  size="lg"
+                  onClick={() => {
+                    setSelectedScopeId(scope.id);
+                    resetMaterialForm();
+                  }}
+                >
+                  <Plus className="h-5 w-5 mr-2" />
+                  Add Materials
+                </Button>
               </div>
 
               {/* Materials Section */}
-              {(scope.bom_materials || []).length > 0 && (
-                <div>
+              {(((scope.bom_materials || []).length > 0) || selectedScopeId === scope.id) && (
+                <div className="mt-4">
                   <h3 className="font-semibold text-lg mb-3">Materials</h3>
-                  <div className="space-y-2">
-                    {(scope.bom_materials || []).map((material: Material) => (
-                      <div key={material.id} className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
-                        <div className="flex-1">
-                          <div className="font-medium">{material.material_name}</div>
-                          {material.description && <div className="text-sm text-muted-foreground">{material.description}</div>}
-                          <div className="text-sm text-muted-foreground mt-1">
-                            {material.quantity} {material.unit} × ${material.unit_cost?.toFixed(2)}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right font-semibold">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Material Description</TableHead>
+                        <TableHead className="w-24 text-right">Qty</TableHead>
+                        <TableHead className="w-32">Unit</TableHead>
+                        <TableHead className="w-32 text-right">Unit Cost</TableHead>
+                        <TableHead className="w-32 text-right">Amount</TableHead>
+                        <TableHead className="w-20 text-right"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(scope.bom_materials || []).map((material: Material) => (
+                        <TableRow key={material.id}>
+                          <TableCell>
+                            <div className="font-medium">{material.material_name}</div>
+                            {material.description && (
+                              <div className="text-xs text-muted-foreground">
+                                {material.description}
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {material.quantity}
+                          </TableCell>
+                          <TableCell>{material.unit}</TableCell>
+                          <TableCell className="text-right">
+                            ${material.unit_cost?.toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">
                             ${material.total_cost?.toFixed(2)}
-                          </div>
-                          <Button size="icon" variant="ghost" onClick={() => handleDeleteMaterial(material.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                    <div className="flex justify-end pt-2 border-t">
-                      <div className="text-lg font-semibold">
-                        Material Total: ${calculateScopeMaterialTotal(scope).toFixed(2)}
-                      </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleDeleteMaterial(material.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+
+                      {selectedScopeId === scope.id && (
+                        <TableRow>
+                          <TableCell>
+                            <Input
+                              placeholder="Material description"
+                              value={materialForm.description}
+                              onChange={(e) =>
+                                setMaterialForm({
+                                  ...materialForm,
+                                  description: e.target.value
+                                })
+                              }
+                            />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={materialForm.quantity}
+                              onChange={(e) =>
+                                setMaterialForm({
+                                  ...materialForm,
+                                  quantity: e.target.value
+                                })
+                              }
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Select
+                              value={materialForm.unit}
+                              onValueChange={(value) =>
+                                setMaterialForm({
+                                  ...materialForm,
+                                  unit: value
+                                })
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select unit" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {["cu.m", "kg", "pc"].map((unit) => (
+                                  <SelectItem key={unit} value={unit}>
+                                    {unit}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={materialForm.unit_cost}
+                              onChange={(e) =>
+                                setMaterialForm({
+                                  ...materialForm,
+                                  unit_cost: e.target.value
+                                })
+                              }
+                            />
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">
+                            {(() => {
+                              const quantity = parseFloat(materialForm.quantity || "0");
+                              const unitCost = parseFloat(materialForm.unit_cost || "0");
+                              const amount = quantity * unitCost;
+                              return `$${amount.toFixed(2)}`;
+                            })()}
+                          </TableCell>
+                          <TableCell className="space-x-1 text-right">
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              onClick={handleMaterialSubmitInline}
+                            >
+                              <Check className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                resetMaterialForm();
+                                setSelectedScopeId("");
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                  <div className="flex justify-end pt-2 border-t mt-2">
+                    <div className="text-lg font-semibold">
+                      Material Total: ${calculateScopeMaterialTotal(scope).toFixed(2)}
                     </div>
                   </div>
                 </div>
