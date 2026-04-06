@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -359,6 +359,56 @@ export type Database = {
           },
         ]
       }
+      deliveries: {
+        Row: {
+          created_at: string | null
+          delivery_date: string
+          id: string
+          items: string
+          notes: string | null
+          project_id: string
+          quantity: number | null
+          received_by: string | null
+          status: string | null
+          supplier: string
+          unit: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          delivery_date: string
+          id?: string
+          items: string
+          notes?: string | null
+          project_id: string
+          quantity?: number | null
+          received_by?: string | null
+          status?: string | null
+          supplier: string
+          unit?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          delivery_date?: string
+          id?: string
+          items?: string
+          notes?: string | null
+          project_id?: string
+          quantity?: number | null
+          received_by?: string | null
+          status?: string | null
+          supplier?: string
+          unit?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deliveries_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory: {
         Row: {
           category: string
@@ -598,6 +648,60 @@ export type Database = {
         }
         Relationships: []
       }
+      progress_updates: {
+        Row: {
+          created_at: string | null
+          hours_spent: number | null
+          id: string
+          issues: string | null
+          photos: string[] | null
+          progress_percentage: number | null
+          project_id: string
+          scope_id: string
+          update_date: string
+          work_completed: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          hours_spent?: number | null
+          id?: string
+          issues?: string | null
+          photos?: string[] | null
+          progress_percentage?: number | null
+          project_id: string
+          scope_id: string
+          update_date: string
+          work_completed?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          hours_spent?: number | null
+          id?: string
+          issues?: string | null
+          photos?: string[] | null
+          progress_percentage?: number | null
+          project_id?: string
+          scope_id?: string
+          update_date?: string
+          work_completed?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "progress_updates_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "progress_updates_scope_id_fkey"
+            columns: ["scope_id"]
+            isOneToOne: false
+            referencedRelation: "scope_of_works"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           budget: number
@@ -642,6 +746,104 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      scope_of_works: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          estimated_cost: number | null
+          estimated_hours: number | null
+          id: string
+          project_id: string
+          scope_name: string
+          start_date: string | null
+          status: string | null
+          target_end_date: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          estimated_cost?: number | null
+          estimated_hours?: number | null
+          id?: string
+          project_id: string
+          scope_name: string
+          start_date?: string | null
+          status?: string | null
+          target_end_date?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          estimated_cost?: number | null
+          estimated_hours?: number | null
+          id?: string
+          project_id?: string
+          scope_name?: string
+          start_date?: string | null
+          status?: string | null
+          target_end_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scope_of_works_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_attendance: {
+        Row: {
+          created_at: string | null
+          date: string
+          hours_worked: number | null
+          id: string
+          notes: string | null
+          personnel_id: string
+          project_id: string
+          time_in: string | null
+          time_out: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          hours_worked?: number | null
+          id?: string
+          notes?: string | null
+          personnel_id: string
+          project_id: string
+          time_in?: string | null
+          time_out?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          hours_worked?: number | null
+          id?: string
+          notes?: string | null
+          personnel_id?: string
+          project_id?: string
+          time_in?: string | null
+          time_out?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_attendance_personnel_id_fkey"
+            columns: ["personnel_id"]
+            isOneToOne: false
+            referencedRelation: "personnel"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_attendance_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscriptions: {
         Row: {
