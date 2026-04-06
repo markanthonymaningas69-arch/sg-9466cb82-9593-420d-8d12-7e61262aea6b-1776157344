@@ -14,12 +14,12 @@ export const bomService = {
       .from("bill_of_materials")
       .select(`
         *,
-        bom_scope_of_work (
+        bom_scope_of_work!bom_scope_of_work_bom_id_fkey (
           *,
-          bom_materials (*),
-          bom_labor (*)
+          bom_materials!bom_materials_scope_id_fkey (*),
+          bom_labor!bom_labor_scope_id_fkey (*)
         ),
-        bom_indirect_costs (*)
+        bom_indirect_costs!bom_indirect_costs_bom_id_fkey (*)
       `)
       .eq("project_id", projectId)
       .single();
