@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -15,6 +15,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      attendance: {
+        Row: {
+          check_in: string | null
+          check_out: string | null
+          created_at: string | null
+          date: string
+          hours_worked: number | null
+          id: string
+          notes: string | null
+          overtime_hours: number | null
+          personnel_id: string
+          status: string
+        }
+        Insert: {
+          check_in?: string | null
+          check_out?: string | null
+          created_at?: string | null
+          date: string
+          hours_worked?: number | null
+          id?: string
+          notes?: string | null
+          overtime_hours?: number | null
+          personnel_id: string
+          status: string
+        }
+        Update: {
+          check_in?: string | null
+          check_out?: string | null
+          created_at?: string | null
+          date?: string
+          hours_worked?: number | null
+          id?: string
+          notes?: string | null
+          overtime_hours?: number | null
+          personnel_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_personnel_id_fkey"
+            columns: ["personnel_id"]
+            isOneToOne: false
+            referencedRelation: "personnel"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bill_of_materials: {
         Row: {
           bom_number: string
@@ -265,6 +312,53 @@ export type Database = {
           },
         ]
       }
+      certifications: {
+        Row: {
+          certificate_number: string | null
+          certification_name: string
+          created_at: string | null
+          document_url: string | null
+          expiry_date: string | null
+          id: string
+          issue_date: string | null
+          issuing_organization: string | null
+          personnel_id: string
+          status: string
+        }
+        Insert: {
+          certificate_number?: string | null
+          certification_name: string
+          created_at?: string | null
+          document_url?: string | null
+          expiry_date?: string | null
+          id?: string
+          issue_date?: string | null
+          issuing_organization?: string | null
+          personnel_id: string
+          status?: string
+        }
+        Update: {
+          certificate_number?: string | null
+          certification_name?: string
+          created_at?: string | null
+          document_url?: string | null
+          expiry_date?: string | null
+          id?: string
+          issue_date?: string | null
+          issuing_organization?: string | null
+          personnel_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "certifications_personnel_id_fkey"
+            columns: ["personnel_id"]
+            isOneToOne: false
+            referencedRelation: "personnel"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory: {
         Row: {
           category: string
@@ -311,6 +405,121 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leave_requests: {
+        Row: {
+          approved_by: string | null
+          approved_date: string | null
+          created_at: string | null
+          days_requested: number
+          end_date: string
+          id: string
+          leave_type: string
+          notes: string | null
+          personnel_id: string
+          reason: string | null
+          start_date: string
+          status: string
+        }
+        Insert: {
+          approved_by?: string | null
+          approved_date?: string | null
+          created_at?: string | null
+          days_requested: number
+          end_date: string
+          id?: string
+          leave_type: string
+          notes?: string | null
+          personnel_id: string
+          reason?: string | null
+          start_date: string
+          status?: string
+        }
+        Update: {
+          approved_by?: string | null
+          approved_date?: string | null
+          created_at?: string | null
+          days_requested?: number
+          end_date?: string
+          id?: string
+          leave_type?: string
+          notes?: string | null
+          personnel_id?: string
+          reason?: string | null
+          start_date?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_requests_personnel_id_fkey"
+            columns: ["personnel_id"]
+            isOneToOne: false
+            referencedRelation: "personnel"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll: {
+        Row: {
+          created_at: string | null
+          deductions: number | null
+          gross_pay: number
+          hourly_rate: number
+          id: string
+          net_pay: number
+          notes: string | null
+          overtime_hours: number | null
+          pay_period_end: string
+          pay_period_start: string
+          payment_date: string | null
+          payment_method: string | null
+          personnel_id: string
+          regular_hours: number | null
+          status: string
+        }
+        Insert: {
+          created_at?: string | null
+          deductions?: number | null
+          gross_pay: number
+          hourly_rate: number
+          id?: string
+          net_pay: number
+          notes?: string | null
+          overtime_hours?: number | null
+          pay_period_end: string
+          pay_period_start: string
+          payment_date?: string | null
+          payment_method?: string | null
+          personnel_id: string
+          regular_hours?: number | null
+          status?: string
+        }
+        Update: {
+          created_at?: string | null
+          deductions?: number | null
+          gross_pay?: number
+          hourly_rate?: number
+          id?: string
+          net_pay?: number
+          notes?: string | null
+          overtime_hours?: number | null
+          pay_period_end?: string
+          pay_period_start?: string
+          payment_date?: string | null
+          payment_method?: string | null
+          personnel_id?: string
+          regular_hours?: number | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_personnel_id_fkey"
+            columns: ["personnel_id"]
+            isOneToOne: false
+            referencedRelation: "personnel"
             referencedColumns: ["id"]
           },
         ]
@@ -474,6 +683,59 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_records: {
+        Row: {
+          certificate_issued: boolean | null
+          completion_status: string
+          created_at: string | null
+          duration_hours: number | null
+          id: string
+          notes: string | null
+          personnel_id: string
+          score: number | null
+          trainer: string | null
+          training_date: string
+          training_title: string
+          training_type: string | null
+        }
+        Insert: {
+          certificate_issued?: boolean | null
+          completion_status?: string
+          created_at?: string | null
+          duration_hours?: number | null
+          id?: string
+          notes?: string | null
+          personnel_id: string
+          score?: number | null
+          trainer?: string | null
+          training_date: string
+          training_title: string
+          training_type?: string | null
+        }
+        Update: {
+          certificate_issued?: boolean | null
+          completion_status?: string
+          created_at?: string | null
+          duration_hours?: number | null
+          id?: string
+          notes?: string | null
+          personnel_id?: string
+          score?: number | null
+          trainer?: string | null
+          training_date?: string
+          training_title?: string
+          training_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_records_personnel_id_fkey"
+            columns: ["personnel_id"]
+            isOneToOne: false
+            referencedRelation: "personnel"
             referencedColumns: ["id"]
           },
         ]
