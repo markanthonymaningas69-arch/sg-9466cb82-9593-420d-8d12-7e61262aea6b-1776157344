@@ -11,7 +11,8 @@ import {
   Settings, 
   CreditCard,
   Menu,
-  X
+  X,
+  ClipboardList
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
