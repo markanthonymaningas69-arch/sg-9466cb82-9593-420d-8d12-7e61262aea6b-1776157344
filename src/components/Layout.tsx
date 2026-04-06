@@ -59,9 +59,12 @@ export function Layout({ children }: LayoutProps) {
               <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
                 TX
               </div>
-              <h1 className="text-lg font-heading font-bold text-primary">
-                Thea-X
-              </h1>
+              <div>
+                <h1 className="text-lg font-heading font-bold text-primary leading-tight">
+                  Thea-X
+                </h1>
+                <p className="text-xs text-muted-foreground">Construction Accounting System</p>
+              </div>
             </div>
             <Button
               variant="ghost"
