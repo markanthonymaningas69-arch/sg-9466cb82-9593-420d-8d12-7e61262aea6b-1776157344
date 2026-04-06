@@ -41,9 +41,7 @@ export default function BillOfMaterials() {
   // Form states
   const [scopeForm, setScopeForm] = useState({
     name: "",
-    description: "",
-    quantity: "",
-    unit: ""
+    description: ""
   });
   
   const [materialForm, setMaterialForm] = useState({
@@ -92,6 +90,8 @@ export default function BillOfMaterials() {
       // Create new BOM
       const { data: newBom } = await bomService.create({
         project_id: projectId,
+        bom_number: `BOM-${projectId.substring(0, 6).toUpperCase()}`,
+        title: `${projectData?.name || 'Project'} BOM`,
         total_direct_cost: 0,
         total_indirect_cost: 0,
         grand_total: 0
@@ -105,13 +105,14 @@ export default function BillOfMaterials() {
       // Load indirect costs into form
       if (bomData.bom_indirect_costs && bomData.bom_indirect_costs.length > 0) {
         const indirect = bomData.bom_indirect_costs[0];
+        const otherCosts: any = indirect.other_costs || { amount: 0, description: "" };
         setIndirectForm({
-          vat: indirect.vat?.toString() || "",
-          tax: indirect.tax?.toString() || "",
-          ocm: indirect.ocm?.toString() || "",
-          profit: indirect.profit?.toString() || "",
-          others_amount: indirect.others_amount?.toString() || "",
-          others_description: indirect.others_description || ""
+          vat: indirect.vat_percentage?.toString() || "",
+          tax: indirect.tax_percentage?.toString() || "",
+          ocm: indirect.ocm_percentage?.toString() || "",
+          profit: indirect.profit_percentage?.toString() || "",
+          others_amount: otherCosts.amount?.toString() || "",
+          others_description: otherCosts.description || ""
         });
       }
     }
@@ -156,8 +157,7 @@ export default function BillOfMaterials() {
       bom_id: bom.id,
       name: scopeForm.name,
       description: scopeForm.description,
-      quantity: parseFloat(scopeForm.quantity),
-      unit: scopeForm.unit
+      order_number: scopes.length + 1
     };
     
     if (editingScope) {
@@ -179,7 +179,7 @@ export default function BillOfMaterials() {
   };
 
   const resetScopeForm = () => {
-    setScopeForm({ name: "", description: "", quantity: "", unit: "" });
+    setScopeForm({ name: "", description: "" });
     setEditingScope(null);
   };
 
@@ -190,7 +190,7 @@ export default function BillOfMaterials() {
     
     const materialData = {
       scope_id: selectedScopeId,
-      name: materialForm.name,
+      material_name: materialForm.name,
       description: materialForm.description,
       quantity: parseFloat(materialForm.quantity),
       unit: materialForm.unit,
@@ -222,10 +222,10 @@ export default function BillOfMaterials() {
     
     const laborData = {
       scope_id: selectedScopeId,
-      role: laborForm.role,
+      labor_type: laborForm.role,
       description: laborForm.description,
       hours: parseFloat(laborForm.hours),
-      rate: parseFloat(laborForm.rate),
+      hourly_rate: parseFloat(laborForm.rate),
       total_cost: parseFloat(laborForm.hours) * parseFloat(laborForm.rate)
     };
     
@@ -252,13 +252,15 @@ export default function BillOfMaterials() {
     
     const indirectData = {
       bom_id: bom.id,
-      vat: parseFloat(indirectForm.vat || "0"),
-      tax: parseFloat(indirectForm.tax || "0"),
-      ocm: parseFloat(indirectForm.ocm || "0"),
-      profit: parseFloat(indirectForm.profit || "0"),
-      others_amount: parseFloat(indirectForm.others_amount || "0"),
-      others_description: indirectForm.others_description,
-      total: calculateIndirectCost()
+      vat_percentage: parseFloat(indirectForm.vat || "0"),
+      tax_percentage: parseFloat(indirectForm.tax || "0"),
+      ocm_percentage: parseFloat(indirectForm.ocm || "0"),
+      profit_percentage: parseFloat(indirectForm.profit || "0"),
+      other_costs: {
+        amount: parseFloat(indirectForm.others_amount || "0"),
+        description: indirectForm.others_description
+      },
+      total_indirect: calculateIndirectCost()
     };
     
     if (indirectCosts.length > 0) {
@@ -364,25 +366,6 @@ export default function BillOfMaterials() {
                         onChange={(e) => setScopeForm({ ...scopeForm, description: e.target.value })}
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Quantity</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={scopeForm.quantity}
-                          onChange={(e) => setScopeForm({ ...scopeForm, quantity: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Unit</Label>
-                        <Input
-                          value={scopeForm.unit}
-                          onChange={(e) => setScopeForm({ ...scopeForm, unit: e.target.value })}
-                          placeholder="sq.m, pcs, lot"
-                        />
-                      </div>
-                    </div>
                     <div className="flex justify-end gap-2">
                       <Button type="button" variant="outline" onClick={() => setScopeDialogOpen(false)}>
                         Cancel
@@ -401,7 +384,6 @@ export default function BillOfMaterials() {
                     <div>
                       <CardTitle>{scope.name}</CardTitle>
                       {scope.description && <p className="text-sm text-muted-foreground mt-1">{scope.description}</p>}
-                      {scope.quantity && <p className="text-sm mt-1">{scope.quantity} {scope.unit}</p>}
                     </div>
                     <Button size="icon" variant="ghost" onClick={() => handleDeleteScope(scope.id)}>
                       <Trash2 className="h-4 w-4" />
@@ -493,7 +475,7 @@ export default function BillOfMaterials() {
                       <TableBody>
                         {(scope.bom_materials || []).map((material: Material) => (
                           <TableRow key={material.id}>
-                            <TableCell>{material.name}</TableCell>
+                            <TableCell>{material.material_name}</TableCell>
                             <TableCell>{material.description}</TableCell>
                             <TableCell>{material.quantity} {material.unit}</TableCell>
                             <TableCell>${material.unit_cost?.toFixed(2)}</TableCell>
@@ -587,10 +569,10 @@ export default function BillOfMaterials() {
                       <TableBody>
                         {(scope.bom_labor || []).map((labor: Labor) => (
                           <TableRow key={labor.id}>
-                            <TableCell>{labor.role}</TableCell>
+                            <TableCell>{labor.labor_type}</TableCell>
                             <TableCell>{labor.description}</TableCell>
                             <TableCell>{labor.hours} hrs</TableCell>
-                            <TableCell>${labor.rate?.toFixed(2)}/hr</TableCell>
+                            <TableCell>${labor.hourly_rate?.toFixed(2)}/hr</TableCell>
                             <TableCell>${labor.total_cost?.toFixed(2)}</TableCell>
                             <TableCell>
                               <Button size="icon" variant="ghost" onClick={() => handleDeleteLabor(labor.id)}>
