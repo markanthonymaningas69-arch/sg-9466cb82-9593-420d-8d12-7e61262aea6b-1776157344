@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { bomService } from "@/services/bomService";
 import { projectService } from "@/services/projectService";
-import { Plus, Pencil, Trash2, Save, ArrowLeft } from "lucide-react";
+import { Plus, Pencil, Trash2, Save, ArrowLeft, Check, X } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
 type BOM = Database["public"]["Tables"]["bill_of_materials"]["Row"];
@@ -33,27 +33,17 @@ export default function BillOfMaterials() {
   const [showIndirectCosts, setShowIndirectCosts] = useState(false);
   const [saving, setSaving] = useState(false);
   
+  // Inline scope creation
+  const [showScopeInput, setShowScopeInput] = useState(false);
+  const [newScopeName, setNewScopeName] = useState("");
+  
   // Dialog states
-  const [scopeDialogOpen, setScopeDialogOpen] = useState(false);
   const [materialDialogOpen, setMaterialDialogOpen] = useState(false);
   const [laborDialogOpen, setLaborDialogOpen] = useState(false);
-  const [editingScope, setEditingScope] = useState<ScopeOfWork | null>(null);
   const [selectedScopeId, setSelectedScopeId] = useState<string>("");
   const [editingLabor, setEditingLabor] = useState<Labor | null>(null);
   
-  // BOM Header form
-  const [bomForm, setBomForm] = useState({
-    bom_number: "",
-    title: "",
-    revision: "1.0"
-  });
-  
   // Form states
-  const [scopeForm, setScopeForm] = useState({
-    name: "",
-    description: ""
-  });
-  
   const [materialForm, setMaterialForm] = useState({
     name: "",
     description: "",
@@ -104,20 +94,8 @@ export default function BillOfMaterials() {
         grand_total: 0
       });
       setBom(newBom);
-      if (newBom) {
-        setBomForm({
-          bom_number: newBom.bom_number,
-          title: newBom.title || "",
-          revision: newBom.revision || "1.0"
-        });
-      }
     } else if (bomData) {
       setBom(bomData);
-      setBomForm({
-        bom_number: bomData.bom_number,
-        title: bomData.title || "",
-        revision: bomData.revision || "1.0"
-      });
       setScopes(bomData.bom_scope_of_work || []);
       setIndirectCosts(bomData.bom_indirect_costs || []);
       setShowIndirectCosts((bomData.bom_indirect_costs || []).length > 0);
@@ -176,27 +154,30 @@ export default function BillOfMaterials() {
     return calculateTotalDirectCost() + calculateIndirectCost();
   };
 
-  // Scope operations
-  const handleScopeSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!bom) return;
+  // Inline scope creation
+  const handleAddScopeClick = () => {
+    setShowScopeInput(true);
+    setNewScopeName("");
+  };
+
+  const handleSaveScopeInline = async () => {
+    if (!bom || !newScopeName.trim()) return;
     
-    const scopeData = {
+    await bomService.createScope({
       bom_id: bom.id,
-      name: scopeForm.name,
-      description: scopeForm.description,
+      name: newScopeName.trim(),
+      description: "",
       order_number: scopes.length + 1
-    };
+    });
     
-    if (editingScope) {
-      await bomService.updateScope(editingScope.id, scopeData);
-    } else {
-      await bomService.createScope(scopeData);
-    }
-    
-    setScopeDialogOpen(false);
-    resetScopeForm();
+    setShowScopeInput(false);
+    setNewScopeName("");
     loadData();
+  };
+
+  const handleCancelScopeInline = () => {
+    setShowScopeInput(false);
+    setNewScopeName("");
   };
 
   const handleDeleteScope = async (id: string) => {
@@ -204,11 +185,6 @@ export default function BillOfMaterials() {
       await bomService.deleteScope(id);
       loadData();
     }
-  };
-
-  const resetScopeForm = () => {
-    setScopeForm({ name: "", description: "" });
-    setEditingScope(null);
   };
 
   // Material operations
@@ -348,11 +324,8 @@ export default function BillOfMaterials() {
     
     setSaving(true);
     
-    // Update BOM header
+    // Update BOM totals
     await bomService.update(bom.id, {
-      bom_number: bomForm.bom_number,
-      title: bomForm.title,
-      revision: bomForm.revision,
       total_direct_cost: calculateTotalDirectCost(),
       total_indirect_cost: calculateIndirectCost(),
       grand_total: calculateGrandTotal()
@@ -407,169 +380,123 @@ export default function BillOfMaterials() {
           </div>
         </div>
 
-        {/* BOM Header Form */}
-        <Card>
-          <CardHeader>
-            <CardTitle>BOM Information</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>BOM Number *</Label>
+        {/* Add Scope Button or Inline Input */}
+        {!showScopeInput ? (
+          <div className="flex justify-end">
+            <Button onClick={handleAddScopeClick}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Scope of Work
+            </Button>
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2">
                 <Input
-                  value={bomForm.bom_number}
-                  onChange={(e) => setBomForm({ ...bomForm, bom_number: e.target.value })}
-                  placeholder="BOM-001"
+                  placeholder="Enter scope of work name..."
+                  value={newScopeName}
+                  onChange={(e) => setNewScopeName(e.target.value)}
+                  onKeyPress={(e) => e.key === "Enter" && handleSaveScopeInline()}
+                  autoFocus
+                  className="flex-1"
                 />
+                <Button size="icon" onClick={handleSaveScopeInline} disabled={!newScopeName.trim()}>
+                  <Check className="h-4 w-4" />
+                </Button>
+                <Button size="icon" variant="outline" onClick={handleCancelScopeInline}>
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
-              <div className="space-y-2">
-                <Label>Title *</Label>
-                <Input
-                  value={bomForm.title}
-                  onChange={(e) => setBomForm({ ...bomForm, title: e.target.value })}
-                  placeholder="Project BOM Title"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Revision</Label>
-                <Input
-                  value={bomForm.revision}
-                  onChange={(e) => setBomForm({ ...bomForm, revision: e.target.value })}
-                  placeholder="1.0"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Add Scope Button */}
-        <div className="flex justify-end">
-          <Dialog open={scopeDialogOpen} onOpenChange={setScopeDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={resetScopeForm}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Scope of Work
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{editingScope ? "Edit Scope" : "Add Scope of Work"}</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleScopeSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Name *</Label>
-                  <Input
-                    value={scopeForm.name}
-                    onChange={(e) => setScopeForm({ ...scopeForm, name: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Description</Label>
-                  <Input
-                    value={scopeForm.description}
-                    onChange={(e) => setScopeForm({ ...scopeForm, description: e.target.value })}
-                  />
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setScopeDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit">Save</Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Scopes List */}
         {scopes.map((scope) => (
           <Card key={scope.id}>
             <CardHeader>
               <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle>{scope.name}</CardTitle>
-                  {scope.description && <p className="text-sm text-muted-foreground mt-1">{scope.description}</p>}
-                </div>
+                <CardTitle className="text-xl">{scope.name}</CardTitle>
                 <Button size="icon" variant="ghost" onClick={() => handleDeleteScope(scope.id)}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Materials Section */}
-              <div>
-                <div className="flex justify-between items-center mb-3">
-                  <h3 className="font-semibold text-lg">Materials</h3>
-                  <Dialog open={materialDialogOpen && selectedScopeId === scope.id} onOpenChange={setMaterialDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button size="sm" onClick={() => { setSelectedScopeId(scope.id); resetMaterialForm(); }}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Material
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Add Material</DialogTitle>
-                      </DialogHeader>
-                      <form onSubmit={handleMaterialSubmit} className="space-y-4">
+              {/* Add Materials Button */}
+              <div className="flex justify-center">
+                <Dialog open={materialDialogOpen && selectedScopeId === scope.id} onOpenChange={setMaterialDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="lg" onClick={() => { setSelectedScopeId(scope.id); resetMaterialForm(); }}>
+                      <Plus className="h-5 w-5 mr-2" />
+                      Add Materials
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add Material</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleMaterialSubmit} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Material Name *</Label>
+                        <Input
+                          value={materialForm.name}
+                          onChange={(e) => setMaterialForm({ ...materialForm, name: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Description</Label>
+                        <Input
+                          value={materialForm.description}
+                          onChange={(e) => setMaterialForm({ ...materialForm, description: e.target.value })}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label>Material Name *</Label>
-                          <Input
-                            value={materialForm.name}
-                            onChange={(e) => setMaterialForm({ ...materialForm, name: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Description</Label>
-                          <Input
-                            value={materialForm.description}
-                            onChange={(e) => setMaterialForm({ ...materialForm, description: e.target.value })}
-                          />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Quantity *</Label>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              value={materialForm.quantity}
-                              onChange={(e) => setMaterialForm({ ...materialForm, quantity: e.target.value })}
-                              required
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Unit</Label>
-                            <Input
-                              value={materialForm.unit}
-                              onChange={(e) => setMaterialForm({ ...materialForm, unit: e.target.value })}
-                              placeholder="pcs, kg, m³"
-                            />
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Unit Cost *</Label>
+                          <Label>Quantity *</Label>
                           <Input
                             type="number"
                             step="0.01"
-                            value={materialForm.unit_cost}
-                            onChange={(e) => setMaterialForm({ ...materialForm, unit_cost: e.target.value })}
+                            value={materialForm.quantity}
+                            onChange={(e) => setMaterialForm({ ...materialForm, quantity: e.target.value })}
                             required
                           />
                         </div>
-                        <div className="flex justify-end gap-2">
-                          <Button type="button" variant="outline" onClick={() => setMaterialDialogOpen(false)}>
-                            Cancel
-                          </Button>
-                          <Button type="submit">Add Material</Button>
+                        <div className="space-y-2">
+                          <Label>Unit</Label>
+                          <Input
+                            value={materialForm.unit}
+                            onChange={(e) => setMaterialForm({ ...materialForm, unit: e.target.value })}
+                            placeholder="pcs, kg, m³"
+                          />
                         </div>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-                
-                {(scope.bom_materials || []).length > 0 ? (
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Unit Cost *</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={materialForm.unit_cost}
+                          onChange={(e) => setMaterialForm({ ...materialForm, unit_cost: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button type="button" variant="outline" onClick={() => setMaterialDialogOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button type="submit">Add Material</Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              {/* Materials Section */}
+              {(scope.bom_materials || []).length > 0 && (
+                <div>
+                  <h3 className="font-semibold text-lg mb-3">Materials</h3>
                   <div className="space-y-2">
                     {(scope.bom_materials || []).map((material: Material) => (
                       <div key={material.id} className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
@@ -596,171 +523,173 @@ export default function BillOfMaterials() {
                       </div>
                     </div>
                   </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground py-4">No materials added yet</p>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Labor Section */}
-              <div>
-                <div className="flex justify-between items-center mb-3">
-                  <h3 className="font-semibold text-lg">Labor Cost</h3>
-                  <Dialog open={laborDialogOpen && selectedScopeId === scope.id} onOpenChange={setLaborDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button size="sm" variant="outline" onClick={() => { setSelectedScopeId(scope.id); resetLaborForm(); }}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Labor Cost
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>{editingLabor ? "Edit Labor Cost" : "Add Labor Cost"}</DialogTitle>
-                      </DialogHeader>
-                      <form onSubmit={handleLaborSubmit} className="space-y-4">
-                        <div className="space-y-2">
-                          <Label>Calculation Method *</Label>
-                          <Select
-                            value={laborForm.calculation_method}
-                            onValueChange={(value: "percentage" | "unit_cost") => 
-                              setLaborForm({ ...laborForm, calculation_method: value })
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="percentage">By Percentage of Materials</SelectItem>
-                              <SelectItem value="unit_cost">By Unit Cost</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+              {(scope.bom_materials || []).length > 0 && (
+                <div>
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="font-semibold text-lg">Labor Cost</h3>
+                    <Dialog open={laborDialogOpen && selectedScopeId === scope.id} onOpenChange={setLaborDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm" variant="outline" onClick={() => { setSelectedScopeId(scope.id); resetLaborForm(); }}>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Labor Cost
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>{editingLabor ? "Edit Labor Cost" : "Add Labor Cost"}</DialogTitle>
+                        </DialogHeader>
+                        <form onSubmit={handleLaborSubmit} className="space-y-4">
+                          <div className="space-y-2">
+                            <Label>Calculation Method *</Label>
+                            <Select
+                              value={laborForm.calculation_method}
+                              onValueChange={(value: "percentage" | "unit_cost") => 
+                                setLaborForm({ ...laborForm, calculation_method: value })
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="percentage">By Percentage of Materials</SelectItem>
+                                <SelectItem value="unit_cost">By Unit Cost</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
 
-                        {laborForm.calculation_method === "percentage" ? (
-                          <>
-                            <div className="space-y-2">
-                              <Label>Percentage of Material Cost *</Label>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                value={laborForm.percentage}
-                                onChange={(e) => setLaborForm({ ...laborForm, percentage: e.target.value })}
-                                placeholder="e.g., 35 for 35%"
-                                required
-                              />
-                              <p className="text-sm text-muted-foreground">
-                                Material Total: ${calculateScopeMaterialTotal(scope).toFixed(2)}
-                              </p>
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Description</Label>
-                              <Input
-                                value={laborForm.description}
-                                onChange={(e) => setLaborForm({ ...laborForm, description: e.target.value })}
-                                placeholder="Labor description"
-                              />
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div className="space-y-2">
-                              <Label>Role/Type *</Label>
-                              <Input
-                                value={laborForm.role}
-                                onChange={(e) => setLaborForm({ ...laborForm, role: e.target.value })}
-                                placeholder="Carpenter, Mason, etc."
-                                required
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Description</Label>
-                              <Input
-                                value={laborForm.description}
-                                onChange={(e) => setLaborForm({ ...laborForm, description: e.target.value })}
-                              />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
+                          {laborForm.calculation_method === "percentage" ? (
+                            <>
                               <div className="space-y-2">
-                                <Label>Hours *</Label>
+                                <Label>Percentage of Material Cost *</Label>
                                 <Input
                                   type="number"
                                   step="0.01"
-                                  value={laborForm.hours}
-                                  onChange={(e) => setLaborForm({ ...laborForm, hours: e.target.value })}
+                                  value={laborForm.percentage}
+                                  onChange={(e) => setLaborForm({ ...laborForm, percentage: e.target.value })}
+                                  placeholder="e.g., 35 for 35%"
+                                  required
+                                />
+                                <p className="text-sm text-muted-foreground">
+                                  Material Total: ${calculateScopeMaterialTotal(scope).toFixed(2)}
+                                </p>
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Description</Label>
+                                <Input
+                                  value={laborForm.description}
+                                  onChange={(e) => setLaborForm({ ...laborForm, description: e.target.value })}
+                                  placeholder="Labor description"
+                                />
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="space-y-2">
+                                <Label>Role/Type *</Label>
+                                <Input
+                                  value={laborForm.role}
+                                  onChange={(e) => setLaborForm({ ...laborForm, role: e.target.value })}
+                                  placeholder="Carpenter, Mason, etc."
                                   required
                                 />
                               </div>
                               <div className="space-y-2">
-                                <Label>Rate ($/hr) *</Label>
+                                <Label>Description</Label>
                                 <Input
-                                  type="number"
-                                  step="0.01"
-                                  value={laborForm.rate}
-                                  onChange={(e) => setLaborForm({ ...laborForm, rate: e.target.value })}
-                                  required
+                                  value={laborForm.description}
+                                  onChange={(e) => setLaborForm({ ...laborForm, description: e.target.value })}
                                 />
                               </div>
-                            </div>
-                          </>
-                        )}
-
-                        <div className="flex justify-end gap-2">
-                          <Button type="button" variant="outline" onClick={() => { setLaborDialogOpen(false); resetLaborForm(); }}>
-                            Cancel
-                          </Button>
-                          <Button type="submit">{editingLabor ? "Update" : "Add"} Labor Cost</Button>
-                        </div>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-
-                {(scope.bom_labor || []).length > 0 ? (
-                  <div className="space-y-2">
-                    {(scope.bom_labor || []).map((labor: Labor) => (
-                      <div key={labor.id} className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
-                        <div className="flex-1">
-                          <div className="font-medium">{labor.labor_type}</div>
-                          {labor.description && <div className="text-sm text-muted-foreground">{labor.description}</div>}
-                          {labor.hours && labor.hourly_rate && (
-                            <div className="text-sm text-muted-foreground mt-1">
-                              {labor.hours} hrs × ${labor.hourly_rate?.toFixed(2)}/hr
-                            </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label>Hours *</Label>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    value={laborForm.hours}
+                                    onChange={(e) => setLaborForm({ ...laborForm, hours: e.target.value })}
+                                    required
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Rate ($/hr) *</Label>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    value={laborForm.rate}
+                                    onChange={(e) => setLaborForm({ ...laborForm, rate: e.target.value })}
+                                    required
+                                  />
+                                </div>
+                              </div>
+                            </>
                           )}
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right font-semibold">
-                            ${labor.total_cost?.toFixed(2)}
-                          </div>
-                          <div className="flex gap-1">
-                            <Button size="icon" variant="ghost" onClick={() => { setSelectedScopeId(scope.id); handleEditLabor(labor); }}>
-                              <Pencil className="h-4 w-4" />
+
+                          <div className="flex justify-end gap-2">
+                            <Button type="button" variant="outline" onClick={() => { setLaborDialogOpen(false); resetLaborForm(); }}>
+                              Cancel
                             </Button>
-                            <Button size="icon" variant="ghost" onClick={() => handleDeleteLabor(labor.id)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <Button type="submit">{editingLabor ? "Update" : "Add"} Labor Cost</Button>
+                          </div>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+
+                  {(scope.bom_labor || []).length > 0 ? (
+                    <div className="space-y-2">
+                      {(scope.bom_labor || []).map((labor: Labor) => (
+                        <div key={labor.id} className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
+                          <div className="flex-1">
+                            <div className="font-medium">{labor.labor_type}</div>
+                            {labor.description && <div className="text-sm text-muted-foreground">{labor.description}</div>}
+                            {labor.hours && labor.hourly_rate && (
+                              <div className="text-sm text-muted-foreground mt-1">
+                                {labor.hours} hrs × ${labor.hourly_rate?.toFixed(2)}/hr
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="text-right font-semibold">
+                              ${labor.total_cost?.toFixed(2)}
+                            </div>
+                            <div className="flex gap-1">
+                              <Button size="icon" variant="ghost" onClick={() => { setSelectedScopeId(scope.id); handleEditLabor(labor); }}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button size="icon" variant="ghost" onClick={() => handleDeleteLabor(labor.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                    <div className="flex justify-end pt-2 border-t">
-                      <div className="text-lg font-semibold">
-                        Labor Total: ${calculateScopeLaborTotal(scope).toFixed(2)}
+                      ))}
+                      <div className="flex justify-end pt-2 border-t">
+                        <div className="text-lg font-semibold">
+                          Labor Total: ${calculateScopeLaborTotal(scope).toFixed(2)}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground py-4">No labor costs added yet</p>
-                )}
-              </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground py-4">No labor costs added yet</p>
+                  )}
+                </div>
+              )}
 
               {/* Direct Cost Total */}
-              <div className="pt-4 border-t-2 border-primary">
-                <div className="flex justify-end">
-                  <div className="text-xl font-bold text-primary">
-                    Direct Cost: ${calculateScopeDirectCost(scope).toFixed(2)}
+              {(scope.bom_materials || []).length > 0 && (
+                <div className="pt-4 border-t-2 border-primary">
+                  <div className="flex justify-end">
+                    <div className="text-xl font-bold text-primary">
+                      Direct Cost: ${calculateScopeDirectCost(scope).toFixed(2)}
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         ))}
@@ -857,10 +786,6 @@ export default function BillOfMaterials() {
                   <span className="text-2xl font-bold">${calculateIndirectCost().toFixed(2)}</span>
                 </div>
               </div>
-              <Button onClick={handleSaveIndirectCosts} className="w-full">
-                <Save className="h-4 w-4 mr-2" />
-                Save Indirect Costs
-              </Button>
             </CardContent>
           </Card>
         )}
