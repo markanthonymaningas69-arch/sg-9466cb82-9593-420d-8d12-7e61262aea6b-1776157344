@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -15,6 +15,256 @@ export type Database = {
   }
   public: {
     Tables: {
+      bill_of_materials: {
+        Row: {
+          bom_number: string
+          created_at: string | null
+          description: string | null
+          grand_total: number | null
+          id: string
+          project_id: string
+          status: string
+          title: string
+          total_direct_cost: number | null
+          total_indirect_cost: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          bom_number: string
+          created_at?: string | null
+          description?: string | null
+          grand_total?: number | null
+          id?: string
+          project_id: string
+          status?: string
+          title: string
+          total_direct_cost?: number | null
+          total_indirect_cost?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          bom_number?: string
+          created_at?: string | null
+          description?: string | null
+          grand_total?: number | null
+          id?: string
+          project_id?: string
+          status?: string
+          title?: string
+          total_direct_cost?: number | null
+          total_indirect_cost?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bill_of_materials_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bom_indirect_costs: {
+        Row: {
+          bom_id: string
+          created_at: string | null
+          id: string
+          ocm_amount: number | null
+          ocm_percentage: number | null
+          other_costs: Json | null
+          profit_amount: number | null
+          profit_percentage: number | null
+          tax_amount: number | null
+          tax_percentage: number | null
+          total_indirect: number | null
+          updated_at: string | null
+          vat_amount: number | null
+          vat_percentage: number | null
+        }
+        Insert: {
+          bom_id: string
+          created_at?: string | null
+          id?: string
+          ocm_amount?: number | null
+          ocm_percentage?: number | null
+          other_costs?: Json | null
+          profit_amount?: number | null
+          profit_percentage?: number | null
+          tax_amount?: number | null
+          tax_percentage?: number | null
+          total_indirect?: number | null
+          updated_at?: string | null
+          vat_amount?: number | null
+          vat_percentage?: number | null
+        }
+        Update: {
+          bom_id?: string
+          created_at?: string | null
+          id?: string
+          ocm_amount?: number | null
+          ocm_percentage?: number | null
+          other_costs?: Json | null
+          profit_amount?: number | null
+          profit_percentage?: number | null
+          tax_amount?: number | null
+          tax_percentage?: number | null
+          total_indirect?: number | null
+          updated_at?: string | null
+          vat_amount?: number | null
+          vat_percentage?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bom_indirect_costs_bom_id_fkey"
+            columns: ["bom_id"]
+            isOneToOne: false
+            referencedRelation: "bill_of_materials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bom_labor: {
+        Row: {
+          created_at: string | null
+          crew_size: number | null
+          description: string | null
+          hourly_rate: number
+          hours: number
+          id: string
+          labor_type: string
+          notes: string | null
+          scope_id: string
+          total_cost: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          crew_size?: number | null
+          description?: string | null
+          hourly_rate: number
+          hours: number
+          id?: string
+          labor_type: string
+          notes?: string | null
+          scope_id: string
+          total_cost?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          crew_size?: number | null
+          description?: string | null
+          hourly_rate?: number
+          hours?: number
+          id?: string
+          labor_type?: string
+          notes?: string | null
+          scope_id?: string
+          total_cost?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bom_labor_scope_id_fkey"
+            columns: ["scope_id"]
+            isOneToOne: false
+            referencedRelation: "bom_scope_of_work"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bom_materials: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          material_name: string
+          notes: string | null
+          quantity: number
+          scope_id: string
+          supplier: string | null
+          total_cost: number | null
+          unit: string
+          unit_cost: number
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          material_name: string
+          notes?: string | null
+          quantity: number
+          scope_id: string
+          supplier?: string | null
+          total_cost?: number | null
+          unit: string
+          unit_cost: number
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          material_name?: string
+          notes?: string | null
+          quantity?: number
+          scope_id?: string
+          supplier?: string | null
+          total_cost?: number | null
+          unit?: string
+          unit_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bom_materials_scope_id_fkey"
+            columns: ["scope_id"]
+            isOneToOne: false
+            referencedRelation: "bom_scope_of_work"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bom_scope_of_work: {
+        Row: {
+          bom_id: string
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          order_number: number
+          subtotal: number | null
+          total_labor: number | null
+          total_materials: number | null
+        }
+        Insert: {
+          bom_id: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          order_number: number
+          subtotal?: number | null
+          total_labor?: number | null
+          total_materials?: number | null
+        }
+        Update: {
+          bom_id?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          order_number?: number
+          subtotal?: number | null
+          total_labor?: number | null
+          total_materials?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bom_scope_of_work_bom_id_fkey"
+            columns: ["bom_id"]
+            isOneToOne: false
+            referencedRelation: "bill_of_materials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory: {
         Row: {
           category: string
