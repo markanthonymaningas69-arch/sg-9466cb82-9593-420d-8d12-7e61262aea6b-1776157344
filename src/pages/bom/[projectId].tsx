@@ -161,15 +161,32 @@ export default function BillOfMaterials() {
   };
 
   const handleSaveScopeInline = async () => {
-    if (!bom || !newScopeName.trim()) return;
+    if (!bom || !newScopeName.trim()) {
+      console.log("Cannot save scope:", { bom, newScopeName });
+      return;
+    }
     
-    await bomService.createScope({
+    console.log("Creating scope with:", {
       bom_id: bom.id,
       name: newScopeName.trim(),
       description: "",
       order_number: scopes.length + 1
     });
     
+    const { data, error } = await bomService.createScope({
+      bom_id: bom.id,
+      name: newScopeName.trim(),
+      description: "",
+      order_number: scopes.length + 1
+    });
+    
+    if (error) {
+      console.error("Error creating scope:", error);
+      alert("Error creating scope: " + error.message);
+      return;
+    }
+    
+    console.log("Scope created successfully:", data);
     setShowScopeInput(false);
     setNewScopeName("");
     loadData();
