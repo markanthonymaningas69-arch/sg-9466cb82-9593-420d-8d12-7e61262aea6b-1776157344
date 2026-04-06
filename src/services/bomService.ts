@@ -14,15 +14,40 @@ export const bomService = {
       .from("bill_of_materials")
       .select(`
         *,
-        bom_scope_of_work!bom_scope_of_work_bom_id_fkey (
-          *,
-          bom_materials!bom_materials_scope_id_fkey (*),
-          bom_labor!bom_labor_scope_id_fkey (*)
-        ),
-        bom_indirect_costs!bom_indirect_costs_bom_id_fkey (*)
+        bom_scope_of_work(*),
+        bom_indirect_costs(*)
       `)
       .eq("project_id", projectId)
       .single();
+
+    if (error) {
+      console.log("BOM Query Error:", error);
+      return { data, error };
+    }
+
+    // If we have scopes, fetch their materials and labor separately
+    if (data && data.bom_scope_of_work) {
+      const scopeIds = data.bom_scope_of_work.map((s: any) => s.id);
+      
+      // Fetch materials for all scopes
+      const { data: materials } = await supabase
+        .from("bom_materials")
+        .select("*")
+        .in("scope_id", scopeIds);
+      
+      // Fetch labor for all scopes
+      const { data: labor } = await supabase
+        .from("bom_labor")
+        .select("*")
+        .in("scope_id", scopeIds);
+      
+      // Attach materials and labor to their respective scopes
+      data.bom_scope_of_work = data.bom_scope_of_work.map((scope: any) => ({
+        ...scope,
+        bom_materials: materials?.filter((m: any) => m.scope_id === scope.id) || [],
+        bom_labor: labor?.filter((l: any) => l.scope_id === scope.id) || []
+      }));
+    }
 
     console.log("BOM Query:", { data, error });
     return { data, error };
