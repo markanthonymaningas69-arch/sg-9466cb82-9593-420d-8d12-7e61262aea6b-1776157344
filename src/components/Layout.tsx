@@ -24,7 +24,8 @@ interface LayoutProps {
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Project Profile", href: "/projects", icon: FolderKanban },
-  { name: "Site Personnel", href: "/personnel", icon: Users },
+  { name: "Human Resources", href: "/personnel", icon: Users },
+  { name: "Site Personnel", href: "/site-personnel", icon: ClipboardList },
   { name: "Accounting", href: "/accounting", icon: Calculator },
   { name: "Warehouse", href: "/warehouse", icon: Warehouse },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
