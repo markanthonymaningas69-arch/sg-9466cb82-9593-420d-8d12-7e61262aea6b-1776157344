@@ -364,7 +364,7 @@ export type Database = {
           created_at: string | null
           delivery_date: string
           id: string
-          items: string
+          item_name: string
           notes: string | null
           project_id: string
           quantity: number | null
@@ -377,7 +377,7 @@ export type Database = {
           created_at?: string | null
           delivery_date: string
           id?: string
-          items: string
+          item_name: string
           notes?: string | null
           project_id: string
           quantity?: number | null
@@ -390,7 +390,7 @@ export type Database = {
           created_at?: string | null
           delivery_date?: string
           id?: string
-          items?: string
+          item_name?: string
           notes?: string | null
           project_id?: string
           quantity?: number | null
@@ -651,48 +651,32 @@ export type Database = {
       progress_updates: {
         Row: {
           created_at: string | null
-          hours_spent: number | null
           id: string
-          issues: string | null
-          photos: string[] | null
-          progress_percentage: number | null
-          project_id: string
+          notes: string | null
+          quantity_completed: number | null
           scope_id: string
           update_date: string
-          work_completed: string | null
+          updated_by: string | null
         }
         Insert: {
           created_at?: string | null
-          hours_spent?: number | null
           id?: string
-          issues?: string | null
-          photos?: string[] | null
-          progress_percentage?: number | null
-          project_id: string
+          notes?: string | null
+          quantity_completed?: number | null
           scope_id: string
           update_date: string
-          work_completed?: string | null
+          updated_by?: string | null
         }
         Update: {
           created_at?: string | null
-          hours_spent?: number | null
           id?: string
-          issues?: string | null
-          photos?: string[] | null
-          progress_percentage?: number | null
-          project_id?: string
+          notes?: string | null
+          quantity_completed?: number | null
           scope_id?: string
           update_date?: string
-          work_completed?: string | null
+          updated_by?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "progress_updates_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "progress_updates_scope_id_fkey"
             columns: ["scope_id"]
@@ -749,40 +733,37 @@ export type Database = {
       }
       scope_of_works: {
         Row: {
+          completed_quantity: number | null
           created_at: string | null
-          description: string | null
-          estimated_cost: number | null
-          estimated_hours: number | null
+          description: string
           id: string
+          order_number: number | null
+          planned_quantity: number | null
           project_id: string
-          scope_name: string
-          start_date: string | null
           status: string | null
-          target_end_date: string | null
+          unit: string | null
         }
         Insert: {
+          completed_quantity?: number | null
           created_at?: string | null
-          description?: string | null
-          estimated_cost?: number | null
-          estimated_hours?: number | null
+          description: string
           id?: string
+          order_number?: number | null
+          planned_quantity?: number | null
           project_id: string
-          scope_name: string
-          start_date?: string | null
           status?: string | null
-          target_end_date?: string | null
+          unit?: string | null
         }
         Update: {
+          completed_quantity?: number | null
           created_at?: string | null
-          description?: string | null
-          estimated_cost?: number | null
-          estimated_hours?: number | null
+          description?: string
           id?: string
+          order_number?: number | null
+          planned_quantity?: number | null
           project_id?: string
-          scope_name?: string
-          start_date?: string | null
           status?: string | null
-          target_end_date?: string | null
+          unit?: string | null
         }
         Relationships: [
           {
@@ -803,8 +784,7 @@ export type Database = {
           notes: string | null
           personnel_id: string
           project_id: string
-          time_in: string | null
-          time_out: string | null
+          status: string | null
         }
         Insert: {
           created_at?: string | null
@@ -814,8 +794,7 @@ export type Database = {
           notes?: string | null
           personnel_id: string
           project_id: string
-          time_in?: string | null
-          time_out?: string | null
+          status?: string | null
         }
         Update: {
           created_at?: string | null
@@ -825,8 +804,7 @@ export type Database = {
           notes?: string | null
           personnel_id?: string
           project_id?: string
-          time_in?: string | null
-          time_out?: string | null
+          status?: string | null
         }
         Relationships: [
           {
