@@ -137,7 +137,7 @@ export default function Personnel() {
     e.preventDefault();
     const start = new Date(leaveForm.start_date);
     const end = new Date(leaveForm.end_date);
-    const days_requested = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+    const daysRequested = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
 
     await personnelService.createLeaveRequest({ 
       ...leaveForm, 
@@ -164,6 +164,7 @@ export default function Personnel() {
       pay_period_end: payrollForm.pay_period_end,
       regular_hours: regularHours,
       overtime_hours: overtimeHours,
+      hourly_rate: hourlyRate,
       gross_pay: grossPay,
       deductions,
       net_pay: netPay,
