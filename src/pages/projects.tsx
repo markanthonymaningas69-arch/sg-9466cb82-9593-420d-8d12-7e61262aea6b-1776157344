@@ -27,7 +27,6 @@ export default function Projects() {
     client: "",
     start_date: "",
     end_date: "",
-    budget: "",
     status: "planning" as const
   });
 
@@ -46,8 +45,8 @@ export default function Projects() {
     
     const projectData = {
       ...formData,
-      budget: parseFloat(formData.budget),
-      spent: editingProject?.spent || 0
+      budget: 0,
+      spent: 0
     };
 
     if (editingProject) {
@@ -69,7 +68,6 @@ export default function Projects() {
       client: project.client || "",
       start_date: project.start_date || "",
       end_date: project.end_date || "",
-      budget: project.budget?.toString() || "",
       status: project.status as any
     });
     setDialogOpen(true);
@@ -93,7 +91,6 @@ export default function Projects() {
       client: "",
       start_date: "",
       end_date: "",
-      budget: "",
       status: "planning"
     });
     setEditingProject(null);
@@ -192,16 +189,6 @@ export default function Projects() {
                       type="date"
                       value={formData.end_date}
                       onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2 col-span-2">
-                    <Label htmlFor="budget">Budget ($)</Label>
-                    <Input
-                      id="budget"
-                      type="number"
-                      step="0.01"
-                      value={formData.budget}
-                      onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
                     />
                   </div>
                 </div>
