@@ -30,8 +30,7 @@ export default function Accounting() {
     amount: "",
     description: "",
     date: new Date().toISOString().split("T")[0],
-    category: "",
-    status: "pending" as const
+    category: ""
   });
 
   useEffect(() => {
@@ -78,8 +77,7 @@ export default function Accounting() {
       amount: transaction.amount.toString(),
       description: transaction.description || "",
       date: transaction.date,
-      category: transaction.category || "",
-      status: transaction.status as any
+      category: transaction.category || ""
     });
     setDialogOpen(true);
   };
@@ -98,16 +96,9 @@ export default function Accounting() {
       amount: "",
       description: "",
       date: new Date().toISOString().split("T")[0],
-      category: "",
-      status: "pending"
+      category: ""
     });
     setEditingTransaction(null);
-  };
-
-  const statusColors: Record<string, string> = {
-    pending: "bg-yellow-100 text-yellow-800",
-    completed: "bg-green-100 text-green-800",
-    cancelled: "bg-red-100 text-red-800"
   };
 
   if (loading) {
@@ -199,19 +190,6 @@ export default function Accounting() {
                       required
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="status">Status</Label>
-                    <Select value={formData.status} onValueChange={(value: any) => setFormData({ ...formData, status: value })}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
                   <div className="space-y-2 col-span-2">
                     <Label htmlFor="description">Description</Label>
                     <Textarea
@@ -235,7 +213,7 @@ export default function Accounting() {
           </Dialog>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-3">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Income</CardTitle>
@@ -264,14 +242,6 @@ export default function Accounting() {
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-warning">${summary.pending.toLocaleString()}</div>
-            </CardContent>
-          </Card>
         </div>
 
         <Card>
@@ -288,7 +258,6 @@ export default function Accounting() {
                   <TableHead>Project</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -306,11 +275,6 @@ export default function Accounting() {
                     <TableCell className="max-w-xs truncate">{transaction.description || "-"}</TableCell>
                     <TableCell className={transaction.type === "income" ? "text-success font-semibold" : "text-destructive font-semibold"}>
                       ${transaction.amount.toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={statusColors[transaction.status] || "bg-gray-100 text-gray-800"}>
-                        {transaction.status}
-                      </Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">

@@ -29,7 +29,8 @@ export default function Personnel() {
     phone: "",
     email: "",
     hourly_rate: "",
-    status: "active" as const
+    status: "active" as const,
+    hire_date: new Date().toISOString().split("T")[0]
   });
 
   useEffect(() => {
@@ -74,7 +75,8 @@ export default function Personnel() {
       phone: person.phone || "",
       email: person.email || "",
       hourly_rate: person.hourly_rate?.toString() || "",
-      status: person.status as any
+      status: person.status as any,
+      hire_date: person.hire_date || new Date().toISOString().split("T")[0]
     });
     setDialogOpen(true);
   };
@@ -94,7 +96,8 @@ export default function Personnel() {
       phone: "",
       email: "",
       hourly_rate: "",
-      status: "active"
+      status: "active",
+      hire_date: new Date().toISOString().split("T")[0]
     });
     setEditingPersonnel(null);
   };
@@ -183,6 +186,16 @@ export default function Personnel() {
                         <SelectItem value="inactive">Inactive</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="hire_date">Hire Date *</Label>
+                    <Input
+                      id="hire_date"
+                      type="date"
+                      value={formData.hire_date}
+                      onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })}
+                      required
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="phone">Contact Number</Label>

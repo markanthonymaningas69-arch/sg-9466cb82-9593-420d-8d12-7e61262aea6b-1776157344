@@ -62,7 +62,7 @@ export const accountingService = {
   async getSummary(projectId?: string) {
     let query = supabase
       .from("transactions")
-      .select("type, amount, status");
+      .select("type, amount");
     
     if (projectId) {
       query = query.eq("project_id", projectId);
@@ -75,8 +75,8 @@ export const accountingService = {
     const summary = {
       totalIncome: data.filter(t => t.type === "income").reduce((sum, t) => sum + t.amount, 0),
       totalExpense: data.filter(t => t.type === "expense").reduce((sum, t) => sum + t.amount, 0),
-      pending: data.filter(t => t.status === "pending").reduce((sum, t) => sum + t.amount, 0),
-      completed: data.filter(t => t.status === "completed").reduce((sum, t) => sum + t.amount, 0),
+      pending: 0,
+      completed: data.reduce((sum, t) => sum + t.amount, 0),
     };
 
     return { data: summary, error: null };
