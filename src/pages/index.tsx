@@ -81,7 +81,7 @@ export default function Dashboard() {
         {/* Header */}
         <div>
           <h1 className="text-3xl font-heading font-bold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Construction project overview and key metrics</p>
+          <p className="text-muted-foreground mt-1">Thea-X Construction Accounting System - Project overview and key metrics</p>
         </div>
 
         {/* Metric Cards */}

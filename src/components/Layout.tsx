@@ -24,9 +24,9 @@ interface LayoutProps {
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Project Profile", href: "/projects", icon: FolderKanban },
-  { name: "Human Resources", href: "/personnel", icon: Users },
   { name: "Site Personnel", href: "/site-personnel", icon: ClipboardList },
   { name: "Accounting", href: "/accounting", icon: Calculator },
+  { name: "Human Resources", href: "/personnel", icon: Users },
   { name: "Warehouse", href: "/warehouse", icon: Warehouse },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
   { name: "Settings", href: "/settings", icon: Settings },
@@ -55,9 +55,14 @@ export function Layout({ children }: LayoutProps) {
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-6 border-b">
-            <h1 className="text-xl font-heading font-bold text-primary">
-              ConstructPro
-            </h1>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
+                TX
+              </div>
+              <h1 className="text-lg font-heading font-bold text-primary">
+                Thea-X
+              </h1>
+            </div>
             <Button
               variant="ghost"
               size="icon"
