@@ -1,0 +1,1 @@
+ALTER TABLE bill_of_materials ADD COLUMN IF NOT EXISTS revision TEXT DEFAULT '1.0';

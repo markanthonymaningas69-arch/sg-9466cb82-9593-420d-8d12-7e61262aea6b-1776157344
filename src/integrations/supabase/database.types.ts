@@ -70,6 +70,7 @@ export type Database = {
           grand_total: number | null
           id: string
           project_id: string
+          revision: string | null
           status: string
           title: string
           total_direct_cost: number | null
@@ -83,6 +84,7 @@ export type Database = {
           grand_total?: number | null
           id?: string
           project_id: string
+          revision?: string | null
           status?: string
           title: string
           total_direct_cost?: number | null
@@ -96,6 +98,7 @@ export type Database = {
           grand_total?: number | null
           id?: string
           project_id?: string
+          revision?: string | null
           status?: string
           title?: string
           total_direct_cost?: number | null
