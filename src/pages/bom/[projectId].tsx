@@ -448,20 +448,6 @@ export default function BillOfMaterials() {
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Add Materials Button */}
-              <div className="flex justify-center">
-                <Button
-                  size="lg"
-                  onClick={() => {
-                    setSelectedScopeId(scope.id);
-                    resetMaterialForm();
-                  }}
-                >
-                  <Plus className="h-5 w-5 mr-2" />
-                  Add Materials
-                </Button>
-              </div>
-
               {/* Materials Section */}
               {(((scope.bom_materials || []).length > 0) || selectedScopeId === scope.id) && (
                 <div className="mt-4">
@@ -582,11 +568,9 @@ export default function BillOfMaterials() {
                           </TableCell>
                           <TableCell className="space-x-1 text-right">
                             <Button
-                              size="icon"
-                              variant="outline"
                               onClick={handleMaterialSubmitInline}
                             >
-                              <Check className="h-4 w-4" />
+                              Add
                             </Button>
                             <Button
                               size="icon"
@@ -610,6 +594,20 @@ export default function BillOfMaterials() {
                   </div>
                 </div>
               )}
+
+              {/* Add Materials Button under last material */}
+              <div className="flex justify-center">
+                <Button
+                  size="lg"
+                  onClick={() => {
+                    setSelectedScopeId(scope.id);
+                    resetMaterialForm();
+                  }}
+                >
+                  <Plus className="h-5 w-5 mr-2" />
+                  Add Materials
+                </Button>
+              </div>
 
               {/* Labor Section */}
               {(scope.bom_materials || []).length > 0 && (
@@ -778,6 +776,37 @@ export default function BillOfMaterials() {
             </CardContent>
           </Card>
         ))}
+
+        {/* Add Scope Button or Inline Input under last scope */}
+        {!showScopeInput ? (
+          <div className="flex justify-end">
+            <Button onClick={handleAddScopeClick}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Scope of Work
+            </Button>
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Enter scope of work name..."
+                  value={newScopeName}
+                  onChange={(e) => setNewScopeName(e.target.value)}
+                  onKeyPress={(e) => e.key === "Enter" && handleSaveScopeInline()}
+                  autoFocus
+                  className="flex-1"
+                />
+                <Button size="icon" onClick={handleSaveScopeInline} disabled={!newScopeName.trim()}>
+                  <Check className="h-4 w-4" />
+                </Button>
+                <Button size="icon" variant="outline" onClick={handleCancelScopeInline}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Total Direct Cost */}
         {scopes.length > 0 && (
