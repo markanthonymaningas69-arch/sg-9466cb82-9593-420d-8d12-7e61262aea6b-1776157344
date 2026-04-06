@@ -31,6 +31,7 @@ export default function BillOfMaterials() {
   const [indirectCosts, setIndirectCosts] = useState<IndirectCost[]>([]);
   const [loading, setLoading] = useState(true);
   const [showIndirectCosts, setShowIndirectCosts] = useState(false);
+  const [saving, setSaving] = useState(false);
   
   // Dialog states
   const [scopeDialogOpen, setScopeDialogOpen] = useState(false);
@@ -39,6 +40,13 @@ export default function BillOfMaterials() {
   const [editingScope, setEditingScope] = useState<ScopeOfWork | null>(null);
   const [selectedScopeId, setSelectedScopeId] = useState<string>("");
   const [editingLabor, setEditingLabor] = useState<Labor | null>(null);
+  
+  // BOM Header form
+  const [bomForm, setBomForm] = useState({
+    bom_number: "",
+    title: "",
+    revision: "1.0"
+  });
   
   // Form states
   const [scopeForm, setScopeForm] = useState({
@@ -96,8 +104,20 @@ export default function BillOfMaterials() {
         grand_total: 0
       });
       setBom(newBom);
+      if (newBom) {
+        setBomForm({
+          bom_number: newBom.bom_number,
+          title: newBom.title || "",
+          revision: newBom.revision || "1.0"
+        });
+      }
     } else if (bomData) {
       setBom(bomData);
+      setBomForm({
+        bom_number: bomData.bom_number,
+        title: bomData.title || "",
+        revision: bomData.revision || "1.0"
+      });
       setScopes(bomData.bom_scope_of_work || []);
       setIndirectCosts(bomData.bom_indirect_costs || []);
       setShowIndirectCosts((bomData.bom_indirect_costs || []).length > 0);
@@ -322,6 +342,48 @@ export default function BillOfMaterials() {
     loadData();
   };
 
+  // Save entire BOM
+  const handleSaveBOM = async () => {
+    if (!bom) return;
+    
+    setSaving(true);
+    
+    // Update BOM header
+    await bomService.update(bom.id, {
+      bom_number: bomForm.bom_number,
+      title: bomForm.title,
+      revision: bomForm.revision,
+      total_direct_cost: calculateTotalDirectCost(),
+      total_indirect_cost: calculateIndirectCost(),
+      grand_total: calculateGrandTotal()
+    });
+    
+    // Update indirect costs if present
+    if (showIndirectCosts) {
+      const indirectData = {
+        bom_id: bom.id,
+        vat_percentage: parseFloat(indirectForm.vat || "0"),
+        tax_percentage: parseFloat(indirectForm.tax || "0"),
+        ocm_percentage: parseFloat(indirectForm.ocm || "0"),
+        profit_percentage: parseFloat(indirectForm.profit || "0"),
+        other_costs: {
+          amount: parseFloat(indirectForm.others_amount || "0"),
+          description: indirectForm.others_description
+        },
+        total_indirect: calculateIndirectCost()
+      };
+      
+      if (indirectCosts.length > 0) {
+        await bomService.updateIndirectCost(indirectCosts[0].id, indirectData);
+      } else {
+        await bomService.createIndirectCost(indirectData);
+      }
+    }
+    
+    setSaving(false);
+    loadData();
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -344,6 +406,41 @@ export default function BillOfMaterials() {
             <p className="text-muted-foreground mt-1">{project?.name}</p>
           </div>
         </div>
+
+        {/* BOM Header Form */}
+        <Card>
+          <CardHeader>
+            <CardTitle>BOM Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>BOM Number *</Label>
+                <Input
+                  value={bomForm.bom_number}
+                  onChange={(e) => setBomForm({ ...bomForm, bom_number: e.target.value })}
+                  placeholder="BOM-001"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Title *</Label>
+                <Input
+                  value={bomForm.title}
+                  onChange={(e) => setBomForm({ ...bomForm, title: e.target.value })}
+                  placeholder="Project BOM Title"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Revision</Label>
+                <Input
+                  value={bomForm.revision}
+                  onChange={(e) => setBomForm({ ...bomForm, revision: e.target.value })}
+                  placeholder="1.0"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Add Scope Button */}
         <div className="flex justify-end">
@@ -770,16 +867,40 @@ export default function BillOfMaterials() {
 
         {/* Grand Total */}
         {showIndirectCosts && (
-          <Card className="bg-primary text-primary-foreground">
-            <CardContent className="pt-6">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold">Grand Total</h2>
-                <div className="text-4xl font-bold">
-                  ${calculateGrandTotal().toFixed(2)}
+          <>
+            <Card className="bg-primary text-primary-foreground">
+              <CardContent className="pt-6">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-bold">Grand Total</h2>
+                  <div className="text-4xl font-bold">
+                    ${calculateGrandTotal().toFixed(2)}
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+
+            {/* Save BOM Button */}
+            <div className="flex justify-center">
+              <Button 
+                size="lg" 
+                onClick={handleSaveBOM}
+                disabled={saving}
+                className="min-w-[200px]"
+              >
+                {saving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-5 w-5 mr-2" />
+                    Save Bill of Materials
+                  </>
+                )}
+              </Button>
+            </div>
+          </>
         )}
       </div>
     </Layout>
