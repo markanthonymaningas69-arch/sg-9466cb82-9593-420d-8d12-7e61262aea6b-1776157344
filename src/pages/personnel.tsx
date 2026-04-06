@@ -32,6 +32,7 @@ export default function Personnel() {
   const [payrollDialogOpen, setPayrollDialogOpen] = useState(false);
   const [trainingDialogOpen, setTrainingDialogOpen] = useState(false);
   const [editingPersonnel, setEditingPersonnel] = useState<Personnel | null>(null);
+  
   const [formData, setFormData] = useState({
     name: "",
     role: "",
@@ -42,6 +43,7 @@ export default function Personnel() {
     status: "active" as const,
     hire_date: new Date().toISOString().split("T")[0]
   });
+
   const [attendanceForm, setAttendanceForm] = useState({
     personnel_id: "",
     date: new Date().toISOString().split("T")[0],
@@ -50,6 +52,7 @@ export default function Personnel() {
     overtime_hours: "0",
     notes: ""
   });
+
   const [leaveForm, setLeaveForm] = useState({
     personnel_id: "",
     leave_type: "vacation" as const,
@@ -58,21 +61,22 @@ export default function Personnel() {
     reason: "",
     status: "pending" as const
   });
+
   const [payrollForm, setPayrollForm] = useState({
     personnel_id: "",
-    month: new Date().toISOString().substring(0, 7),
+    pay_period_start: new Date().toISOString().substring(0, 8) + "01",
+    pay_period_end: new Date().toISOString().split("T")[0],
     regular_hours: "160",
     overtime_hours: "0",
     deductions: "0",
-    bonus: "0",
     status: "pending" as const
   });
+
   const [trainingForm, setTrainingForm] = useState({
     personnel_id: "",
-    training_name: "",
+    training_title: "",
     training_type: "safety" as const,
-    completed_date: new Date().toISOString().split("T")[0],
-    expiry_date: "",
+    training_date: new Date().toISOString().split("T")[0],
     notes: ""
   });
 
@@ -89,7 +93,7 @@ export default function Personnel() {
         new Date().toISOString().split("T")[0]
       ),
       personnelService.getLeaveRequests(),
-      personnelService.getPayroll(new Date().toISOString().substring(0, 7)),
+      personnelService.getPayroll(new Date().toISOString().substring(0, 8) + "01"),
       personnelService.getTrainingRecords()
     ]);
     setPersonnel(personnelData.data || []);
@@ -131,7 +135,14 @@ export default function Personnel() {
 
   const handleLeaveSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await personnelService.createLeaveRequest(leaveForm);
+    const start = new Date(leaveForm.start_date);
+    const end = new Date(leaveForm.end_date);
+    const days_requested = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+
+    await personnelService.createLeaveRequest({ 
+      ...leaveForm, 
+      days_requested 
+    });
     setLeaveDialogOpen(false);
     resetLeaveForm();
     loadData();
@@ -145,17 +156,18 @@ export default function Personnel() {
     const hourlyRate = person?.hourly_rate || 0;
     const grossPay = (regularHours * hourlyRate) + (overtimeHours * hourlyRate * 1.5);
     const deductions = parseFloat(payrollForm.deductions);
-    const bonus = parseFloat(payrollForm.bonus);
-    const netPay = grossPay - deductions + bonus;
+    const netPay = grossPay - deductions;
 
     await personnelService.generatePayroll({
-      ...payrollForm,
+      personnel_id: payrollForm.personnel_id,
+      pay_period_start: payrollForm.pay_period_start,
+      pay_period_end: payrollForm.pay_period_end,
       regular_hours: regularHours,
       overtime_hours: overtimeHours,
       gross_pay: grossPay,
       deductions,
-      bonus,
-      net_pay: netPay
+      net_pay: netPay,
+      status: payrollForm.status
     });
     setPayrollDialogOpen(false);
     resetPayrollForm();
@@ -241,11 +253,11 @@ export default function Personnel() {
   const resetPayrollForm = () => {
     setPayrollForm({
       personnel_id: "",
-      month: new Date().toISOString().substring(0, 7),
+      pay_period_start: new Date().toISOString().substring(0, 8) + "01",
+      pay_period_end: new Date().toISOString().split("T")[0],
       regular_hours: "160",
       overtime_hours: "0",
       deductions: "0",
-      bonus: "0",
       status: "pending"
     });
   };
@@ -253,10 +265,9 @@ export default function Personnel() {
   const resetTrainingForm = () => {
     setTrainingForm({
       personnel_id: "",
-      training_name: "",
+      training_title: "",
       training_type: "safety",
-      completed_date: new Date().toISOString().split("T")[0],
-      expiry_date: "",
+      training_date: new Date().toISOString().split("T")[0],
       notes: ""
     });
   };
@@ -706,6 +717,7 @@ export default function Personnel() {
                       <TableHead>Type</TableHead>
                       <TableHead>Start Date</TableHead>
                       <TableHead>End Date</TableHead>
+                      <TableHead>Days</TableHead>
                       <TableHead>Reason</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -718,6 +730,7 @@ export default function Personnel() {
                         <TableCell className="capitalize">{leave.leave_type}</TableCell>
                         <TableCell>{new Date(leave.start_date).toLocaleDateString()}</TableCell>
                         <TableCell>{new Date(leave.end_date).toLocaleDateString()}</TableCell>
+                        <TableCell>{leave.days_requested}</TableCell>
                         <TableCell className="max-w-xs truncate">{leave.reason}</TableCell>
                         <TableCell>
                           <Badge className={statusColors[leave.status]}>
@@ -773,15 +786,27 @@ export default function Personnel() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="month">Month *</Label>
-                      <Input
-                        id="month"
-                        type="month"
-                        value={payrollForm.month}
-                        onChange={(e) => setPayrollForm({ ...payrollForm, month: e.target.value })}
-                        required
-                      />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="pay_period_start">Period Start *</Label>
+                        <Input
+                          id="pay_period_start"
+                          type="date"
+                          value={payrollForm.pay_period_start}
+                          onChange={(e) => setPayrollForm({ ...payrollForm, pay_period_start: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="pay_period_end">Period End *</Label>
+                        <Input
+                          id="pay_period_end"
+                          type="date"
+                          value={payrollForm.pay_period_end}
+                          onChange={(e) => setPayrollForm({ ...payrollForm, pay_period_end: e.target.value })}
+                          required
+                        />
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -814,16 +839,6 @@ export default function Personnel() {
                           onChange={(e) => setPayrollForm({ ...payrollForm, deductions: e.target.value })}
                         />
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="bonus">Bonus ($)</Label>
-                        <Input
-                          id="bonus"
-                          type="number"
-                          step="0.01"
-                          value={payrollForm.bonus}
-                          onChange={(e) => setPayrollForm({ ...payrollForm, bonus: e.target.value })}
-                        />
-                      </div>
                     </div>
                     <div className="flex justify-end gap-2 pt-4">
                       <Button type="button" variant="outline" onClick={() => setPayrollDialogOpen(false)}>
@@ -838,14 +853,14 @@ export default function Personnel() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Payroll Records (Current Month)</CardTitle>
+                <CardTitle>Payroll Records</CardTitle>
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Personnel</TableHead>
-                      <TableHead>Month</TableHead>
+                      <TableHead>Period</TableHead>
                       <TableHead>Regular Hours</TableHead>
                       <TableHead>Overtime</TableHead>
                       <TableHead>Gross Pay</TableHead>
@@ -859,7 +874,9 @@ export default function Personnel() {
                     {payroll.map((record) => (
                       <TableRow key={record.id}>
                         <TableCell className="font-medium">{record.personnel?.name}</TableCell>
-                        <TableCell>{record.month}</TableCell>
+                        <TableCell>
+                          {new Date(record.pay_period_start).toLocaleDateString()} - {new Date(record.pay_period_end).toLocaleDateString()}
+                        </TableCell>
                         <TableCell>{record.regular_hours}h</TableCell>
                         <TableCell>{record.overtime_hours}h</TableCell>
                         <TableCell>${record.gross_pay.toLocaleString()}</TableCell>
@@ -915,11 +932,11 @@ export default function Personnel() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="training_name">Training Name *</Label>
+                      <Label htmlFor="training_title">Training Title *</Label>
                       <Input
-                        id="training_name"
-                        value={trainingForm.training_name}
-                        onChange={(e) => setTrainingForm({ ...trainingForm, training_name: e.target.value })}
+                        id="training_title"
+                        value={trainingForm.training_title}
+                        onChange={(e) => setTrainingForm({ ...trainingForm, training_title: e.target.value })}
                         placeholder="e.g., OSHA Safety Training"
                         required
                       />
@@ -938,26 +955,15 @@ export default function Personnel() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="completed_date">Completed Date *</Label>
-                        <Input
-                          id="completed_date"
-                          type="date"
-                          value={trainingForm.completed_date}
-                          onChange={(e) => setTrainingForm({ ...trainingForm, completed_date: e.target.value })}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="expiry_date">Expiry Date</Label>
-                        <Input
-                          id="expiry_date"
-                          type="date"
-                          value={trainingForm.expiry_date}
-                          onChange={(e) => setTrainingForm({ ...trainingForm, expiry_date: e.target.value })}
-                        />
-                      </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="training_date">Training Date *</Label>
+                      <Input
+                        id="training_date"
+                        type="date"
+                        value={trainingForm.training_date}
+                        onChange={(e) => setTrainingForm({ ...trainingForm, training_date: e.target.value })}
+                        required
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="train_notes">Notes</Label>
@@ -987,32 +993,22 @@ export default function Personnel() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Personnel</TableHead>
-                      <TableHead>Training Name</TableHead>
+                      <TableHead>Training Title</TableHead>
                       <TableHead>Type</TableHead>
-                      <TableHead>Completed</TableHead>
-                      <TableHead>Expires</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Notes</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {training.map((record) => {
-                      const isExpired = record.expiry_date && new Date(record.expiry_date) < new Date();
-                      const isExpiringSoon = record.expiry_date && new Date(record.expiry_date) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-                      return (
-                        <TableRow key={record.id}>
-                          <TableCell className="font-medium">{record.personnel?.name}</TableCell>
-                          <TableCell>{record.training_name}</TableCell>
-                          <TableCell className="capitalize">{record.training_type}</TableCell>
-                          <TableCell>{new Date(record.completed_date).toLocaleDateString()}</TableCell>
-                          <TableCell>{record.expiry_date ? new Date(record.expiry_date).toLocaleDateString() : "N/A"}</TableCell>
-                          <TableCell>
-                            <Badge className={isExpired ? "bg-red-100 text-red-800" : isExpiringSoon ? "bg-yellow-100 text-yellow-800" : "bg-green-100 text-green-800"}>
-                              {isExpired ? "Expired" : isExpiringSoon ? "Expiring Soon" : "Valid"}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
+                    {training.map((record) => (
+                      <TableRow key={record.id}>
+                        <TableCell className="font-medium">{record.personnel?.name}</TableCell>
+                        <TableCell>{record.training_title}</TableCell>
+                        <TableCell className="capitalize">{record.training_type}</TableCell>
+                        <TableCell>{new Date(record.training_date).toLocaleDateString()}</TableCell>
+                        <TableCell className="max-w-xs truncate">{record.notes || "-"}</TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </CardContent>

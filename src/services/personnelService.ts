@@ -132,11 +132,11 @@ export const personnelService = {
   },
 
   // Payroll Management
-  async getPayroll(month: string) {
+  async getPayroll(periodStart: string) {
     const { data, error } = await supabase
       .from("payroll")
       .select("*, personnel(name, role, hourly_rate)")
-      .eq("month", month)
+      .eq("pay_period_start", periodStart)
       .order("created_at", { ascending: false });
     
     return { data: data || [], error };
