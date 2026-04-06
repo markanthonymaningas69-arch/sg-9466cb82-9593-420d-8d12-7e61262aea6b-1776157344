@@ -22,7 +22,7 @@ export default function Projects() {
   const [formData, setFormData] = useState({
     name: "",
     location: "",
-    client_name: "",
+    client: "",
     start_date: "",
     end_date: "",
     budget: "",
@@ -45,7 +45,7 @@ export default function Projects() {
     const projectData = {
       ...formData,
       budget: parseFloat(formData.budget),
-      actual_cost: editingProject?.actual_cost || 0
+      spent: editingProject?.spent || 0
     };
 
     if (editingProject) {
@@ -64,11 +64,11 @@ export default function Projects() {
     setFormData({
       name: project.name,
       location: project.location || "",
-      client_name: project.client_name || "",
+      client: project.client || "",
       start_date: project.start_date || "",
       end_date: project.end_date || "",
       budget: project.budget?.toString() || "",
-      status: project.status
+      status: project.status as any
     });
     setDialogOpen(true);
   };
@@ -84,7 +84,7 @@ export default function Projects() {
     setFormData({
       name: "",
       location: "",
-      client_name: "",
+      client: "",
       start_date: "",
       end_date: "",
       budget: "",
@@ -93,7 +93,7 @@ export default function Projects() {
     setEditingProject(null);
   };
 
-  const statusColors = {
+  const statusColors: Record<string, string> = {
     planning: "bg-blue-100 text-blue-800",
     active: "bg-green-100 text-green-800",
     on_hold: "bg-yellow-100 text-yellow-800",
@@ -141,11 +141,11 @@ export default function Projects() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="client_name">Client Name</Label>
+                    <Label htmlFor="client">Client Name</Label>
                     <Input
-                      id="client_name"
-                      value={formData.client_name}
-                      onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
+                      id="client"
+                      value={formData.client}
+                      onChange={(e) => setFormData({ ...formData, client: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
@@ -234,15 +234,15 @@ export default function Projects() {
                 {projects.map((project) => (
                   <TableRow key={project.id}>
                     <TableCell className="font-medium">{project.name}</TableCell>
-                    <TableCell>{project.client_name || "-"}</TableCell>
+                    <TableCell>{project.client || "-"}</TableCell>
                     <TableCell>{project.location || "-"}</TableCell>
                     <TableCell>
-                      <Badge className={statusColors[project.status]}>
+                      <Badge className={statusColors[project.status] || "bg-gray-100 text-gray-800"}>
                         {project.status.replace("_", " ")}
                       </Badge>
                     </TableCell>
                     <TableCell>${project.budget?.toLocaleString() || 0}</TableCell>
-                    <TableCell>${project.actual_cost?.toLocaleString() || 0}</TableCell>
+                    <TableCell>${project.spent?.toLocaleString() || 0}</TableCell>
                     <TableCell>{project.start_date ? new Date(project.start_date).toLocaleDateString() : "-"}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">

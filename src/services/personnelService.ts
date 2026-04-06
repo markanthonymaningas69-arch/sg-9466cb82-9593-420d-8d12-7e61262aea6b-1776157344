@@ -1,13 +1,13 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 
-type Personnel = Database["public"]["Tables"]["site_personnel"]["Row"];
-type PersonnelInsert = Database["public"]["Tables"]["site_personnel"]["Insert"];
+type Personnel = Database["public"]["Tables"]["personnel"]["Row"];
+type PersonnelInsert = Database["public"]["Tables"]["personnel"]["Insert"];
 
 export const personnelService = {
   async getAll() {
     const { data, error } = await supabase
-      .from("site_personnel")
+      .from("personnel")
       .select("*, projects(name)")
       .order("created_at", { ascending: false });
     
@@ -17,7 +17,7 @@ export const personnelService = {
 
   async getByProject(projectId: string) {
     const { data, error } = await supabase
-      .from("site_personnel")
+      .from("personnel")
       .select("*")
       .eq("project_id", projectId);
     
@@ -27,7 +27,7 @@ export const personnelService = {
 
   async create(personnel: PersonnelInsert) {
     const { data, error } = await supabase
-      .from("site_personnel")
+      .from("personnel")
       .insert(personnel)
       .select()
       .single();
@@ -38,7 +38,7 @@ export const personnelService = {
 
   async update(id: string, updates: Partial<PersonnelInsert>) {
     const { data, error } = await supabase
-      .from("site_personnel")
+      .from("personnel")
       .update(updates)
       .eq("id", id)
       .select()
@@ -50,7 +50,7 @@ export const personnelService = {
 
   async delete(id: string) {
     const { error } = await supabase
-      .from("site_personnel")
+      .from("personnel")
       .delete()
       .eq("id", id);
     

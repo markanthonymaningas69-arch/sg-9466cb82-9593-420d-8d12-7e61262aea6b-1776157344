@@ -13,7 +13,7 @@ import { projectService } from "@/services/projectService";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
-type Personnel = Database["public"]["Tables"]["site_personnel"]["Row"];
+type Personnel = Database["public"]["Tables"]["personnel"]["Row"];
 type Project = Database["public"]["Tables"]["projects"]["Row"];
 
 export default function Personnel() {
@@ -26,9 +26,9 @@ export default function Personnel() {
     name: "",
     role: "",
     project_id: "",
-    contact_number: "",
+    phone: "",
     email: "",
-    daily_rate: "",
+    hourly_rate: "",
     status: "active" as const
   });
 
@@ -51,7 +51,7 @@ export default function Personnel() {
     
     const personnelData = {
       ...formData,
-      daily_rate: parseFloat(formData.daily_rate)
+      hourly_rate: parseFloat(formData.hourly_rate) || 0
     };
 
     if (editingPersonnel) {
@@ -71,10 +71,10 @@ export default function Personnel() {
       name: person.name,
       role: person.role,
       project_id: person.project_id || "",
-      contact_number: person.contact_number || "",
+      phone: person.phone || "",
       email: person.email || "",
-      daily_rate: person.daily_rate?.toString() || "",
-      status: person.status
+      hourly_rate: person.hourly_rate?.toString() || "",
+      status: person.status as any
     });
     setDialogOpen(true);
   };
@@ -91,15 +91,15 @@ export default function Personnel() {
       name: "",
       role: "",
       project_id: "",
-      contact_number: "",
+      phone: "",
       email: "",
-      daily_rate: "",
+      hourly_rate: "",
       status: "active"
     });
     setEditingPersonnel(null);
   };
 
-  const statusColors = {
+  const statusColors: Record<string, string> = {
     active: "bg-green-100 text-green-800",
     on_leave: "bg-yellow-100 text-yellow-800",
     inactive: "bg-gray-100 text-gray-800"
@@ -185,11 +185,11 @@ export default function Personnel() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="contact_number">Contact Number</Label>
+                    <Label htmlFor="phone">Contact Number</Label>
                     <Input
-                      id="contact_number"
-                      value={formData.contact_number}
-                      onChange={(e) => setFormData({ ...formData, contact_number: e.target.value })}
+                      id="phone"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
@@ -202,13 +202,13 @@ export default function Personnel() {
                     />
                   </div>
                   <div className="space-y-2 col-span-2">
-                    <Label htmlFor="daily_rate">Daily Rate ($)</Label>
+                    <Label htmlFor="hourly_rate">Hourly Rate ($)</Label>
                     <Input
-                      id="daily_rate"
+                      id="hourly_rate"
                       type="number"
                       step="0.01"
-                      value={formData.daily_rate}
-                      onChange={(e) => setFormData({ ...formData, daily_rate: e.target.value })}
+                      value={formData.hourly_rate}
+                      onChange={(e) => setFormData({ ...formData, hourly_rate: e.target.value })}
                     />
                   </div>
                 </div>
@@ -248,10 +248,10 @@ export default function Personnel() {
                     <TableCell className="font-medium">{person.name}</TableCell>
                     <TableCell>{person.role}</TableCell>
                     <TableCell>{person.projects?.name || "Unassigned"}</TableCell>
-                    <TableCell>{person.contact_number || "-"}</TableCell>
-                    <TableCell>${person.daily_rate?.toLocaleString() || 0}</TableCell>
+                    <TableCell>{person.phone || "-"}</TableCell>
+                    <TableCell>${person.hourly_rate?.toLocaleString() || 0}/hr</TableCell>
                     <TableCell>
-                      <Badge className={statusColors[person.status]}>
+                      <Badge className={statusColors[person.status] || "bg-gray-100 text-gray-800"}>
                         {person.status.replace("_", " ")}
                       </Badge>
                     </TableCell>

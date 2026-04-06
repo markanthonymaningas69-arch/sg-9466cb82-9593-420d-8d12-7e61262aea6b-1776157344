@@ -14,7 +14,7 @@ import { projectService } from "@/services/projectService";
 import { Plus, Pencil, Trash2, TrendingUp, TrendingDown } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
-type Transaction = Database["public"]["Tables"]["accounting_transactions"]["Row"];
+type Transaction = Database["public"]["Tables"]["transactions"]["Row"];
 type Project = Database["public"]["Tables"]["projects"]["Row"];
 
 export default function Accounting() {
@@ -29,7 +29,7 @@ export default function Accounting() {
     type: "income" as const,
     amount: "",
     description: "",
-    transaction_date: new Date().toISOString().split("T")[0],
+    date: new Date().toISOString().split("T")[0],
     category: "",
     status: "pending" as const
   });
@@ -74,12 +74,12 @@ export default function Accounting() {
     setEditingTransaction(transaction);
     setFormData({
       project_id: transaction.project_id || "",
-      type: transaction.type,
+      type: transaction.type as any,
       amount: transaction.amount.toString(),
       description: transaction.description || "",
-      transaction_date: transaction.transaction_date,
+      date: transaction.date,
       category: transaction.category || "",
-      status: transaction.status
+      status: transaction.status as any
     });
     setDialogOpen(true);
   };
@@ -97,14 +97,14 @@ export default function Accounting() {
       type: "income",
       amount: "",
       description: "",
-      transaction_date: new Date().toISOString().split("T")[0],
+      date: new Date().toISOString().split("T")[0],
       category: "",
       status: "pending"
     });
     setEditingTransaction(null);
   };
 
-  const statusColors = {
+  const statusColors: Record<string, string> = {
     pending: "bg-yellow-100 text-yellow-800",
     completed: "bg-green-100 text-green-800",
     cancelled: "bg-red-100 text-red-800"
@@ -190,12 +190,12 @@ export default function Accounting() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="transaction_date">Date *</Label>
+                    <Label htmlFor="date">Date *</Label>
                     <Input
-                      id="transaction_date"
+                      id="date"
                       type="date"
-                      value={formData.transaction_date}
-                      onChange={(e) => setFormData({ ...formData, transaction_date: e.target.value })}
+                      value={formData.date}
+                      onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                       required
                     />
                   </div>
@@ -295,7 +295,7 @@ export default function Accounting() {
               <TableBody>
                 {transactions.map((transaction) => (
                   <TableRow key={transaction.id}>
-                    <TableCell>{new Date(transaction.transaction_date).toLocaleDateString()}</TableCell>
+                    <TableCell>{new Date(transaction.date).toLocaleDateString()}</TableCell>
                     <TableCell>
                       <Badge variant={transaction.type === "income" ? "default" : "secondary"}>
                         {transaction.type}
@@ -308,7 +308,7 @@ export default function Accounting() {
                       ${transaction.amount.toLocaleString()}
                     </TableCell>
                     <TableCell>
-                      <Badge className={statusColors[transaction.status]}>
+                      <Badge className={statusColors[transaction.status] || "bg-gray-100 text-gray-800"}>
                         {transaction.status}
                       </Badge>
                     </TableCell>

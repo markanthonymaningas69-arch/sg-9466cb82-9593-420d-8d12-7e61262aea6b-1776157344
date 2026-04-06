@@ -47,7 +47,7 @@ export default function Analytics() {
     const accounting = accountingSummary.data || { totalIncome: 0, totalExpense: 0, pending: 0, completed: 0 };
     const warehouse = warehouseData.data || [];
     
-    const inventoryValue = warehouse.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+    const inventoryValue = warehouse.reduce((sum, item) => sum + (item.quantity * item.unit_cost), 0);
     const netProfit = accounting.totalIncome - accounting.totalExpense;
     const profitMargin = accounting.totalIncome > 0 ? (netProfit / accounting.totalIncome) * 100 : 0;
     const budgetUtilization = stats.totalBudget > 0 ? (stats.totalCost / stats.totalBudget) * 100 : 0;

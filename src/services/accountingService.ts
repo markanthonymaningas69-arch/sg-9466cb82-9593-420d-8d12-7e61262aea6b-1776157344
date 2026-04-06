@@ -1,15 +1,15 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 
-type Transaction = Database["public"]["Tables"]["accounting_transactions"]["Row"];
-type TransactionInsert = Database["public"]["Tables"]["accounting_transactions"]["Insert"];
+type Transaction = Database["public"]["Tables"]["transactions"]["Row"];
+type TransactionInsert = Database["public"]["Tables"]["transactions"]["Insert"];
 
 export const accountingService = {
   async getAll() {
     const { data, error } = await supabase
-      .from("accounting_transactions")
+      .from("transactions")
       .select("*, projects(name)")
-      .order("transaction_date", { ascending: false });
+      .order("date", { ascending: false });
     
     console.log("Transactions query:", { data, error });
     return { data: data || [], error };
@@ -17,10 +17,10 @@ export const accountingService = {
 
   async getByProject(projectId: string) {
     const { data, error } = await supabase
-      .from("accounting_transactions")
+      .from("transactions")
       .select("*")
       .eq("project_id", projectId)
-      .order("transaction_date", { ascending: false });
+      .order("date", { ascending: false });
     
     console.log("Transactions by project:", { data, error });
     return { data: data || [], error };
@@ -28,7 +28,7 @@ export const accountingService = {
 
   async create(transaction: TransactionInsert) {
     const { data, error } = await supabase
-      .from("accounting_transactions")
+      .from("transactions")
       .insert(transaction)
       .select()
       .single();
@@ -39,7 +39,7 @@ export const accountingService = {
 
   async update(id: string, updates: Partial<TransactionInsert>) {
     const { data, error } = await supabase
-      .from("accounting_transactions")
+      .from("transactions")
       .update(updates)
       .eq("id", id)
       .select()
@@ -51,7 +51,7 @@ export const accountingService = {
 
   async delete(id: string) {
     const { error } = await supabase
-      .from("accounting_transactions")
+      .from("transactions")
       .delete()
       .eq("id", id);
     
@@ -61,7 +61,7 @@ export const accountingService = {
 
   async getSummary(projectId?: string) {
     let query = supabase
-      .from("accounting_transactions")
+      .from("transactions")
       .select("type, amount, status");
     
     if (projectId) {

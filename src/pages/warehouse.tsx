@@ -12,7 +12,7 @@ import { warehouseService } from "@/services/warehouseService";
 import { Plus, Pencil, Trash2, Package, AlertTriangle } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
-type WarehouseItem = Database["public"]["Tables"]["warehouse_inventory"]["Row"];
+type WarehouseItem = Database["public"]["Tables"]["inventory"]["Row"];
 
 export default function Warehouse() {
   const [items, setItems] = useState<WarehouseItem[]>([]);
@@ -20,11 +20,11 @@ export default function Warehouse() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<WarehouseItem | null>(null);
   const [formData, setFormData] = useState({
-    item_name: "",
+    name: "",
     category: "",
     quantity: "",
     unit: "",
-    unit_price: "",
+    unit_cost: "",
     reorder_level: "",
     location: ""
   });
@@ -45,7 +45,7 @@ export default function Warehouse() {
     const itemData = {
       ...formData,
       quantity: parseInt(formData.quantity),
-      unit_price: parseFloat(formData.unit_price),
+      unit_cost: parseFloat(formData.unit_cost),
       reorder_level: parseInt(formData.reorder_level)
     };
 
@@ -63,12 +63,12 @@ export default function Warehouse() {
   const handleEdit = (item: WarehouseItem) => {
     setEditingItem(item);
     setFormData({
-      item_name: item.item_name,
+      name: item.name,
       category: item.category || "",
       quantity: item.quantity.toString(),
       unit: item.unit,
-      unit_price: item.unit_price.toString(),
-      reorder_level: item.reorder_level.toString(),
+      unit_cost: item.unit_cost.toString(),
+      reorder_level: item.reorder_level?.toString() || "0",
       location: item.location || ""
     });
     setDialogOpen(true);
@@ -83,19 +83,19 @@ export default function Warehouse() {
 
   const resetForm = () => {
     setFormData({
-      item_name: "",
+      name: "",
       category: "",
       quantity: "",
       unit: "",
-      unit_price: "",
+      unit_cost: "",
       reorder_level: "",
       location: ""
     });
     setEditingItem(null);
   };
 
-  const lowStockItems = items.filter(item => item.quantity <= item.reorder_level);
-  const totalValue = items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+  const lowStockItems = items.filter(item => item.quantity <= (item.reorder_level || 0));
+  const totalValue = items.reduce((sum, item) => sum + (item.quantity * item.unit_cost), 0);
 
   if (loading) {
     return (
@@ -129,11 +129,11 @@ export default function Warehouse() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="item_name">Item Name *</Label>
+                    <Label htmlFor="name">Item Name *</Label>
                     <Input
-                      id="item_name"
-                      value={formData.item_name}
-                      onChange={(e) => setFormData({ ...formData, item_name: e.target.value })}
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       required
                     />
                   </div>
@@ -172,13 +172,13 @@ export default function Warehouse() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="unit_price">Unit Price ($) *</Label>
+                    <Label htmlFor="unit_cost">Unit Cost ($) *</Label>
                     <Input
-                      id="unit_price"
+                      id="unit_cost"
                       type="number"
                       step="0.01"
-                      value={formData.unit_price}
-                      onChange={(e) => setFormData({ ...formData, unit_price: e.target.value })}
+                      value={formData.unit_cost}
+                      onChange={(e) => setFormData({ ...formData, unit_cost: e.target.value })}
                       required
                     />
                   </div>
@@ -260,7 +260,7 @@ export default function Warehouse() {
               <div className="space-y-2">
                 {lowStockItems.map((item) => (
                   <div key={item.id} className="flex justify-between items-center p-2 bg-warning/10 rounded">
-                    <span className="font-medium">{item.item_name}</span>
+                    <span className="font-medium">{item.name}</span>
                     <Badge variant="outline" className="text-warning">
                       {item.quantity} {item.unit} (Reorder at {item.reorder_level})
                     </Badge>
@@ -292,18 +292,18 @@ export default function Warehouse() {
               <TableBody>
                 {items.map((item) => (
                   <TableRow key={item.id}>
-                    <TableCell className="font-medium">{item.item_name}</TableCell>
+                    <TableCell className="font-medium">{item.name}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{item.category || "-"}</Badge>
                     </TableCell>
                     <TableCell>{item.quantity} {item.unit}</TableCell>
-                    <TableCell>${item.unit_price.toFixed(2)}</TableCell>
+                    <TableCell>${item.unit_cost.toFixed(2)}</TableCell>
                     <TableCell className="font-semibold">
-                      ${(item.quantity * item.unit_price).toLocaleString()}
+                      ${(item.quantity * item.unit_cost).toLocaleString()}
                     </TableCell>
                     <TableCell>{item.location || "-"}</TableCell>
                     <TableCell>
-                      {item.quantity <= item.reorder_level ? (
+                      {item.quantity <= (item.reorder_level || 0) ? (
                         <Badge className="bg-warning/20 text-warning">Low Stock</Badge>
                       ) : (
                         <Badge className="bg-success/20 text-success">In Stock</Badge>

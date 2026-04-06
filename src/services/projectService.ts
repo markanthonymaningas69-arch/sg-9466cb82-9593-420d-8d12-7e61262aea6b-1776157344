@@ -63,7 +63,7 @@ export const projectService = {
   async getStats() {
     const { data, error } = await supabase
       .from("projects")
-      .select("status, budget, actual_cost");
+      .select("status, budget, spent");
     
     if (error) return { data: null, error };
 
@@ -72,7 +72,7 @@ export const projectService = {
       active: data.filter(p => p.status === "active").length,
       completed: data.filter(p => p.status === "completed").length,
       totalBudget: data.reduce((sum, p) => sum + (p.budget || 0), 0),
-      totalCost: data.reduce((sum, p) => sum + (p.actual_cost || 0), 0),
+      totalCost: data.reduce((sum, p) => sum + (p.spent || 0), 0),
     };
 
     return { data: stats, error: null };

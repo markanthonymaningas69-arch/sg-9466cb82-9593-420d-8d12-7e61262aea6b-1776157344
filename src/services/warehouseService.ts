@@ -1,13 +1,13 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 
-type WarehouseItem = Database["public"]["Tables"]["warehouse_inventory"]["Row"];
-type WarehouseInsert = Database["public"]["Tables"]["warehouse_inventory"]["Insert"];
+type WarehouseItem = Database["public"]["Tables"]["inventory"]["Row"];
+type WarehouseInsert = Database["public"]["Tables"]["inventory"]["Insert"];
 
 export const warehouseService = {
   async getAll() {
     const { data, error } = await supabase
-      .from("warehouse_inventory")
+      .from("inventory")
       .select("*")
       .order("created_at", { ascending: false });
     
@@ -17,7 +17,7 @@ export const warehouseService = {
 
   async getLowStock(threshold: number = 10) {
     const { data, error } = await supabase
-      .from("warehouse_inventory")
+      .from("inventory")
       .select("*")
       .lte("quantity", threshold)
       .order("quantity", { ascending: true });
@@ -28,7 +28,7 @@ export const warehouseService = {
 
   async create(item: WarehouseInsert) {
     const { data, error } = await supabase
-      .from("warehouse_inventory")
+      .from("inventory")
       .insert(item)
       .select()
       .single();
@@ -39,7 +39,7 @@ export const warehouseService = {
 
   async update(id: string, updates: Partial<WarehouseInsert>) {
     const { data, error } = await supabase
-      .from("warehouse_inventory")
+      .from("inventory")
       .update(updates)
       .eq("id", id)
       .select()
@@ -51,7 +51,7 @@ export const warehouseService = {
 
   async delete(id: string) {
     const { error } = await supabase
-      .from("warehouse_inventory")
+      .from("inventory")
       .delete()
       .eq("id", id);
     
@@ -61,7 +61,7 @@ export const warehouseService = {
 
   async adjustQuantity(id: string, adjustment: number) {
     const { data: current } = await supabase
-      .from("warehouse_inventory")
+      .from("inventory")
       .select("quantity")
       .eq("id", id)
       .single();
