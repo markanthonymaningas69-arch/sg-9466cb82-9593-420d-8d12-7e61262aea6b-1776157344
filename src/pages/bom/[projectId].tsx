@@ -479,6 +479,7 @@ export default function BillOfMaterials() {
               </div>
               <div className="flex justify-end mt-3">
                 <Button
+                  size="sm"
                   onClick={handleSaveScopeInline}
                   disabled={!newScopeName.trim()}
                   className="bg-green-600 hover:bg-green-700 text-white"
@@ -494,6 +495,7 @@ export default function BillOfMaterials() {
             {!showScopeInput ?
           <div className="flex justify-end">
                 <Button
+                  size="sm"
                   onClick={handleAddScopeClick}
                   style={{ lineHeight: "1" }}
                   className="bg-green-600 hover:bg-green-700 text-white"
@@ -517,6 +519,7 @@ export default function BillOfMaterials() {
                   </div>
                   <div className="flex justify-end mt-3 gap-2">
                     <Button
+                      size="sm"
                       onClick={handleSaveScopeInline}
                       disabled={!newScopeName.trim()}
                       className="bg-green-600 hover:bg-green-700 text-white"
@@ -738,7 +741,7 @@ export default function BillOfMaterials() {
               {/* Add Materials Button under last material */}
               <div className="flex justify-center">
                 <Button
-                size="lg"
+                size="sm"
                 className="bg-green-600 hover:bg-green-700 text-white"
                 onClick={() => {
                   setSelectedScopeId(scope.id);
@@ -748,11 +751,6 @@ export default function BillOfMaterials() {
                   <Plus className="h-5 w-5 mr-2" />
                   Add Materials
                 </Button>
-              </div>
-              <div className="flex justify-end pt-2 border-t mt-2">
-                <div className="text-lg font-semibold">
-                  Material Total: ${formatCurrency(calculateScopeMaterialTotal(scope))}
-                </div>
               </div>
 
               {/* Labor Section */}
