@@ -539,91 +539,38 @@ export default function BillOfMaterials() {
                       {(scope.bom_materials || []).map((material: Material) =>
                   <TableRow key={material.id}>
                           <TableCell>
-                            <div className="font-medium">{material.material_name}</div>
-                            {material.description &&
-                      <div className="text-xs text-muted-foreground">
-                                {material.description}
-                              </div>
-                      }
+                            <div className="font-medium">
+                              {material.description || material.material_name}
+                            </div>
                           </TableCell>
                           <TableCell className="text-right">
                             {material.quantity}
                           </TableCell>
                           <TableCell>
-                            <div className="space-y-2">
-                              <Select
-                          value={materialForm.unit_selection}
-                          onValueChange={(value) =>
-                          setMaterialForm({
-                            ...materialForm,
-                            unit: value === "Other" ? "" : value,
-                            unit_selection: value
-                          })
-                          }>
-                          
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select unit" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {["Cu.m", "Sq.m", "Lin.m", "Pc", "Kg", "Box", "Other"].map((unitOption) =>
-                            <SelectItem key={unitOption} value={unitOption}>
-                                      {unitOption === "Other" ? "Other (specify)" : unitOption}
-                                    </SelectItem>
-                            )}
-                                </SelectContent>
-                              </Select>
-                              {materialForm.unit_selection === "Other" &&
-                        <Input
-                          placeholder="Enter unit"
-                          value={materialForm.unit}
-                          onChange={(e) =>
-                          setMaterialForm({
-                            ...materialForm,
-                            unit: e.target.value
-                          })
-                          } />
-
-                        }
-                            </div>
+                            {material.unit}
                           </TableCell>
                           <TableCell className="text-right">
-                            <Input
-                        type="number"
-                        step="0.01"
-                        value={materialForm.unit_cost}
-                        onChange={(e) =>
-                        setMaterialForm({
-                          ...materialForm,
-                          unit_cost: e.target.value
-                        })
-                        } />
-                      
+                            ${((material.unit_cost ?? 0) as number).toFixed(2)}
                           </TableCell>
                           <TableCell className="text-right font-semibold">
                             {(() => {
-                        const quantity = parseFloat(materialForm.quantity || "0");
-                        const unitCost = parseFloat(materialForm.unit_cost || "0");
-                        const amount = quantity * unitCost;
-                        return `$${amount.toFixed(2)}`;
-                      })()}
+                              const quantity = material.quantity || 0;
+                              const unitCost = material.unit_cost || 0;
+                              const total =
+                                material.total_cost != null
+                                  ? material.total_cost
+                                  : quantity * unitCost;
+                              return `$${(total as number).toFixed(2)}`;
+                            })()}
                           </TableCell>
-                          <TableCell className="space-x-1 text-right">
+                          <TableCell className="text-right">
                             <Button
-                              onClick={handleMaterialSubmitInline}
-                              className="bg-green-600 hover:bg-green-700 text-white"
+                              size="icon"
+                              variant="ghost"
+                              className="text-red-600 hover:text-red-700"
+                              onClick={() => handleDeleteMaterial(material.id)}
                             >
-                              Add
-                            </Button>
-                            <Button
-                        size="icon"
-                        variant="ghost"
-                        className="text-red-600 hover:text-red-700"
-                        onClick={() => {
-                          resetMaterialForm();
-                          setSelectedScopeId("");
-                        }}>
-                        
-                              <X className="h-4 w-4" />
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -714,24 +661,27 @@ export default function BillOfMaterials() {
                         return `$${amount.toFixed(2)}`;
                       })()}
                           </TableCell>
-                          <TableCell className="space-x-1 text-right">
-                            <Button
-                              onClick={handleMaterialSubmitInline}
-                              className="bg-green-600 hover:bg-green-700 text-white"
-                            >
-                              Add
-                            </Button>
-                            <Button
-                        size="icon"
-                        variant="ghost"
-                        className="text-red-600 hover:text-red-700"
-                        onClick={() => {
-                          resetMaterialForm();
-                          setSelectedScopeId("");
-                        }}>
-                        
-                              <X className="h-4 w-4" />
-                            </Button>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end items-center gap-2">
+                              <Button
+                                size="sm"
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                                onClick={handleMaterialSubmitInline}
+                              >
+                                Add
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-red-600 text-red-700 hover:bg-red-50"
+                                onClick={() => {
+                                  resetMaterialForm();
+                                  setSelectedScopeId("");
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                   }
