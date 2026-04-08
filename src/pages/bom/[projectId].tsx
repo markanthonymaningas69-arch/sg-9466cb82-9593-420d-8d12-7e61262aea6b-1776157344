@@ -162,8 +162,14 @@ export default function BillOfMaterials() {
   };
 
   const handleSaveScopeInline = async () => {
-    if (!bom || !newScopeName.trim()) {
-      console.log("Cannot save scope:", { bom, newScopeName });
+    if (!newScopeName.trim()) {
+      alert("Please enter a Scope of Work name before adding.");
+      return;
+    }
+
+    if (!bom) {
+      alert("The Bill of Materials record is not loaded yet. Please reload the page and try again.");
+      console.log("Cannot save scope because BOM is null:", { bom, newScopeName });
       return;
     }
     
