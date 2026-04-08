@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { bomService } from "@/services/bomService";
 import { projectService } from "@/services/projectService";
-import { Plus, Pencil, Trash2, Save, ArrowLeft, Check, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Save, ArrowLeft, Check, X, Printer } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
 type BOM = Database["public"]["Tables"]["bill_of_materials"]["Row"];
@@ -32,6 +32,7 @@ export default function BillOfMaterials() {
   const [loading, setLoading] = useState(true);
   const [showIndirectCosts, setShowIndirectCosts] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [indirectDialogOpen, setIndirectDialogOpen] = useState(false);
   
   // Inline scope creation
   const [showScopeInput, setShowScopeInput] = useState(false);
@@ -48,6 +49,7 @@ export default function BillOfMaterials() {
     description: "",
     quantity: "",
     unit: "",
+    unit_selection: "",
     unit_cost: ""
   });
   
@@ -240,7 +242,14 @@ export default function BillOfMaterials() {
   };
 
   const resetMaterialForm = () => {
-    setMaterialForm({ name: "", description: "", quantity: "", unit: "", unit_cost: "" });
+    setMaterialForm({
+      name: "",
+      description: "",
+      quantity: "",
+      unit: "",
+      unit_selection: "",
+      unit_cost: ""
+    });
   };
 
   // Labor operations
@@ -381,6 +390,15 @@ export default function BillOfMaterials() {
     loadData();
   };
 
+  const handlePrintPDF = async () => {
+    if (bom) {
+      await handleSaveBOM();
+    }
+    if (typeof window !== "undefined") {
+      window.print();
+    }
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -404,15 +422,8 @@ export default function BillOfMaterials() {
           </div>
         </div>
 
-        {/* Add Scope Button or Inline Input */}
-        {!showScopeInput ? (
-          <div className="flex justify-end">
-            <Button onClick={handleAddScopeClick}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Scope of Work
-            </Button>
-          </div>
-        ) : (
+        {/* Initial Scope of Work form and Add Scope button */}
+        {scopes.length === 0 ? (
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-2">
@@ -424,15 +435,47 @@ export default function BillOfMaterials() {
                   autoFocus
                   className="flex-1"
                 />
-                <Button size="icon" onClick={handleSaveScopeInline} disabled={!newScopeName.trim()}>
-                  <Check className="h-4 w-4" />
-                </Button>
-                <Button size="icon" variant="outline" onClick={handleCancelScopeInline}>
-                  <X className="h-4 w-4" />
+              </div>
+              <div className="flex justify-end mt-3">
+                <Button onClick={handleSaveScopeInline} disabled={!newScopeName.trim()}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Scope of Work
                 </Button>
               </div>
             </CardContent>
           </Card>
+        ) : (
+          <>
+            {!showScopeInput ? (
+              <div className="flex justify-end">
+                <Button onClick={handleAddScopeClick}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Scope of Work
+                </Button>
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="Enter scope of work name..."
+                      value={newScopeName}
+                      onChange={(e) => setNewScopeName(e.target.value)}
+                      onKeyPress={(e) => e.key === "Enter" && handleSaveScopeInline()}
+                      autoFocus
+                      className="flex-1"
+                    />
+                    <Button size="icon" onClick={handleSaveScopeInline} disabled={!newScopeName.trim()}>
+                      <Check className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="outline" onClick={handleCancelScopeInline}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </>
         )}
 
         {/* Scopes List */}
@@ -476,20 +519,77 @@ export default function BillOfMaterials() {
                           <TableCell className="text-right">
                             {material.quantity}
                           </TableCell>
-                          <TableCell>{material.unit}</TableCell>
+                          <TableCell>
+                            <div className="space-y-2">
+                              <Select
+                                value={materialForm.unit_selection}
+                                onValueChange={(value) =>
+                                  setMaterialForm({
+                                    ...materialForm,
+                                    unit: value === "Other" ? "" : value,
+                                    unit_selection: value
+                                  })
+                                }
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select unit" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {["Cu.m", "Sq.m", "Lin.m", "Pc", "Kg", "Box", "Other"].map((unitOption) => (
+                                    <SelectItem key={unitOption} value={unitOption}>
+                                      {unitOption === "Other" ? "Other (specify)" : unitOption}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              {materialForm.unit_selection === "Other" && (
+                                <Input
+                                  placeholder="Enter unit"
+                                  value={materialForm.unit}
+                                  onChange={(e) =>
+                                    setMaterialForm({
+                                      ...materialForm,
+                                      unit: e.target.value
+                                    })
+                                  }
+                                />
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell className="text-right">
-                            ${material.unit_cost?.toFixed(2)}
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={materialForm.unit_cost}
+                              onChange={(e) =>
+                                setMaterialForm({
+                                  ...materialForm,
+                                  unit_cost: e.target.value
+                                })
+                              }
+                            />
                           </TableCell>
                           <TableCell className="text-right font-semibold">
-                            ${material.total_cost?.toFixed(2)}
+                            {(() => {
+                              const quantity = parseFloat(materialForm.quantity || "0");
+                              const unitCost = parseFloat(materialForm.unit_cost || "0");
+                              const amount = quantity * unitCost;
+                              return `$${amount.toFixed(2)}`;
+                            })()}
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="space-x-1 text-right">
+                            <Button onClick={handleMaterialSubmitInline}>
+                              Add
+                            </Button>
                             <Button
                               size="icon"
                               variant="ghost"
-                              onClick={() => handleDeleteMaterial(material.id)}
+                              onClick={() => {
+                                resetMaterialForm();
+                                setSelectedScopeId("");
+                              }}
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <X className="h-4 w-4" />
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -523,26 +623,41 @@ export default function BillOfMaterials() {
                             />
                           </TableCell>
                           <TableCell>
-                            <Select
-                              value={materialForm.unit}
-                              onValueChange={(value) =>
-                                setMaterialForm({
-                                  ...materialForm,
-                                  unit: value
-                                })
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select unit" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {["cu.m", "kg", "pc"].map((unit) => (
-                                  <SelectItem key={unit} value={unit}>
-                                    {unit}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <div className="space-y-2">
+                              <Select
+                                value={materialForm.unit_selection}
+                                onValueChange={(value) =>
+                                  setMaterialForm({
+                                    ...materialForm,
+                                    unit: value === "Other" ? "" : value,
+                                    unit_selection: value
+                                  })
+                                }
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select unit" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {["Cu.m", "Sq.m", "Lin.m", "Pc", "Kg", "Box", "Other"].map((unitOption) => (
+                                    <SelectItem key={unitOption} value={unitOption}>
+                                      {unitOption === "Other" ? "Other (specify)" : unitOption}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              {materialForm.unit_selection === "Other" && (
+                                <Input
+                                  placeholder="Enter unit"
+                                  value={materialForm.unit}
+                                  onChange={(e) =>
+                                    setMaterialForm({
+                                      ...materialForm,
+                                      unit: e.target.value
+                                    })
+                                  }
+                                />
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-right">
                             <Input
@@ -804,131 +919,99 @@ export default function BillOfMaterials() {
           </Card>
         ))}
 
-        {/* Add Scope Button or Inline Input under last scope */}
-        {!showScopeInput ? (
-          <div className="flex justify-end">
-            <Button onClick={handleAddScopeClick}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Scope of Work
-            </Button>
-          </div>
-        ) : (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2">
-                <Input
-                  placeholder="Enter scope of work name..."
-                  value={newScopeName}
-                  onChange={(e) => setNewScopeName(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && handleSaveScopeInline()}
-                  autoFocus
-                  className="flex-1"
-                />
-                <Button size="icon" onClick={handleSaveScopeInline} disabled={!newScopeName.trim()}>
-                  <Check className="h-4 w-4" />
-                </Button>
-                <Button size="icon" variant="outline" onClick={handleCancelScopeInline}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Total Direct Cost */}
+        {/* Indirect Costs using a dialog, no full inline form */}
         {scopes.length > 0 && (
-          <Card className="bg-primary/5">
-            <CardContent className="pt-6">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold">Total Direct Cost</h2>
-                <div className="text-3xl font-bold text-primary">
-                  ${calculateTotalDirectCost().toFixed(2)}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+          <>
+            <div className="flex justify-center">
+              <Button
+                size="lg"
+                onClick={() => {
+                  setShowIndirectCosts(true);
+                  setIndirectDialogOpen(true);
+                }}
+              >
+                <Plus className="h-5 w-5 mr-2" />
+                Add Indirect Cost
+              </Button>
+            </div>
 
-        {/* Add Indirect Cost Button */}
-        {!showIndirectCosts && scopes.length > 0 && (
-          <div className="flex justify-center">
-            <Button size="lg" onClick={() => setShowIndirectCosts(true)}>
-              <Plus className="h-5 w-5 mr-2" />
-              Add Indirect Cost
-            </Button>
-          </div>
-        )}
-
-        {/* Indirect Costs Section */}
-        {showIndirectCosts && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Indirect Costs</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>VAT (%)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={indirectForm.vat}
-                    onChange={(e) => setIndirectForm({ ...indirectForm, vat: e.target.value })}
-                  />
+            <Dialog open={indirectDialogOpen} onOpenChange={setIndirectDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Indirect Costs</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 mt-2">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>VAT (%)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={indirectForm.vat}
+                        onChange={(e) => setIndirectForm({ ...indirectForm, vat: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Tax (%)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={indirectForm.tax}
+                        onChange={(e) => setIndirectForm({ ...indirectForm, tax: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>OCM (%)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={indirectForm.ocm}
+                        onChange={(e) => setIndirectForm({ ...indirectForm, ocm: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Profit (%)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={indirectForm.profit}
+                        onChange={(e) => setIndirectForm({ ...indirectForm, profit: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Others - Description</Label>
+                    <Input
+                      value={indirectForm.others_description}
+                      onChange={(e) =>
+                        setIndirectForm({ ...indirectForm, others_description: e.target.value })
+                      }
+                      placeholder="Specify other costs"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Others - Amount ($)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={indirectForm.others_amount}
+                      onChange={(e) =>
+                        setIndirectForm({ ...indirectForm, others_amount: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="pt-4 border-t">
+                    <div className="flex justify-between items-center mb-4">
+                      <span className="text-lg font-semibold">Total Indirect Cost:</span>
+                      <span className="text-2xl font-bold">
+                        ${calculateIndirectCost().toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Tax (%)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={indirectForm.tax}
-                    onChange={(e) => setIndirectForm({ ...indirectForm, tax: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>OCM (%)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={indirectForm.ocm}
-                    onChange={(e) => setIndirectForm({ ...indirectForm, ocm: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Profit (%)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={indirectForm.profit}
-                    onChange={(e) => setIndirectForm({ ...indirectForm, profit: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Others - Description</Label>
-                <Input
-                  value={indirectForm.others_description}
-                  onChange={(e) => setIndirectForm({ ...indirectForm, others_description: e.target.value })}
-                  placeholder="Specify other costs"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Others - Amount ($)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={indirectForm.others_amount}
-                  onChange={(e) => setIndirectForm({ ...indirectForm, others_amount: e.target.value })}
-                />
-              </div>
-              <div className="pt-4 border-t">
-                <div className="flex justify-between items-center mb-4">
-                  <span className="text-lg font-semibold">Total Indirect Cost:</span>
-                  <span className="text-2xl font-bold">${calculateIndirectCost().toFixed(2)}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </DialogContent>
+            </Dialog>
+          </>
         )}
 
         {/* Grand Total */}
@@ -945,25 +1028,15 @@ export default function BillOfMaterials() {
               </CardContent>
             </Card>
 
-            {/* Save BOM Button */}
+            {/* Print to PDF Button */}
             <div className="flex justify-center">
-              <Button 
-                size="lg" 
-                onClick={handleSaveBOM}
-                disabled={saving}
+              <Button
+                size="lg"
+                onClick={handlePrintPDF}
                 className="min-w-[200px]"
               >
-                {saving ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-5 w-5 mr-2" />
-                    Save Bill of Materials
-                  </>
-                )}
+                <Printer className="h-5 w-5 mr-2" />
+                Print to PDF
               </Button>
             </div>
           </>
