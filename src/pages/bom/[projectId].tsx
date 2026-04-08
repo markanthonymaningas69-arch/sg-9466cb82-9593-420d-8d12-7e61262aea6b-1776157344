@@ -10,16 +10,16 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
+  SelectValue } from
+"@/components/ui/select";
 import {
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
-  TableRow
-} from "@/components/ui/table";
+  TableRow } from
+"@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { bomService } from "@/services/bomService";
 import { projectService } from "@/services/projectService";
@@ -166,12 +166,12 @@ export default function BillOfMaterials() {
 
   const calculateScopeMaterialTotal = (scope: ScopeOfWork): number => {
     const materials = scope.bom_materials || [];
-    return materials.reduce((sum, m) => sum + ((m.total_cost as number) ?? 0), 0);
+    return materials.reduce((sum, m) => sum + (m.total_cost as number ?? 0), 0);
   };
 
   const calculateScopeLaborTotal = (scope: ScopeOfWork): number => {
     const labor = scope.bom_labor || [];
-    return labor.reduce((sum, l) => sum + ((l.total_cost as number) ?? 0), 0);
+    return labor.reduce((sum, l) => sum + (l.total_cost as number ?? 0), 0);
   };
 
   const calculateScopeDirectCost = (scope: ScopeOfWork): number => {
@@ -190,7 +190,7 @@ export default function BillOfMaterials() {
     const profit = parseFloat(indirectForm.profit || "0");
     const others = parseFloat(indirectForm.others_amount || "0");
 
-    return (directCost * (vat + tax + ocm + profit)) / 100 + others;
+    return directCost * (vat + tax + ocm + profit) / 100 + others;
   };
 
   const calculateGrandTotal = (): number => {
@@ -356,11 +356,11 @@ export default function BillOfMaterials() {
       }
     } else {
       if (
-        !laborForm.hours ||
-        !laborForm.rate ||
-        parseFloat(laborForm.hours) <= 0 ||
-        parseFloat(laborForm.rate) <= 0
-      ) {
+      !laborForm.hours ||
+      !laborForm.rate ||
+      parseFloat(laborForm.hours) <= 0 ||
+      parseFloat(laborForm.rate) <= 0)
+      {
         alert("Please enter a valid quantity and rate for labor.");
         return;
       }
@@ -381,24 +381,24 @@ export default function BillOfMaterials() {
       scope_id: scopeId,
       labor_type: laborForm.role || "Labor",
       description:
-        laborForm.calculation_method === "unit_cost" && laborForm.unit
-          ? laborForm.unit
-          : laborForm.description,
+      laborForm.calculation_method === "unit_cost" && laborForm.unit ?
+      laborForm.unit :
+      laborForm.description,
       hours:
-        laborForm.calculation_method === "unit_cost"
-          ? parseFloat(laborForm.hours || "0")
-          : 0,
+      laborForm.calculation_method === "unit_cost" ?
+      parseFloat(laborForm.hours || "0") :
+      0,
       hourly_rate:
-        laborForm.calculation_method === "unit_cost"
-          ? parseFloat(laborForm.rate || "0")
-          : 0
+      laborForm.calculation_method === "unit_cost" ?
+      parseFloat(laborForm.rate || "0") :
+      0
     };
 
     const existingScope = scopes.find((s) => s.id === scopeId);
     const existingLabor =
-      existingScope && Array.isArray(existingScope.bom_labor) && existingScope.bom_labor.length > 0
-        ? existingScope.bom_labor[0]
-        : null;
+    existingScope && Array.isArray(existingScope.bom_labor) && existingScope.bom_labor.length > 0 ?
+    existingScope.bom_labor[0] :
+    null;
 
     let error;
     if (editingLabor && editingLabor.scope_id === scopeId) {
@@ -539,8 +539,8 @@ export default function BillOfMaterials() {
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
         </div>
-      </Layout>
-    );
+      </Layout>);
+
   }
 
   return (
@@ -556,11 +556,55 @@ export default function BillOfMaterials() {
           </div>
         </div>
 
-        {scopes.length === 0 ? (
-          <Card>
+        {scopes.length === 0 ?
+        <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-2">
                 <Input
+                placeholder="Enter the scope name"
+                value={newScopeName}
+                onChange={(e) => setNewScopeName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    void handleSaveScopeInline();
+                  }
+                }}
+                autoFocus
+                className="flex-1" />
+              
+              </div>
+              <div className="flex justify-end mt-3">
+                <Button
+                size="sm"
+                onClick={() => void handleSaveScopeInline()}
+                disabled={!newScopeName.trim()}
+                className="bg-green-600 hover:bg-green-700 text-white">
+                
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Scope of Work
+                </Button>
+              </div>
+            </CardContent>
+          </Card> :
+
+        <>
+            {!showScopeInput ?
+          <div className="flex justify-end">
+                <Button
+              size="sm"
+              onClick={handleAddScopeClick}
+              style={{ lineHeight: "1" }}
+              className="bg-green-600 hover:bg-green-700 text-white">
+              
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Scope of Work
+                </Button>
+              </div> :
+
+          <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-2">
+                    <Input
                   placeholder="Enter the scope name"
                   value={newScopeName}
                   onChange={(e) => setNewScopeName(e.target.value)}
@@ -570,96 +614,52 @@ export default function BillOfMaterials() {
                     }
                   }}
                   autoFocus
-                  className="flex-1"
-                />
-              </div>
-              <div className="flex justify-end mt-3">
-                <Button
-                  size="sm"
-                  onClick={() => void handleSaveScopeInline()}
-                  disabled={!newScopeName.trim()}
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Scope of Work
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <>
-            {!showScopeInput ? (
-              <div className="flex justify-end">
-                <Button
-                  size="sm"
-                  onClick={handleAddScopeClick}
-                  style={{ lineHeight: "1" }}
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Scope of Work
-                </Button>
-              </div>
-            ) : (
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-2">
-                    <Input
-                      placeholder="Enter the scope name"
-                      value={newScopeName}
-                      onChange={(e) => setNewScopeName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          void handleSaveScopeInline();
-                        }
-                      }}
-                      autoFocus
-                      className="flex-1"
-                    />
+                  className="flex-1" />
+                
                   </div>
                   <div className="flex justify-end mt-3 gap-2">
                     <Button
-                      size="sm"
-                      onClick={() => void handleSaveScopeInline()}
-                      disabled={!newScopeName.trim()}
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                    >
+                  size="sm"
+                  onClick={() => void handleSaveScopeInline()}
+                  disabled={!newScopeName.trim()}
+                  className="bg-green-600 hover:bg-green-700 text-white">
+                  
                       <Plus className="h-4 w-4 mr-2" />
                       Add Scope of Work
                     </Button>
                     <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-red-600 text-red-700 hover:bg-red-50"
-                      onClick={handleCancelScopeInline}
-                    >
+                  size="sm"
+                  variant="outline"
+                  className="border-red-600 text-red-700 hover:bg-red-50"
+                  onClick={handleCancelScopeInline}>
+                  
                       Cancel
                     </Button>
                   </div>
                 </CardContent>
               </Card>
-            )}
+          }
           </>
-        )}
+        }
 
-        {scopes.map((scope) => (
-          <Card key={scope.id}>
+        {scopes.map((scope) =>
+        <Card key={scope.id}>
             <CardHeader>
               <div className="flex justify-between items-start">
                 <CardTitle className="text-xl">{scope.name}</CardTitle>
                 <Button
-                  size="icon"
-                  variant="ghost"
-                  className="text-red-600 hover:text-red-700"
-                  onClick={() => void handleDeleteScope(scope.id as string)}
-                >
+                size="icon"
+                variant="ghost"
+                className="text-red-600 hover:text-red-700"
+                onClick={() => void handleDeleteScope(scope.id as string)}>
+                
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              {(scope.bom_materials?.length || 0) > 0 || selectedScopeId === scope.id ? (
-                <div className="mt-4">
+              {(scope.bom_materials?.length || 0) > 0 || selectedScopeId === scope.id ?
+            <div className="mt-4">
                   <div className="flex justify-between items-center mb-3">
                     <h3 className="font-semibold text-lg">Materials</h3>
                   </div>
@@ -675,8 +675,8 @@ export default function BillOfMaterials() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {(scope.bom_materials || []).map((material) => (
-                        <TableRow key={material.id}>
+                      {(scope.bom_materials || []).map((material) =>
+                  <TableRow key={material.id}>
                           <TableCell>
                             <div className="font-medium">
                               {material.description || material.material_name}
@@ -687,167 +687,167 @@ export default function BillOfMaterials() {
                           </TableCell>
                           <TableCell>{material.unit}</TableCell>
                           <TableCell className="text-right">
-                            ${formatCurrency((material.unit_cost as number) ?? 0)}
+                            ${formatCurrency(material.unit_cost as number ?? 0)}
                           </TableCell>
                           <TableCell className="text-right font-semibold">
                             {(() => {
-                              const total =
-                                (material.total_cost as number) ??
-                                ((material.quantity || 0) *
-                                  ((material.unit_cost as number) || 0));
-                              return `$${formatCurrency(total)}`;
-                            })()}
+                        const total =
+                        material.total_cost as number ??
+                        (material.quantity || 0) * (
+                        material.unit_cost as number || 0);
+                        return `$${formatCurrency(total)}`;
+                      })()}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">
                               <Button
-                                size="icon"
-                                variant="ghost"
-                                className="text-green-600 hover:text-green-700"
-                                onClick={() => handleEditMaterial(material)}
-                              >
+                          size="icon"
+                          variant="ghost"
+                          className="text-green-600 hover:text-green-700"
+                          onClick={() => handleEditMaterial(material)}>
+                          
                                 <Pencil className="h-4 w-4" />
                               </Button>
                               <Button
-                                size="icon"
-                                variant="ghost"
-                                className="text-red-600 hover:text-red-700"
-                                onClick={() => void handleDeleteMaterial(material.id as string)}
-                              >
+                          size="icon"
+                          variant="ghost"
+                          className="text-red-600 hover:text-red-700"
+                          onClick={() => void handleDeleteMaterial(material.id as string)}>
+                          
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))}
+                  )}
 
-                      {selectedScopeId === scope.id && (
-                        <TableRow>
+                      {selectedScopeId === scope.id &&
+                  <TableRow>
                           <TableCell>
                             <Input
-                              placeholder="Material description"
-                              value={materialForm.description}
-                              onChange={(e) =>
-                                setMaterialForm({
-                                  ...materialForm,
-                                  description: e.target.value
-                                })
-                              }
-                            />
+                        placeholder="Material description"
+                        value={materialForm.description}
+                        onChange={(e) =>
+                        setMaterialForm({
+                          ...materialForm,
+                          description: e.target.value
+                        })
+                        } />
+                      
                           </TableCell>
                           <TableCell className="text-right">
                             <Input
-                              type="number"
-                              step="0.01"
-                              value={materialForm.quantity}
-                              onChange={(e) =>
-                                setMaterialForm({
-                                  ...materialForm,
-                                  quantity: e.target.value
-                                })
-                              }
-                            />
+                        type="number"
+                        step="0.01"
+                        value={materialForm.quantity}
+                        onChange={(e) =>
+                        setMaterialForm({
+                          ...materialForm,
+                          quantity: e.target.value
+                        })
+                        } />
+                      
                           </TableCell>
                           <TableCell>
                             <div className="space-y-2">
                               <Select
-                                value={materialForm.unit_selection}
-                                onValueChange={(value) =>
-                                  setMaterialForm({
-                                    ...materialForm,
-                                    unit: value === "Other" ? "" : value,
-                                    unit_selection: value
-                                  })
-                                }
-                              >
+                          value={materialForm.unit_selection}
+                          onValueChange={(value) =>
+                          setMaterialForm({
+                            ...materialForm,
+                            unit: value === "Other" ? "" : value,
+                            unit_selection: value
+                          })
+                          }>
+                          
                                 <SelectTrigger>
                                   <SelectValue placeholder="Select unit" />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {["Cu.m", "Sq.m", "Lin.m", "Pc", "Kg", "Box", "Other"].map(
-                                    (unitOption) => (
-                                      <SelectItem key={unitOption} value={unitOption}>
-                                        {unitOption === "Other"
-                                          ? "Other (specify)"
-                                          : unitOption}
+                              (unitOption) =>
+                              <SelectItem key={unitOption} value={unitOption}>
+                                        {unitOption === "Other" ?
+                                "Other (specify)" :
+                                unitOption}
                                       </SelectItem>
-                                    )
-                                  )}
+
+                            )}
                                 </SelectContent>
                               </Select>
-                              {materialForm.unit_selection === "Other" && (
-                                <Input
-                                  placeholder="Enter unit"
-                                  value={materialForm.unit}
-                                  onChange={(e) =>
-                                    setMaterialForm({
-                                      ...materialForm,
-                                      unit: e.target.value
-                                    })
-                                  }
-                                />
-                              )}
+                              {materialForm.unit_selection === "Other" &&
+                        <Input
+                          placeholder="Enter unit"
+                          value={materialForm.unit}
+                          onChange={(e) =>
+                          setMaterialForm({
+                            ...materialForm,
+                            unit: e.target.value
+                          })
+                          } />
+
+                        }
                             </div>
                           </TableCell>
                           <TableCell className="text-right">
                             <Input
-                              type="number"
-                              step="0.01"
-                              value={materialForm.unit_cost}
-                              onChange={(e) =>
-                                setMaterialForm({
-                                  ...materialForm,
-                                  unit_cost: e.target.value
-                                })
-                              }
-                            />
+                        type="number"
+                        step="0.01"
+                        value={materialForm.unit_cost}
+                        onChange={(e) =>
+                        setMaterialForm({
+                          ...materialForm,
+                          unit_cost: e.target.value
+                        })
+                        } />
+                      
                           </TableCell>
                           <TableCell className="text-right font-semibold">
                             {(() => {
-                              const quantity = parseFloat(materialForm.quantity || "0");
-                              const unitCost = parseFloat(materialForm.unit_cost || "0");
-                              const amount = quantity * unitCost;
-                              return `$${formatCurrency(amount)}`;
-                            })()}
+                        const quantity = parseFloat(materialForm.quantity || "0");
+                        const unitCost = parseFloat(materialForm.unit_cost || "0");
+                        const amount = quantity * unitCost;
+                        return `$${formatCurrency(amount)}`;
+                      })()}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end items-center gap-2">
                               <Button
-                                size="sm"
-                                className="bg-green-600 hover:bg-green-700 text-white"
-                                onClick={() => void handleMaterialSubmitInline()}
-                              >
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                          onClick={() => void handleMaterialSubmitInline()}>
+                          
                                 {editingMaterial ? "Update" : "Add"}
                               </Button>
                               <Button
-                                size="sm"
-                                variant="outline"
-                                className="border-red-600 text-red-700 hover:bg-red-50"
-                                onClick={() => {
-                                  resetMaterialForm();
-                                  setSelectedScopeId("");
-                                }}
-                              >
+                          size="sm"
+                          variant="outline"
+                          className="border-red-600 text-red-700 hover:bg-red-50"
+                          onClick={() => {
+                            resetMaterialForm();
+                            setSelectedScopeId("");
+                          }}>
+                          
                                 Cancel
                               </Button>
                             </div>
                           </TableCell>
                         </TableRow>
-                      )}
+                  }
                     </TableBody>
                   </Table>
-                </div>
-              ) : null}
+                </div> :
+            null}
 
               <div className="flex justify-center">
                 <Button
-                  size="sm"
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                  onClick={() => {
-                    setSelectedScopeId(scope.id as string);
-                    resetMaterialForm();
-                  }}
-                >
+                size="sm"
+                className="bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => {
+                  setSelectedScopeId(scope.id as string);
+                  resetMaterialForm();
+                }}>
+                
                   <Plus className="h-5 w-5 mr-2" />
                   Add Materials
                 </Button>
@@ -858,8 +858,8 @@ export default function BillOfMaterials() {
                 </div>
               </div>
 
-              {(scope.bom_materials?.length || 0) > 0 && (
-                <div>
+              {(scope.bom_materials?.length || 0) > 0 &&
+            <div>
                   <div className="flex justify-between items-center mb-3">
                     <h3 className="font-semibold text-lg">Labor Cost</h3>
                   </div>
@@ -870,246 +870,246 @@ export default function BillOfMaterials() {
                         <Label>Calculation Method *</Label>
                         <div className="inline-flex rounded-md border border-green-600 bg-muted p-1">
                           <Button
-                            type="button"
-                            size="sm"
-                            variant={
-                              laborForm.calculation_method === "percentage" ? "default" : "ghost"
-                            }
-                            className={
-                              laborForm.calculation_method === "percentage"
-                                ? "bg-green-600 text-white hover:bg-green-700"
-                                : "text-green-700 hover:bg-transparent"
-                            }
-                            onClick={() =>
-                              setLaborForm((prev) => ({
-                                ...prev,
-                                calculation_method: "percentage"
-                              }))
-                            }
-                          >
+                        type="button"
+                        size="sm"
+                        variant={
+                        laborForm.calculation_method === "percentage" ? "default" : "ghost"
+                        }
+                        className={
+                        laborForm.calculation_method === "percentage" ?
+                        "bg-green-600 text-white hover:bg-green-700" :
+                        "text-green-700 hover:bg-transparent"
+                        }
+                        onClick={() =>
+                        setLaborForm((prev) => ({
+                          ...prev,
+                          calculation_method: "percentage"
+                        }))
+                        }>
+                        
                             % of Materials
                           </Button>
                           <Button
-                            type="button"
-                            size="sm"
-                            variant={
-                              laborForm.calculation_method === "unit_cost" ? "default" : "ghost"
-                            }
-                            className={
-                              laborForm.calculation_method === "unit_cost"
-                                ? "bg-green-600 text-white hover:bg-green-700"
-                                : "text-green-700 hover:bg-transparent"
-                            }
-                            onClick={() =>
-                              setLaborForm((prev) => ({
-                                ...prev,
-                                calculation_method: "unit_cost"
-                              }))
-                            }
-                          >
+                        type="button"
+                        size="sm"
+                        variant={
+                        laborForm.calculation_method === "unit_cost" ? "default" : "ghost"
+                        }
+                        className={
+                        laborForm.calculation_method === "unit_cost" ?
+                        "bg-green-600 text-white hover:bg-green-700" :
+                        "text-green-700 hover:bg-transparent"
+                        }
+                        onClick={() =>
+                        setLaborForm((prev) => ({
+                          ...prev,
+                          calculation_method: "unit_cost"
+                        }))
+                        }>
+                        
                             By Unit Cost
                           </Button>
                         </div>
                       </div>
 
-                      {laborForm.calculation_method === "percentage" ? (
-                        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 items-end w-full md:w-auto">
+                      {laborForm.calculation_method === "percentage" ?
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 items-end w-full md:w-auto">
                           <div className="space-y-2">
                             <Label>Percentage of Material Cost *</Label>
                             <Input
-                              type="number"
-                              step="0.01"
-                              value={laborForm.percentage}
-                              onChange={(e) =>
-                                setLaborForm({ ...laborForm, percentage: e.target.value })
-                              }
-                              placeholder="e.g., 35 for 35%"
-                            />
+                        type="number"
+                        step="0.01"
+                        value={laborForm.percentage}
+                        onChange={(e) =>
+                        setLaborForm({ ...laborForm, percentage: e.target.value })
+                        }
+                        placeholder="e.g., 35 for 35%" />
+                      
                           </div>
                           <div className="text-right text-sm text-muted-foreground">
                             Material Total: ${formatCurrency(calculateScopeMaterialTotal(scope))}
                           </div>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-3 gap-4 w-full md:w-auto">
+                        </div> :
+
+                  <div className="grid grid-cols-3 gap-4 w-full md:w-auto">
                           <div className="space-y-2">
                             <Label>Quantity *</Label>
                             <Input
-                              type="number"
-                              step="0.01"
-                              value={laborForm.hours}
-                              onChange={(e) =>
-                                setLaborForm({ ...laborForm, hours: e.target.value })
-                              }
-                            />
+                        type="number"
+                        step="0.01"
+                        value={laborForm.hours}
+                        onChange={(e) =>
+                        setLaborForm({ ...laborForm, hours: e.target.value })
+                        } />
+                      
                           </div>
                           <div className="space-y-2">
                             <Label>Unit *</Label>
                             <div className="space-y-2">
                               <Select
-                                value={laborForm.unit_selection}
-                                onValueChange={(value) =>
-                                  setLaborForm({
-                                    ...laborForm,
-                                    unit: value === "Other" ? "" : value,
-                                    unit_selection: value
-                                  })
-                                }
-                              >
+                          value={laborForm.unit_selection}
+                          onValueChange={(value) =>
+                          setLaborForm({
+                            ...laborForm,
+                            unit: value === "Other" ? "" : value,
+                            unit_selection: value
+                          })
+                          }>
+                          
                                 <SelectTrigger>
                                   <SelectValue placeholder="Select unit" />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {["Cu.m", "Sq.m", "Lin.m", "Kg", "lot", "Other"].map(
-                                    (unitOption) => (
-                                      <SelectItem key={unitOption} value={unitOption}>
-                                        {unitOption === "Other"
-                                          ? "Other (specify)"
-                                          : unitOption}
+                              (unitOption) =>
+                              <SelectItem key={unitOption} value={unitOption}>
+                                        {unitOption === "Other" ?
+                                "Other (specify)" :
+                                unitOption}
                                       </SelectItem>
-                                    )
-                                  )}
+
+                            )}
                                 </SelectContent>
                               </Select>
-                              {laborForm.unit_selection === "Other" && (
-                                <Input
-                                  placeholder="Enter unit"
-                                  value={laborForm.unit}
-                                  onChange={(e) =>
-                                    setLaborForm({
-                                      ...laborForm,
-                                      unit: e.target.value
-                                    })
-                                  }
-                                />
-                              )}
+                              {laborForm.unit_selection === "Other" &&
+                        <Input
+                          placeholder="Enter unit"
+                          value={laborForm.unit}
+                          onChange={(e) =>
+                          setLaborForm({
+                            ...laborForm,
+                            unit: e.target.value
+                          })
+                          } />
+
+                        }
                             </div>
                           </div>
                           <div className="space-y-2">
                             <Label>Rate ($/unit) *</Label>
                             <Input
-                              type="number"
-                              step="0.01"
-                              value={laborForm.rate}
-                              onChange={(e) =>
-                                setLaborForm({ ...laborForm, rate: e.target.value })
-                              }
-                            />
+                        type="number"
+                        step="0.01"
+                        value={laborForm.rate}
+                        onChange={(e) =>
+                        setLaborForm({ ...laborForm, rate: e.target.value })
+                        } />
+                      
                           </div>
                         </div>
-                      )}
+                  }
                     </div>
 
                     <div className="flex justify-end gap-2">
                       <Button
-                        size="sm"
-                        className="bg-green-600 hover:bg-green-700 text-white"
-                        onClick={() => void handleLaborSubmit(scope.id as string)}
-                      >
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => void handleLaborSubmit(scope.id as string)}>
+                    
                         {(scope.bom_labor || []).length > 0 ? "Edit Labor" : "Add Labor"}
                       </Button>
                       <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-red-600 text-red-700 hover:bg-red-50"
-                        onClick={() => {
-                          resetLaborForm();
-                          setEditingLabor(null);
-                        }}
-                      >
+                    size="sm"
+                    variant="outline"
+                    className="border-red-600 text-red-700 hover:bg-red-50"
+                    onClick={() => {
+                      resetLaborForm();
+                      setEditingLabor(null);
+                    }}>
+                    
                         Cancel
                       </Button>
                     </div>
                   </div>
 
-                  {(scope.bom_labor || []).length > 0 ? (
-                    <div className="space-y-2">
-                      {(scope.bom_labor || []).slice(0, 1).map((labor) => (
-                        <div
-                          key={labor.id}
-                          className="flex justify-between items-center p-3 bg-muted/50 rounded-lg"
-                        >
-                          <div className="flex-1">
-                            <div className="font-medium">{labor.labor_type}</div>
-                            {labor.description && (
-                              <div className="text-sm text-muted-foreground">
-                                {labor.description}
-                              </div>
-                            )}
-                            {labor.hours && labor.hourly_rate && (
-                              <div className="text-sm text-muted-foreground mt-1">
-                                {labor.hours} × $
-                                {formatCurrency(labor.hourly_rate as number)}
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <div className="text-right font-semibold">
-                              ${formatCurrency((labor.total_cost as number) || 0)}
-                            </div>
-                            <div className="flex gap-1">
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="text-green-600 hover:text-green-700"
-                                onClick={() => {
-                                  setSelectedScopeId(scope.id as string);
-                                  handleEditLabor(labor);
-                                }}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="text-red-600 hover:text-red-700"
-                                onClick={() => void handleDeleteLabor(labor.id as string)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                  {(scope.bom_labor || []).length > 0 ?
+              <div className="space-y-2">
+                      {(scope.bom_labor || []).slice(0, 1).map((labor) => {}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                )}
                       <div className="flex justify-end pt-2 border-t">
                         <div className="text-lg font-semibold">
                           Labor Total: ${formatCurrency(calculateScopeLaborTotal(scope))}
                         </div>
                       </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground py-4">
+                    </div> :
+
+              <p className="text-sm text-muted-foreground py-4">
                       No labor costs added yet
                     </p>
-                  )}
+              }
                 </div>
-              )}
+            }
 
-              {(scope.bom_materials?.length || 0) > 0 && (
-                <div className="pt-4 border-t-2 border-primary">
+              {(scope.bom_materials?.length || 0) > 0 &&
+            <div className="pt-4 border-t-2 border-primary">
                   <div className="flex justify-end">
                     <div className="text-xl font-bold text-primary">
                       Direct Cost: ${formatCurrency(calculateScopeDirectCost(scope))}
                     </div>
                   </div>
                 </div>
-              )}
+            }
             </CardContent>
           </Card>
-        ))}
+        )}
 
-        {scopes.length > 0 && (
-          <>
+        {scopes.length > 0 &&
+        <>
             <div className="flex justify-center">
               <Button
-                size="lg"
-                className="bg-green-600 hover:bg-green-700 text-white"
-                onClick={() => {
-                  setShowIndirectCosts(true);
-                  setIndirectDialogOpen(true);
-                }}
-                style={{ lineHeight: "1" }}
-              >
+              size="lg"
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={() => {
+                setShowIndirectCosts(true);
+                setIndirectDialogOpen(true);
+              }}
+              style={{ lineHeight: "1" }}>
+              
                 <Plus className="h-5 w-5 mr-2" />
                 Add Indirect Cost
               </Button>
@@ -1125,74 +1125,74 @@ export default function BillOfMaterials() {
                     <div className="space-y-2">
                       <Label>VAT (%)</Label>
                       <Input
-                        type="number"
-                        step="0.01"
-                        value={indirectForm.vat}
-                        onChange={(e) =>
-                          setIndirectForm({ ...indirectForm, vat: e.target.value })
-                        }
-                      />
+                      type="number"
+                      step="0.01"
+                      value={indirectForm.vat}
+                      onChange={(e) =>
+                      setIndirectForm({ ...indirectForm, vat: e.target.value })
+                      } />
+                    
                     </div>
                     <div className="space-y-2">
                       <Label>Tax (%)</Label>
                       <Input
-                        type="number"
-                        step="0.01"
-                        value={indirectForm.tax}
-                        onChange={(e) =>
-                          setIndirectForm({ ...indirectForm, tax: e.target.value })
-                        }
-                      />
+                      type="number"
+                      step="0.01"
+                      value={indirectForm.tax}
+                      onChange={(e) =>
+                      setIndirectForm({ ...indirectForm, tax: e.target.value })
+                      } />
+                    
                     </div>
                     <div className="space-y-2">
                       <Label>OCM (%)</Label>
                       <Input
-                        type="number"
-                        step="0.01"
-                        value={indirectForm.ocm}
-                        onChange={(e) =>
-                          setIndirectForm({ ...indirectForm, ocm: e.target.value })
-                        }
-                      />
+                      type="number"
+                      step="0.01"
+                      value={indirectForm.ocm}
+                      onChange={(e) =>
+                      setIndirectForm({ ...indirectForm, ocm: e.target.value })
+                      } />
+                    
                     </div>
                     <div className="space-y-2">
                       <Label>Profit (%)</Label>
                       <Input
-                        type="number"
-                        step="0.01"
-                        value={indirectForm.profit}
-                        onChange={(e) =>
-                          setIndirectForm({ ...indirectForm, profit: e.target.value })
-                        }
-                      />
+                      type="number"
+                      step="0.01"
+                      value={indirectForm.profit}
+                      onChange={(e) =>
+                      setIndirectForm({ ...indirectForm, profit: e.target.value })
+                      } />
+                    
                     </div>
                   </div>
                   <div className="space-y-2">
                     <Label>Others - Description</Label>
                     <Input
-                      value={indirectForm.others_description}
-                      onChange={(e) =>
-                        setIndirectForm({
-                          ...indirectForm,
-                          others_description: e.target.value
-                        })
-                      }
-                      placeholder="Specify other costs"
-                    />
+                    value={indirectForm.others_description}
+                    onChange={(e) =>
+                    setIndirectForm({
+                      ...indirectForm,
+                      others_description: e.target.value
+                    })
+                    }
+                    placeholder="Specify other costs" />
+                  
                   </div>
                   <div className="space-y-2">
                     <Label>Others - Amount ($)</Label>
                     <Input
-                      type="number"
-                      step="0.01"
-                      value={indirectForm.others_amount}
-                      onChange={(e) =>
-                        setIndirectForm({
-                          ...indirectForm,
-                          others_amount: e.target.value
-                        })
-                      }
-                    />
+                    type="number"
+                    step="0.01"
+                    value={indirectForm.others_amount}
+                    onChange={(e) =>
+                    setIndirectForm({
+                      ...indirectForm,
+                      others_amount: e.target.value
+                    })
+                    } />
+                  
                   </div>
                   <div className="pt-4 border-t">
                     <div className="flex justify-between items-center mb-4">
@@ -1203,19 +1203,19 @@ export default function BillOfMaterials() {
                     </div>
                     <div className="flex justify-end gap-2">
                       <Button
-                        variant="outline"
-                        className="border-red-600 text-red-700 hover:bg-red-50"
-                        onClick={() => setIndirectDialogOpen(false)}
-                      >
+                      variant="outline"
+                      className="border-red-600 text-red-700 hover:bg-red-50"
+                      onClick={() => setIndirectDialogOpen(false)}>
+                      
                         Cancel
                       </Button>
                       <Button
-                        className="bg-green-600 hover:bg-green-700 text-white"
-                        onClick={() => {
-                          void handleSaveIndirectCosts();
-                          setIndirectDialogOpen(false);
-                        }}
-                      >
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                      onClick={() => {
+                        void handleSaveIndirectCosts();
+                        setIndirectDialogOpen(false);
+                      }}>
+                      
                         Save Indirect Costs
                       </Button>
                     </div>
@@ -1224,10 +1224,10 @@ export default function BillOfMaterials() {
               </DialogContent>
             </Dialog>
           </>
-        )}
+        }
 
-        {showIndirectCosts && (
-          <>
+        {showIndirectCosts &&
+        <>
             <Card className="bg-primary text-primary-foreground">
               <CardContent className="pt-6">
                 <div className="flex justify-between items-center">
@@ -1246,10 +1246,10 @@ export default function BillOfMaterials() {
               </Button>
             </div>
           </>
-        )}
+        }
 
-        {scopes.length > 0 && (
-          <Card className="bg-primary/5">
+        {scopes.length > 0 &&
+        <Card className="bg-primary/5">
             <CardContent className="pt-6">
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold">Total Direct Cost</h2>
@@ -1259,8 +1259,8 @@ export default function BillOfMaterials() {
               </div>
             </CardContent>
           </Card>
-        )}
+        }
       </div>
-    </Layout>
-  );
+    </Layout>);
+
 }
