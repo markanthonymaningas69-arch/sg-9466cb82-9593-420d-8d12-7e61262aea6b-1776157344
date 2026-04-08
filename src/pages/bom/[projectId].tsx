@@ -37,6 +37,16 @@ type IndirectCost = Database["public"]["Tables"]["bom_indirect_costs"]["Row"];
 
 type LaborCalculationMethod = "percentage" | "unit_cost";
 
+// Light background colors used per scope of work card
+const scopeBgColors: string[] = [
+  "bg-green-50",
+  "bg-blue-50",
+  "bg-amber-50",
+  "bg-purple-50",
+  "bg-pink-50",
+  "bg-slate-50"
+];
+
 export default function BillOfMaterials() {
   const router = useRouter();
   const { projectId } = router.query;
@@ -647,7 +657,10 @@ export default function BillOfMaterials() {
           const scopeKey = scope.id as string;
           const isCollapsed = collapsedScopes[scopeKey] ?? false;
           return (
-            <Card key={scope.id}>
+            <Card
+              key={scope.id}
+              className={scopeBgColors[scopes.indexOf(scope) % scopeBgColors.length]}
+            >
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start gap-3">
                   <CardTitle className="text-xl">{scope.name}</CardTitle>
