@@ -72,6 +72,13 @@ export default function BillOfMaterials() {
     others_description: ""
   });
 
+  const formatCurrency = (value: number): string => {
+    return value.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  };
+
   useEffect(() => {
     if (projectId) {
       loadData();
@@ -578,7 +585,7 @@ export default function BillOfMaterials() {
                             {material.unit}
                           </TableCell>
                           <TableCell className="text-right">
-                            ${((material.unit_cost ?? 0) as number).toFixed(2)}
+                            ${formatCurrency((material.unit_cost ?? 0) as number)}
                           </TableCell>
                           <TableCell className="text-right font-semibold">
                             {(() => {
@@ -588,7 +595,7 @@ export default function BillOfMaterials() {
                                 material.total_cost != null
                                   ? material.total_cost
                                   : quantity * unitCost;
-                              return `$${(total as number).toFixed(2)}`;
+                              return `$${formatCurrency(total as number)}`;
                             })()}
                           </TableCell>
                           <TableCell className="text-right">
@@ -696,7 +703,7 @@ export default function BillOfMaterials() {
                         const quantity = parseFloat(materialForm.quantity || "0");
                         const unitCost = parseFloat(materialForm.unit_cost || "0");
                         const amount = quantity * unitCost;
-                        return `$${amount.toFixed(2)}`;
+                        return `$${formatCurrency(amount)}`;
                       })()}
                           </TableCell>
                           <TableCell className="text-right">
@@ -725,11 +732,6 @@ export default function BillOfMaterials() {
                   }
                     </TableBody>
                   </Table>
-                  <div className="flex justify-end pt-2 border-t mt-2">
-                    <div className="text-lg font-semibold">
-                      Material Total: ${calculateScopeMaterialTotal(scope).toFixed(2)}
-                    </div>
-                  </div>
                 </div>
             }
 
@@ -749,7 +751,7 @@ export default function BillOfMaterials() {
               </div>
               <div className="flex justify-end pt-2 border-t mt-2">
                 <div className="text-lg font-semibold">
-                  Material Total: ${calculateScopeMaterialTotal(scope).toFixed(2)}
+                  Material Total: ${formatCurrency(calculateScopeMaterialTotal(scope))}
                 </div>
               </div>
 
@@ -952,7 +954,7 @@ export default function BillOfMaterials() {
                 )}
                       <div className="flex justify-end pt-2 border-t">
                         <div className="text-lg font-semibold">
-                          Labor Total: ${calculateScopeLaborTotal(scope).toFixed(2)}
+                          Labor Total: ${formatCurrency(calculateScopeLaborTotal(scope))}
                         </div>
                       </div>
                     </div> :
@@ -967,7 +969,7 @@ export default function BillOfMaterials() {
             <div className="pt-4 border-t-2 border-primary">
                   <div className="flex justify-end">
                     <div className="text-xl font-bold text-primary">
-                      Direct Cost: ${calculateScopeDirectCost(scope).toFixed(2)}
+                      Direct Cost: ${formatCurrency(calculateScopeDirectCost(scope))}
                     </div>
                   </div>
                 </div>
@@ -1062,7 +1064,7 @@ export default function BillOfMaterials() {
                     <div className="flex justify-between items-center mb-4">
                       <span className="text-lg font-semibold">Total Indirect Cost:</span>
                       <span className="text-2xl font-bold">
-                        ${calculateIndirectCost().toFixed(2)}
+                        ${formatCurrency(calculateIndirectCost())}
                       </span>
                     </div>
                   </div>
@@ -1080,7 +1082,7 @@ export default function BillOfMaterials() {
                 <div className="flex justify-between items-center">
                   <h2 className="text-2xl font-bold">Grand Total</h2>
                   <div className="text-4xl font-bold">
-                    ${calculateGrandTotal().toFixed(2)}
+                    ${formatCurrency(calculateGrandTotal())}
                   </div>
                 </div>
               </CardContent>
@@ -1098,6 +1100,19 @@ export default function BillOfMaterials() {
               </Button>
             </div>
           </>
+        }
+
+        {scopes.length > 0 &&
+        <Card className="bg-primary/5">
+            <CardContent className="pt-6">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold">Total Direct Cost</h2>
+                <div className="text-3xl font-bold text-primary">
+                  ${formatCurrency(calculateTotalDirectCost())}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         }
       </div>
     </Layout>);
