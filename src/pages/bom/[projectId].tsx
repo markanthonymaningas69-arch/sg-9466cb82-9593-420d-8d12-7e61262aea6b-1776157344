@@ -38,7 +38,7 @@ export default function BillOfMaterials() {
   const [showScopeInput, setShowScopeInput] = useState(false);
   const [newScopeName, setNewScopeName] = useState("");
 
-  // Labor/dialog state
+  // Labor/material edit state
   const [selectedScopeId, setSelectedScopeId] = useState<string>("");
   const [editingLabor, setEditingLabor] = useState<Labor | null>(null);
   const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
@@ -587,9 +587,9 @@ export default function BillOfMaterials() {
                           </TableCell>
                           <TableCell className="text-right font-semibold">
                             {(() => {
-                              const quantity = material.quantity || 0;
-                              const unitCost = material.unit_cost || 0;
-                              const total =
+                        const quantity = material.quantity || 0;
+                        const unitCost = material.unit_cost || 0;
+                        const total =
                                 material.total_cost != null
                                   ? material.total_cost
                                   : quantity * unitCost;
@@ -789,7 +789,7 @@ export default function BillOfMaterials() {
                     </div>
                   </div>
 
-                  <div className="space-y-4 mb-4">
+                  <div className="space-y-4 mt-2">
                     <div className="space-y-2">
                       <Label>Calculation Method *</Label>
                       <div className="inline-flex rounded-md border border-green-600 bg-muted p-1">
