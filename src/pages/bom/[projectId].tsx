@@ -342,8 +342,8 @@ export default function BillOfMaterials() {
       hourly_rate:
         laborForm.calculation_method === "unit_cost"
           ? parseFloat(laborForm.rate || "0")
-          : 0,
-      total_cost: totalCost
+          : 0
+      // Do NOT send total_cost; it is computed by the database
     };
 
     let error;
@@ -755,7 +755,10 @@ export default function BillOfMaterials() {
                               <Button
                           size="sm"
                           className="bg-green-600 hover:bg-green-700 text-white"
-                          onClick={handleMaterialSubmitInline}>
+                          onClick={() => {
+                            setSelectedScopeId(scope.id);
+                            resetMaterialForm();
+                          }}>
                           
                                 {editingMaterial ? "Update" : "Add"}
                               </Button>
