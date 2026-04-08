@@ -753,40 +753,6 @@ export default function BillOfMaterials() {
             <div>
                   <div className="flex justify-between items-center mb-3">
                     <h3 className="font-semibold text-lg">Labor Cost</h3>
-                    <div className="flex gap-2">
-                      <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-green-600 text-green-700 hover:bg-green-50"
-                    onClick={() => {
-                      setSelectedScopeId(scope.id);
-                      resetLaborForm();
-                      setLaborForm((prev) => ({
-                        ...prev,
-                        calculation_method: "percentage"
-                      }));
-                      setLaborDialogOpen(true);
-                    }}>
-                    
-                        % of Materials
-                      </Button>
-                      <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-green-600 text-green-700 hover:bg-green-50"
-                    onClick={() => {
-                      setSelectedScopeId(scope.id);
-                      resetLaborForm();
-                      setLaborForm((prev) => ({
-                        ...prev,
-                        calculation_method: "unit_cost"
-                      }));
-                      setLaborDialogOpen(true);
-                    }}>
-                    
-                        By Unit Cost
-                      </Button>
-                    </div>
                   </div>
 
                   <div className="space-y-4 mt-2">
