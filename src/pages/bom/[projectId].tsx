@@ -346,9 +346,20 @@ export default function BillOfMaterials() {
       // Do NOT send total_cost; it is computed by the database
     };
 
+    // Enforce single labor entry per scope:
+    const existingScope = scopes.find((s) => s.id === scopeId);
+    const existingLabor =
+      existingScope && Array.isArray(existingScope.bom_labor) && existingScope.bom_labor.length > 0
+        ? existingScope.bom_labor[0]
+        : null;
+
     let error;
     if (editingLabor && editingLabor.scope_id === scopeId) {
       const { error: updateError } = await bomService.updateLabor(editingLabor.id, laborData);
+      error = updateError;
+    } else if (existingLabor) {
+      // If a labor row already exists for this scope, update it instead of creating a new one
+      const { error: updateError } = await bomService.updateLabor(existingLabor.id, laborData);
       error = updateError;
     } else {
       const { error: createError } = await bomService.createLabor(laborData);
@@ -805,10 +816,11 @@ export default function BillOfMaterials() {
                   </div>
 
                   <div className="space-y-4 mt-2">
-                    <div className="space-y-2">
-                      <Label>Calculation Method *</Label>
-                      <div className="inline-flex rounded-md border border-green-600 bg-muted p-1">
-                        <Button
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 items-end">
+                      <div className="space-y-2">
+                        <Label>Calculation Method *</Label>
+                        <div className="inline-flex rounded-md border border-green-600 bg-muted p-1">
+                          <Button
                       type="button"
                       size="sm"
                       variant={laborForm.calculation_method === "percentage" ? "default" : "ghost"}
@@ -845,10 +857,12 @@ export default function BillOfMaterials() {
                           By Unit Cost
                         </Button>
                       </div>
+                      <div className="text-right text-sm text-muted-foreground">
+                        Material Total: ${formatCurrency(calculateScopeMaterialTotal(scope))}
+                      </div>
                     </div>
-
                     {laborForm.calculation_method === "percentage" ? (
-                      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 items-end">
+                      <div className="grid grid-cols-3 gap-4">
                         <div className="space-y-2">
                           <Label>Percentage of Material Cost *</Label>
                           <Input
@@ -860,8 +874,58 @@ export default function BillOfMaterials() {
                             }
                             placeholder="e.g., 35 for 35%" />
                         </div>
-                        <div className="text-right text-sm text-muted-foreground">
-                          Material Total: ${formatCurrency(calculateScopeMaterialTotal(scope))}
+                        <div className="space-y-2">
+                          <Label>Unit *</Label>
+                          <div className="space-y-2">
+                            <Select
+                              value={laborForm.unit_selection}
+                              onValueChange={(value) =>
+                                setLaborForm({
+                                  ...laborForm,
+                                  unit: value === "Other" ? "" : value,
+                                  unit_selection: value
+                                })
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select unit" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {["Cu.m", "Sq.m", "Lin.m", "Kg", "lot", "Other"].map(
+                                  (unitOption) => (
+                                    <SelectItem key={unitOption} value={unitOption}>
+                                      {unitOption === "Other"
+                                        ? "Other (specify)"
+                                        : unitOption}
+                                    </SelectItem>
+                                  )
+                                )}
+                              </SelectContent>
+                            </Select>
+                            {laborForm.unit_selection === "Other" && (
+                              <Input
+                                placeholder="Enter unit"
+                                value={laborForm.unit}
+                                onChange={(e) =>
+                                  setLaborForm({
+                                    ...laborForm,
+                                    unit: e.target.value
+                                  })
+                                }
+                              />
+                            )}
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Rate ($/unit) *</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={laborForm.rate}
+                            onChange={(e) =>
+                              setLaborForm({ ...laborForm, rate: e.target.value })
+                            }
+                          />
                         </div>
                       </div>
                     ) : (
@@ -957,45 +1021,44 @@ export default function BillOfMaterials() {
                     </div>
                   </div>
 
-                  {(scope.bom_labor || []).length > 0 ?
-              <div className="space-y-2">
-                      {(scope.bom_labor || []).map((labor: Labor) =>
-                <div key={labor.id} className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
-                          <div className="flex-1">
-                            <div className="font-medium">{labor.labor_type}</div>
-                            {labor.description && <div className="text-sm text-muted-foreground">{labor.description}</div>}
-                            {labor.hours && labor.hourly_rate &&
+                  {(scope.bom_labor || []).slice(0, 1).map((labor: Labor) =>
+              <div key={labor.id} className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
+                      <div className="flex-1">
+                        <div className="font-medium">{labor.labor_type}</div>
+                        {labor.description && <div className="text-sm text-muted-foreground">{labor.description}</div>}
+                        {labor.hours && labor.hourly_rate &&
                     <div className="text-sm text-muted-foreground mt-1">
                                 {labor.hours} hrs × ${labor.hourly_rate?.toFixed(2)}/hr
                               </div>
                     }
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <div className="text-right font-semibold">
-                              ${labor.total_cost?.toFixed(2)}
-                            </div>
-                            <div className="flex gap-1">
-                              <Button
-                        size="icon"
-                        variant="ghost"
-                        className="text-green-600 hover:text-green-700"
-                        onClick={() => {
-                          setSelectedScopeId(scope.id);
-                          handleEditLabor(labor);
-                        }}>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right font-semibold">
+                          ${labor.total_cost?.toFixed(2)}
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                                size="icon"
+                                variant="ghost"
+                                className="text-green-600 hover:text-green-700"
+                                onClick={() => {
+                                  setSelectedScopeId(scope.id);
+                                  handleEditLabor(labor);
+                                }}>
                                 <Pencil className="h-4 w-4" />
                               </Button>
-                              <Button
-                        size="icon"
-                        variant="ghost"
-                        className="text-red-600 hover:text-red-700"
-                        onClick={() => handleDeleteLabor(labor.id)}>
+                          <Button
+                                size="icon"
+                                variant="ghost"
+                                className="text-red-600 hover:text-red-700"
+                                onClick={() => handleDeleteLabor(labor.id)}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
-                            </div>
-                          </div>
                         </div>
-                )}
+                      </div>
+                    </div>
+              )}
+
                       <div className="flex justify-end pt-2 border-t">
                         <div className="text-lg font-semibold">
                           Labor Total: ${formatCurrency(calculateScopeLaborTotal(scope))}
