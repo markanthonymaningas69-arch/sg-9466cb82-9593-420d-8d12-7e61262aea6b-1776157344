@@ -659,7 +659,7 @@ export default function BillOfMaterials() {
           return (
             <Card
               key={scope.id}
-              className={`${scopeBgColors[scopes.indexOf(scope) % scopeBgColors.length]} text-black dark:text-white`}
+              className={`${scopeBgColors[scopes.indexOf(scope) % scopeBgColors.length]} text-black`}
             >
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start gap-3">
