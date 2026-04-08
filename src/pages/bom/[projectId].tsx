@@ -858,7 +858,7 @@ export default function BillOfMaterials() {
                 </div>
               </div>
 
-              {(scope.bom_materials || []).length > 0 && (
+              {(scope.bom_labor || []).length > 0 && (
                 <div>
                   <div className="flex justify-between items-center mb-3">
                     <h3 className="font-semibold text-lg">Labor Cost</h3>
