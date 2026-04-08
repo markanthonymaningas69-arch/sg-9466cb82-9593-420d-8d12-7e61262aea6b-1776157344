@@ -434,7 +434,7 @@ export default function BillOfMaterials() {
             <CardContent className="pt-6">
               <div className="flex items-center gap-2">
                 <Input
-                  placeholder="Enter scope of work name..."
+                  placeholder="Enter the scope name"
                   value={newScopeName}
                   onChange={(e) => setNewScopeName(e.target.value)}
                   onKeyPress={(e) => e.key === "Enter" && handleSaveScopeInline()}
@@ -442,10 +442,13 @@ export default function BillOfMaterials() {
                   className="flex-1"
                 />
               </div>
-              <div className="flex justify-end mt-3">
+              <div className="flex justify-end mt-3 gap-2">
                 <Button onClick={handleSaveScopeInline} disabled={!newScopeName.trim()}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Scope of Work
+                </Button>
+                <Button variant="outline" onClick={handleCancelScopeInline}>
+                  Cancel
                 </Button>
               </div>
             </CardContent>
@@ -464,18 +467,21 @@ export default function BillOfMaterials() {
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-2">
                     <Input
-                      placeholder="Enter scope of work name..."
+                      placeholder="Enter the scope name"
                       value={newScopeName}
                       onChange={(e) => setNewScopeName(e.target.value)}
                       onKeyPress={(e) => e.key === "Enter" && handleSaveScopeInline()}
                       autoFocus
                       className="flex-1"
                     />
-                    <Button size="icon" onClick={handleSaveScopeInline} disabled={!newScopeName.trim()}>
-                      <Check className="h-4 w-4" />
+                  </div>
+                  <div className="flex justify-end mt-3 gap-2">
+                    <Button onClick={handleSaveScopeInline} disabled={!newScopeName.trim()}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Scope of Work
                     </Button>
-                    <Button size="icon" variant="outline" onClick={handleCancelScopeInline}>
-                      <X className="h-4 w-4" />
+                    <Button variant="outline" onClick={handleCancelScopeInline}>
+                      Cancel
                     </Button>
                   </div>
                 </CardContent>
