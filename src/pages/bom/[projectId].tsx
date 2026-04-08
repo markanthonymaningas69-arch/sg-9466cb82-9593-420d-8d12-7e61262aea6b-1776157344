@@ -39,12 +39,12 @@ type LaborCalculationMethod = "percentage" | "unit_cost";
 
 // Light background colors used per scope of work card
 const scopeBgColors: string[] = [
-  "bg-green-200",
-  "bg-blue-200",
-  "bg-amber-200",
-  "bg-purple-200",
-  "bg-pink-200",
-  "bg-slate-200"
+  "bg-gradient-to-r from-green-200 to-green-400",
+  "bg-gradient-to-r from-blue-200 to-blue-400",
+  "bg-gradient-to-r from-amber-200 to-amber-400",
+  "bg-gradient-to-r from-purple-200 to-purple-400",
+  "bg-gradient-to-r from-pink-200 to-pink-400",
+  "bg-gradient-to-r from-slate-200 to-slate-400"
 ];
 
 export default function BillOfMaterials() {
@@ -659,7 +659,7 @@ export default function BillOfMaterials() {
           return (
             <Card
               key={scope.id}
-              className={scopeBgColors[scopes.indexOf(scope) % scopeBgColors.length]}
+              className={`${scopeBgColors[scopes.indexOf(scope) % scopeBgColors.length]} text-black dark:text-white`}
             >
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start gap-3">
