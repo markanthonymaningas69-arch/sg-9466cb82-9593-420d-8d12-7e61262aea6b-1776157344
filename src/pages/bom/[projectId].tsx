@@ -56,6 +56,7 @@ export default function BillOfMaterials() {
   const [selectedScopeId, setSelectedScopeId] = useState<string>("");
   const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
   const [editingLabor, setEditingLabor] = useState<Labor | null>(null);
+  const [collapsedScopes, setCollapsedScopes] = useState<Record<string, boolean>>({});
 
   const [materialForm, setMaterialForm] = useState({
     name: "",
@@ -539,13 +540,13 @@ export default function BillOfMaterials() {
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
         </div>
-      </Layout>);
-
+      </Layout>
+    );
   }
 
   return (
     <Layout>
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" onClick={() => router.push("/projects")}>
             <ArrowLeft className="h-4 w-4" />
@@ -558,7 +559,7 @@ export default function BillOfMaterials() {
 
         {scopes.length === 0 ?
         <Card>
-            <CardContent className="pt-6">
+            <CardContent className="pt-4">
               <div className="flex items-center gap-2">
                 <Input
                 placeholder="Enter the scope name"
@@ -602,7 +603,7 @@ export default function BillOfMaterials() {
               </div> :
 
           <Card>
-                <CardContent className="pt-6">
+                <CardContent className="pt-4">
                   <div className="flex items-center gap-2">
                     <Input
                   placeholder="Enter the scope name"
@@ -642,25 +643,44 @@ export default function BillOfMaterials() {
           </>
         }
 
-        {scopes.map((scope) =>
-        <Card key={scope.id}>
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <CardTitle className="text-xl">{scope.name}</CardTitle>
-                <Button
-                size="icon"
-                variant="ghost"
-                className="text-red-600 hover:text-red-700"
-                onClick={() => void handleDeleteScope(scope.id as string)}>
-                
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {(scope.bom_materials || []).length > 0 || selectedScopeId === scope.id ?
-            <div className="mt-4">
-                  <div className="flex justify-between items-center mb-3">
+        {scopes.map((scope) => {
+          const scopeKey = scope.id as string;
+          const isCollapsed = collapsedScopes[scopeKey] ?? false;
+          return (
+            <Card key={scope.id}>
+              <CardHeader className="pb-3">
+                <div className="flex justify-between items-start gap-3">
+                  <CardTitle className="text-xl">{scope.name}</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 px-2 text-xs"
+                      onClick={() =>
+                        setCollapsedScopes((prev) => ({
+                          ...prev,
+                          [scopeKey]: !isCollapsed
+                        }))
+                      }
+                    >
+                      {isCollapsed ? "Show content" : "Hide content"}
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="text-red-600 hover:text-red-700"
+                      onClick={() => void handleDeleteScope(scope.id as string)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              {!isCollapsed && (
+                <CardContent className="space-y-4 pt-3">
+                  {(scope.bom_materials || []).length > 0 || selectedScopeId === scope.id ?
+            <div className="mt-2">
+                  <div className="flex justify-between items-center mb-2">
                     <h3 className="font-semibold text-lg">Materials</h3>
                   </div>
                   <Table>
@@ -839,7 +859,7 @@ export default function BillOfMaterials() {
                 </div> :
             null}
 
-              <div className="flex justify-center">
+              <div className="flex justify-center mt-1">
                 <Button
                 size="sm"
                 className="bg-green-600 hover:bg-green-700 text-white"
@@ -859,12 +879,12 @@ export default function BillOfMaterials() {
               </div>
 
               {(scope.bom_labor || []).length > 0 && (
-                <div>
-                  <div className="flex justify-between items-center mb-3">
+                <div className="mt-2">
+                  <div className="flex justify-between items-center mb-2">
                     <h3 className="font-semibold text-lg">Labor Cost</h3>
                   </div>
 
-                  <div className="space-y-4 mt-2">
+                  <div className="space-y-3 mt-1">
                     <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                       <div className="space-y-2">
                         <Label>Calculation Method *</Label>
@@ -1084,7 +1104,7 @@ export default function BillOfMaterials() {
               )}
 
               {(scope.bom_materials?.length || 0) > 0 &&
-            <div className="pt-4 border-t-2 border-primary">
+            <div className="pt-3 border-t-2 border-primary">
                   <div className="flex justify-end">
                     <div className="text-xl font-bold text-primary">
                       Direct Cost: ${formatCurrency(calculateScopeDirectCost(scope))}
@@ -1092,9 +1112,11 @@ export default function BillOfMaterials() {
                   </div>
                 </div>
             }
-            </CardContent>
-          </Card>
-        )}
+                </CardContent>
+              )}
+            </Card>
+          );
+        })}
 
         {scopes.length > 0 &&
         <>
@@ -1227,7 +1249,7 @@ export default function BillOfMaterials() {
         {showIndirectCosts &&
         <>
             <Card className="bg-primary text-primary-foreground">
-              <CardContent className="pt-6">
+              <CardContent className="pt-4">
                 <div className="flex justify-between items-center">
                   <h2 className="text-2xl font-bold">Grand Total</h2>
                   <div className="text-4xl font-bold">
@@ -1248,7 +1270,7 @@ export default function BillOfMaterials() {
 
         {scopes.length > 0 &&
         <Card className="bg-primary/5">
-            <CardContent className="pt-6">
+            <CardContent className="pt-4">
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold">Total Direct Cost</h2>
                 <div className="text-3xl font-bold text-primary">
