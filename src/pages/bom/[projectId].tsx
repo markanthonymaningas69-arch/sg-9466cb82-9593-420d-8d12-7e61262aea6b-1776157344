@@ -39,12 +39,12 @@ type LaborCalculationMethod = "percentage" | "unit_cost";
 
 // Light background colors used per scope of work card
 const scopeBgColors: string[] = [
-  "bg-green-100",
-  "bg-blue-100",
-  "bg-amber-100",
-  "bg-purple-100",
-  "bg-pink-100",
-  "bg-slate-100"
+  "bg-green-200",
+  "bg-blue-200",
+  "bg-amber-200",
+  "bg-purple-200",
+  "bg-pink-200",
+  "bg-slate-200"
 ];
 
 export default function BillOfMaterials() {
@@ -897,8 +897,8 @@ export default function BillOfMaterials() {
                     <h3 className="font-semibold text-lg">Labor Cost</h3>
                   </div>
 
-                  <div className="space-y-3 mt-1">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                  <div className="space-y-4 mt-1">
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 items-end w-full md:w-auto">
                       <div className="space-y-2">
                         <Label>Calculation Method *</Label>
                         <div className="inline-flex rounded-md border border-green-600 bg-muted p-1">
@@ -946,7 +946,7 @@ export default function BillOfMaterials() {
                       </div>
 
                       {laborForm.calculation_method === "percentage" ? (
-                        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 items-end w-full md:w-auto">
+                        <div className="grid grid-cols-3 gap-4 w-full md:w-auto">
                           <div className="space-y-2">
                             <Label>Percentage of Material Cost *</Label>
                             <Input
