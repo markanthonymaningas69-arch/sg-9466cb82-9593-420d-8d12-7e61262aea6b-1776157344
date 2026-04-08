@@ -442,13 +442,14 @@ export default function BillOfMaterials() {
                 className="flex-1" />
               
               </div>
-              <div className="flex justify-end mt-3 gap-2">
-                <Button onClick={handleSaveScopeInline} disabled={!newScopeName.trim()}>
+              <div className="flex justify-end mt-3">
+                <Button
+                  onClick={handleSaveScopeInline}
+                  disabled={!newScopeName.trim()}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Scope of Work
-                </Button>
-                <Button variant="outline" onClick={handleCancelScopeInline}>
-                  Cancel
                 </Button>
               </div>
             </CardContent>
@@ -457,7 +458,11 @@ export default function BillOfMaterials() {
         <>
             {!showScopeInput ?
           <div className="flex justify-end">
-                <Button onClick={handleAddScopeClick} style={{ lineHeight: "1" }}>
+                <Button
+                  onClick={handleAddScopeClick}
+                  style={{ lineHeight: "1" }}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Scope of Work
                 </Button>
@@ -473,14 +478,22 @@ export default function BillOfMaterials() {
                   onKeyPress={(e) => e.key === "Enter" && handleSaveScopeInline()}
                   autoFocus
                   className="flex-1" />
-                
+                 
                   </div>
                   <div className="flex justify-end mt-3 gap-2">
-                    <Button onClick={handleSaveScopeInline} disabled={!newScopeName.trim()}>
+                    <Button
+                      onClick={handleSaveScopeInline}
+                      disabled={!newScopeName.trim()}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
                       <Plus className="h-4 w-4 mr-2" />
                       Add Scope of Work
                     </Button>
-                    <Button variant="outline" onClick={handleCancelScopeInline}>
+                    <Button
+                      variant="outline"
+                      className="border-red-600 text-red-700 hover:bg-red-50"
+                      onClick={handleCancelScopeInline}
+                    >
                       Cancel
                     </Button>
                   </div>
@@ -496,7 +509,12 @@ export default function BillOfMaterials() {
             <CardHeader>
               <div className="flex justify-between items-start">
                 <CardTitle className="text-xl">{scope.name}</CardTitle>
-                <Button size="icon" variant="ghost" onClick={() => handleDeleteScope(scope.id)}>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="text-red-600 hover:text-red-700"
+                  onClick={() => handleDeleteScope(scope.id)}
+                >
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
@@ -590,12 +608,16 @@ export default function BillOfMaterials() {
                       })()}
                           </TableCell>
                           <TableCell className="space-x-1 text-right">
-                            <Button onClick={handleMaterialSubmitInline}>
+                            <Button
+                              onClick={handleMaterialSubmitInline}
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                            >
                               Add
                             </Button>
                             <Button
                         size="icon"
                         variant="ghost"
+                        className="text-red-600 hover:text-red-700"
                         onClick={() => {
                           resetMaterialForm();
                           setSelectedScopeId("");
@@ -693,12 +715,16 @@ export default function BillOfMaterials() {
                       })()}
                           </TableCell>
                           <TableCell className="space-x-1 text-right">
-                            <Button onClick={handleMaterialSubmitInline}>
+                            <Button
+                              onClick={handleMaterialSubmitInline}
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                            >
                               Add
                             </Button>
                             <Button
                         size="icon"
                         variant="ghost"
+                        className="text-red-600 hover:text-red-700"
                         onClick={() => {
                           resetMaterialForm();
                           setSelectedScopeId("");
@@ -723,6 +749,7 @@ export default function BillOfMaterials() {
               <div className="flex justify-center">
                 <Button
                 size="lg"
+                className="bg-green-600 hover:bg-green-700 text-white"
                 onClick={() => {
                   setSelectedScopeId(scope.id);
                   resetMaterialForm();
@@ -731,6 +758,11 @@ export default function BillOfMaterials() {
                   <Plus className="h-5 w-5 mr-2" />
                   Add Materials
                 </Button>
+              </div>
+              <div className="flex justify-end pt-2 border-t mt-2">
+                <div className="text-lg font-semibold">
+                  Material Total: ${calculateScopeMaterialTotal(scope).toFixed(2)}
+                </div>
               </div>
 
               {/* Labor Section */}
@@ -742,6 +774,7 @@ export default function BillOfMaterials() {
                       <Button
                     size="sm"
                     variant="outline"
+                    className="border-green-600 text-green-700 hover:bg-green-50"
                     onClick={() => {
                       setSelectedScopeId(scope.id);
                       resetLaborForm();
@@ -757,6 +790,7 @@ export default function BillOfMaterials() {
                       <Button
                     size="sm"
                     variant="outline"
+                    className="border-green-600 text-green-700 hover:bg-green-50"
                     onClick={() => {
                       setSelectedScopeId(scope.id);
                       resetLaborForm();
@@ -868,10 +902,22 @@ export default function BillOfMaterials() {
                     }
 
                         <div className="flex justify-end gap-2">
-                          <Button type="button" variant="outline" onClick={() => {setLaborDialogOpen(false);resetLaborForm();}}>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="border-red-600 text-red-700 hover:bg-red-50"
+                            onClick={() => {
+                              setLaborDialogOpen(false);
+                              resetLaborForm();
+                            }}>
                             Cancel
                           </Button>
-                          <Button type="submit">{editingLabor ? "Update" : "Add"} Labor Cost</Button>
+                          <Button
+                            type="submit"
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            {editingLabor ? "Update" : "Add"} Labor Cost
+                          </Button>
                         </div>
                       </form>
                     </DialogContent>
@@ -895,10 +941,21 @@ export default function BillOfMaterials() {
                               ${labor.total_cost?.toFixed(2)}
                             </div>
                             <div className="flex gap-1">
-                              <Button size="icon" variant="ghost" onClick={() => {setSelectedScopeId(scope.id);handleEditLabor(labor);}}>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="text-green-600 hover:text-green-700"
+                                onClick={() => {
+                                  setSelectedScopeId(scope.id);
+                                  handleEditLabor(labor);
+                                }}>
                                 <Pencil className="h-4 w-4" />
                               </Button>
-                              <Button size="icon" variant="ghost" onClick={() => handleDeleteLabor(labor.id)}>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="text-red-600 hover:text-red-700"
+                                onClick={() => handleDeleteLabor(labor.id)}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
@@ -937,6 +994,7 @@ export default function BillOfMaterials() {
             <div className="flex justify-center">
               <Button
               size="lg"
+              className="bg-green-600 hover:bg-green-700 text-white"
               onClick={() => {
                 setShowIndirectCosts(true);
                 setIndirectDialogOpen(true);
