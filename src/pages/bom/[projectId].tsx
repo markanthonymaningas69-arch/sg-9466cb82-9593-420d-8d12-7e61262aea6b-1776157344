@@ -474,11 +474,11 @@ export default function BillOfMaterials() {
               </div>
               <div className="flex justify-end mt-3">
                 <Button
-                  size="sm"
-                  onClick={handleSaveScopeInline}
-                  disabled={!newScopeName.trim()}
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                >
+                size="sm"
+                onClick={handleSaveScopeInline}
+                disabled={!newScopeName.trim()}
+                className="bg-green-600 hover:bg-green-700 text-white">
+                
                   <Plus className="h-4 w-4 mr-2" />
                   Add Scope of Work
                 </Button>
@@ -490,11 +490,11 @@ export default function BillOfMaterials() {
             {!showScopeInput ?
           <div className="flex justify-end">
                 <Button
-                  size="sm"
-                  onClick={handleAddScopeClick}
-                  style={{ lineHeight: "1" }}
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                >
+              size="sm"
+              onClick={handleAddScopeClick}
+              style={{ lineHeight: "1" }}
+              className="bg-green-600 hover:bg-green-700 text-white">
+              
                   <Plus className="h-4 w-4 mr-2" />
                   Add Scope of Work
                 </Button>
@@ -514,19 +514,19 @@ export default function BillOfMaterials() {
                   </div>
                   <div className="flex justify-end mt-3 gap-2">
                     <Button
-                      size="sm"
-                      onClick={handleSaveScopeInline}
-                      disabled={!newScopeName.trim()}
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                    >
+                  size="sm"
+                  onClick={handleSaveScopeInline}
+                  disabled={!newScopeName.trim()}
+                  className="bg-green-600 hover:bg-green-700 text-white">
+                  
                       <Plus className="h-4 w-4 mr-2" />
                       Add Scope of Work
                     </Button>
                     <Button
-                      variant="outline"
-                      className="border-red-600 text-red-700 hover:bg-red-50"
-                      onClick={handleCancelScopeInline}
-                    >
+                  variant="outline"
+                  className="border-red-600 text-red-700 hover:bg-red-50"
+                  onClick={handleCancelScopeInline}>
+                  
                       Cancel
                     </Button>
                   </div>
@@ -543,11 +543,11 @@ export default function BillOfMaterials() {
               <div className="flex justify-between items-start">
                 <CardTitle className="text-xl">{scope.name}</CardTitle>
                 <Button
-                  size="icon"
-                  variant="ghost"
-                  className="text-red-600 hover:text-red-700"
-                  onClick={() => handleDeleteScope(scope.id)}
-                >
+                size="icon"
+                variant="ghost"
+                className="text-red-600 hover:text-red-700"
+                onClick={() => handleDeleteScope(scope.id)}>
+                
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
@@ -590,28 +590,28 @@ export default function BillOfMaterials() {
                         const quantity = material.quantity || 0;
                         const unitCost = material.unit_cost || 0;
                         const total =
-                                material.total_cost != null
-                                  ? material.total_cost
-                                  : quantity * unitCost;
-                              return `$${formatCurrency(total as number)}`;
-                            })()}
+                        material.total_cost != null ?
+                        material.total_cost :
+                        quantity * unitCost;
+                        return `$${formatCurrency(total as number)}`;
+                      })()}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">
                               <Button
-                                size="icon"
-                                variant="ghost"
-                                className="text-green-600 hover:text-green-700"
-                                onClick={() => handleEditMaterial(material)}
-                              >
+                          size="icon"
+                          variant="ghost"
+                          className="text-green-600 hover:text-green-700"
+                          onClick={() => handleEditMaterial(material)}>
+                          
                                 <Pencil className="h-4 w-4" />
                               </Button>
                               <Button
-                                size="icon"
-                                variant="ghost"
-                                className="text-red-600 hover:text-red-700"
-                                onClick={() => handleDeleteMaterial(material.id)}
-                              >
+                          size="icon"
+                          variant="ghost"
+                          className="text-red-600 hover:text-red-700"
+                          onClick={() => handleDeleteMaterial(material.id)}>
+                          
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
@@ -707,21 +707,21 @@ export default function BillOfMaterials() {
                           <TableCell className="text-right">
                             <div className="flex justify-end items-center gap-2">
                               <Button
-                                size="sm"
-                                className="bg-green-600 hover:bg-green-700 text-white"
-                                onClick={handleMaterialSubmitInline}
-                              >
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                          onClick={handleMaterialSubmitInline}>
+                          
                                 {editingMaterial ? "Update" : "Add"}
                               </Button>
                               <Button
-                                size="sm"
-                                variant="outline"
-                                className="border-red-600 text-red-700 hover:bg-red-50"
-                                onClick={() => {
-                                  resetMaterialForm();
-                                  setSelectedScopeId("");
-                                }}
-                              >
+                          size="sm"
+                          variant="outline"
+                          className="border-red-600 text-red-700 hover:bg-red-50"
+                          onClick={() => {
+                            resetMaterialForm();
+                            setSelectedScopeId("");
+                          }}>
+                          
                                 Cancel
                               </Button>
                             </div>
@@ -760,118 +760,118 @@ export default function BillOfMaterials() {
                       <Label>Calculation Method *</Label>
                       <div className="inline-flex rounded-md border border-green-600 bg-muted p-1">
                         <Button
-                          type="button"
-                          size="sm"
-                          variant={laborForm.calculation_method === "percentage" ? "default" : "ghost"}
-                          className={
-                            laborForm.calculation_method === "percentage"
-                              ? "bg-green-600 text-white hover:bg-green-700"
-                              : "text-green-700 hover:bg-transparent"
-                          }
-                          onClick={() =>
-                            setLaborForm((prev) => ({
-                              ...prev,
-                              calculation_method: "percentage"
-                            }))
-                          }
-                        >
+                      type="button"
+                      size="sm"
+                      variant={laborForm.calculation_method === "percentage" ? "default" : "ghost"}
+                      className={
+                      laborForm.calculation_method === "percentage" ?
+                      "bg-green-600 text-white hover:bg-green-700" :
+                      "text-green-700 hover:bg-transparent"
+                      }
+                      onClick={() =>
+                      setLaborForm((prev) => ({
+                        ...prev,
+                        calculation_method: "percentage"
+                      }))
+                      }>
+                      
                           % of Materials
                         </Button>
                         <Button
-                          type="button"
-                          size="sm"
-                          variant={laborForm.calculation_method === "unit_cost" ? "default" : "ghost"}
-                          className={
-                            laborForm.calculation_method === "unit_cost"
-                              ? "bg-green-600 text-white hover:bg-green-700"
-                              : "text-green-700 hover:bg-transparent"
-                          }
-                          onClick={() =>
-                            setLaborForm((prev) => ({
-                              ...prev,
-                              calculation_method: "unit_cost"
-                            }))
-                          }
-                        >
+                      type="button"
+                      size="sm"
+                      variant={laborForm.calculation_method === "unit_cost" ? "default" : "ghost"}
+                      className={
+                      laborForm.calculation_method === "unit_cost" ?
+                      "bg-green-600 text-white hover:bg-green-700" :
+                      "text-green-700 hover:bg-transparent"
+                      }
+                      onClick={() =>
+                      setLaborForm((prev) => ({
+                        ...prev,
+                        calculation_method: "unit_cost"
+                      }))
+                      }>
+                      
                           By Unit Cost
                         </Button>
                       </div>
                     </div>
 
-                    {laborForm.calculation_method === "percentage" ? (
-                      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 items-end">
+                    {laborForm.calculation_method === "percentage" ?
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 items-end">
                         <div className="space-y-2">
                           <Label>Percentage of Material Cost *</Label>
                           <Input
-                            type="number"
-                            step="0.01"
-                            value={laborForm.percentage}
-                            onChange={(e) =>
-                              setLaborForm({ ...laborForm, percentage: e.target.value })
-                            }
-                            placeholder="e.g., 35 for 35%"
-                          />
+                      type="number"
+                      step="0.01"
+                      value={laborForm.percentage}
+                      onChange={(e) =>
+                      setLaborForm({ ...laborForm, percentage: e.target.value })
+                      }
+                      placeholder="e.g., 35 for 35%" />
+                    
                         </div>
                         <div className="text-right text-sm text-muted-foreground">
                           Material Total: ${formatCurrency(calculateScopeMaterialTotal(scope))}
                         </div>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-3 gap-4">
+                      </div> :
+
+                <div className="grid grid-cols-3 gap-4">
                         <div className="space-y-2">
                           <Label>Role/Type *</Label>
                           <Input
-                            value={laborForm.role}
-                            onChange={(e) =>
-                              setLaborForm({ ...laborForm, role: e.target.value })
-                            }
-                            placeholder="Carpenter, Mason, etc."
-                          />
+                      value={laborForm.role}
+                      onChange={(e) =>
+                      setLaborForm({ ...laborForm, role: e.target.value })
+                      }
+                      placeholder="Carpenter, Mason, etc." />
+                    
                         </div>
                         <div className="space-y-2">
                           <Label>Hours *</Label>
                           <Input
-                            type="number"
-                            step="0.01"
-                            value={laborForm.hours}
-                            onChange={(e) =>
-                              setLaborForm({ ...laborForm, hours: e.target.value })
-                            }
-                          />
+                      type="number"
+                      step="0.01"
+                      value={laborForm.hours}
+                      onChange={(e) =>
+                      setLaborForm({ ...laborForm, hours: e.target.value })
+                      } />
+                    
                         </div>
                         <div className="space-y-2">
                           <Label>Rate ($/hr) *</Label>
                           <Input
-                            type="number"
-                            step="0.01"
-                            value={laborForm.rate}
-                            onChange={(e) =>
-                              setLaborForm({ ...laborForm, rate: e.target.value })
-                            }
-                          />
+                      type="number"
+                      step="0.01"
+                      value={laborForm.rate}
+                      onChange={(e) =>
+                      setLaborForm({ ...laborForm, rate: e.target.value })
+                      } />
+                    
                         </div>
                       </div>
-                    )}
+                }
 
                     <div className="flex justify-end gap-2">
                       <Button
-                        size="sm"
-                        className="bg-green-600 hover:bg-green-700 text-white"
-                        onClick={() => handleLaborSubmit(scope.id)}
-                      >
-                        {editingLabor && editingLabor.scope_id === scope.id
-                          ? "Update Labor"
-                          : "Add Labor"}
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => handleLaborSubmit(scope.id)}>
+                    
+                        {editingLabor && editingLabor.scope_id === scope.id ?
+                    "Update Labor" :
+                    "Add Labor"}
                       </Button>
                       <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-red-600 text-red-700 hover:bg-red-50"
-                        onClick={() => {
-                          resetLaborForm();
-                          setEditingLabor(null);
-                        }}
-                      >
+                    size="sm"
+                    variant="outline"
+                    className="border-red-600 text-red-700 hover:bg-red-50"
+                    onClick={() => {
+                      resetLaborForm();
+                      setEditingLabor(null);
+                    }}>
+                    
                         Cancel
                       </Button>
                     </div>
@@ -896,20 +896,20 @@ export default function BillOfMaterials() {
                             </div>
                             <div className="flex gap-1">
                               <Button
-                                size="icon"
-                                variant="ghost"
-                                className="text-green-600 hover:text-green-700"
-                                onClick={() => {
-                                  setSelectedScopeId(scope.id);
-                                  handleEditLabor(labor);
-                                }}>
+                        size="icon"
+                        variant="ghost"
+                        className="text-green-600 hover:text-green-700"
+                        onClick={() => {
+                          setSelectedScopeId(scope.id);
+                          handleEditLabor(labor);
+                        }}>
                                 <Pencil className="h-4 w-4" />
                               </Button>
                               <Button
-                                size="icon"
-                                variant="ghost"
-                                className="text-red-600 hover:text-red-700"
-                                onClick={() => handleDeleteLabor(labor.id)}>
+                        size="icon"
+                        variant="ghost"
+                        className="text-red-600 hover:text-red-700"
+                        onClick={() => handleDeleteLabor(labor.id)}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
@@ -952,7 +952,7 @@ export default function BillOfMaterials() {
               onClick={() => {
                 setShowIndirectCosts(true);
                 setIndirectDialogOpen(true);
-              }}>
+              }} style={{ lineHeight: "1" }}>
               
                 <Plus className="h-5 w-5 mr-2" />
                 Add Indirect Cost
