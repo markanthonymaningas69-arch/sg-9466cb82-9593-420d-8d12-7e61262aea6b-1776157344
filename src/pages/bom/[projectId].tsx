@@ -42,6 +42,7 @@ export default function BillOfMaterials() {
   const [laborDialogOpen, setLaborDialogOpen] = useState(false);
   const [selectedScopeId, setSelectedScopeId] = useState<string>("");
   const [editingLabor, setEditingLabor] = useState<Labor | null>(null);
+  const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
 
   // Form states
   const [materialForm, setMaterialForm] = useState({
@@ -228,16 +229,42 @@ export default function BillOfMaterials() {
       // total_cost is computed by the database; do not send it here to avoid errors
     };
 
-    const { error } = await bomService.createMaterial(materialData as any);
+    let error;
+    if (editingMaterial) {
+      const result = await bomService.updateMaterial(editingMaterial.id, materialData as any);
+      error = result.error;
+    } else {
+      const result = await bomService.createMaterial(materialData as any);
+      error = result.error;
+    }
+
     if (error) {
-      console.error("Error creating material:", error);
-      alert("Error creating material: " + error.message);
+      console.error("Error saving material:", error);
+      alert("Error saving material: " + error.message);
       return;
     }
 
     resetMaterialForm();
     setSelectedScopeId("");
+    setEditingMaterial(null);
     loadData();
+  };
+
+  const handleEditMaterial = (material: Material) => {
+    setSelectedScopeId(material.scope_id as string);
+    const knownUnits = ["Cu.m", "Sq.m", "Lin.m", "Pc", "Kg", "Box"];
+    const unit = material.unit || "";
+    const isKnown = knownUnits.includes(unit);
+
+    setMaterialForm({
+      name: material.material_name || "",
+      description: material.description || material.material_name || "",
+      quantity: material.quantity != null ? material.quantity.toString() : "",
+      unit: unit,
+      unit_selection: isKnown ? unit : unit ? "Other" : "",
+      unit_cost: material.unit_cost != null ? (material.unit_cost as number).toString() : ""
+    });
+    setEditingMaterial(material);
   };
 
   const handleDeleteMaterial = async (id: string) => {
@@ -256,6 +283,7 @@ export default function BillOfMaterials() {
       unit_selection: "",
       unit_cost: ""
     });
+    setEditingMaterial(null);
   };
 
   // Labor operations
@@ -532,7 +560,7 @@ export default function BillOfMaterials() {
                         <TableHead className="w-32">Unit</TableHead>
                         <TableHead className="w-32 text-right">Unit Cost</TableHead>
                         <TableHead className="w-32 text-right">Amount</TableHead>
-                        <TableHead className="w-20 text-right"></TableHead>
+                        <TableHead className="w-28 text-right"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -564,14 +592,24 @@ export default function BillOfMaterials() {
                             })()}
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="text-red-600 hover:text-red-700"
-                              onClick={() => handleDeleteMaterial(material.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="text-green-600 hover:text-green-700"
+                                onClick={() => handleEditMaterial(material)}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="text-red-600 hover:text-red-700"
+                                onClick={() => handleDeleteMaterial(material.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                   )}
@@ -668,7 +706,7 @@ export default function BillOfMaterials() {
                                 className="bg-green-600 hover:bg-green-700 text-white"
                                 onClick={handleMaterialSubmitInline}
                               >
-                                Add
+                                {editingMaterial ? "Update" : "Add"}
                               </Button>
                               <Button
                                 size="sm"
