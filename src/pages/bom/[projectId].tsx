@@ -1,17 +1,17 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { Layout } from "@/components/Layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Label } from "@/components/ui/Label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue
-} from "@/components/ui/Select";
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -19,8 +19,8 @@ import {
   TableHead,
   TableHeader,
   TableRow
-} from "@/components/ui/Table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/Dialog";
+} from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { bomService } from "@/services/bomService";
 import { projectService } from "@/services/projectService";
 import { Plus, Pencil, Trash2, ArrowLeft, Printer } from "lucide-react";
@@ -227,7 +227,9 @@ export default function BillOfMaterials() {
 
     setShowScopeInput(false);
     setNewScopeName("");
-    await loadData(bom.project_id as string);
+    if (bom?.project_id) {
+      await loadData(bom.project_id as string);
+    }
   };
 
   const handleCancelScopeInline = () => {
@@ -416,9 +418,9 @@ export default function BillOfMaterials() {
       return;
     }
 
-    // Keep the current values in the inputs so user can see/edit them.
-    // Just refresh data so totals and list reflect the saved labor.
-    await loadData();
+    if (bom?.project_id) {
+      await loadData(bom.project_id as string);
+    }
   };
 
   const handleEditLabor = (labor: Labor) => {
