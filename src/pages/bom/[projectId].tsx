@@ -23,7 +23,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { bomService } from "@/services/bomService";
 import { projectService } from "@/services/projectService";
-import { Plus, Pencil, Trash2, ArrowLeft, Printer } from "lucide-react";
+import { Plus, Pencil, Trash2, ArrowLeft } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
 type BOM = Database["public"]["Tables"]["bill_of_materials"]["Row"];
@@ -169,7 +169,18 @@ export default function BillOfMaterials() {
 
   const calculateScopeMaterialTotal = (scope: ScopeOfWork): number => {
     const materials = scope.bom_materials || [];
-    return materials.reduce((sum, m) => sum + (m.total_cost as number ?? 0), 0);
+    return materials.reduce((sum, m) => {
+      const quantity =
+        typeof m.quantity === "number" && Number.isFinite(m.quantity) ? m.quantity : 0;
+      const unitCost =
+        typeof m.unit_cost === "number" && Number.isFinite(m.unit_cost) ? m.unit_cost : 0;
+      const storedTotal =
+        typeof m.total_cost === "number" && Number.isFinite(m.total_cost)
+          ? m.total_cost
+          : null;
+      const materialTotal = storedTotal != null ? storedTotal : quantity * unitCost;
+      return sum + materialTotal;
+    }, 0);
   };
 
   const calculateScopeLaborTotal = (scope: ScopeOfWork): number => {
@@ -277,6 +288,7 @@ export default function BillOfMaterials() {
 
     const quantity = parseFloat(materialForm.quantity || "0");
     const unitCost = parseFloat(materialForm.unit_cost || "0");
+    const totalCost = quantity * unitCost;
 
     const materialData: Database["public"]["Tables"]["bom_materials"]["Insert"] = {
       scope_id: selectedScopeId,
@@ -284,7 +296,8 @@ export default function BillOfMaterials() {
       description: materialForm.description || materialForm.name || "Material",
       quantity,
       unit: materialForm.unit,
-      unit_cost: unitCost
+      unit_cost: unitCost,
+      total_cost: totalCost
     };
 
     let error;
@@ -541,15 +554,6 @@ export default function BillOfMaterials() {
     setSaving(false);
     if (bom.project_id) {
       await loadData(bom.project_id as string);
-    }
-  };
-
-  const handlePrintPDF = async () => {
-    if (bom) {
-      await handleSaveBOM();
-    }
-    if (typeof window !== "undefined") {
-      window.print();
     }
   };
 
@@ -1077,8 +1081,21 @@ export default function BillOfMaterials() {
         })}
 
         {scopes.length > 0 &&
+        <Card className="bg-primary/5">
+            <CardContent className="pt-4">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold">Total Direct Cost</h2>
+                <div className="text-3xl font-bold text-primary">
+                  ${formatCurrency(calculateTotalDirectCost())}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        }
+
+        {scopes.length > 0 &&
         <>
-            <div className="flex justify-center">
+            <div className="flex justify-center mt-4">
               <Button
               size="lg"
               className="bg-green-600 hover:bg-green-700 text-white"
@@ -1205,34 +1222,12 @@ export default function BillOfMaterials() {
         }
 
         {showIndirectCosts &&
-        <>
-            <Card className="bg-primary text-primary-foreground">
-              <CardContent className="pt-4">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-2xl font-bold">Grand Total</h2>
-                  <div className="text-4xl font-bold">
-                    ${formatCurrency(calculateGrandTotal())}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="flex justify-center">
-              <Button size="lg" onClick={() => void handlePrintPDF()} className="min-w-[200px]">
-                <Printer className="h-5 w-5 mr-2" />
-                Print to PDF
-              </Button>
-            </div>
-          </>
-        }
-
-        {scopes.length > 0 &&
-        <Card className="bg-primary/5">
+        <Card className="bg-primary text-primary-foreground">
             <CardContent className="pt-4">
               <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold">Total Direct Cost</h2>
-                <div className="text-3xl font-bold text-primary">
-                  ${formatCurrency(calculateTotalDirectCost())}
+                <h2 className="text-2xl font-bold">Grand Total</h2>
+                <div className="text-4xl font-bold">
+                  ${formatCurrency(calculateGrandTotal())}
                 </div>
               </div>
             </CardContent>
