@@ -37,15 +37,7 @@ type IndirectCost = Database["public"]["Tables"]["bom_indirect_costs"]["Row"];
 
 type LaborCalculationMethod = "percentage" | "unit_cost";
 
-// Light background colors used per scope of work card
-const scopeBgColors: string[] = [
-  "bg-gradient-to-r from-green-200 to-green-400",
-  "bg-gradient-to-r from-blue-200 to-blue-400",
-  "bg-gradient-to-r from-amber-200 to-amber-400",
-  "bg-gradient-to-r from-purple-200 to-purple-400",
-  "bg-gradient-to-r from-pink-200 to-pink-400",
-  "bg-gradient-to-r from-slate-200 to-slate-400"
-];
+// Scope cards use default neutral background (no custom colors).
 
 export default function BillOfMaterials() {
   const router = useRouter();
@@ -676,7 +668,7 @@ export default function BillOfMaterials() {
           return (
             <Card
               key={scope.id}
-              className={`${scopeBgColors[scopes.indexOf(scope) % scopeBgColors.length]} text-black`}
+              className="text-black"
             >
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start gap-3">
