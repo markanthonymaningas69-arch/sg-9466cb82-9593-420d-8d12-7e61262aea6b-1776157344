@@ -373,15 +373,23 @@ export default function BillOfMaterials() {
 
     const isPercentage = laborForm.calculation_method === "percentage";
 
+    let percentageValue = 0;
+    let hoursValue = 0;
+    let rateValue = 0;
+
     if (isPercentage) {
-      const percentageValue = parseFloat(laborForm.percentage || "0");
+      percentageValue = parseFloat(laborForm.percentage || "0");
       if (!percentageValue || percentageValue <= 0) {
         alert("Please enter a valid percentage for labor.");
         return;
       }
+
+      const laborTotal = materialTotal * (percentageValue / 100);
+      hoursValue = 1;
+      rateValue = laborTotal;
     } else {
-      const hoursValue = parseFloat(laborForm.hours || "0");
-      const rateValue = parseFloat(laborForm.rate || "0");
+      hoursValue = parseFloat(laborForm.hours || "0");
+      rateValue = parseFloat(laborForm.rate || "0");
 
       if (!hoursValue || !rateValue) {
         alert("Please enter a valid quantity and rate for labor.");
@@ -394,26 +402,16 @@ export default function BillOfMaterials() {
       }
     }
 
-    const percentageValue = parseFloat(laborForm.percentage || "0");
-    const hoursValue = parseFloat(laborForm.hours || "0");
-    const rateValue = parseFloat(laborForm.rate || "0");
-
-    let totalCost = 0;
-    if (isPercentage) {
-      totalCost = materialTotal * (percentageValue / 100);
-    } else {
-      totalCost = hoursValue * rateValue;
-    }
+    const description = isPercentage
+      ? `${percentageValue || 0}% of materials`
+      : laborForm.unit || laborForm.description || "Labor";
 
     const laborData: Database["public"]["Tables"]["bom_labor"]["Insert"] = {
       scope_id: scopeId,
       labor_type: laborForm.role || "Labor",
-      description: isPercentage
-        ? `${percentageValue || 0}% of materials`
-        : laborForm.unit || laborForm.description || "Labor",
-      hours: isPercentage ? 0 : hoursValue,
-      hourly_rate: isPercentage ? 0 : rateValue,
-      total_cost: totalCost
+      description,
+      hours: hoursValue,
+      hourly_rate: rateValue
     };
 
     const existingScope = scopes.find((s) => s.id === scopeId);
@@ -459,18 +457,22 @@ export default function BillOfMaterials() {
   const handleEditLabor = (labor: Labor) => {
     const knownUnits = ["Cu.m", "Sq.m", "Lin.m", "Kg", "lot"];
     const desc = labor.description || "";
-    const isKnown = knownUnits.includes(desc);
+
+    const percentageMatch = desc.match(/(\d+(\.\d+)?)\s*%/);
+    const isPercentage = !!percentageMatch;
+    const percentageValue = isPercentage && percentageMatch ? percentageMatch[1] : "";
+    const isKnownUnit = !isPercentage && knownUnits.includes(desc);
 
     setEditingLabor(labor);
     setLaborForm({
-      calculation_method: labor.hours && labor.hourly_rate ? "unit_cost" : "percentage",
-      percentage: "",
+      calculation_method: isPercentage ? "percentage" : "unit_cost",
+      percentage: isPercentage ? percentageValue : "",
       role: labor.labor_type || "",
       description: desc,
-      hours: labor.hours?.toString() || "",
-      rate: labor.hourly_rate?.toString() || "",
-      unit: isKnown ? desc : desc || "",
-      unit_selection: isKnown ? desc : desc ? "Other" : ""
+      hours: isPercentage ? "" : labor.hours?.toString() || "",
+      rate: isPercentage ? "" : labor.hourly_rate?.toString() || "",
+      unit: isPercentage ? "" : isKnownUnit ? desc : desc || "",
+      unit_selection: isPercentage ? "" : isKnownUnit ? desc : desc ? "Other" : ""
     });
   };
 
