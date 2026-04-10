@@ -237,15 +237,13 @@ export default function BillOfMaterials() {
       alert("Please enter a valid amount or percentage.");
       return;
     }
-    if (indirectRowForm.type === 'Others' && !indirectRowForm.description.trim()) {
-      alert("Please enter a description for this cost.");
-      return;
-    }
+
+    const rowToSave = { ...indirectRowForm, description: indirectRowForm.type === 'Others' ? 'Others' : indirectRowForm.description };
 
     if (indirectRowForm.id) {
-      setIndirectCostsList(prev => prev.map(c => c.id === indirectRowForm.id ? indirectRowForm : c));
+      setIndirectCostsList(prev => prev.map(c => c.id === indirectRowForm.id ? rowToSave : c));
     } else {
-      setIndirectCostsList(prev => [...prev, { ...indirectRowForm, id: Math.random().toString(36).substr(2, 9) }]);
+      setIndirectCostsList(prev => [...prev, { ...rowToSave, id: Math.random().toString(36).substr(2, 9) }]);
     }
     setIndirectRowForm({ id: '', type: 'VAT', description: '', value: '' });
   };
@@ -1327,7 +1325,6 @@ export default function BillOfMaterials() {
                 <TableHeader>
                   <TableRow className="h-8">
                     <TableHead className="h-8 py-1 w-32">Type</TableHead>
-                    <TableHead className="h-8 py-1">Description</TableHead>
                     <TableHead className="text-right h-8 py-1 w-32">Value</TableHead>
                     <TableHead className="text-right h-8 py-1 w-32">Amount</TableHead>
                     <TableHead className="text-right h-8 py-1 w-24"></TableHead>
@@ -1337,7 +1334,6 @@ export default function BillOfMaterials() {
                   {indirectCostsList.map((cost) => (
                     <TableRow key={cost.id} className="h-8">
                       <TableCell className="py-1 font-medium text-sm">{cost.type}</TableCell>
-                      <TableCell className="py-1 text-sm">{cost.type === 'Others' ? cost.description : '-'}</TableCell>
                       <TableCell className="text-right py-1 text-sm">
                         {cost.type !== 'Others' ? `${cost.value}%` : formatCurrency(parseFloat(cost.value.replace(/,/g, "") || "0"))}
                       </TableCell>
@@ -1373,15 +1369,6 @@ export default function BillOfMaterials() {
                           <SelectItem value="Others">Others/Input</SelectItem>
                         </SelectContent>
                       </Select>
-                    </TableCell>
-                    <TableCell className="py-1">
-                      <Input 
-                        disabled={indirectRowForm.type !== 'Others'}
-                        placeholder={indirectRowForm.type !== 'Others' ? 'N/A' : 'Description'}
-                        className="h-7 text-xs w-full"
-                        value={indirectRowForm.description}
-                        onChange={e => setIndirectRowForm({...indirectRowForm, description: e.target.value})}
-                      />
                     </TableCell>
                     <TableCell className="py-1 text-right">
                       <Input 
@@ -1422,19 +1409,11 @@ export default function BillOfMaterials() {
               </Table>
 
               <div className="pt-4 border-t">
-                <div className="flex justify-between items-center mb-4">
+                <div className="flex justify-between items-center">
                   <span className="text-lg font-semibold">Total Indirect Cost:</span>
                   <span className="text-2xl font-bold">
                     {formatCurrency(calculateIndirectCost())}
                   </span>
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                    onClick={() => void handleSaveIndirectCosts()}
-                  >
-                    Save Indirect Costs
-                  </Button>
                 </div>
               </div>
             </CardContent>
