@@ -818,9 +818,9 @@ export default function BillOfMaterials() {
                     <TableHeader>
                       <TableRow className="h-8">
                         <TableHead className="h-8 py-1">Material Description</TableHead>
-                        <TableHead className="w-24 text-right h-8 py-1">Qty</TableHead>
-                        <TableHead className="w-32 h-8 py-1">Unit</TableHead>
-                        <TableHead className="w-32 text-right h-8 py-1">Unit Cost</TableHead>
+                        <TableHead className="w-32 text-right h-8 py-1">Qty</TableHead>
+                        <TableHead className="w-40 h-8 py-1">Unit</TableHead>
+                        <TableHead className="w-40 text-right h-8 py-1">Unit Cost</TableHead>
                         <TableHead className="w-32 text-right h-8 py-1">Amount</TableHead>
                         <TableHead className="w-28 text-right h-8 py-1" />
                       </TableRow>
@@ -891,7 +891,7 @@ export default function BillOfMaterials() {
                             <Input
                         type="number"
                         step="0.01"
-                        className="h-7 text-xs text-right"
+                        className="h-7 text-xs text-right w-full min-w-[80px]"
                         value={materialForm.quantity}
                         onChange={(e) =>
                         setMaterialForm({
@@ -913,15 +913,15 @@ export default function BillOfMaterials() {
                           })
                           }>
                           
-                                <SelectTrigger className="h-7 text-xs">
+                                <SelectTrigger className="h-7 text-xs w-full min-w-[100px]">
                                   <SelectValue placeholder="Select unit" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {["Cu.m", "Sq.m", "Lin.m", "Pc", "Kg", "Box", "Other"].map(
+                                  {["Cu.m", "Sq.m", "Lin.m", "Pc", "Kg", "Box", "lot", "bags", "pails", "gal", "liters", "bd.ft", "sets", "pairs", "rolls", "Other"].map(
                               (unitOption) =>
                               <SelectItem key={unitOption} value={unitOption} className="text-xs">
                                         {unitOption === "Other" ?
-                                "Other (specify)" :
+                                "Others/Input" :
                                 unitOption}
                                       </SelectItem>
 
@@ -931,7 +931,7 @@ export default function BillOfMaterials() {
                               {materialForm.unit_selection === "Other" &&
                         <Input
                           placeholder="Enter unit"
-                          className="h-7 text-xs"
+                          className="h-7 text-xs w-full"
                           value={materialForm.unit}
                           onChange={(e) =>
                           setMaterialForm({
@@ -947,7 +947,7 @@ export default function BillOfMaterials() {
                             <Input
                         type="number"
                         step="0.01"
-                        className="h-7 text-xs text-right"
+                        className="h-7 text-xs text-right w-full min-w-[100px]"
                         value={materialForm.unit_cost}
                         onChange={(e) =>
                         setMaterialForm({
