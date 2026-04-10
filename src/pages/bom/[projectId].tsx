@@ -1499,6 +1499,6 @@ export default function BillOfMaterials() {
           </Card>
         )}
       </div>
-    </Layout>);
-
+    </Layout>
+  );
 }
