@@ -833,19 +833,8 @@ export default function BillOfMaterials() {
                               {material.description || material.material_name}
                             </div>
                           </TableCell>
-                          <TableCell className="text-right py-1">
-                            <Input
-                        type="number"
-                        step="0.01"
-                        className="h-7 text-xs text-right w-full min-w-[120px]"
-                        value={materialForm.quantity}
-                        onChange={(e) =>
-                        setMaterialForm({
-                          ...materialForm,
-                          quantity: e.target.value
-                        })
-                        } />
-                      
+                          <TableCell className="text-right py-1 text-sm">
+                            {material.quantity}
                           </TableCell>
                           <TableCell className="py-1 text-sm">{material.unit}</TableCell>
                           <TableCell className="text-right py-1 text-sm">
@@ -902,7 +891,7 @@ export default function BillOfMaterials() {
                             <Input
                         type="number"
                         step="0.01"
-                        className="h-7 text-xs text-right w-full min-w-[140px]"
+                        className="h-7 text-xs text-right w-full min-w-[120px]"
                         value={materialForm.quantity}
                         onChange={(e) =>
                         setMaterialForm({
@@ -958,7 +947,7 @@ export default function BillOfMaterials() {
                             <Input
                         type="number"
                         step="0.01"
-                        className="h-7 text-xs text-right w-full min-w-[100px]"
+                        className="h-7 text-xs text-right w-full min-w-[140px]"
                         value={materialForm.unit_cost}
                         onChange={(e) =>
                         setMaterialForm({
