@@ -288,7 +288,6 @@ export default function BillOfMaterials() {
 
     const quantity = parseFloat(materialForm.quantity || "0");
     const unitCost = parseFloat(materialForm.unit_cost || "0");
-    const totalCost = quantity * unitCost;
 
     const materialData: Database["public"]["Tables"]["bom_materials"]["Insert"] = {
       scope_id: selectedScopeId,
@@ -296,8 +295,7 @@ export default function BillOfMaterials() {
       description: materialForm.description || materialForm.name || "Material",
       quantity,
       unit: materialForm.unit,
-      unit_cost: unitCost,
-      total_cost: totalCost
+      unit_cost: unitCost
     };
 
     let error;
@@ -899,182 +897,6 @@ export default function BillOfMaterials() {
                   <Plus className="h-5 w-5 mr-2" />
                   Add Materials
                 </Button>
-              </div>
-              <div className="flex justify-end pt-2 border-t mt-2">
-                <div className="text-right text-sm space-y-1">
-                  <div className="font-semibold">
-                    Material Total: ${formatCurrency(calculateScopeMaterialTotal(scope))}
-                  </div>
-                  <div>
-                    Labor Total: ${formatCurrency(calculateScopeLaborTotal(scope))}
-                  </div>
-                  <div className="font-semibold">
-                    Subtotal: ${formatCurrency(calculateScopeDirectCost(scope))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-1">
-                <div className="flex items-center mb-0">
-                  <h3 className="font-semibold text-sm">Labor Cost</h3>
-                </div>
-
-                <div className="mt-1">
-                  <div className="flex flex-wrap items-center gap-2 md:gap-3">
-                    <span className="text-[11px] font-medium">Method:</span>
-                    <div className="inline-flex rounded-md border border-green-600 bg-muted p-0.5">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={
-                          laborForm.calculation_method === "percentage" ? "default" : "ghost"
-                        }
-                        className={
-                          laborForm.calculation_method === "percentage"
-                            ? "bg-green-600 text-white hover:bg-green-700"
-                            : "text-green-700 hover:bg-transparent"
-                        }
-                        onClick={() =>
-                          setLaborForm((prev) => ({
-                            ...prev,
-                            calculation_method: "percentage"
-                          }))
-                        }
-                      >
-                        % of Materials
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={
-                          laborForm.calculation_method === "unit_cost" ? "default" : "ghost"
-                        }
-                        className={
-                          laborForm.calculation_method === "unit_cost"
-                            ? "bg-green-600 text-white hover:bg-green-700"
-                            : "text-green-700 hover:bg-transparent"
-                        }
-                        onClick={() =>
-                          setLaborForm((prev) => ({
-                            ...prev,
-                            calculation_method: "unit_cost"
-                          }))
-                        }
-                      >
-                        By Unit Cost
-                      </Button>
-                    </div>
-
-                    {laborForm.calculation_method === "percentage" ? (
-                      <>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={laborForm.percentage}
-                          onChange={(e) =>
-                            setLaborForm({ ...laborForm, percentage: e.target.value })
-                          }
-                          placeholder="% of materials"
-                          className="h-8 w-28 text-xs"
-                        />
-                        <span className="text-[11px] text-muted-foreground">
-                          Material: ${formatCurrency(calculateScopeMaterialTotal(scope))}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={laborForm.hours}
-                          onChange={(e) =>
-                            setLaborForm({ ...laborForm, hours: e.target.value })
-                          }
-                          placeholder="Qty"
-                          className="h-8 w-20 text-xs"
-                        />
-                        <Select
-                          value={laborForm.unit_selection}
-                          onValueChange={(value) =>
-                            setLaborForm({
-                              ...laborForm,
-                              unit: value === "Other" ? "" : value,
-                              unit_selection: value
-                            })
-                          }
-                        >
-                          <SelectTrigger className="h-8 w-24 text-xs">
-                            <SelectValue placeholder="Unit" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {["Cu.m", "Sq.m", "Lin.m", "Kg", "lot", "Other"].map((unitOption) => (
-                              <SelectItem key={unitOption} value={unitOption}>
-                                {unitOption === "Other" ? "Other" : unitOption}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {laborForm.unit_selection === "Other" && (
-                          <Input
-                            placeholder="Unit"
-                            value={laborForm.unit}
-                            onChange={(e) =>
-                              setLaborForm({
-                                ...laborForm,
-                                unit: e.target.value
-                              })
-                            }
-                            className="h-8 w-24 text-xs"
-                          />
-                        )}
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={laborForm.rate}
-                          onChange={(e) =>
-                            setLaborForm({ ...laborForm, rate: e.target.value })
-                          }
-                          placeholder="Rate $/unit"
-                          className="h-8 w-28 text-xs"
-                        />
-                      </>
-                    )}
-
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        className="bg-green-600 hover:bg-green-700 text-white"
-                        onClick={() => void handleLaborSubmit(scope.id as string)}
-                      >
-                        Save
-                      </Button>
-                      <span className="text-[11px] font-semibold">
-                        {(() => {
-                          const materialTotal = calculateScopeMaterialTotal(scope);
-                          const percentage = parseFloat(laborForm.percentage || "0");
-                          const qty = parseFloat(laborForm.hours || "0");
-                          const rate = parseFloat(laborForm.rate || "0");
-
-                          let fromForm = 0;
-                          if (laborForm.calculation_method === "percentage" && percentage > 0) {
-                            fromForm = materialTotal * (percentage / 100);
-                          } else if (
-                            laborForm.calculation_method === "unit_cost" &&
-                            qty > 0 &&
-                            rate > 0
-                          ) {
-                            fromForm = qty * rate;
-                          }
-
-                          const displayTotal =
-                            fromForm > 0 ? fromForm : calculateScopeLaborTotal(scope);
-
-                          return `$${formatCurrency(displayTotal)}`;
-                        })()}
-                      </span>
-                    </div>
-                  </div>
-                </div>
               </div>
                 </CardContent>
               )}
