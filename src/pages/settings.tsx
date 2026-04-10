@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/contexts/ThemeProvider";
+import { useSettings } from "@/contexts/SettingsProvider";
 import { 
   User, 
   Building2, 
@@ -31,6 +32,7 @@ import {
 export default function Settings() {
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
+  const { currency, setCurrency } = useSettings();
   
   const [profile, setProfile] = useState({
     name: "John Doe",
@@ -63,7 +65,6 @@ export default function Settings() {
   const [appearance, setAppearance] = useState({
     language: "en",
     dateFormat: "MM/DD/YYYY",
-    currency: "USD",
     timezone: "America/New_York"
   });
 
@@ -419,7 +420,7 @@ export default function Settings() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="currency">Currency</Label>
-                      <Select value={appearance.currency} onValueChange={(value) => setAppearance({ ...appearance, currency: value })}>
+                      <Select value={currency} onValueChange={(value: any) => setCurrency(value)}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
@@ -428,6 +429,7 @@ export default function Settings() {
                           <SelectItem value="EUR">EUR (€)</SelectItem>
                           <SelectItem value="GBP">GBP (£)</SelectItem>
                           <SelectItem value="JPY">JPY (¥)</SelectItem>
+                          <SelectItem value="PHP">PHP (₱)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

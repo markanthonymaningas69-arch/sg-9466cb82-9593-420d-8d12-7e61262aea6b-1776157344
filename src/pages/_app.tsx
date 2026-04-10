@@ -3,8 +3,14 @@ import type { AppProps } from "next/app";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
+import { SettingsProvider } from "@/contexts/SettingsProvider";
 import { Toaster } from "@/components/ui/toaster";
 import { authService } from "@/services/authService";
+import { Inter, Outfit, Playfair_Display } from "next/font/google";
+
+const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
+const outfit = Outfit({ subsets: ["latin"], variable: "--font-sans" });
+const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-serif" });
 
 function AppInner({ Component, pageProps }: AppProps) {
   const router = useRouter();
@@ -50,11 +56,21 @@ function AppInner({ Component, pageProps }: AppProps) {
   return <Component {...pageProps} />;
 }
 
-export default function App(props: AppProps) {
+export default function App({ Component, pageProps }: AppProps) {
   return (
-    <ThemeProvider>
-      <AppInner {...props} />
-      <Toaster />
-    </ThemeProvider>
+    <>
+      <style jsx global>{`
+        :root {
+          --font-sans: ${inter.style.fontFamily}, ${outfit.style.fontFamily}, sans-serif;
+          --font-serif: ${playfair.style.fontFamily}, serif;
+        }
+      `}</style>
+      <ThemeProvider>
+        <SettingsProvider>
+          <Component {...pageProps} />
+          <Toaster />
+        </SettingsProvider>
+      </ThemeProvider>
+    </>
   );
 }
