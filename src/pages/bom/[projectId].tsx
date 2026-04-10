@@ -1317,164 +1317,132 @@ export default function BillOfMaterials() {
           </Card>
         }
 
-        {scopes.length > 0 &&
-        <>
-            <div className="flex justify-center mt-4">
-              <Button
-              size="lg"
-              className="bg-green-600 hover:bg-green-700 text-white"
-              onClick={() => {
-                setShowIndirectCosts(true);
-                setIndirectDialogOpen(true);
-              }}
-              style={{ lineHeight: "1" }}>
-              
-                <Plus className="h-5 w-5 mr-2" />
-                Add Indirect Cost
-              </Button>
-            </div>
+        {scopes.length > 0 && (
+          <Card className="mt-4">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-xl">Indirect Costs</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Table>
+                <TableHeader>
+                  <TableRow className="h-8">
+                    <TableHead className="h-8 py-1 w-32">Type</TableHead>
+                    <TableHead className="h-8 py-1">Description</TableHead>
+                    <TableHead className="text-right h-8 py-1 w-32">Value</TableHead>
+                    <TableHead className="text-right h-8 py-1 w-32">Amount</TableHead>
+                    <TableHead className="text-right h-8 py-1 w-24"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {indirectCostsList.map((cost) => (
+                    <TableRow key={cost.id} className="h-8">
+                      <TableCell className="py-1 font-medium text-sm">{cost.type}</TableCell>
+                      <TableCell className="py-1 text-sm">{cost.type === 'Others' ? cost.description : '-'}</TableCell>
+                      <TableCell className="text-right py-1 text-sm">
+                        {cost.type !== 'Others' ? `${cost.value}%` : formatCurrency(parseFloat(cost.value.replace(/,/g, "") || "0"))}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold py-1 text-sm">
+                        {formatCurrency(
+                          ['VAT', 'OCM', 'Profit', 'Tax'].includes(cost.type)
+                          ? calculateTotalDirectCost() * (parseFloat(cost.value.replace(/,/g, "") || "0") / 100)
+                          : parseFloat(cost.value.replace(/,/g, "") || "0")
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right py-1">
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-green-600 hover:text-green-700" onClick={() => handleEditIndirect(cost)}>
+                            <Pencil className="w-3 h-3" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-red-600 hover:text-red-700" onClick={() => handleDeleteIndirect(cost.id)}>
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
 
-            <Dialog open={indirectDialogOpen} onOpenChange={(open) => {
-              setIndirectDialogOpen(open);
-              if (!open) setIndirectRowForm({ id: '', type: 'VAT', description: '', value: '' });
-            }}>
-              <DialogContent className="max-w-4xl">
-                <DialogHeader>
-                  <DialogTitle>Indirect Costs</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 mt-2">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="h-8">
-                        <TableHead className="h-8 py-1 w-32">Type</TableHead>
-                        <TableHead className="h-8 py-1">Description</TableHead>
-                        <TableHead className="text-right h-8 py-1 w-32">Value</TableHead>
-                        <TableHead className="text-right h-8 py-1 w-32">Amount</TableHead>
-                        <TableHead className="text-right h-8 py-1 w-24"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {indirectCostsList.map((cost) => (
-                        <TableRow key={cost.id} className="h-8">
-                          <TableCell className="py-1 font-medium text-sm">{cost.type}</TableCell>
-                          <TableCell className="py-1 text-sm">{cost.type === 'Others' ? cost.description : '-'}</TableCell>
-                          <TableCell className="text-right py-1 text-sm">
-                            {cost.type !== 'Others' ? `${cost.value}%` : formatCurrency(parseFloat(cost.value.replace(/,/g, "") || "0"))}
-                          </TableCell>
-                          <TableCell className="text-right font-semibold py-1 text-sm">
-                            {formatCurrency(
-                              ['VAT', 'OCM', 'Profit', 'Tax'].includes(cost.type)
-                              ? calculateTotalDirectCost() * (parseFloat(cost.value.replace(/,/g, "") || "0") / 100)
-                              : parseFloat(cost.value.replace(/,/g, "") || "0")
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right py-1">
-                            <div className="flex justify-end gap-1">
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-green-600 hover:text-green-700" onClick={() => handleEditIndirect(cost)}>
-                                <Pencil className="w-3 h-3" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-red-600 hover:text-red-700" onClick={() => handleDeleteIndirect(cost.id)}>
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                  <TableRow className="h-8 bg-muted/20">
+                    <TableCell className="py-1">
+                      <Select value={indirectRowForm.type} onValueChange={(val) => setIndirectRowForm({...indirectRowForm, type: val, description: val !== 'Others' ? '' : indirectRowForm.description})}>
+                        <SelectTrigger className="h-7 text-xs"><SelectValue/></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="VAT">VAT</SelectItem>
+                          <SelectItem value="Tax">Tax</SelectItem>
+                          <SelectItem value="OCM">OCM</SelectItem>
+                          <SelectItem value="Profit">Profit</SelectItem>
+                          <SelectItem value="Others">Others/Input</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell className="py-1">
+                      <Input 
+                        disabled={indirectRowForm.type !== 'Others'}
+                        placeholder={indirectRowForm.type !== 'Others' ? 'N/A' : 'Description'}
+                        className="h-7 text-xs w-full"
+                        value={indirectRowForm.description}
+                        onChange={e => setIndirectRowForm({...indirectRowForm, description: e.target.value})}
+                      />
+                    </TableCell>
+                    <TableCell className="py-1 text-right">
+                      <Input 
+                        className="h-7 text-xs text-right w-full"
+                        placeholder={indirectRowForm.type !== 'Others' ? '%' : 'Amount'}
+                        value={indirectRowForm.value}
+                        onChange={e => setIndirectRowForm({...indirectRowForm, value: e.target.value.replace(/[^0-9.,]/g, '')})}
+                        onBlur={e => {
+                            const val = e.target.value;
+                            if (val) {
+                              const num = parseFloat(val.replace(/,/g, ""));
+                              if (!isNaN(num)) {
+                                setIndirectRowForm({ ...indirectRowForm, value: num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
+                              }
+                            }
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell className="text-right font-semibold py-1 text-sm text-muted-foreground">
+                        {formatCurrency(
+                          ['VAT', 'OCM', 'Profit', 'Tax'].includes(indirectRowForm.type)
+                          ? calculateTotalDirectCost() * (parseFloat(indirectRowForm.value.replace(/,/g, "") || "0") / 100)
+                          : parseFloat(indirectRowForm.value.replace(/,/g, "") || "0")
+                        )}
+                    </TableCell>
+                    <TableCell className="text-right py-1">
+                      <div className="flex justify-end gap-1 items-center">
+                        <Button size="sm" className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={handleAddOrUpdateIndirect}>
+                            {indirectRowForm.id ? 'Update' : 'Add'}
+                        </Button>
+                        {indirectRowForm.id && (
+                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-red-600 text-red-700 hover:bg-red-50" onClick={() => setIndirectRowForm({id: '', type: 'VAT', description: '', value: ''})}>Cancel</Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
 
-                      <TableRow className="h-8 bg-muted/20">
-                        <TableCell className="py-1">
-                          <Select value={indirectRowForm.type} onValueChange={(val) => setIndirectRowForm({...indirectRowForm, type: val, description: val !== 'Others' ? '' : indirectRowForm.description})}>
-                            <SelectTrigger className="h-7 text-xs"><SelectValue/></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="VAT">VAT</SelectItem>
-                              <SelectItem value="Tax">Tax</SelectItem>
-                              <SelectItem value="OCM">OCM</SelectItem>
-                              <SelectItem value="Profit">Profit</SelectItem>
-                              <SelectItem value="Others">Others/Input</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell className="py-1">
-                          <Input 
-                            disabled={indirectRowForm.type !== 'Others'}
-                            placeholder={indirectRowForm.type !== 'Others' ? 'N/A' : 'Description'}
-                            className="h-7 text-xs w-full"
-                            value={indirectRowForm.description}
-                            onChange={e => setIndirectRowForm({...indirectRowForm, description: e.target.value})}
-                          />
-                        </TableCell>
-                        <TableCell className="py-1 text-right">
-                          <Input 
-                            className="h-7 text-xs text-right w-full"
-                            placeholder={indirectRowForm.type !== 'Others' ? '%' : 'Amount'}
-                            value={indirectRowForm.value}
-                            onChange={e => setIndirectRowForm({...indirectRowForm, value: e.target.value.replace(/[^0-9.,]/g, '')})}
-                            onBlur={e => {
-                                const val = e.target.value;
-                                if (val) {
-                                  const num = parseFloat(val.replace(/,/g, ""));
-                                  if (!isNaN(num)) {
-                                    setIndirectRowForm({ ...indirectRowForm, value: num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
-                                  }
-                                }
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell className="text-right font-semibold py-1 text-sm text-muted-foreground">
-                            {formatCurrency(
-                              ['VAT', 'OCM', 'Profit', 'Tax'].includes(indirectRowForm.type)
-                              ? calculateTotalDirectCost() * (parseFloat(indirectRowForm.value.replace(/,/g, "") || "0") / 100)
-                              : parseFloat(indirectRowForm.value.replace(/,/g, "") || "0")
-                            )}
-                        </TableCell>
-                        <TableCell className="text-right py-1">
-                          <div className="flex justify-end gap-1 items-center">
-                            <Button size="sm" className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={handleAddOrUpdateIndirect}>
-                                {indirectRowForm.id ? 'Update' : 'Add'}
-                            </Button>
-                            {indirectRowForm.id && (
-                                <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-red-600 text-red-700 hover:bg-red-50" onClick={() => setIndirectRowForm({id: '', type: 'VAT', description: '', value: ''})}>Cancel</Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
-
-                  <div className="pt-4 border-t">
-                    <div className="flex justify-between items-center mb-4">
-                      <span className="text-lg font-semibold">Total Indirect Cost:</span>
-                      <span className="text-2xl font-bold">
-                        {formatCurrency(calculateIndirectCost())}
-                      </span>
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      <Button
-                      variant="outline"
-                      className="border-red-600 text-red-700 hover:bg-red-50"
-                      onClick={() => setIndirectDialogOpen(false)}>
-                      
-                        Cancel
-                      </Button>
-                      <Button
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                      onClick={() => {
-                        void handleSaveIndirectCosts();
-                        setIndirectDialogOpen(false);
-                      }}>
-                      
-                        Save Indirect Costs
-                      </Button>
-                    </div>
-                  </div>
+              <div className="pt-4 border-t">
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-lg font-semibold">Total Indirect Cost:</span>
+                  <span className="text-2xl font-bold">
+                    {formatCurrency(calculateIndirectCost())}
+                  </span>
                 </div>
-              </DialogContent>
-            </Dialog>
-          </>
-        }
+                <div className="flex justify-end gap-2">
+                  <Button
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => void handleSaveIndirectCosts()}
+                  >
+                    Save Indirect Costs
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-        {showIndirectCosts &&
-        <Card className="bg-primary text-primary-foreground">
+        {scopes.length > 0 && (
+          <Card className="bg-primary text-primary-foreground mt-4">
             <CardContent className="pt-4">
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold">Grand Total</h2>
@@ -1484,7 +1452,7 @@ export default function BillOfMaterials() {
               </div>
             </CardContent>
           </Card>
-        }
+        )}
       </div>
     </Layout>);
 
