@@ -818,9 +818,9 @@ export default function BillOfMaterials() {
                     <TableHeader>
                       <TableRow className="h-8">
                         <TableHead className="h-8 py-1">Material Description</TableHead>
-                        <TableHead className="w-32 text-right h-8 py-1">Qty</TableHead>
+                        <TableHead className="w-40 text-right h-8 py-1">Qty</TableHead>
                         <TableHead className="w-40 h-8 py-1">Unit</TableHead>
-                        <TableHead className="w-40 text-right h-8 py-1">Unit Cost</TableHead>
+                        <TableHead className="w-48 text-right h-8 py-1">Unit Cost</TableHead>
                         <TableHead className="w-32 text-right h-8 py-1">Amount</TableHead>
                         <TableHead className="w-28 text-right h-8 py-1" />
                       </TableRow>
@@ -833,8 +833,19 @@ export default function BillOfMaterials() {
                               {material.description || material.material_name}
                             </div>
                           </TableCell>
-                          <TableCell className="text-right py-1 text-sm">
-                            {material.quantity}
+                          <TableCell className="text-right py-1">
+                            <Input
+                        type="number"
+                        step="0.01"
+                        className="h-7 text-xs text-right w-full min-w-[120px]"
+                        value={materialForm.quantity}
+                        onChange={(e) =>
+                        setMaterialForm({
+                          ...materialForm,
+                          quantity: e.target.value
+                        })
+                        } />
+                      
                           </TableCell>
                           <TableCell className="py-1 text-sm">{material.unit}</TableCell>
                           <TableCell className="text-right py-1 text-sm">
@@ -891,7 +902,7 @@ export default function BillOfMaterials() {
                             <Input
                         type="number"
                         step="0.01"
-                        className="h-7 text-xs text-right w-full min-w-[80px]"
+                        className="h-7 text-xs text-right w-full min-w-[140px]"
                         value={materialForm.quantity}
                         onChange={(e) =>
                         setMaterialForm({
@@ -1070,7 +1081,7 @@ export default function BillOfMaterials() {
                                     setLaborForm({ ...laborForm, hours: e.target.value })
                                   }
                                   placeholder="Qty"
-                                  className="h-7 w-16 text-xs"
+                                  className="h-7 w-24 text-xs"
                                 />
                                 <Select
                                   value={laborForm.unit_selection}
@@ -1087,7 +1098,7 @@ export default function BillOfMaterials() {
                                   </SelectTrigger>
                                   <SelectContent>
                                     {["Cu.m", "Sq.m", "Lin.m", "Kg", "lot", "Other"].map((unitOption) => (
-                                      <SelectItem key={unitOption} value={unitOption}>
+                                      <SelectItem key={unitOption} value={unitOption} className="text-xs">
                                         {unitOption === "Other" ? "Other" : unitOption}
                                       </SelectItem>
                                     ))}
@@ -1114,7 +1125,7 @@ export default function BillOfMaterials() {
                                     setLaborForm({ ...laborForm, rate: e.target.value })
                                   }
                                   placeholder="$/u"
-                                  className="h-7 w-16 text-xs"
+                                  className="h-7 w-32 text-xs"
                                 />
                               </>
                             )}
