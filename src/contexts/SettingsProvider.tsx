@@ -7,6 +7,7 @@ interface SettingsContextType {
   currency: CurrencyType;
   setCurrency: (currency: CurrencyType) => void;
   formatCurrency: (value: number) => string;
+  formatNumber: (value: number) => string;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -37,8 +38,17 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     }).format(value);
   };
 
+  const formatNumber = (value: number) => {
+    if (!Number.isFinite(value)) return "0.00";
+    
+    return new Intl.NumberFormat("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+  };
+
   return (
-    <SettingsContext.Provider value={{ currency, setCurrency: handleSetCurrency, formatCurrency }}>
+    <SettingsContext.Provider value={{ currency, setCurrency: handleSetCurrency, formatCurrency, formatNumber }}>
       {children}
     </SettingsContext.Provider>
   );

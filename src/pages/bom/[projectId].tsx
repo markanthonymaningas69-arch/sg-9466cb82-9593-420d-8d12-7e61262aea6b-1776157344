@@ -41,7 +41,7 @@ type LaborCalculationMethod = "percentage" | "unit_cost";
 // Scope cards use default neutral background (no custom colors).
 
 export default function BillOfMaterials() {
-  const { formatCurrency } = useSettings();
+  const { formatCurrency, formatNumber } = useSettings();
   const router = useRouter();
   const { projectId } = router.query;
 
@@ -834,7 +834,7 @@ export default function BillOfMaterials() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right py-1 text-sm">
-                            {material.quantity}
+                            {formatNumber(material.quantity as number || 0)}
                           </TableCell>
                           <TableCell className="py-1 text-sm">{material.unit}</TableCell>
                           <TableCell className="text-right py-1 text-sm">
@@ -1163,7 +1163,7 @@ export default function BillOfMaterials() {
                                   return (
                                     <>
                                       <span className="text-[11px] font-semibold text-green-700">
-                                        {laborEntry.hours} {desc || "Units"} × {formatCurrency(laborEntry.hourly_rate as number || 0)}
+                                        {formatNumber(laborEntry.hours as number || 0)} {desc || "Units"} × {formatCurrency(laborEntry.hourly_rate as number || 0)}
                                       </span>
                                     </>
                                   );
