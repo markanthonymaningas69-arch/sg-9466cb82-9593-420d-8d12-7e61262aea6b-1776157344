@@ -317,8 +317,8 @@ export default function BillOfMaterials() {
   const handleMaterialSubmitInline = async () => {
     if (!selectedScopeId) return;
 
-    const quantity = parseFloat(materialForm.quantity || "0");
-    const unitCost = parseFloat(materialForm.unit_cost || "0");
+    const quantity = parseFloat(materialForm.quantity.replace(/,/g, "") || "0");
+    const unitCost = parseFloat(materialForm.unit_cost.replace(/,/g, "") || "0");
 
     const materialData: Database["public"]["Tables"]["bom_materials"]["Insert"] = {
       scope_id: selectedScopeId,
@@ -362,10 +362,10 @@ export default function BillOfMaterials() {
     setMaterialForm({
       name: material.material_name || "",
       description: material.description || material.material_name || "",
-      quantity: material.quantity != null ? material.quantity.toString() : "",
+      quantity: material.quantity != null ? Number(material.quantity).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "",
       unit,
       unit_selection: isKnown ? unit : unit ? "Other" : "",
-      unit_cost: material.unit_cost != null ? (material.unit_cost as number).toString() : ""
+      unit_cost: material.unit_cost != null ? Number(material.unit_cost).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ""
     });
     setEditingMaterial(material);
   };
@@ -407,7 +407,7 @@ export default function BillOfMaterials() {
     let rateValue = 0;
 
     if (isPercentage) {
-      percentageValue = parseFloat(laborForm.percentage || "0");
+      percentageValue = parseFloat(laborForm.percentage.replace(/,/g, "") || "0");
       if (!percentageValue || percentageValue <= 0) {
         alert("Please enter a valid percentage for labor.");
         return;
@@ -417,8 +417,8 @@ export default function BillOfMaterials() {
       hoursValue = 1;
       rateValue = laborTotal;
     } else {
-      hoursValue = parseFloat(laborForm.hours || "0");
-      rateValue = parseFloat(laborForm.rate || "0");
+      hoursValue = parseFloat(laborForm.hours.replace(/,/g, "") || "0");
+      rateValue = parseFloat(laborForm.rate.replace(/,/g, "") || "0");
 
       if (!hoursValue || !rateValue) {
         alert("Please enter a valid quantity and rate for labor.");
@@ -499,8 +499,8 @@ export default function BillOfMaterials() {
       percentage: isPercentage ? percentageValue : "",
       role: labor.labor_type || "",
       description: desc,
-      hours: isPercentage ? "" : labor.hours?.toString() || "",
-      rate: isPercentage ? "" : labor.hourly_rate?.toString() || "",
+      hours: isPercentage ? "" : (labor.hours != null ? Number(labor.hours).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ""),
+      rate: isPercentage ? "" : (labor.hourly_rate != null ? Number(labor.hourly_rate).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ""),
       unit: isPercentage ? "" : isKnownUnit ? desc : desc || "",
       unit_selection: isPercentage ? "" : isKnownUnit ? desc : desc ? "Other" : ""
     });
@@ -889,16 +889,24 @@ export default function BillOfMaterials() {
                           </TableCell>
                           <TableCell className="text-right py-1">
                             <Input
-                        type="number"
-                        step="0.01"
+                        type="text"
                         className="h-7 text-xs text-right w-full min-w-[120px]"
                         value={materialForm.quantity}
                         onChange={(e) =>
                         setMaterialForm({
                           ...materialForm,
-                          quantity: e.target.value
+                          quantity: e.target.value.replace(/[^0-9.,]/g, '')
                         })
-                        } />
+                        }
+                        onBlur={(e) => {
+                          const val = e.target.value;
+                          if (val) {
+                            const num = parseFloat(val.replace(/,/g, ""));
+                            if (!isNaN(num)) {
+                              setMaterialForm({ ...materialForm, quantity: num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
+                            }
+                          }
+                        }} />
                       
                           </TableCell>
                           <TableCell className="py-1">
@@ -945,22 +953,30 @@ export default function BillOfMaterials() {
                           </TableCell>
                           <TableCell className="text-right py-1">
                             <Input
-                        type="number"
-                        step="0.01"
+                        type="text"
                         className="h-7 text-xs text-right w-full min-w-[140px]"
                         value={materialForm.unit_cost}
                         onChange={(e) =>
                         setMaterialForm({
                           ...materialForm,
-                          unit_cost: e.target.value
+                          unit_cost: e.target.value.replace(/[^0-9.,]/g, '')
                         })
-                        } />
+                        }
+                        onBlur={(e) => {
+                          const val = e.target.value;
+                          if (val) {
+                            const num = parseFloat(val.replace(/,/g, ""));
+                            if (!isNaN(num)) {
+                              setMaterialForm({ ...materialForm, unit_cost: num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
+                            }
+                          }
+                        }} />
                       
                           </TableCell>
                           <TableCell className="text-right font-semibold py-1 text-sm">
                             {(() => {
-                        const quantity = parseFloat(materialForm.quantity || "0");
-                        const unitCost = parseFloat(materialForm.unit_cost || "0");
+                        const quantity = parseFloat(materialForm.quantity.replace(/,/g, "") || "0");
+                        const unitCost = parseFloat(materialForm.unit_cost.replace(/,/g, "") || "0");
                         const amount = quantity * unitCost;
                         return formatCurrency(amount);
                       })()}
@@ -1063,12 +1079,20 @@ export default function BillOfMaterials() {
                             ) : (
                               <>
                                 <Input
-                                  type="number"
-                                  step="0.01"
+                                  type="text"
                                   value={laborForm.hours}
                                   onChange={(e) =>
-                                    setLaborForm({ ...laborForm, hours: e.target.value })
+                                    setLaborForm({ ...laborForm, hours: e.target.value.replace(/[^0-9.,]/g, '') })
                                   }
+                                  onBlur={(e) => {
+                                    const val = e.target.value;
+                                    if (val) {
+                                      const num = parseFloat(val.replace(/,/g, ""));
+                                      if (!isNaN(num)) {
+                                        setLaborForm({ ...laborForm, hours: num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
+                                      }
+                                    }
+                                  }}
                                   placeholder="Qty"
                                   className="h-7 w-24 text-xs"
                                 />
@@ -1107,12 +1131,20 @@ export default function BillOfMaterials() {
                                   />
                                 )}
                                 <Input
-                                  type="number"
-                                  step="0.01"
+                                  type="text"
                                   value={laborForm.rate}
                                   onChange={(e) =>
-                                    setLaborForm({ ...laborForm, rate: e.target.value })
+                                    setLaborForm({ ...laborForm, rate: e.target.value.replace(/[^0-9.,]/g, '') })
                                   }
+                                  onBlur={(e) => {
+                                    const val = e.target.value;
+                                    if (val) {
+                                      const num = parseFloat(val.replace(/,/g, ""));
+                                      if (!isNaN(num)) {
+                                        setLaborForm({ ...laborForm, rate: num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
+                                      }
+                                    }
+                                  }}
                                   placeholder="$/u"
                                   className="h-7 w-32 text-xs"
                                 />
