@@ -59,6 +59,8 @@ export default function BillOfMaterials() {
   const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
   const [editingLabor, setEditingLabor] = useState<Labor | null>(null);
   const [collapsedScopes, setCollapsedScopes] = useState<Record<string, boolean>>({});
+  const [editingScopeId, setEditingScopeId] = useState<string | null>(null);
+  const [editingScopeName, setEditingScopeName] = useState<string>("");
 
   const [materialForm, setMaterialForm] = useState({
     name: "",
@@ -266,6 +268,42 @@ export default function BillOfMaterials() {
       alert("Error deleting scope: " + error.message);
       return;
     }
+    if (bom?.project_id) {
+      await loadData(bom.project_id as string);
+    }
+  };
+
+  const handleStartEditScope = (scope: ScopeOfWork) => {
+    setEditingScopeId(scope.id as string);
+    setEditingScopeName(scope.name || "");
+  };
+
+  const handleCancelEditScope = () => {
+    setEditingScopeId(null);
+    setEditingScopeName("");
+  };
+
+  const handleSaveEditScope = async () => {
+    if (!editingScopeId) return;
+
+    const trimmedName = editingScopeName.trim();
+    if (!trimmedName) {
+      alert("Scope name cannot be empty.");
+      return;
+    }
+
+    const { error } = await bomService.updateScope(editingScopeId, {
+      name: trimmedName
+    } as Database["public"]["Tables"]["bom_scope_of_work"]["Update"]);
+
+    if (error) {
+      alert("Error updating scope: " + error.message);
+      return;
+    }
+
+    setEditingScopeId(null);
+    setEditingScopeName("");
+
     if (bom?.project_id) {
       await loadData(bom.project_id as string);
     }
@@ -676,7 +714,45 @@ export default function BillOfMaterials() {
             >
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start gap-3">
-                  <CardTitle className="text-xl">{scope.name}</CardTitle>
+                  <div className="flex items-center gap-2">
+                    {editingScopeId === scope.id ? (
+                      <>
+                        <Input
+                          value={editingScopeName}
+                          onChange={(e) => setEditingScopeName(e.target.value)}
+                          placeholder="Scope name"
+                          className="h-8 max-w-xs"
+                        />
+                        <Button
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                          onClick={() => void handleSaveEditScope()}
+                        >
+                          Save
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-red-600 text-red-700 hover:bg-red-50"
+                          onClick={handleCancelEditScope}
+                        >
+                          Cancel
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <CardTitle className="text-xl">{scope.name}</CardTitle>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="text-green-700 hover:text-green-800"
+                          onClick={() => handleStartEditScope(scope)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
