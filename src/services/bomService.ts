@@ -101,6 +101,15 @@ export const bomService = {
     return { data, error };
   },
 
+  async updateScopeOrder(updates: { id: string, order_number: number }[]) {
+    const promises = updates.map(u => 
+      supabase.from("bom_scope_of_work").update({ order_number: u.order_number }).eq("id", u.id)
+    );
+    const results = await Promise.all(promises);
+    const error = results.find(r => r.error)?.error;
+    return { error };
+  },
+
   async deleteScope(id: string) {
     const { error } = await supabase
       .from("bom_scope_of_work")

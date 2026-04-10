@@ -24,7 +24,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useSettings } from "@/contexts/SettingsProvider";
 import { bomService } from "@/services/bomService";
 import { projectService } from "@/services/projectService";
-import { Plus, Pencil, Trash2, ArrowLeft } from "lucide-react";
+import { Plus, Pencil, Trash2, ArrowLeft, ArrowUp, ArrowDown } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
 type BOM = Database["public"]["Tables"]["bill_of_materials"]["Row"];
@@ -53,6 +53,8 @@ export default function BillOfMaterials() {
   const [showIndirectCosts, setShowIndirectCosts] = useState(false);
   const [saving, setSaving] = useState(false);
   const [indirectDialogOpen, setIndirectDialogOpen] = useState(false);
+  const [indirectCollapsed, setIndirectCollapsed] = useState(false);
+  const [reorderMode, setReorderMode] = useState(false);
 
   const [showScopeInput, setShowScopeInput] = useState(false);
   const [newScopeName, setNewScopeName] = useState("");
@@ -136,47 +138,11 @@ export default function BillOfMaterials() {
       setIndirectCosts([]);
     } else if (bomData) {
       setBom(bomData as BOM);
-      setScopes((bomData as any).bom_scope_of_work || []);
+      
+      const sortedScopes = ((bomData as any).bom_scope_of_work || []).sort((a: any, b: any) => (a.order_number || 0) - (b.order_number || 0));
+      setScopes(sortedScopes);
+      
       setIndirectCosts((bomData as any).bom_indirect_costs || []);
-      const hasIndirect = (bomData as any).bom_indirect_costs?.length > 0;
-      setShowIndirectCosts(hasIndirect);
-
-      if (hasIndirect) {
-        const indirect = (bomData as any).bom_indirect_costs[0] as IndirectCost;
-        const loadedList: UnifiedIndirectCost[] = [];
-        
-        if (indirect.vat_percentage) loadedList.push({ id: 'vat', type: 'VAT', description: 'VAT', value: Number(indirect.vat_percentage).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
-        if (indirect.tax_percentage) loadedList.push({ id: 'tax', type: 'Tax', description: 'Tax', value: Number(indirect.tax_percentage).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
-        if (indirect.ocm_percentage) loadedList.push({ id: 'ocm', type: 'OCM', description: 'OCM', value: Number(indirect.ocm_percentage).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
-        if (indirect.profit_percentage) loadedList.push({ id: 'profit', type: 'Profit', description: 'Profit', value: Number(indirect.profit_percentage).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
-
-        try {
-          const rawOtherCosts = indirect.other_costs;
-          if (Array.isArray(rawOtherCosts)) {
-            rawOtherCosts.forEach((oc: any, index: number) => {
-              loadedList.push({
-                id: oc.id || `loaded-${index}`,
-                type: 'Others',
-                description: oc.description || "",
-                value: Number(oc.amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-              });
-            });
-          } else if (rawOtherCosts && typeof rawOtherCosts === "object") {
-            loadedList.push({
-              id: "legacy-1",
-              type: 'Others',
-              description: (rawOtherCosts as any).description || "",
-              value: Number((rawOtherCosts as any).amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-            });
-          }
-        } catch (e) {
-          console.error("Error parsing other costs", e);
-        }
-
-        setIndirectCostsList(loadedList);
-      } else {
-        setIndirectCostsList([]);
-      }
     }
 
     setLoading(false);
@@ -258,6 +224,48 @@ export default function BillOfMaterials() {
 
   const calculateGrandTotal = (): number => {
     return calculateTotalDirectCost() + calculateIndirectCost();
+  };
+
+  const handleHideAllScopes = () => {
+    const allCollapsed: Record<string, boolean> = {};
+    scopes.forEach(s => { allCollapsed[s.id as string] = true; });
+    setCollapsedScopes(allCollapsed);
+  };
+
+  const handleToggleReorder = () => {
+    if (!reorderMode) {
+      handleHideAllScopes();
+    }
+    setReorderMode(!reorderMode);
+  };
+
+  const moveScope = (index: number, direction: 'up' | 'down') => {
+    if (direction === 'up' && index > 0) {
+      const newScopes = [...scopes];
+      const temp = newScopes[index];
+      newScopes[index] = newScopes[index - 1];
+      newScopes[index - 1] = temp;
+      setScopes(newScopes);
+    } else if (direction === 'down' && index < scopes.length - 1) {
+      const newScopes = [...scopes];
+      const temp = newScopes[index];
+      newScopes[index] = newScopes[index + 1];
+      newScopes[index + 1] = temp;
+      setScopes(newScopes);
+    }
+  };
+
+  const handleSaveOrder = async () => {
+    const updates = scopes.map((s, idx) => ({ id: s.id as string, order_number: idx + 1 }));
+    const { error } = await bomService.updateScopeOrder(updates);
+    if (error) {
+      alert("Error saving order: " + error.message);
+      return;
+    }
+    setReorderMode(false);
+    if (bom?.project_id) {
+      await loadData(bom.project_id as string);
+    }
   };
 
   const handleAddScopeClick = () => {
@@ -709,7 +717,31 @@ export default function BillOfMaterials() {
 
         <>
             {!showScopeInput ?
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleHideAllScopes}
+                >
+                  Hide All Scopes
+                </Button>
+                {reorderMode ? (
+                  <Button
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => void handleSaveOrder()}
+                  >
+                    Save Order
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleToggleReorder}
+                  >
+                    Reorder Scopes
+                  </Button>
+                )}
                 <Button
               size="sm"
               onClick={handleAddScopeClick}
@@ -762,7 +794,7 @@ export default function BillOfMaterials() {
           </>
         }
 
-        {scopes.map((scope) => {
+        {scopes.map((scope, index) => {
           const scopeKey = scope.id as string;
           const isCollapsed = collapsedScopes[scopeKey] ?? false;
           return (
@@ -805,6 +837,7 @@ export default function BillOfMaterials() {
                           variant="ghost"
                           className="text-green-700 hover:text-green-800"
                           onClick={() => handleStartEditScope(scope)}
+                          disabled={reorderMode}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -812,6 +845,28 @@ export default function BillOfMaterials() {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
+                    {reorderMode && (
+                      <div className="flex items-center bg-muted rounded-md mr-2">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
+                          disabled={index === 0}
+                          onClick={() => moveScope(index, 'up')}
+                        >
+                          <ArrowUp className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
+                          disabled={index === scopes.length - 1}
+                          onClick={() => moveScope(index, 'down')}
+                        >
+                          <ArrowDown className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
@@ -822,6 +877,7 @@ export default function BillOfMaterials() {
                           [scopeKey]: !isCollapsed
                         }))
                       }
+                      disabled={reorderMode}
                     >
                       {isCollapsed ? "Show content" : "Hide content"}
                     </Button>
@@ -830,13 +886,14 @@ export default function BillOfMaterials() {
                       variant="ghost"
                       className="text-red-600 hover:text-red-700"
                       onClick={() => void handleDeleteScope(scope.id as string)}
+                      disabled={reorderMode}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
               </CardHeader>
-              {!isCollapsed && (
+              {!isCollapsed && !reorderMode && (
                 <CardContent className="space-y-4 pt-3">
                   <div className="flex justify-end gap-2 mb-2">
                     <Button
@@ -1049,7 +1106,7 @@ export default function BillOfMaterials() {
                             <div className="flex justify-end items-center gap-1">
                               <Button
                           size="sm"
-                          className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700 text-white"
+                          className="bg-green-600 hover:bg-green-700 text-white h-7 px-2 text-xs"
                           onClick={() => void handleMaterialSubmitInline()}>
                           
                                 {editingMaterial ? "Update" : "Add"}
@@ -1317,9 +1374,18 @@ export default function BillOfMaterials() {
 
         {scopes.length > 0 && (
           <Card className="mt-4">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-xl">Indirect Costs</CardTitle>
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <CardTitle className="text-xl mt-0">Indirect Costs</CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-2 text-xs"
+                onClick={() => setIndirectCollapsed(!indirectCollapsed)}
+              >
+                {indirectCollapsed ? "Show content" : "Hide content"}
+              </Button>
             </CardHeader>
+            {!indirectCollapsed && (
             <CardContent className="space-y-4">
               <Table>
                 <TableHeader>
@@ -1409,7 +1475,7 @@ export default function BillOfMaterials() {
               </Table>
 
               <div className="pt-4 border-t">
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center mb-4">
                   <span className="text-lg font-semibold">Total Indirect Cost:</span>
                   <span className="text-2xl font-bold">
                     {formatCurrency(calculateIndirectCost())}
