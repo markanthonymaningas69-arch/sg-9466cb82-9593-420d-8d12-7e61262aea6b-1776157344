@@ -1,6 +1,6 @@
 ---
 title: "Adjust BOM indirect costs layout and fix labor calculations"
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -20,7 +20,7 @@ This task updates the Bill of Materials screen to:
 3. Fix labor cost calculations, especially percentage-based labor, so they correctly use the scope's material totals and persist to Supabase.
 
 ## Checklist
-- [ ] Remove the Print to PDF button from the BOM page so it no longer appears under Grand Total.
-- [ ] Reposition the "Add Indirect Cost" button to appear below the Total Direct Cost summary card.
-- [ ] Ensure material totals use either stored total_cost or quantity × unit_cost so percentage labor has the correct base.
-- [ ] Persist material total_cost on create/update and verify labor costs (percentage and unit cost) update scope and BOM totals correctly.
+- [x] Remove the Print to PDF button from the BOM page so it no longer appears under Grand Total.
+- [x] Reposition the "Add Indirect Cost" button to appear below the Total Direct Cost summary card.
+- [x] Ensure material totals use either stored total_cost or quantity × unit_cost so percentage labor has the correct base.
+- [x] Persist material total_cost on create/update and verify labor costs (percentage and unit cost) update scope and BOM totals correctly.

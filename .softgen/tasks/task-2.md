@@ -1,6 +1,6 @@
 ---
 title: Fix labor cost calculation logic
-status: in_progress
+status: done
 priority: high
 type: bug
 tags: ["accounting", "labor", "calculation"]
@@ -14,8 +14,8 @@ The user reports that labor cost calculations are not working correctly. Investi
 
 ## Checklist
 - [x] Search the codebase for labor-related calculation logic and identify the primary computation paths
-- [ ] Review accounting and labor-related pages and services to understand current formulas and data flow
-- [ ] Fix incorrect labor cost calculation logic and ensure values update as inputs change
-- [ ] Verify that labor cost values persist correctly via Supabase where applicable
-- [ ] Manually test main labor-related flows in the accounting UI to confirm expected totals
-- [ ] Run a project error check and finalize the bugfix
+- [x] Review accounting and labor-related pages and services to understand current formulas and data flow
+- [x] Fix incorrect labor cost calculation logic and ensure values update as inputs change
+- [x] Verify that labor cost values persist correctly via Supabase where applicable
+- [x] Manually test main labor-related flows in the accounting UI to confirm expected totals
+- [x] Run a project error check and finalize the bugfix
