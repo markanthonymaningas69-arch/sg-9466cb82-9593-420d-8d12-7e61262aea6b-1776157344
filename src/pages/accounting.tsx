@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { useSettings } from "@/contexts/SettingsProvider";
 import { accountingService } from "@/services/accountingService";
 import { projectService } from "@/services/projectService";
 import { Plus, Pencil, Trash2, TrendingUp, TrendingDown } from "lucide-react";
@@ -18,6 +19,7 @@ type Transaction = Database["public"]["Tables"]["transactions"]["Row"];
 type Project = Database["public"]["Tables"]["projects"]["Row"];
 
 export default function Accounting() {
+  const { formatCurrency } = useSettings();
   const [transactions, setTransactions] = useState<any[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -220,7 +222,7 @@ export default function Accounting() {
               <TrendingUp className="h-4 w-4 text-success" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-success">${summary.totalIncome.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-success">{formatCurrency(summary.totalIncome)}</div>
             </CardContent>
           </Card>
           <Card>
@@ -229,7 +231,7 @@ export default function Accounting() {
               <TrendingDown className="h-4 w-4 text-destructive" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-destructive">${summary.totalExpense.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-destructive">{formatCurrency(summary.totalExpense)}</div>
             </CardContent>
           </Card>
           <Card>
@@ -238,7 +240,7 @@ export default function Accounting() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-primary">
-                ${(summary.totalIncome - summary.totalExpense).toLocaleString()}
+                {formatCurrency(summary.totalIncome - summary.totalExpense)}
               </div>
             </CardContent>
           </Card>
@@ -274,7 +276,7 @@ export default function Accounting() {
                     <TableCell>{transaction.projects?.name || "General"}</TableCell>
                     <TableCell className="max-w-xs truncate">{transaction.description || "-"}</TableCell>
                     <TableCell className={transaction.type === "income" ? "text-success font-semibold" : "text-destructive font-semibold"}>
-                      ${transaction.amount.toLocaleString()}
+                      {formatCurrency(transaction.amount)}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">

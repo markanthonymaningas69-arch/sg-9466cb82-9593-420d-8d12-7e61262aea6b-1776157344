@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useSettings } from "@/contexts/SettingsProvider";
 import { projectService } from "@/services/projectService";
 import { accountingService } from "@/services/accountingService";
 import { warehouseService } from "@/services/warehouseService";
@@ -11,6 +12,7 @@ import type { Database } from "@/integrations/supabase/types";
 type Project = Database["public"]["Tables"]["projects"]["Row"];
 
 export default function Analytics() {
+  const { formatCurrency } = useSettings();
   const [loading, setLoading] = useState(true);
   const [selectedProject, setSelectedProject] = useState<string>("all");
   const [projects, setProjects] = useState<Project[]>([]);
@@ -126,7 +128,7 @@ export default function Analytics() {
             <CardContent>
               <div className="text-2xl font-bold">{analytics.budgetUtilization.toFixed(1)}%</div>
               <p className="text-xs text-muted-foreground mt-1">
-                ${analytics.totalSpent.toLocaleString()} / ${analytics.totalBudget.toLocaleString()}
+                {formatCurrency(analytics.totalSpent)} / {formatCurrency(analytics.totalBudget)}
               </p>
             </CardContent>
           </Card>
@@ -141,7 +143,7 @@ export default function Analytics() {
                 {analytics.profitMargin.toFixed(1)}%
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                ${analytics.netProfit.toLocaleString()} net
+                {formatCurrency(analytics.netProfit)} net
               </p>
             </CardContent>
           </Card>
@@ -152,7 +154,7 @@ export default function Analytics() {
               <Package className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${analytics.inventoryValue.toLocaleString()}</div>
+              <div className="text-2xl font-bold">{formatCurrency(analytics.inventoryValue)}</div>
               <p className="text-xs text-muted-foreground mt-1">
                 {analytics.lowStockCount} low stock alerts
               </p>
@@ -174,7 +176,7 @@ export default function Analytics() {
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium">Total Income</span>
                   <span className="text-lg font-bold text-success">
-                    ${analytics.totalIncome.toLocaleString()}
+                    {formatCurrency(analytics.totalIncome)}
                   </span>
                 </div>
                 <div className="h-2 bg-secondary rounded-full overflow-hidden">
@@ -189,7 +191,7 @@ export default function Analytics() {
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium">Total Expenses</span>
                   <span className="text-lg font-bold text-destructive">
-                    ${analytics.totalExpense.toLocaleString()}
+                    {formatCurrency(analytics.totalExpense)}
                   </span>
                 </div>
                 <div className="h-2 bg-secondary rounded-full overflow-hidden">
@@ -208,7 +210,7 @@ export default function Analytics() {
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium">Net Profit</span>
                   <span className={`text-2xl font-bold ${analytics.netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
-                    ${analytics.netProfit.toLocaleString()}
+                    {formatCurrency(analytics.netProfit)}
                   </span>
                 </div>
               </div>
@@ -228,7 +230,7 @@ export default function Analytics() {
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium">Total Budget</span>
                   <span className="text-lg font-bold text-primary">
-                    ${analytics.totalBudget.toLocaleString()}
+                    {formatCurrency(analytics.totalBudget)}
                   </span>
                 </div>
                 <div className="h-2 bg-secondary rounded-full overflow-hidden">
@@ -243,7 +245,7 @@ export default function Analytics() {
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium">Amount Spent</span>
                   <span className="text-lg font-bold text-warning">
-                    ${analytics.totalSpent.toLocaleString()}
+                    {formatCurrency(analytics.totalSpent)}
                   </span>
                 </div>
                 <div className="h-2 bg-secondary rounded-full overflow-hidden">
@@ -262,7 +264,7 @@ export default function Analytics() {
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium">Remaining Budget</span>
                   <span className="text-2xl font-bold text-success">
-                    ${(analytics.totalBudget - analytics.totalSpent).toLocaleString()}
+                    {formatCurrency(analytics.totalBudget - analytics.totalSpent)}
                   </span>
                 </div>
               </div>
@@ -280,17 +282,17 @@ export default function Analytics() {
               <div className="space-y-2">
                 <div className="text-sm text-muted-foreground">Revenue Per Project</div>
                 <div className="text-2xl font-bold">
-                  ${analytics.projectCount > 0 
-                    ? (analytics.totalIncome / analytics.projectCount).toLocaleString(undefined, { maximumFractionDigits: 0 })
-                    : 0}
+                  {formatCurrency(analytics.projectCount > 0 
+                    ? (analytics.totalIncome / analytics.projectCount)
+                    : 0)}
                 </div>
               </div>
               <div className="space-y-2">
                 <div className="text-sm text-muted-foreground">Average Project Budget</div>
                 <div className="text-2xl font-bold">
-                  ${analytics.projectCount > 0 
-                    ? (analytics.totalBudget / analytics.projectCount).toLocaleString(undefined, { maximumFractionDigits: 0 })
-                    : 0}
+                  {formatCurrency(analytics.projectCount > 0 
+                    ? (analytics.totalBudget / analytics.projectCount)
+                    : 0)}
                 </div>
               </div>
               <div className="space-y-2">

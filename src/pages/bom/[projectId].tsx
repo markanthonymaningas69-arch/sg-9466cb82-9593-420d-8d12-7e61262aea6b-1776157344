@@ -21,6 +21,7 @@ import {
   TableRow } from
 "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useSettings } from "@/contexts/SettingsProvider";
 import { bomService } from "@/services/bomService";
 import { projectService } from "@/services/projectService";
 import { Plus, Pencil, Trash2, ArrowLeft } from "lucide-react";
@@ -40,6 +41,7 @@ type LaborCalculationMethod = "percentage" | "unit_cost";
 // Scope cards use default neutral background (no custom colors).
 
 export default function BillOfMaterials() {
+  const { formatCurrency } = useSettings();
   const router = useRouter();
   const { projectId } = router.query;
 
@@ -99,16 +101,6 @@ export default function BillOfMaterials() {
     others_amount: "",
     others_description: ""
   });
-
-  const formatCurrency = (value: number): string => {
-    if (!Number.isFinite(value)) {
-      return "0.00";
-    }
-    return value.toLocaleString("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
-  };
 
   useEffect(() => {
     if (projectId && typeof projectId === "string") {
@@ -809,7 +801,7 @@ export default function BillOfMaterials() {
                           </TableCell>
                           <TableCell>{material.unit}</TableCell>
                           <TableCell className="text-right">
-                            ${formatCurrency(material.unit_cost as number ?? 0)}
+                            {formatCurrency(material.unit_cost as number ?? 0)}
                           </TableCell>
                           <TableCell className="text-right font-semibold">
                             {(() => {
@@ -817,7 +809,7 @@ export default function BillOfMaterials() {
                         material.total_cost as number ??
                         (material.quantity || 0) * (
                         material.unit_cost as number || 0);
-                        return `$${formatCurrency(total)}`;
+                        return formatCurrency(total);
                       })()}
                           </TableCell>
                           <TableCell className="text-right">
@@ -929,7 +921,7 @@ export default function BillOfMaterials() {
                         const quantity = parseFloat(materialForm.quantity || "0");
                         const unitCost = parseFloat(materialForm.unit_cost || "0");
                         const amount = quantity * unitCost;
-                        return `$${formatCurrency(amount)}`;
+                        return formatCurrency(amount);
                       })()}
                           </TableCell>
                           <TableCell className="text-right">
@@ -961,19 +953,45 @@ export default function BillOfMaterials() {
                 </div> :
             null}
 
-              <div className="flex justify-end mt-1">
-                <Button
-                  size="sm"
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                  onClick={() => {
-                    setSelectedScopeId(scope.id as string);
-                    resetMaterialForm();
-                  }}
-                >
-                  <Plus className="h-5 w-5 mr-2" />
-                  Add Materials
-                </Button>
-              </div>
+                  <div className="flex justify-end pt-2 border-t mt-2">
+                    <div className="text-right text-sm space-y-1">
+                      <div className="font-semibold">
+                        Material Total: {formatCurrency(calculateScopeMaterialTotal(scope))}
+                      </div>
+                      <div>
+                        Labor Total: {formatCurrency(calculateScopeLaborTotal(scope))}
+                      </div>
+                      <div className="font-semibold">
+                        Subtotal: {formatCurrency(calculateScopeDirectCost(scope))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                      onClick={() => {
+                        setSelectedScopeId(scope.id as string);
+                        resetMaterialForm();
+                      }}
+                    >
+                      <Plus className="h-5 w-5 mr-2" />
+                      Add Materials
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-red-600 text-red-700 hover:bg-red-50"
+                      onClick={() => {
+                        resetLaborForm();
+                        setSelectedScopeId(scope.id as string);
+                      }}
+                    >
+                      <Plus className="h-5 w-5 mr-2" />
+                      Add Labor
+                    </Button>
+                  </div>
                 </CardContent>
               )}
             </Card>
@@ -986,7 +1004,7 @@ export default function BillOfMaterials() {
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold">Total Direct Cost</h2>
                 <div className="text-3xl font-bold text-primary">
-                  ${formatCurrency(calculateTotalDirectCost())}
+                  {formatCurrency(calculateTotalDirectCost())}
                 </div>
               </div>
             </CardContent>
@@ -1093,7 +1111,7 @@ export default function BillOfMaterials() {
                     <div className="flex justify-between items-center mb-4">
                       <span className="text-lg font-semibold">Total Indirect Cost:</span>
                       <span className="text-2xl font-bold">
-                        ${formatCurrency(calculateIndirectCost())}
+                        {formatCurrency(calculateIndirectCost())}
                       </span>
                     </div>
                     <div className="flex justify-end gap-2">
@@ -1127,7 +1145,7 @@ export default function BillOfMaterials() {
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold">Grand Total</h2>
                 <div className="text-4xl font-bold">
-                  ${formatCurrency(calculateGrandTotal())}
+                  {formatCurrency(calculateGrandTotal())}
                 </div>
               </div>
             </CardContent>
