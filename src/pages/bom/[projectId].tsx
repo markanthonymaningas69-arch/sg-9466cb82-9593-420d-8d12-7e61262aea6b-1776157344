@@ -887,15 +887,15 @@ export default function BillOfMaterials() {
                 </div> :
             null}
 
-              <div className="flex justify-center mt-1">
+              <div className="flex justify-end mt-1">
                 <Button
-                size="sm"
-                className="bg-green-600 hover:bg-green-700 text-white"
-                onClick={() => {
-                  setSelectedScopeId(scope.id as string);
-                  resetMaterialForm();
-                }}>
-                
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                  onClick={() => {
+                    setSelectedScopeId(scope.id as string);
+                    resetMaterialForm();
+                  }}
+                >
                   <Plus className="h-5 w-5 mr-2" />
                   Add Materials
                 </Button>
@@ -907,45 +907,9 @@ export default function BillOfMaterials() {
               </div>
 
               <div className="mt-1">
-                <div className="flex justify-between items-center mb-0">
+                <div className="flex items-center mb-0">
                   <h3 className="font-semibold text-sm">Labor Cost</h3>
-                  <div className="text-xs font-semibold whitespace-nowrap">
-                    Labor Total: ${formatCurrency(calculateScopeLaborTotal(scope))}
-                  </div>
                 </div>
-
-                {(scope.bom_labor || []).length > 0 && (
-                  <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
-                    <div>
-                      <span className="font-medium">Current labor: </span>
-                      <span>
-                        {scope.bom_labor?.[0]?.description ||
-                          scope.bom_labor?.[0]?.labor_type ||
-                          "Labor"}{" "}
-                        — $
-                        {formatCurrency(
-                          typeof scope.bom_labor?.[0]?.total_cost === "number"
-                            ? (scope.bom_labor?.[0]?.total_cost as number)
-                            : 0
-                        )}
-                      </span>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-[11px] text-green-700 hover:text-green-800"
-                      onClick={() => {
-                        if (scope.bom_labor && scope.bom_labor[0]) {
-                          handleEditLabor(scope.bom_labor[0] as Labor);
-                        }
-                      }}
-                    >
-                      <Pencil className="mr-1 h-3 w-3" />
-                      Edit Labor
-                    </Button>
-                  </div>
-                )}
 
                 <div className="mt-1">
                   <div className="flex flex-wrap items-center gap-2 md:gap-3">
@@ -1068,7 +1032,7 @@ export default function BillOfMaterials() {
                       </>
                     )}
 
-                    <div className="flex items-center gap-1.5 ml-auto">
+                    <div className="flex items-center gap-2">
                       <Button
                         size="sm"
                         className="bg-green-600 hover:bg-green-700 text-white"
@@ -1076,17 +1040,30 @@ export default function BillOfMaterials() {
                       >
                         Save
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-red-600 text-red-700 hover:bg-red-50"
-                        onClick={() => {
-                          resetLaborForm();
-                          setEditingLabor(null);
-                        }}
-                      >
-                        Cancel
-                      </Button>
+                      <span className="text-[11px] font-semibold">
+                        {(() => {
+                          const materialTotal = calculateScopeMaterialTotal(scope);
+                          const percentage = parseFloat(laborForm.percentage || "0");
+                          const qty = parseFloat(laborForm.hours || "0");
+                          const rate = parseFloat(laborForm.rate || "0");
+
+                          let fromForm = 0;
+                          if (laborForm.calculation_method === "percentage" && percentage > 0) {
+                            fromForm = materialTotal * (percentage / 100);
+                          } else if (
+                            laborForm.calculation_method === "unit_cost" &&
+                            qty > 0 &&
+                            rate > 0
+                          ) {
+                            fromForm = qty * rate;
+                          }
+
+                          const displayTotal =
+                            fromForm > 0 ? fromForm : calculateScopeLaborTotal(scope);
+
+                          return `Labor Total: $${formatCurrency(displayTotal)}`;
+                        })()}
+                      </span>
                     </div>
                   </div>
                 </div>
