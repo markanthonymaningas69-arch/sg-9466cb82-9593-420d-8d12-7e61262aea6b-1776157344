@@ -94,13 +94,20 @@ export default function BillOfMaterials() {
     unit_selection: ""
   });
 
-  const [indirectForm, setIndirectForm] = useState({
+  type OtherCostEntry = { id: string; description: string; amount: string };
+
+  const [indirectForm, setIndirectForm] = useState<{
+    vat: string;
+    tax: string;
+    ocm: string;
+    profit: string;
+    other_costs: OtherCostEntry[];
+  }>({
     vat: "",
     tax: "",
     ocm: "",
     profit: "",
-    others_amount: "",
-    others_description: ""
+    other_costs: []
   });
 
   useEffect(() => {
@@ -138,14 +145,34 @@ export default function BillOfMaterials() {
 
       if (hasIndirect) {
         const indirect = (bomData as any).bom_indirect_costs[0] as IndirectCost;
-        const otherCosts: any = indirect.other_costs || { amount: 0, description: "" };
+        let loadedOtherCosts: OtherCostEntry[] = [];
+        
+        try {
+          const rawOtherCosts = indirect.other_costs;
+          if (Array.isArray(rawOtherCosts)) {
+            loadedOtherCosts = rawOtherCosts.map((oc: any, index: number) => ({
+              id: oc.id || `loaded-${index}`,
+              description: oc.description || "",
+              amount: oc.amount?.toString() || ""
+            }));
+          } else if (rawOtherCosts && typeof rawOtherCosts === "object") {
+            // Fallback for old single object structure
+            loadedOtherCosts = [{
+              id: "legacy-1",
+              description: (rawOtherCosts as any).description || "",
+              amount: (rawOtherCosts as any).amount?.toString() || ""
+            }];
+          }
+        } catch (e) {
+          console.error("Error parsing other costs", e);
+        }
+
         setIndirectForm({
           vat: indirect.vat_percentage?.toString() || "",
           tax: indirect.tax_percentage?.toString() || "",
           ocm: indirect.ocm_percentage?.toString() || "",
           profit: indirect.profit_percentage?.toString() || "",
-          others_amount: otherCosts.amount?.toString() || "",
-          others_description: otherCosts.description || ""
+          other_costs: loadedOtherCosts
         });
       } else {
         setIndirectForm({
@@ -153,8 +180,7 @@ export default function BillOfMaterials() {
           tax: "",
           ocm: "",
           profit: "",
-          others_amount: "",
-          others_description: ""
+          other_costs: []
         });
       }
     }
@@ -203,9 +229,13 @@ export default function BillOfMaterials() {
     const tax = parseFloat(indirectForm.tax || "0");
     const ocm = parseFloat(indirectForm.ocm || "0");
     const profit = parseFloat(indirectForm.profit || "0");
-    const others = parseFloat(indirectForm.others_amount || "0");
+    
+    const othersSum = indirectForm.other_costs.reduce((sum, cost) => {
+      const amount = parseFloat(cost.amount.replace(/,/g, "") || "0");
+      return sum + amount;
+    }, 0);
 
-    return directCost * (vat + tax + ocm + profit) / 100 + others;
+    return directCost * (vat + tax + ocm + profit) / 100 + othersSum;
   };
 
   const calculateGrandTotal = (): number => {
@@ -522,16 +552,19 @@ export default function BillOfMaterials() {
   const handleSaveIndirectCosts = async () => {
     if (!bom) return;
 
+    const formattedOtherCosts = indirectForm.other_costs.map(cost => ({
+      id: cost.id,
+      description: cost.description,
+      amount: parseFloat(cost.amount.replace(/,/g, "") || "0")
+    }));
+
     const indirectData: Database["public"]["Tables"]["bom_indirect_costs"]["Insert"] = {
       bom_id: bom.id,
       vat_percentage: parseFloat(indirectForm.vat || "0"),
       tax_percentage: parseFloat(indirectForm.tax || "0"),
       ocm_percentage: parseFloat(indirectForm.ocm || "0"),
       profit_percentage: parseFloat(indirectForm.profit || "0"),
-      other_costs: {
-        amount: parseFloat(indirectForm.others_amount || "0"),
-        description: indirectForm.others_description
-      },
+      other_costs: formattedOtherCosts as any,
       total_indirect: calculateIndirectCost()
     };
 
@@ -563,16 +596,19 @@ export default function BillOfMaterials() {
     });
 
     if (showIndirectCosts) {
+      const formattedOtherCosts = indirectForm.other_costs.map(cost => ({
+        id: cost.id,
+        description: cost.description,
+        amount: parseFloat(cost.amount.replace(/,/g, "") || "0")
+      }));
+
       const indirectData: Database["public"]["Tables"]["bom_indirect_costs"]["Insert"] = {
         bom_id: bom.id,
         vat_percentage: parseFloat(indirectForm.vat || "0"),
         tax_percentage: parseFloat(indirectForm.tax || "0"),
         ocm_percentage: parseFloat(indirectForm.ocm || "0"),
         profit_percentage: parseFloat(indirectForm.profit || "0"),
-        other_costs: {
-          amount: parseFloat(indirectForm.others_amount || "0"),
-          description: indirectForm.others_description
-        },
+        other_costs: formattedOtherCosts as any,
         total_indirect: calculateIndirectCost()
       };
 
@@ -1321,31 +1357,84 @@ export default function BillOfMaterials() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Others - Description</Label>
-                    <Input
-                    value={indirectForm.others_description}
-                    onChange={(e) =>
-                    setIndirectForm({
-                      ...indirectForm,
-                      others_description: e.target.value
-                    })
-                    }
-                    placeholder="Specify other costs" />
-                  
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Others - Amount ($)</Label>
-                    <Input
-                    type="number"
-                    step="0.01"
-                    value={indirectForm.others_amount}
-                    onChange={(e) =>
-                    setIndirectForm({
-                      ...indirectForm,
-                      others_amount: e.target.value
-                    })
-                    } />
-                  
+                    <div className="flex justify-between items-center">
+                      <Label>Other Indirect Costs</Label>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs border-green-600 text-green-700 hover:bg-green-50"
+                        onClick={() => {
+                          setIndirectForm({
+                            ...indirectForm,
+                            other_costs: [
+                              ...indirectForm.other_costs,
+                              { id: Math.random().toString(36).substr(2, 9), description: "", amount: "" }
+                            ]
+                          });
+                        }}
+                      >
+                        <Plus className="h-3 w-3 mr-1" /> Add Row
+                      </Button>
+                    </div>
+                    
+                    {indirectForm.other_costs.length === 0 ? (
+                      <div className="text-sm text-muted-foreground italic text-center p-4 border border-dashed rounded-md bg-muted/20">
+                        No other indirect costs added. Click "Add Row" to add one.
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
+                        {indirectForm.other_costs.map((cost, index) => (
+                          <div key={cost.id} className="flex items-center gap-2">
+                            <Input
+                              placeholder="Description"
+                              value={cost.description}
+                              onChange={(e) => {
+                                const newCosts = [...indirectForm.other_costs];
+                                newCosts[index].description = e.target.value;
+                                setIndirectForm({ ...indirectForm, other_costs: newCosts });
+                              }}
+                              className="flex-1"
+                            />
+                            <Input
+                              type="text"
+                              placeholder="Amount"
+                              className="w-32 text-right"
+                              value={cost.amount}
+                              onChange={(e) => {
+                                const newCosts = [...indirectForm.other_costs];
+                                newCosts[index].amount = e.target.value.replace(/[^0-9.,]/g, '');
+                                setIndirectForm({ ...indirectForm, other_costs: newCosts });
+                              }}
+                              onBlur={(e) => {
+                                const val = e.target.value;
+                                if (val) {
+                                  const num = parseFloat(val.replace(/,/g, ""));
+                                  if (!isNaN(num)) {
+                                    const newCosts = [...indirectForm.other_costs];
+                                    newCosts[index].amount = num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                    setIndirectForm({ ...indirectForm, other_costs: newCosts });
+                                  }
+                                }
+                              }}
+                            />
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="text-red-600 hover:text-red-700 h-9 w-9 flex-shrink-0"
+                              onClick={() => {
+                                const newCosts = [...indirectForm.other_costs];
+                                newCosts.splice(index, 1);
+                                setIndirectForm({ ...indirectForm, other_costs: newCosts });
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className="pt-4 border-t">
                     <div className="flex justify-between items-center mb-4">
