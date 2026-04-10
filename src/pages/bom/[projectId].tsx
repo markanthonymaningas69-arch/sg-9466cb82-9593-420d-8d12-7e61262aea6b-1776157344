@@ -912,6 +912,39 @@ export default function BillOfMaterials() {
                   </div>
                 </div>
 
+                {(scope.bom_labor || []).length > 0 && (
+                  <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
+                    <div>
+                      <span className="font-medium">Current labor: </span>
+                      <span>
+                        {scope.bom_labor?.[0]?.description ||
+                          scope.bom_labor?.[0]?.labor_type ||
+                          "Labor"}{" "}
+                        — $
+                        {formatCurrency(
+                          typeof scope.bom_labor?.[0]?.total_cost === "number"
+                            ? (scope.bom_labor?.[0]?.total_cost as number)
+                            : 0
+                        )}
+                      </span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-[11px] text-green-700 hover:text-green-800"
+                      onClick={() => {
+                        if (scope.bom_labor && scope.bom_labor[0]) {
+                          handleEditLabor(scope.bom_labor[0] as Labor);
+                        }
+                      }}
+                    >
+                      <Pencil className="mr-1 h-3 w-3" />
+                      Edit Labor
+                    </Button>
+                  </div>
+                )}
+
                 <div className="mt-1">
                   <div className="flex flex-col gap-1.5 md:flex-row md:items-end md:justify-between">
                     <div className="space-y-1">
@@ -1057,7 +1090,7 @@ export default function BillOfMaterials() {
                         className="bg-green-600 hover:bg-green-700 text-white"
                         onClick={() => void handleLaborSubmit(scope.id as string)}
                       >
-                        {(scope.bom_labor || []).length > 0 ? "Edit Labor" : "Add Labor"}
+                        Save Labor
                       </Button>
                       <Button
                         size="sm"
