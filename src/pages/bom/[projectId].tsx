@@ -901,8 +901,16 @@ export default function BillOfMaterials() {
                 </Button>
               </div>
               <div className="flex justify-end pt-2 border-t mt-2">
-                <div className="text-lg font-semibold">
-                  Material Total: ${formatCurrency(calculateScopeMaterialTotal(scope))}
+                <div className="text-right text-sm space-y-1">
+                  <div className="font-semibold">
+                    Material Total: ${formatCurrency(calculateScopeMaterialTotal(scope))}
+                  </div>
+                  <div>
+                    Labor Total: ${formatCurrency(calculateScopeLaborTotal(scope))}
+                  </div>
+                  <div className="font-semibold">
+                    Subtotal: ${formatCurrency(calculateScopeDirectCost(scope))}
+                  </div>
                 </div>
               </div>
 
@@ -1061,7 +1069,7 @@ export default function BillOfMaterials() {
                           const displayTotal =
                             fromForm > 0 ? fromForm : calculateScopeLaborTotal(scope);
 
-                          return `Labor Total: $${formatCurrency(displayTotal)}`;
+                          return `$${formatCurrency(displayTotal)}`;
                         })()}
                       </span>
                     </div>
