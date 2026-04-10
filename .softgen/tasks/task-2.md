@@ -13,7 +13,7 @@ position: 2
 The user reports that labor cost calculations are not working correctly. Investigate the accounting and labor-related pages and services to find where labor costs are computed, then fix the calculation and ensure values persist and display correctly in the UI.
 
 ## Checklist
-- [ ] Search the codebase for labor-related calculation logic and identify the primary computation paths
+- [x] Search the codebase for labor-related calculation logic and identify the primary computation paths
 - [ ] Review accounting and labor-related pages and services to understand current formulas and data flow
 - [ ] Fix incorrect labor cost calculation logic and ensure values update as inputs change
 - [ ] Verify that labor cost values persist correctly via Supabase where applicable
