@@ -58,6 +58,7 @@ export default function BillOfMaterials() {
   const [newScopeName, setNewScopeName] = useState("");
 
   const [selectedScopeId, setSelectedScopeId] = useState<string>("");
+  const [activeLaborScopeId, setActiveLaborScopeId] = useState<string | null>(null);
   const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
   const [editingLabor, setEditingLabor] = useState<Labor | null>(null);
   const [collapsedScopes, setCollapsedScopes] = useState<Record<string, boolean>>({});
@@ -476,6 +477,7 @@ export default function BillOfMaterials() {
 
     resetLaborForm();
     setEditingLabor(null);
+    setActiveLaborScopeId(null);
 
     if (bom?.project_id) {
       await loadData(bom.project_id as string);
@@ -953,6 +955,19 @@ export default function BillOfMaterials() {
                 </div> :
             null}
 
+                  <div className="flex justify-end mt-1">
+                    <Button
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                      onClick={() => {
+                        setSelectedScopeId(scope.id as string);
+                        resetMaterialForm();
+                      }}
+                    >
+                      <Plus className="h-5 w-5 mr-2" />
+                      Add Materials
+                    </Button>
+                  </div>
                   <div className="flex justify-end pt-2 border-t mt-2">
                     <div className="text-right text-sm space-y-1">
                       <div className="font-semibold">
@@ -967,30 +982,50 @@ export default function BillOfMaterials() {
                     </div>
                   </div>
 
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      size="sm"
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                      onClick={() => {
-                        setSelectedScopeId(scope.id as string);
-                        resetMaterialForm();
-                      }}
-                    >
-                      <Plus className="h-5 w-5 mr-2" />
-                      Add Materials
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-red-600 text-red-700 hover:bg-red-50"
-                      onClick={() => {
-                        resetLaborForm();
-                        setSelectedScopeId(scope.id as string);
-                      }}
-                    >
-                      <Plus className="h-5 w-5 mr-2" />
-                      Add Labor
-                    </Button>
+                  <div className="mt-1">
+                    <div className="flex items-center mb-0">
+                      <h3 className="font-semibold text-sm">Labor Cost</h3>
+                    </div>
+
+                    <div className="mt-1">
+                      <div className="flex flex-wrap items-center gap-2 md:gap-3">
+                        <span className="text-[11px] font-medium">Method:</span>
+                        <span className="text-[11px] font-semibold">
+                          {laborForm.calculation_method === "percentage" ? "Percentage" : "Unit Cost"}
+                        </span>
+                        <span className="text-[11px] font-medium">Hours:</span>
+                        <span className="text-[11px] font-semibold">
+                          {laborForm.calculation_method === "percentage" ? "" : laborForm.hours}
+                        </span>
+                        <span className="text-[11px] font-medium">Rate:</span>
+                        <span className="text-[11px] font-semibold">
+                          {laborForm.calculation_method === "percentage" ? "" : laborForm.rate}
+                        </span>
+                        <span className="text-[11px] font-medium">Unit:</span>
+                        <span className="text-[11px] font-semibold">
+                          {laborForm.calculation_method === "percentage" ? "" : laborForm.unit}
+                        </span>
+                        <span className="text-[11px] font-medium">Unit Selection:</span>
+                        <span className="text-[11px] font-semibold">
+                          {laborForm.calculation_method === "percentage" ? "" : laborForm.unit_selection}
+                        </span>
+                        <span className="text-[11px] font-medium">Description:</span>
+                        <span className="text-[11px] font-semibold">
+                          {laborForm.calculation_method === "percentage" ? `${percentageValue || 0}% of materials` : laborForm.description}
+                        </span>
+                        <span className="text-[11px] font-medium">Total:</span>
+                        <span className="text-[11px] font-semibold">
+                          {(() => {
+                        const fromForm =
+                          parseFloat(laborForm.hours || "0") * parseFloat(laborForm.rate || "0");
+                        const displayTotal =
+                            fromForm > 0 ? fromForm : calculateScopeLaborTotal(scope);
+
+                          return formatCurrency(displayTotal);
+                        })()}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               )}
