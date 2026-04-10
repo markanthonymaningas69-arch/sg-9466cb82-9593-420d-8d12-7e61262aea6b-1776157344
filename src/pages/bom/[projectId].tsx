@@ -774,6 +774,41 @@ export default function BillOfMaterials() {
               </CardHeader>
               {!isCollapsed && (
                 <CardContent className="space-y-4 pt-3">
+                  <div className="flex justify-end gap-2 mb-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-green-600 text-green-700 hover:bg-green-50 h-8 text-xs"
+                      onClick={() => {
+                        if (activeLaborScopeId === scope.id) {
+                          setActiveLaborScopeId(null);
+                          resetLaborForm();
+                        } else {
+                          setActiveLaborScopeId(scope.id as string);
+                          if (scope.bom_labor && scope.bom_labor.length > 0) {
+                            handleEditLabor(scope.bom_labor[0] as Labor);
+                          } else {
+                            resetLaborForm();
+                          }
+                        }
+                      }}
+                    >
+                      <Pencil className="h-3 w-3 mr-2" />
+                      Add / Edit Labor
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700 text-white h-8 text-xs"
+                      onClick={() => {
+                        setSelectedScopeId(scope.id as string);
+                        resetMaterialForm();
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Materials
+                    </Button>
+                  </div>
+
                   {(scope.bom_materials || []).length > 0 || selectedScopeId === scope.id ?
             <div className="mt-2">
                   <div className="flex justify-between items-center mb-2">
@@ -1111,7 +1146,7 @@ export default function BillOfMaterials() {
                           {scope.bom_labor && scope.bom_labor.length > 0 ? (
                             <div className="flex flex-wrap items-center gap-2 md:gap-3 text-muted-foreground">
                               {(() => {
-                                const laborEntry = scope.bom_labor[0];
+                                const laborEntry = scope.bom_labor[0] as Labor;
                                 const desc = laborEntry.description || "";
                                 const percentageMatch = desc.match(/(\d+(\.\d+)?)\s*%/);
                                 const isPercentage = !!percentageMatch;
