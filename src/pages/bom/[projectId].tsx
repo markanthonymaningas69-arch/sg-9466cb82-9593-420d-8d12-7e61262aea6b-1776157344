@@ -94,20 +94,18 @@ export default function BillOfMaterials() {
     unit_selection: ""
   });
 
-  type OtherCostEntry = { id: string; description: string; amount: string };
-
-  const [indirectForm, setIndirectForm] = useState<{
-    vat: string;
-    tax: string;
-    ocm: string;
-    profit: string;
-    other_costs: OtherCostEntry[];
-  }>({
-    vat: "",
-    tax: "",
-    ocm: "",
-    profit: "",
-    other_costs: []
+  type UnifiedIndirectCost = {
+    id: string;
+    type: string;
+    description: string;
+    value: string;
+  };
+  const [indirectCostsList, setIndirectCostsList] = useState<UnifiedIndirectCost[]>([]);
+  const [indirectRowForm, setIndirectRowForm] = useState<UnifiedIndirectCost>({
+    id: '',
+    type: 'VAT',
+    description: '',
+    value: ''
   });
 
   useEffect(() => {
@@ -145,43 +143,39 @@ export default function BillOfMaterials() {
 
       if (hasIndirect) {
         const indirect = (bomData as any).bom_indirect_costs[0] as IndirectCost;
-        let loadedOtherCosts: OtherCostEntry[] = [];
+        const loadedList: UnifiedIndirectCost[] = [];
         
+        if (indirect.vat_percentage) loadedList.push({ id: 'vat', type: 'VAT', description: 'VAT', value: Number(indirect.vat_percentage).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
+        if (indirect.tax_percentage) loadedList.push({ id: 'tax', type: 'Tax', description: 'Tax', value: Number(indirect.tax_percentage).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
+        if (indirect.ocm_percentage) loadedList.push({ id: 'ocm', type: 'OCM', description: 'OCM', value: Number(indirect.ocm_percentage).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
+        if (indirect.profit_percentage) loadedList.push({ id: 'profit', type: 'Profit', description: 'Profit', value: Number(indirect.profit_percentage).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
+
         try {
           const rawOtherCosts = indirect.other_costs;
           if (Array.isArray(rawOtherCosts)) {
-            loadedOtherCosts = rawOtherCosts.map((oc: any, index: number) => ({
-              id: oc.id || `loaded-${index}`,
-              description: oc.description || "",
-              amount: oc.amount?.toString() || ""
-            }));
+            rawOtherCosts.forEach((oc: any, index: number) => {
+              loadedList.push({
+                id: oc.id || `loaded-${index}`,
+                type: 'Others',
+                description: oc.description || "",
+                value: Number(oc.amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+              });
+            });
           } else if (rawOtherCosts && typeof rawOtherCosts === "object") {
-            // Fallback for old single object structure
-            loadedOtherCosts = [{
+            loadedList.push({
               id: "legacy-1",
+              type: 'Others',
               description: (rawOtherCosts as any).description || "",
-              amount: (rawOtherCosts as any).amount?.toString() || ""
-            }];
+              value: Number((rawOtherCosts as any).amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+            });
           }
         } catch (e) {
           console.error("Error parsing other costs", e);
         }
 
-        setIndirectForm({
-          vat: indirect.vat_percentage?.toString() || "",
-          tax: indirect.tax_percentage?.toString() || "",
-          ocm: indirect.ocm_percentage?.toString() || "",
-          profit: indirect.profit_percentage?.toString() || "",
-          other_costs: loadedOtherCosts
-        });
+        setIndirectCostsList(loadedList);
       } else {
-        setIndirectForm({
-          vat: "",
-          tax: "",
-          ocm: "",
-          profit: "",
-          other_costs: []
-        });
+        setIndirectCostsList([]);
       }
     }
 
@@ -225,17 +219,43 @@ export default function BillOfMaterials() {
 
   const calculateIndirectCost = (): number => {
     const directCost = calculateTotalDirectCost();
-    const vat = parseFloat(indirectForm.vat || "0");
-    const tax = parseFloat(indirectForm.tax || "0");
-    const ocm = parseFloat(indirectForm.ocm || "0");
-    const profit = parseFloat(indirectForm.profit || "0");
-    
-    const othersSum = indirectForm.other_costs.reduce((sum, cost) => {
-      const amount = parseFloat(cost.amount.replace(/,/g, "") || "0");
-      return sum + amount;
-    }, 0);
+    let total = 0;
+    indirectCostsList.forEach(c => {
+      const val = parseFloat(c.value.replace(/,/g, "") || "0");
+      if (['VAT', 'Tax', 'OCM', 'Profit'].includes(c.type)) {
+        total += directCost * (val / 100);
+      } else {
+        total += val;
+      }
+    });
+    return total;
+  };
 
-    return directCost * (vat + tax + ocm + profit) / 100 + othersSum;
+  const handleAddOrUpdateIndirect = () => {
+    const val = parseFloat(indirectRowForm.value.replace(/,/g, "") || "0");
+    if (val <= 0) {
+      alert("Please enter a valid amount or percentage.");
+      return;
+    }
+    if (indirectRowForm.type === 'Others' && !indirectRowForm.description.trim()) {
+      alert("Please enter a description for this cost.");
+      return;
+    }
+
+    if (indirectRowForm.id) {
+      setIndirectCostsList(prev => prev.map(c => c.id === indirectRowForm.id ? indirectRowForm : c));
+    } else {
+      setIndirectCostsList(prev => [...prev, { ...indirectRowForm, id: Math.random().toString(36).substr(2, 9) }]);
+    }
+    setIndirectRowForm({ id: '', type: 'VAT', description: '', value: '' });
+  };
+
+  const handleEditIndirect = (cost: UnifiedIndirectCost) => {
+    setIndirectRowForm(cost);
+  };
+
+  const handleDeleteIndirect = (id: string) => {
+    setIndirectCostsList(prev => prev.filter(c => c.id !== id));
   };
 
   const calculateGrandTotal = (): number => {
@@ -552,19 +572,24 @@ export default function BillOfMaterials() {
   const handleSaveIndirectCosts = async () => {
     if (!bom) return;
 
-    const formattedOtherCosts = indirectForm.other_costs.map(cost => ({
-      id: cost.id,
-      description: cost.description,
-      amount: parseFloat(cost.amount.replace(/,/g, "") || "0")
-    }));
+    let vat = 0, tax = 0, ocm = 0, profit = 0;
+    const other_costs: any[] = [];
+    indirectCostsList.forEach(c => {
+      const val = parseFloat(c.value.replace(/,/g, "") || "0");
+      if (c.type === 'VAT') vat += val;
+      else if (c.type === 'Tax') tax += val;
+      else if (c.type === 'OCM') ocm += val;
+      else if (c.type === 'Profit') profit += val;
+      else if (c.type === 'Others') other_costs.push({ id: c.id, description: c.description, amount: val });
+    });
 
     const indirectData: Database["public"]["Tables"]["bom_indirect_costs"]["Insert"] = {
       bom_id: bom.id,
-      vat_percentage: parseFloat(indirectForm.vat || "0"),
-      tax_percentage: parseFloat(indirectForm.tax || "0"),
-      ocm_percentage: parseFloat(indirectForm.ocm || "0"),
-      profit_percentage: parseFloat(indirectForm.profit || "0"),
-      other_costs: formattedOtherCosts as any,
+      vat_percentage: vat,
+      tax_percentage: tax,
+      ocm_percentage: ocm,
+      profit_percentage: profit,
+      other_costs: other_costs as any,
       total_indirect: calculateIndirectCost()
     };
 
@@ -596,19 +621,24 @@ export default function BillOfMaterials() {
     });
 
     if (showIndirectCosts) {
-      const formattedOtherCosts = indirectForm.other_costs.map(cost => ({
-        id: cost.id,
-        description: cost.description,
-        amount: parseFloat(cost.amount.replace(/,/g, "") || "0")
-      }));
+      let vat = 0, tax = 0, ocm = 0, profit = 0;
+      const other_costs: any[] = [];
+      indirectCostsList.forEach(c => {
+        const val = parseFloat(c.value.replace(/,/g, "") || "0");
+        if (c.type === 'VAT') vat += val;
+        else if (c.type === 'Tax') tax += val;
+        else if (c.type === 'OCM') ocm += val;
+        else if (c.type === 'Profit') profit += val;
+        else if (c.type === 'Others') other_costs.push({ id: c.id, description: c.description, amount: val });
+      });
 
       const indirectData: Database["public"]["Tables"]["bom_indirect_costs"]["Insert"] = {
         bom_id: bom.id,
-        vat_percentage: parseFloat(indirectForm.vat || "0"),
-        tax_percentage: parseFloat(indirectForm.tax || "0"),
-        ocm_percentage: parseFloat(indirectForm.ocm || "0"),
-        profit_percentage: parseFloat(indirectForm.profit || "0"),
-        other_costs: formattedOtherCosts as any,
+        vat_percentage: vat,
+        tax_percentage: tax,
+        ocm_percentage: ocm,
+        profit_percentage: profit,
+        other_costs: other_costs as any,
         total_indirect: calculateIndirectCost()
       };
 
@@ -1304,138 +1334,113 @@ export default function BillOfMaterials() {
               </Button>
             </div>
 
-            <Dialog open={indirectDialogOpen} onOpenChange={setIndirectDialogOpen}>
-              <DialogContent>
+            <Dialog open={indirectDialogOpen} onOpenChange={(open) => {
+              setIndirectDialogOpen(open);
+              if (!open) setIndirectRowForm({ id: '', type: 'VAT', description: '', value: '' });
+            }}>
+              <DialogContent className="max-w-4xl">
                 <DialogHeader>
                   <DialogTitle>Indirect Costs</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 mt-2">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>VAT (%)</Label>
-                      <Input
-                      type="number"
-                      step="0.01"
-                      value={indirectForm.vat}
-                      onChange={(e) =>
-                      setIndirectForm({ ...indirectForm, vat: e.target.value })
-                      } />
-                    
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Tax (%)</Label>
-                      <Input
-                      type="number"
-                      step="0.01"
-                      value={indirectForm.tax}
-                      onChange={(e) =>
-                      setIndirectForm({ ...indirectForm, tax: e.target.value })
-                      } />
-                    
-                    </div>
-                    <div className="space-y-2">
-                      <Label>OCM (%)</Label>
-                      <Input
-                      type="number"
-                      step="0.01"
-                      value={indirectForm.ocm}
-                      onChange={(e) =>
-                      setIndirectForm({ ...indirectForm, ocm: e.target.value })
-                      } />
-                    
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Profit (%)</Label>
-                      <Input
-                      type="number"
-                      step="0.01"
-                      value={indirectForm.profit}
-                      onChange={(e) =>
-                      setIndirectForm({ ...indirectForm, profit: e.target.value })
-                      } />
-                    
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <Label>Other Indirect Costs</Label>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-xs border-green-600 text-green-700 hover:bg-green-50"
-                        onClick={() => {
-                          setIndirectForm({
-                            ...indirectForm,
-                            other_costs: [
-                              ...indirectForm.other_costs,
-                              { id: Math.random().toString(36).substr(2, 9), description: "", amount: "" }
-                            ]
-                          });
-                        }}
-                      >
-                        <Plus className="h-3 w-3 mr-1" /> Add Row
-                      </Button>
-                    </div>
-                    
-                    {indirectForm.other_costs.length === 0 ? (
-                      <div className="text-sm text-muted-foreground italic text-center p-4 border border-dashed rounded-md bg-muted/20">
-                        No other indirect costs added. Click "Add Row" to add one.
-                      </div>
-                    ) : (
-                      <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
-                        {indirectForm.other_costs.map((cost, index) => (
-                          <div key={cost.id} className="flex items-center gap-2">
-                            <Input
-                              placeholder="Description"
-                              value={cost.description}
-                              onChange={(e) => {
-                                const newCosts = [...indirectForm.other_costs];
-                                newCosts[index].description = e.target.value;
-                                setIndirectForm({ ...indirectForm, other_costs: newCosts });
-                              }}
-                              className="flex-1"
-                            />
-                            <Input
-                              type="text"
-                              placeholder="Amount"
-                              className="w-32 text-right"
-                              value={cost.amount}
-                              onChange={(e) => {
-                                const newCosts = [...indirectForm.other_costs];
-                                newCosts[index].amount = e.target.value.replace(/[^0-9.,]/g, '');
-                                setIndirectForm({ ...indirectForm, other_costs: newCosts });
-                              }}
-                              onBlur={(e) => {
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="h-8">
+                        <TableHead className="h-8 py-1 w-32">Type</TableHead>
+                        <TableHead className="h-8 py-1">Description</TableHead>
+                        <TableHead className="text-right h-8 py-1 w-32">Value</TableHead>
+                        <TableHead className="text-right h-8 py-1 w-32">Amount</TableHead>
+                        <TableHead className="text-right h-8 py-1 w-24"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {indirectCostsList.map((cost) => (
+                        <TableRow key={cost.id} className="h-8">
+                          <TableCell className="py-1 font-medium text-sm">{cost.type}</TableCell>
+                          <TableCell className="py-1 text-sm">{cost.type === 'Others' ? cost.description : '-'}</TableCell>
+                          <TableCell className="text-right py-1 text-sm">
+                            {cost.type !== 'Others' ? `${cost.value}%` : formatCurrency(parseFloat(cost.value.replace(/,/g, "") || "0"))}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold py-1 text-sm">
+                            {formatCurrency(
+                              ['VAT', 'OCM', 'Profit', 'Tax'].includes(cost.type)
+                              ? calculateTotalDirectCost() * (parseFloat(cost.value.replace(/,/g, "") || "0") / 100)
+                              : parseFloat(cost.value.replace(/,/g, "") || "0")
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right py-1">
+                            <div className="flex justify-end gap-1">
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-green-600 hover:text-green-700" onClick={() => handleEditIndirect(cost)}>
+                                <Pencil className="w-3 h-3" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-red-600 hover:text-red-700" onClick={() => handleDeleteIndirect(cost.id)}>
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+
+                      <TableRow className="h-8 bg-muted/20">
+                        <TableCell className="py-1">
+                          <Select value={indirectRowForm.type} onValueChange={(val) => setIndirectRowForm({...indirectRowForm, type: val, description: val !== 'Others' ? '' : indirectRowForm.description})}>
+                            <SelectTrigger className="h-7 text-xs"><SelectValue/></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="VAT">VAT</SelectItem>
+                              <SelectItem value="Tax">Tax</SelectItem>
+                              <SelectItem value="OCM">OCM</SelectItem>
+                              <SelectItem value="Profit">Profit</SelectItem>
+                              <SelectItem value="Others">Others/Input</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell className="py-1">
+                          <Input 
+                            disabled={indirectRowForm.type !== 'Others'}
+                            placeholder={indirectRowForm.type !== 'Others' ? 'N/A' : 'Description'}
+                            className="h-7 text-xs w-full"
+                            value={indirectRowForm.description}
+                            onChange={e => setIndirectRowForm({...indirectRowForm, description: e.target.value})}
+                          />
+                        </TableCell>
+                        <TableCell className="py-1 text-right">
+                          <Input 
+                            className="h-7 text-xs text-right w-full"
+                            placeholder={indirectRowForm.type !== 'Others' ? '%' : 'Amount'}
+                            value={indirectRowForm.value}
+                            onChange={e => setIndirectRowForm({...indirectRowForm, value: e.target.value.replace(/[^0-9.,]/g, '')})}
+                            onBlur={e => {
                                 const val = e.target.value;
                                 if (val) {
                                   const num = parseFloat(val.replace(/,/g, ""));
                                   if (!isNaN(num)) {
-                                    const newCosts = [...indirectForm.other_costs];
-                                    newCosts[index].amount = num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                                    setIndirectForm({ ...indirectForm, other_costs: newCosts });
+                                    setIndirectRowForm({ ...indirectRowForm, value: num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
                                   }
                                 }
-                              }}
-                            />
-                            <Button
-                              type="button"
-                              size="icon"
-                              variant="ghost"
-                              className="text-red-600 hover:text-red-700 h-9 w-9 flex-shrink-0"
-                              onClick={() => {
-                                const newCosts = [...indirectForm.other_costs];
-                                newCosts.splice(index, 1);
-                                setIndirectForm({ ...indirectForm, other_costs: newCosts });
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell className="text-right font-semibold py-1 text-sm text-muted-foreground">
+                            {formatCurrency(
+                              ['VAT', 'OCM', 'Profit', 'Tax'].includes(indirectRowForm.type)
+                              ? calculateTotalDirectCost() * (parseFloat(indirectRowForm.value.replace(/,/g, "") || "0") / 100)
+                              : parseFloat(indirectRowForm.value.replace(/,/g, "") || "0")
+                            )}
+                        </TableCell>
+                        <TableCell className="text-right py-1">
+                          <div className="flex justify-end gap-1 items-center">
+                            <Button size="sm" className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={handleAddOrUpdateIndirect}>
+                                {indirectRowForm.id ? 'Update' : 'Add'}
                             </Button>
+                            {indirectRowForm.id && (
+                                <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-red-600 text-red-700 hover:bg-red-50" onClick={() => setIndirectRowForm({id: '', type: 'VAT', description: '', value: ''})}>Cancel</Button>
+                            )}
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+
                   <div className="pt-4 border-t">
                     <div className="flex justify-between items-center mb-4">
                       <span className="text-lg font-semibold">Total Indirect Cost:</span>
