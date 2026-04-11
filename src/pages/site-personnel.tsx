@@ -201,17 +201,6 @@ export default function SitePersonnel() {
     loadDeliveries();
   };
 
-  const resetAttendanceForm = () => {
-    setAttendanceForm({
-      personnel_id: "",
-      project_id: "",
-      date: new Date().toISOString().split("T")[0],
-      status: "present",
-      hours_worked: 8,
-      notes: ""
-    });
-  };
-
   const resetDeliveryForm = () => {
     setDeliveryForm({
       project_id: "",
