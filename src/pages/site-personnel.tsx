@@ -19,14 +19,15 @@ type Project = { id: string; name: string; location: string; status: string };
 type Personnel = { id: string; name: string; role: string };
 type SiteAttendance = { id: string; personnel_id: string; project_id: string; date: string; status: string; hours_worked: number; notes: string; personnel?: { name: string; role: string } };
 type Delivery = { id: string; project_id: string; delivery_date: string; item_name: string; quantity: number; unit: string; supplier: string; received_by: string; status: string; notes: string };
-type ScopeOfWork = { id: string; project_id: string; description: string; unit: string; planned_quantity: number; completed_quantity: number; order_number: number; status: string };
-type ProgressUpdate = { id: string; scope_id: string; update_date: string; quantity_completed: number; notes: string; updated_by: string };
+type ScopeOfWork = { id: string; name: string; description?: string; order_number: number; completion_percentage?: number; status?: string; bom_id: string };
+type ProgressUpdate = { id: string; bom_scope_id: string; update_date: string; percentage_completed: number; notes: string; updated_by: string };
 
 export default function SitePersonnel() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [personnel, setPersonnel] = useState<Personnel[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [activeTab, setActiveTab] = useState("attendance");
   
   // Site Attendance
   const [attendance, setAttendance] = useState<SiteAttendance[]>([]);
@@ -57,25 +58,15 @@ export default function SitePersonnel() {
 
   // Scope of Works
   const [scopes, setScopes] = useState<ScopeOfWork[]>([]);
-  const [scopeDialogOpen, setScopeDialogOpen] = useState(false);
-  const [scopeForm, setScopeForm] = useState({
-    project_id: "",
-    description: "",
-    unit: "",
-    planned_quantity: 0,
-    completed_quantity: 0,
-    order_number: 1,
-    status: "not_started"
-  });
 
   // Progress Updates
   const [selectedScope, setSelectedScope] = useState<string>("");
   const [progressUpdates, setProgressUpdates] = useState<ProgressUpdate[]>([]);
   const [progressDialogOpen, setProgressDialogOpen] = useState(false);
   const [progressForm, setProgressForm] = useState({
-    scope_id: "",
+    bom_scope_id: "",
     update_date: new Date().toISOString().split("T")[0],
-    quantity_completed: 0,
+    percentage_completed: 0,
     notes: "",
     updated_by: ""
   });
@@ -156,26 +147,12 @@ export default function SitePersonnel() {
     loadDeliveries();
   };
 
-  const handleScopeSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await siteService.createScopeOfWork({
-      ...scopeForm,
-      project_id: selectedProject,
-      planned_quantity: parseFloat(scopeForm.planned_quantity.toString()),
-      completed_quantity: parseFloat(scopeForm.completed_quantity.toString()),
-      order_number: parseInt(scopeForm.order_number.toString())
-    });
-    setScopeDialogOpen(false);
-    resetScopeForm();
-    loadScopes();
-  };
-
   const handleProgressSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await siteService.createProgressUpdate({
       ...progressForm,
-      scope_id: selectedScope,
-      quantity_completed: parseFloat(progressForm.quantity_completed.toString())
+      bom_scope_id: selectedScope,
+      percentage_completed: parseFloat(progressForm.percentage_completed.toString())
     });
     setProgressDialogOpen(false);
     resetProgressForm();
@@ -208,23 +185,11 @@ export default function SitePersonnel() {
     });
   };
 
-  const resetScopeForm = () => {
-    setScopeForm({
-      project_id: "",
-      description: "",
-      unit: "",
-      planned_quantity: 0,
-      completed_quantity: 0,
-      order_number: 1,
-      status: "not_started"
-    });
-  };
-
   const resetProgressForm = () => {
     setProgressForm({
-      scope_id: "",
+      bom_scope_id: selectedScope,
       update_date: new Date().toISOString().split("T")[0],
-      quantity_completed: 0,
+      percentage_completed: 0,
       notes: "",
       updated_by: ""
     });
@@ -283,7 +248,7 @@ export default function SitePersonnel() {
         </div>
 
         {selectedProject && (
-          <Tabs defaultValue="attendance" className="space-y-4">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="attendance">
                 <Users className="h-4 w-4 mr-2" />
@@ -578,142 +543,62 @@ export default function SitePersonnel() {
             <TabsContent value="scope">
               <Card>
                 <CardHeader>
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <CardTitle>Scope of Works</CardTitle>
-                      <CardDescription>Define and track project scopes</CardDescription>
-                    </div>
-                    <Dialog open={scopeDialogOpen} onOpenChange={setScopeDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button>
-                          <Plus className="h-4 w-4 mr-2" />
-                          New Scope
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Create Scope of Work</DialogTitle>
-                        </DialogHeader>
-                        <form onSubmit={handleScopeSubmit} className="space-y-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="description">Description</Label>
-                            <Textarea
-                              id="description"
-                              value={scopeForm.description}
-                              onChange={(e) => setScopeForm({ ...scopeForm, description: e.target.value })}
-                              placeholder="e.g., Excavation, Concrete Pouring, Steel Erection"
-                              required
-                            />
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="planned_qty">Planned Quantity</Label>
-                              <Input
-                                id="planned_qty"
-                                type="number"
-                                step="0.01"
-                                value={scopeForm.planned_quantity}
-                                onChange={(e) => setScopeForm({ ...scopeForm, planned_quantity: parseFloat(e.target.value) })}
-                                required
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="unit">Unit</Label>
-                              <Input
-                                id="unit"
-                                value={scopeForm.unit}
-                                onChange={(e) => setScopeForm({ ...scopeForm, unit: e.target.value })}
-                                placeholder="e.g., m³, m², kg"
-                                required
-                              />
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="order">Order</Label>
-                              <Input
-                                id="order"
-                                type="number"
-                                value={scopeForm.order_number}
-                                onChange={(e) => setScopeForm({ ...scopeForm, order_number: parseInt(e.target.value) })}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="scope_status">Status</Label>
-                              <Select 
-                                value={scopeForm.status} 
-                                onValueChange={(value) => setScopeForm({ ...scopeForm, status: value })}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="not_started">Not Started</SelectItem>
-                                  <SelectItem value="in_progress">In Progress</SelectItem>
-                                  <SelectItem value="completed">Completed</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-                          <div className="flex justify-end gap-2 pt-4">
-                            <Button type="button" variant="outline" onClick={() => setScopeDialogOpen(false)}>
-                              Cancel
-                            </Button>
-                            <Button type="submit">Create</Button>
-                          </div>
-                        </form>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
+                  <CardTitle>Scope of Works (From BOM)</CardTitle>
+                  <CardDescription>Track progress for scopes officially defined in the Bill of Materials</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>#</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead>Planned</TableHead>
-                        <TableHead>Completed</TableHead>
-                        <TableHead>Progress</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {scopes.map((scope) => {
-                        const progress = scope.planned_quantity > 0 
-                          ? ((scope.completed_quantity / scope.planned_quantity) * 100).toFixed(1)
-                          : 0;
-                        return (
+                  {scopes.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg bg-gray-50">
+                      <p className="mb-4">No scopes found. Ensure a Bill of Materials is created for this project with defined Scope of Works.</p>
+                      <Button variant="outline" onClick={() => setActiveTab("scope")}>Go to Scope of Works</Button>
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-16">#</TableHead>
+                          <TableHead>Scope Name</TableHead>
+                          <TableHead className="w-48">Completion</TableHead>
+                          <TableHead className="w-32">Status</TableHead>
+                          <TableHead className="text-right w-40">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {scopes.map((scope) => (
                           <TableRow key={scope.id}>
                             <TableCell>{scope.order_number}</TableCell>
-                            <TableCell className="font-medium">{scope.description}</TableCell>
-                            <TableCell>{scope.planned_quantity} {scope.unit}</TableCell>
-                            <TableCell>{scope.completed_quantity} {scope.unit}</TableCell>
-                            <TableCell>{progress}%</TableCell>
-                            <TableCell>{getStatusBadge(scope.status)}</TableCell>
                             <TableCell>
-                              <div className="flex gap-2">
-                                <Button 
-                                  size="sm" 
-                                  variant="outline"
-                                  onClick={() => {
-                                    setSelectedScope(scope.id);
-                                    setProgressForm({ ...progressForm, scope_id: scope.id });
-                                  }}
-                                >
-                                  Update Progress
-                                </Button>
-                                <Button size="sm" variant="ghost" onClick={() => siteService.deleteScopeOfWork(scope.id).then(loadScopes)}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                              <div className="font-medium">{scope.name}</div>
+                              {scope.description && <div className="text-sm text-muted-foreground">{scope.description}</div>}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <div className="w-24 bg-secondary rounded-full h-2.5 overflow-hidden">
+                                  <div className="bg-green-500 h-full transition-all" style={{ width: `${scope.completion_percentage || 0}%` }} />
+                                </div>
+                                <span className="text-sm font-medium">{scope.completion_percentage || 0}%</span>
                               </div>
                             </TableCell>
+                            <TableCell>{getStatusBadge(scope.status || 'not_started')}</TableCell>
+                            <TableCell className="text-right">
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                className="bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 border-blue-200"
+                                onClick={() => {
+                                  setSelectedScope(scope.id);
+                                  setProgressForm({ ...progressForm, bom_scope_id: scope.id, percentage_completed: scope.completion_percentage || 0 });
+                                  setActiveTab("progress");
+                                }}
+                              >
+                                Update Progress
+                              </Button>
+                            </TableCell>
                           </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -724,18 +609,22 @@ export default function SitePersonnel() {
                   <div className="flex justify-between items-center">
                     <div>
                       <CardTitle>Progress Updates</CardTitle>
-                      <CardDescription>Daily progress tracking per scope</CardDescription>
+                      <CardDescription>
+                        {selectedScope 
+                          ? `Tracking progress for: ${scopes.find(s => s.id === selectedScope)?.name}`
+                          : "Select a scope from the Scope of Works tab to view and add updates"}
+                      </CardDescription>
                     </div>
                     <Dialog open={progressDialogOpen} onOpenChange={setProgressDialogOpen}>
                       <DialogTrigger asChild>
-                        <Button disabled={!selectedScope}>
+                        <Button disabled={!selectedScope} className="bg-blue-600 hover:bg-blue-700 text-white">
                           <Plus className="h-4 w-4 mr-2" />
-                          New Update
+                          Log Progress
                         </Button>
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
-                          <DialogTitle>Record Progress</DialogTitle>
+                          <DialogTitle>Log Percentage Completion</DialogTitle>
                         </DialogHeader>
                         <form onSubmit={handleProgressSubmit} className="space-y-4">
                           <div className="space-y-2">
@@ -748,18 +637,21 @@ export default function SitePersonnel() {
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="qty_completed">Quantity Completed</Label>
+                            <Label htmlFor="percentage_completed">Total Percentage Completed (%)</Label>
                             <Input
-                              id="qty_completed"
+                              id="percentage_completed"
                               type="number"
+                              min="0"
+                              max="100"
                               step="0.01"
-                              value={progressForm.quantity_completed}
-                              onChange={(e) => setProgressForm({ ...progressForm, quantity_completed: parseFloat(e.target.value) })}
+                              value={progressForm.percentage_completed}
+                              onChange={(e) => setProgressForm({ ...progressForm, percentage_completed: parseFloat(e.target.value) })}
                               required
                             />
+                            <p className="text-xs text-muted-foreground">Enter the cumulative completion percentage (e.g., 50 for 50% complete).</p>
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="updated_by">Updated By</Label>
+                            <Label htmlFor="updated_by">Updated By (Name)</Label>
                             <Input
                               id="updated_by"
                               value={progressForm.updated_by}
@@ -768,7 +660,7 @@ export default function SitePersonnel() {
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="prog_notes">Notes</Label>
+                            <Label htmlFor="prog_notes">Notes / Observations</Label>
                             <Textarea
                               id="prog_notes"
                               value={progressForm.notes}
@@ -779,7 +671,7 @@ export default function SitePersonnel() {
                             <Button type="button" variant="outline" onClick={() => setProgressDialogOpen(false)}>
                               Cancel
                             </Button>
-                            <Button type="submit">Save</Button>
+                            <Button type="submit">Save Progress</Button>
                           </div>
                         </form>
                       </DialogContent>
@@ -788,34 +680,41 @@ export default function SitePersonnel() {
                 </CardHeader>
                 <CardContent>
                   {!selectedScope ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      Select a scope from the "Scope of Works" tab to view progress updates
+                    <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg bg-gray-50">
+                      <p className="mb-4">Select a scope from the "Scope of Works" tab to view or log progress updates.</p>
+                      <Button variant="outline" onClick={() => setActiveTab("scope")}>Go to Scope of Works</Button>
                     </div>
                   ) : (
                     <Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Date</TableHead>
-                          <TableHead>Quantity</TableHead>
+                          <TableHead>Percentage</TableHead>
                           <TableHead>Updated By</TableHead>
                           <TableHead>Notes</TableHead>
-                          <TableHead>Actions</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {progressUpdates.map((update) => (
-                          <TableRow key={update.id}>
-                            <TableCell>{update.update_date}</TableCell>
-                            <TableCell className="font-medium">{update.quantity_completed}</TableCell>
-                            <TableCell>{update.updated_by}</TableCell>
-                            <TableCell>{update.notes}</TableCell>
-                            <TableCell>
-                              <Button size="sm" variant="ghost" onClick={() => siteService.deleteProgressUpdate(update.id).then(loadProgressUpdates)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
+                        {progressUpdates.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">No progress updates logged yet.</TableCell>
                           </TableRow>
-                        ))}
+                        ) : (
+                          progressUpdates.map((update) => (
+                            <TableRow key={update.id}>
+                              <TableCell>{update.update_date}</TableCell>
+                              <TableCell className="font-medium text-green-600">{update.percentage_completed}%</TableCell>
+                              <TableCell>{update.updated_by}</TableCell>
+                              <TableCell>{update.notes}</TableCell>
+                              <TableCell className="text-right">
+                                <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => siteService.deleteProgressUpdate(update.id).then(loadProgressUpdates)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
                       </TableBody>
                     </Table>
                   )}

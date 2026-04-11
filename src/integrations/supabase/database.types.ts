@@ -274,33 +274,39 @@ export type Database = {
       bom_scope_of_work: {
         Row: {
           bom_id: string
+          completion_percentage: number | null
           created_at: string | null
           description: string | null
           id: string
           name: string
           order_number: number
+          status: string | null
           subtotal: number | null
           total_labor: number | null
           total_materials: number | null
         }
         Insert: {
           bom_id: string
+          completion_percentage?: number | null
           created_at?: string | null
           description?: string | null
           id?: string
           name: string
           order_number: number
+          status?: string | null
           subtotal?: number | null
           total_labor?: number | null
           total_materials?: number | null
         }
         Update: {
           bom_id?: string
+          completion_percentage?: number | null
           created_at?: string | null
           description?: string | null
           id?: string
           name?: string
           order_number?: number
+          status?: string | null
           subtotal?: number | null
           total_labor?: number | null
           total_materials?: number | null
@@ -653,33 +659,46 @@ export type Database = {
       }
       progress_updates: {
         Row: {
+          bom_scope_id: string | null
           created_at: string | null
           id: string
           notes: string | null
+          percentage_completed: number | null
           quantity_completed: number | null
           scope_id: string
           update_date: string
           updated_by: string | null
         }
         Insert: {
+          bom_scope_id?: string | null
           created_at?: string | null
           id?: string
           notes?: string | null
+          percentage_completed?: number | null
           quantity_completed?: number | null
           scope_id: string
           update_date: string
           updated_by?: string | null
         }
         Update: {
+          bom_scope_id?: string | null
           created_at?: string | null
           id?: string
           notes?: string | null
+          percentage_completed?: number | null
           quantity_completed?: number | null
           scope_id?: string
           update_date?: string
           updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "progress_updates_bom_scope_id_fkey"
+            columns: ["bom_scope_id"]
+            isOneToOne: false
+            referencedRelation: "bom_scope_of_work"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "progress_updates_scope_id_fkey"
             columns: ["scope_id"]

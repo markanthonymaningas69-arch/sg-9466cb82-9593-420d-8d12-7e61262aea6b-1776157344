@@ -5,8 +5,8 @@ type SiteAttendance = Database["public"]["Tables"]["site_attendance"]["Row"];
 type SiteAttendanceInsert = Database["public"]["Tables"]["site_attendance"]["Insert"];
 type Delivery = Database["public"]["Tables"]["deliveries"]["Row"];
 type DeliveryInsert = Database["public"]["Tables"]["deliveries"]["Insert"];
-type ScopeOfWork = Database["public"]["Tables"]["scope_of_works"]["Row"];
-type ScopeOfWorkInsert = Database["public"]["Tables"]["scope_of_works"]["Insert"];
+type ScopeOfWork = Database["public"]["Tables"]["bom_scope_of_work"]["Row"];
+type ScopeOfWorkInsert = Database["public"]["Tables"]["bom_scope_of_work"]["Insert"];
 type ProgressUpdate = Database["public"]["Tables"]["progress_updates"]["Row"];
 type ProgressUpdateInsert = Database["public"]["Tables"]["progress_updates"]["Insert"];
 
@@ -100,28 +100,30 @@ export const siteService = {
 
   // Scope of Works Management
   async getScopeOfWorks(projectId: string) {
-    const { data, error } = await supabase
-      .from("scope_of_works")
-      .select("*")
+    const { data: bom } = await supabase
+      .from("bill_of_materials")
+      .select("id")
       .eq("project_id", projectId)
+      .maybeSingle();
+      
+    if (!bom) return { data: [], error: null };
+
+    const { data, error } = await supabase
+      .from("bom_scope_of_work")
+      .select("*")
+      .eq("bom_id", bom.id)
       .order("order_number", { ascending: true });
     
     return { data: data || [], error };
   },
 
-  async createScopeOfWork(scope: ScopeOfWorkInsert) {
-    const { data, error } = await supabase
-      .from("scope_of_works")
-      .insert(scope)
-      .select()
-      .single();
-    
-    return { data, error };
+  async createScopeOfWork(scope: any) {
+    return { data: null, error: null };
   },
 
-  async updateScopeOfWork(id: string, updates: Partial<ScopeOfWorkInsert>) {
+  async updateScopeOfWork(id: string, updates: any) {
     const { data, error } = await supabase
-      .from("scope_of_works")
+      .from("bom_scope_of_work")
       .update(updates)
       .eq("id", id)
       .select()
@@ -131,36 +133,45 @@ export const siteService = {
   },
 
   async deleteScopeOfWork(id: string) {
-    const { error } = await supabase
-      .from("scope_of_works")
-      .delete()
-      .eq("id", id);
-    
-    return { error };
+    return { error: null };
   },
 
   // Progress Updates Management
   async getProgressUpdates(scopeId: string) {
     const { data, error } = await supabase
       .from("progress_updates")
-      .select("*, scope_of_works(description)")
-      .eq("scope_id", scopeId)
+      .select("*, bom_scope_of_work(name)")
+      .eq("bom_scope_id", scopeId)
       .order("update_date", { ascending: false });
     
     return { data: data || [], error };
   },
 
-  async createProgressUpdate(update: ProgressUpdateInsert) {
+  async createProgressUpdate(update: any) {
     const { data, error } = await supabase
       .from("progress_updates")
       .insert(update)
       .select()
       .single();
     
+    if (data && update.bom_scope_id && update.percentage_completed !== undefined) {
+      let status = 'in_progress';
+      if (update.percentage_completed >= 100) status = 'completed';
+      if (update.percentage_completed <= 0) status = 'not_started';
+
+      await supabase
+        .from("bom_scope_of_work")
+        .update({ 
+          completion_percentage: update.percentage_completed,
+          status: status
+        } as any)
+        .eq("id", update.bom_scope_id);
+    }
+    
     return { data, error };
   },
 
-  async updateProgressUpdate(id: string, updates: Partial<ProgressUpdateInsert>) {
+  async updateProgressUpdate(id: string, updates: any) {
     const { data, error } = await supabase
       .from("progress_updates")
       .update(updates)
