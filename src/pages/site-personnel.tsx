@@ -42,6 +42,8 @@ export default function SitePersonnel() {
 
   // Deliveries
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [bomMaterials, setBomMaterials] = useState<{id: string, name: string, unit: string}[]>([]);
+  const [isManualItem, setIsManualItem] = useState(false);
   const [deliveryDialogOpen, setDeliveryDialogOpen] = useState(false);
   const [deliveryForm, setDeliveryForm] = useState({
     project_id: "",
@@ -68,6 +70,7 @@ export default function SitePersonnel() {
       loadAttendance();
       loadDeliveries();
       loadScopes();
+      loadBomMaterials();
     }
   }, [selectedProject, selectedDate]);
 
@@ -97,6 +100,12 @@ export default function SitePersonnel() {
     if (!selectedProject) return;
     const { data } = await siteService.getScopeOfWorks(selectedProject);
     setScopes(data || []);
+  };
+
+  const loadBomMaterials = async () => {
+    if (!selectedProject) return;
+    const { data } = await siteService.getBomMaterials(selectedProject);
+    setBomMaterials(data || []);
   };
 
   const handleUpdateProgress = async (scope: ScopeOfWork, newValue: string) => {
@@ -135,8 +144,8 @@ export default function SitePersonnel() {
       project_id: selectedProject,
       quantity: parseFloat(deliveryForm.quantity.toString())
     });
-    setDeliveryDialogOpen(false);
-    resetDeliveryForm();
+    setDeliveryForm(prev => ({ ...prev, item_name: "" }));
+    setIsManualItem(false);
     loadDeliveries();
   };
 
@@ -163,6 +172,7 @@ export default function SitePersonnel() {
       status: "pending",
       notes: ""
     });
+    setIsManualItem(false);
   };
 
   const getStatusBadge = (status: string) => {
@@ -376,12 +386,46 @@ export default function SitePersonnel() {
                           <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                               <Label htmlFor="item">Item Name</Label>
-                              <Input
-                                id="item"
-                                value={deliveryForm.item_name}
-                                onChange={(e) => setDeliveryForm({ ...deliveryForm, item_name: e.target.value })}
-                                required
-                              />
+                              {!isManualItem ? (
+                                <Select
+                                  value={deliveryForm.item_name}
+                                  onValueChange={(val) => {
+                                    if (val === "others") {
+                                      setIsManualItem(true);
+                                      setDeliveryForm({ ...deliveryForm, item_name: "", unit: "" });
+                                    } else {
+                                      const mat = bomMaterials.find(m => m.name === val);
+                                      setDeliveryForm({ ...deliveryForm, item_name: val, unit: mat?.unit || deliveryForm.unit });
+                                    }
+                                  }}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select material" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {bomMaterials.map((mat) => (
+                                      <SelectItem key={mat.id} value={mat.name}>{mat.name}</SelectItem>
+                                    ))}
+                                    <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                <div className="flex gap-2">
+                                  <Input
+                                    id="item"
+                                    placeholder="Custom material"
+                                    value={deliveryForm.item_name}
+                                    onChange={(e) => setDeliveryForm({ ...deliveryForm, item_name: e.target.value })}
+                                    required
+                                  />
+                                  <Button type="button" variant="outline" className="px-2" onClick={() => {
+                                    setIsManualItem(false);
+                                    setDeliveryForm({ ...deliveryForm, item_name: "", unit: "" });
+                                  }}>
+                                    List
+                                  </Button>
+                                </div>
+                              )}
                             </div>
                             <div className="space-y-2">
                               <Label htmlFor="supplier">Supplier</Label>
@@ -458,11 +502,16 @@ export default function SitePersonnel() {
                               onChange={(e) => setDeliveryForm({ ...deliveryForm, notes: e.target.value })}
                             />
                           </div>
-                          <div className="flex justify-end gap-2 pt-4">
-                            <Button type="button" variant="outline" onClick={() => setDeliveryDialogOpen(false)}>
-                              Cancel
+                          <div className="flex justify-between items-center pt-4">
+                            <Button type="button" variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={resetDeliveryForm}>
+                              Clear
                             </Button>
-                            <Button type="submit">Save</Button>
+                            <div className="flex gap-2">
+                              <Button type="button" variant="outline" onClick={() => setDeliveryDialogOpen(false)}>
+                                Done / Close
+                              </Button>
+                              <Button type="submit">Save</Button>
+                            </div>
                           </div>
                         </form>
                       </DialogContent>

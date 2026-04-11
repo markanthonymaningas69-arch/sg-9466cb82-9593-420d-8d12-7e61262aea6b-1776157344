@@ -98,6 +98,24 @@ export const siteService = {
     return { error };
   },
 
+  async getBomMaterials(projectId: string) {
+    const { data: bom } = await supabase
+      .from("bill_of_materials")
+      .select("id")
+      .eq("project_id", projectId)
+      .maybeSingle();
+      
+    if (!bom) return { data: [], error: null };
+
+    const { data, error } = await supabase
+      .from("bom_materials")
+      .select("id, name, unit")
+      .eq("bom_id", bom.id)
+      .order("name", { ascending: true });
+    
+    return { data: data || [], error };
+  },
+
   // Scope of Works Management
   async getScopeOfWorks(projectId: string) {
     const { data: bom } = await supabase
