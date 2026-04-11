@@ -859,8 +859,8 @@ export default function BillOfMaterials() {
               key={scope.id}
               className="text-foreground"
             >
-              <CardHeader className="pb-3">
-                <div className="flex justify-between items-start gap-3">
+              <CardHeader className={isCollapsed || reorderMode ? "py-2 px-4" : "pt-6 px-6 pb-3"}>
+                <div className="flex justify-between items-center gap-3">
                   <div className="flex items-center gap-2">
                     {editingScopeId === scope.id ? (
                       <>
@@ -1431,7 +1431,7 @@ export default function BillOfMaterials() {
 
         {scopes.length > 0 && (
           <Card className="mt-4">
-            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+            <CardHeader className={indirectCollapsed ? "py-2 px-4 flex flex-row items-center justify-between space-y-0" : "pt-6 px-6 pb-3 flex flex-row items-center justify-between space-y-0"}>
               <CardTitle className="text-xl mt-0">Indirect Costs</CardTitle>
               <Button
                 variant="outline"
@@ -1460,7 +1460,7 @@ export default function BillOfMaterials() {
                       <TableCell className="text-right py-1 text-sm">
                         {cost.type !== 'Others' ? `${cost.value}%` : formatCurrency(parseFloat(cost.value.replace(/,/g, "") || "0"))}
                       </TableCell>
-                      <TableCell className="text-right font-semibold py-1 text-sm">
+                      <TableCell className="text-right font-semibold py-1 text-sm text-muted-foreground">
                         {formatCurrency(
                           ['VAT', 'OCM', 'Profit', 'Tax'].includes(cost.type)
                           ? calculateTotalDirectCost() * (parseFloat(cost.value.replace(/,/g, "") || "0") / 100)
@@ -1468,7 +1468,7 @@ export default function BillOfMaterials() {
                         )}
                       </TableCell>
                       <TableCell className="text-right py-1">
-                        <div className="flex justify-end gap-1">
+                        <div className="flex justify-end gap-1 items-center">
                           <Button variant="ghost" size="icon" className="h-6 w-6 text-green-600 hover:text-green-700" onClick={() => handleEditIndirect(cost)}>
                             <Pencil className="w-3 h-3" />
                           </Button>
@@ -1518,7 +1518,7 @@ export default function BillOfMaterials() {
                         )}
                     </TableCell>
                     <TableCell className="text-right py-1">
-                      <div className="flex justify-end gap-1 items-center">
+                      <div className="flex justify-end gap-1">
                         <Button size="sm" className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={() => void handleAddOrUpdateIndirect()}>
                             {indirectRowForm.id ? 'Update' : 'Add'}
                         </Button>
