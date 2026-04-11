@@ -136,7 +136,7 @@ export default function SitePersonnel() {
       });
       setAttendanceList(merged);
     } else {
-      const { data } = await siteService.getSiteAttendance(selectedProject);
+      const { data: attendance } = await siteService.getSiteAttendance(selectedProject);
       const grouped = (attendance || []).reduce((acc: any, curr: any) => {
         const d = curr.date;
         if (!acc[d]) acc[d] = [];
