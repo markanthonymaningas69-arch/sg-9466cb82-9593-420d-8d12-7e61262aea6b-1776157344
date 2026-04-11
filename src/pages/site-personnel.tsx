@@ -136,7 +136,7 @@ export default function SitePersonnel() {
       });
       setAttendanceList(merged);
     } else {
-      const { data: attendance } = await siteService.getSiteAttendance(selectedProject);
+      const { data } = await siteService.getSiteAttendance(selectedProject);
       const grouped = (attendance || []).reduce((acc: any, curr: any) => {
         const d = curr.date;
         if (!acc[d]) acc[d] = [];
@@ -208,6 +208,26 @@ export default function SitePersonnel() {
       notes: "Inline progress update"
     });
     loadScopes();
+  };
+
+  const handleEnrollSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await siteService.enrollPersonnel({
+      project_id: selectedProject,
+      name: enrollForm.name,
+      role: enrollForm.role,
+      daily_rate: enrollForm.daily_rate,
+      overtime_rate: enrollForm.overtime_rate,
+      hourly_rate: enrollForm.daily_rate > 0 ? enrollForm.daily_rate / 8 : 0,
+      status: "active",
+      hire_date: new Date().toISOString().split("T")[0],
+      email: `${enrollForm.name.replace(/\s+/g, '').toLowerCase()}${Date.now()}@example.com`
+    });
+    
+    // Rapid Entry: Do NOT close dialog, just reset form
+    setEnrollForm({ name: "", role: "", daily_rate: 0, overtime_rate: 0 });
+    setIsManualRole(false);
+    loadProjectPersonnelList();
   };
 
   const handleAttendanceChange = async (personnel_id: string, field: string, value: any) => {
