@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -589,11 +589,13 @@ export type Database = {
       personnel: {
         Row: {
           created_at: string | null
+          daily_rate: number | null
           email: string
           hire_date: string
           hourly_rate: number | null
           id: string
           name: string
+          overtime_rate: number | null
           phone: string | null
           project_id: string | null
           role: string
@@ -601,11 +603,13 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          daily_rate?: number | null
           email: string
           hire_date: string
           hourly_rate?: number | null
           id?: string
           name: string
+          overtime_rate?: number | null
           phone?: string | null
           project_id?: string | null
           role: string
@@ -613,11 +617,13 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          daily_rate?: number | null
           email?: string
           hire_date?: string
           hourly_rate?: number | null
           id?: string
           name?: string
+          overtime_rate?: number | null
           phone?: string | null
           project_id?: string | null
           role?: string
