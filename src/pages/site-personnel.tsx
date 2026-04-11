@@ -23,6 +23,8 @@ type AttendanceRow = { personnel_id: string; name: string; role: string; daily_r
 type Delivery = { id: string; project_id: string; delivery_date: string; item_name: string; quantity: number; unit: string; supplier: string; received_by: string; status: string; notes: string; receipt_number?: string };
 type ScopeOfWork = { id: string; name: string; description?: string; order_number: number; completion_percentage?: number; status?: string; bom_id: string };
 
+const STANDARD_ROLES = ["Mason", "Carpenter", "Helper", "Skilled", "Welder", "Plumber", "Electrician"];
+
 export default function SitePersonnel() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [personnel, setPersonnel] = useState<Personnel[]>([]);
@@ -39,8 +41,10 @@ export default function SitePersonnel() {
   const [historicalAttendance, setHistoricalAttendance] = useState<Record<string, any[]>>({});
   const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
   const [isEditMode, setIsEditMode] = useState(false);
+  const [enrollDialogOpen, setEnrollDialogOpen] = useState(false);
   const [addManpowerDialogOpen, setAddManpowerDialogOpen] = useState(false);
   const [projectPersonnelList, setProjectPersonnelList] = useState<Personnel[]>([]);
+  const [manualRoles, setManualRoles] = useState<Record<string, boolean>>({});
   const [isManualRole, setIsManualRole] = useState(false);
   const [enrollForm, setEnrollForm] = useState({
     name: "",
@@ -403,13 +407,7 @@ export default function SitePersonnel() {
                                   <SelectValue placeholder="Select position" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="Mason">Mason</SelectItem>
-                                  <SelectItem value="Carpenter">Carpenter</SelectItem>
-                                  <SelectItem value="Helper">Helper</SelectItem>
-                                  <SelectItem value="Skilled">Skilled</SelectItem>
-                                  <SelectItem value="Welder">Welder</SelectItem>
-                                  <SelectItem value="Plumber">Plumber</SelectItem>
-                                  <SelectItem value="Electrician">Electrician</SelectItem>
+                                  {STANDARD_ROLES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
                                   <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
                                 </SelectContent>
                               </Select>
@@ -492,16 +490,57 @@ export default function SitePersonnel() {
                             />
                           </TableCell>
                           <TableCell>
-                            <Input 
-                              value={p.role} 
-                              onChange={e => {
-                                const l = [...projectPersonnelList];
-                                const i = l.findIndex(x => x.id === p.id);
-                                l[i].role = e.target.value;
-                                setProjectPersonnelList(l);
-                              }}
-                              onBlur={e => siteService.updatePersonnel(p.id, { role: e.target.value })}
-                            />
+                            {manualRoles[p.id] || (p.role && !STANDARD_ROLES.includes(p.role)) ? (
+                              <div className="flex gap-2">
+                                <Input 
+                                  placeholder="Custom position"
+                                  value={p.role} 
+                                  onChange={e => {
+                                    const l = [...projectPersonnelList];
+                                    const i = l.findIndex(x => x.id === p.id);
+                                    l[i].role = e.target.value;
+                                    setProjectPersonnelList(l);
+                                  }}
+                                  onBlur={e => siteService.updatePersonnel(p.id, { role: e.target.value })}
+                                />
+                                <Button type="button" variant="outline" className="px-2" onClick={() => {
+                                  setManualRoles(prev => ({ ...prev, [p.id]: false }));
+                                  const l = [...projectPersonnelList];
+                                  const i = l.findIndex(x => x.id === p.id);
+                                  l[i].role = "";
+                                  setProjectPersonnelList(l);
+                                }}>
+                                  List
+                                </Button>
+                              </div>
+                            ) : (
+                              <Select 
+                                value={p.role || ""} 
+                                onValueChange={val => {
+                                  if (val === "others") {
+                                    setManualRoles(prev => ({ ...prev, [p.id]: true }));
+                                    const l = [...projectPersonnelList];
+                                    const i = l.findIndex(x => x.id === p.id);
+                                    l[i].role = "";
+                                    setProjectPersonnelList(l);
+                                  } else {
+                                    const l = [...projectPersonnelList];
+                                    const i = l.findIndex(x => x.id === p.id);
+                                    l[i].role = val;
+                                    setProjectPersonnelList(l);
+                                    siteService.updatePersonnel(p.id, { role: val });
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="h-9">
+                                  <SelectValue placeholder="Position" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {STANDARD_ROLES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                                  <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            )}
                           </TableCell>
                           <TableCell>
                             <Input 
