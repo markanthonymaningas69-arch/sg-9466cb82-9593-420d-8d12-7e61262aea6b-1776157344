@@ -505,15 +505,6 @@ export default function SitePersonnel() {
                           </div>
                           <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                              <Label htmlFor="supplier">Supplier</Label>
-                              <Input
-                                id="supplier"
-                                value={deliveryForm.supplier}
-                                onChange={(e) => setDeliveryForm({ ...deliveryForm, supplier: e.target.value })}
-                                required
-                              />
-                            </div>
-                            <div className="space-y-2">
                               <Label htmlFor="receipt_number">Receipt Number</Label>
                               <Input
                                 id="receipt_number"
@@ -522,8 +513,6 @@ export default function SitePersonnel() {
                                 placeholder="Optional"
                               />
                             </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                               <Label htmlFor="delivery_date">Delivery Date</Label>
                               <Input
@@ -533,6 +522,8 @@ export default function SitePersonnel() {
                                 onChange={(e) => setDeliveryForm({ ...deliveryForm, delivery_date: e.target.value })}
                               />
                             </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                               <Label htmlFor="received_by">Received By</Label>
                               <Input
@@ -541,21 +532,21 @@ export default function SitePersonnel() {
                                 onChange={(e) => setDeliveryForm({ ...deliveryForm, received_by: e.target.value })}
                               />
                             </div>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="status">Status</Label>
-                            <Select 
-                              value={deliveryForm.status} 
-                              onValueChange={(value) => setDeliveryForm({ ...deliveryForm, status: value })}
-                            >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="pending">Pending</SelectItem>
-                                <SelectItem value="received">Received</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            <div className="space-y-2">
+                              <Label htmlFor="status">Status</Label>
+                              <Select 
+                                value={deliveryForm.status} 
+                                onValueChange={(value) => setDeliveryForm({ ...deliveryForm, status: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="pending">Pending</SelectItem>
+                                  <SelectItem value="received">Received</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="del_notes">Notes</Label>
