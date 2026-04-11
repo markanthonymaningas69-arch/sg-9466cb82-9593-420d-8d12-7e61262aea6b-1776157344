@@ -27,7 +27,7 @@ export default function SitePersonnel() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [personnel, setPersonnel] = useState<Personnel[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>("");
-  const [activeTab, setActiveTab] = useState("attendance");
+  const [activeTab, setActiveTab] = useState("manpower");
   
   const todayStr = new Date().toISOString().split("T")[0];
   const [attendanceDate, setAttendanceDate] = useState<string>(todayStr);
@@ -40,7 +40,7 @@ export default function SitePersonnel() {
   const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
   const [isEditMode, setIsEditMode] = useState(false);
   const [enrollDialogOpen, setEnrollDialogOpen] = useState(false);
-  const [editManpowerDialogOpen, setEditManpowerDialogOpen] = useState(false);
+  const [addManpowerDialogOpen, setAddManpowerDialogOpen] = useState(false);
   const [projectPersonnelList, setProjectPersonnelList] = useState<Personnel[]>([]);
   const [isManualRole, setIsManualRole] = useState(false);
   const [enrollForm, setEnrollForm] = useState({
@@ -86,16 +86,17 @@ export default function SitePersonnel() {
 
   useEffect(() => {
     if (selectedProject) {
-      loadDeliveries();
-    }
-  }, [selectedProject, deliveriesDate]);
-
-  useEffect(() => {
-    if (selectedProject) {
+      loadProjectPersonnelList();
       loadScopes();
       loadBomMaterials();
     }
   }, [selectedProject]);
+
+  useEffect(() => {
+    if (selectedProject) {
+      loadDeliveries();
+    }
+  }, [selectedProject, deliveriesDate]);
 
   const loadProjects = async () => {
     const { data } = await projectService.getAll();
@@ -117,19 +118,21 @@ export default function SitePersonnel() {
 
     if (attendanceDate) {
       const { data: projectPersonnel } = await siteService.getProjectPersonnel(selectedProject);
+      setProjectPersonnelList(projectPersonnel || []);
       const { data: attendance } = await siteService.getSiteAttendance(selectedProject, attendanceDate);
 
-      const merged = projectPersonnel.map((p: any) => {
-        const att = attendance.find((a: any) => a.personnel_id === p.id);
+      // Only show personnel who actually have an attendance record for this date
+      const merged = (attendance || []).map((att: any) => {
+        const p = projectPersonnel?.find((p: any) => p.id === att.personnel_id) || {};
         return {
-          personnel_id: p.id,
-          name: p.name,
-          role: p.role,
+          personnel_id: att.personnel_id,
+          name: p.name || "Unknown",
+          role: p.role || "Unknown",
           daily_rate: p.daily_rate || 0,
-          status: att?.status || "present",
-          hours_worked: att?.hours_worked ?? 8,
-          overtime_hours: att?.overtime_hours ?? 0,
-          bom_scope_id: att?.bom_scope_id || null,
+          status: att.status || "present",
+          hours_worked: att.hours_worked ?? 8,
+          overtime_hours: att.overtime_hours ?? 0,
+          bom_scope_id: att.bom_scope_id || null,
         };
       });
       setAttendanceList(merged);
@@ -143,6 +146,34 @@ export default function SitePersonnel() {
       }, {});
       setHistoricalAttendance(grouped);
     }
+  };
+
+  const handleAddWorkerToRollCall = async (personnel_id: string) => {
+    await siteService.upsertAttendance({
+      project_id: selectedProject,
+      personnel_id: personnel_id,
+      date: attendanceDate,
+      status: "present",
+      hours_worked: 8,
+      overtime_hours: 0,
+      bom_scope_id: null
+    });
+    loadAttendanceData();
+  };
+
+  const handleAddAllToRollCall = async () => {
+    const availableToAdd = projectPersonnelList.filter(p => !attendanceList.find(a => a.personnel_id === p.id));
+    await Promise.all(availableToAdd.map(p => siteService.upsertAttendance({
+      project_id: selectedProject,
+      personnel_id: p.id,
+      date: attendanceDate,
+      status: "present",
+      hours_worked: 8,
+      overtime_hours: 0,
+      bom_scope_id: null
+    })));
+    loadAttendanceData();
+    setAddManpowerDialogOpen(false);
   };
 
   const loadDeliveries = async () => {
@@ -197,7 +228,7 @@ export default function SitePersonnel() {
     // Rapid Entry: Do NOT close dialog, just reset form
     setEnrollForm({ name: "", role: "", daily_rate: 0, overtime_rate: 0 });
     setIsManualRole(false);
-    loadAttendanceData();
+    loadProjectPersonnelList();
   };
 
   const handleAttendanceChange = async (personnel_id: string, field: string, value: any) => {
@@ -308,9 +339,13 @@ export default function SitePersonnel() {
 
         {selectedProject && (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="attendance">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="manpower">
                 <Users className="h-4 w-4 mr-2" />
+                Project Manpower
+              </TabsTrigger>
+              <TabsTrigger value="attendance">
+                <ClipboardList className="h-4 w-4 mr-2" />
                 Attendance
               </TabsTrigger>
               <TabsTrigger value="deliveries">
@@ -318,10 +353,205 @@ export default function SitePersonnel() {
                 Deliveries
               </TabsTrigger>
               <TabsTrigger value="scope">
-                <ClipboardList className="h-4 w-4 mr-2" />
-                Scope of Works
+                <Plus className="h-4 w-4 mr-2" />
+                Scope of Work
               </TabsTrigger>
             </TabsList>
+
+            <TabsContent value="manpower">
+              <Card>
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Manpower</CardTitle>
+                      <CardDescription>Master list of enrolled workers for this project</CardDescription>
+                    </div>
+                    <Dialog open={enrollDialogOpen} onOpenChange={setEnrollDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Enroll Manpower
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Enroll New Worker to Project</DialogTitle>
+                        </DialogHeader>
+                        <form onSubmit={handleEnrollSubmit} className="space-y-4">
+                          <div className="space-y-2">
+                            <Label>Full Name</Label>
+                            <Input
+                              required
+                              value={enrollForm.name}
+                              onChange={(e) => setEnrollForm({ ...enrollForm, name: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Position / Role</Label>
+                            {!isManualRole ? (
+                              <Select
+                                value={enrollForm.role}
+                                onValueChange={(val) => {
+                                  if (val === "others") {
+                                    setIsManualRole(true);
+                                    setEnrollForm({ ...enrollForm, role: "" });
+                                  } else {
+                                    setEnrollForm({ ...enrollForm, role: val });
+                                  }
+                                }}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select position" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Mason">Mason</SelectItem>
+                                  <SelectItem value="Carpenter">Carpenter</SelectItem>
+                                  <SelectItem value="Helper">Helper</SelectItem>
+                                  <SelectItem value="Skilled">Skilled</SelectItem>
+                                  <SelectItem value="Welder">Welder</SelectItem>
+                                  <SelectItem value="Plumber">Plumber</SelectItem>
+                                  <SelectItem value="Electrician">Electrician</SelectItem>
+                                  <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <div className="flex gap-2">
+                                <Input
+                                  placeholder="Custom position"
+                                  value={enrollForm.role}
+                                  onChange={(e) => setEnrollForm({ ...enrollForm, role: e.target.value })}
+                                  required
+                                />
+                                <Button type="button" variant="outline" className="px-2" onClick={() => {
+                                  setIsManualRole(false);
+                                  setEnrollForm({ ...enrollForm, role: "" });
+                                }}>
+                                  List
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>Daily Rate (₱)</Label>
+                              <Input
+                                required
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={enrollForm.daily_rate}
+                                onChange={(e) => setEnrollForm({ ...enrollForm, daily_rate: parseFloat(e.target.value) || 0 })}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Overtime Rate (₱/hr)</Label>
+                              <Input
+                                required
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={enrollForm.overtime_rate}
+                                onChange={(e) => setEnrollForm({ ...enrollForm, overtime_rate: parseFloat(e.target.value) || 0 })}
+                              />
+                            </div>
+                          </div>
+                          <div className="flex justify-end gap-2 pt-4">
+                            <Button type="button" variant="outline" onClick={() => setEnrollDialogOpen(false)}>
+                              Done / Close
+                            </Button>
+                            <Button type="submit">Add Worker</Button>
+                          </div>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Position</TableHead>
+                        <TableHead className="w-32">Daily Rate</TableHead>
+                        <TableHead className="w-32">OT Rate</TableHead>
+                        <TableHead className="w-16"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {projectPersonnelList.map(p => (
+                        <TableRow key={p.id}>
+                          <TableCell>
+                            <Input 
+                              value={p.name} 
+                              onChange={e => {
+                                const l = [...projectPersonnelList];
+                                const i = l.findIndex(x => x.id === p.id);
+                                l[i].name = e.target.value;
+                                setProjectPersonnelList(l);
+                              }}
+                              onBlur={e => siteService.updatePersonnel(p.id, { name: e.target.value })}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input 
+                              value={p.role} 
+                              onChange={e => {
+                                const l = [...projectPersonnelList];
+                                const i = l.findIndex(x => x.id === p.id);
+                                l[i].role = e.target.value;
+                                setProjectPersonnelList(l);
+                              }}
+                              onBlur={e => siteService.updatePersonnel(p.id, { role: e.target.value })}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input 
+                              type="number"
+                              value={p.daily_rate} 
+                              onChange={e => {
+                                const l = [...projectPersonnelList];
+                                const i = l.findIndex(x => x.id === p.id);
+                                l[i].daily_rate = parseFloat(e.target.value) || 0;
+                                setProjectPersonnelList(l);
+                              }}
+                              onBlur={e => siteService.updatePersonnel(p.id, { daily_rate: parseFloat(e.target.value) || 0 })}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input 
+                              type="number"
+                              value={p.overtime_rate} 
+                              onChange={e => {
+                                const l = [...projectPersonnelList];
+                                const i = l.findIndex(x => x.id === p.id);
+                                l[i].overtime_rate = parseFloat(e.target.value) || 0;
+                                setProjectPersonnelList(l);
+                              }}
+                              onBlur={e => siteService.updatePersonnel(p.id, { overtime_rate: parseFloat(e.target.value) || 0 })}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="sm" onClick={async () => {
+                              await siteService.deletePersonnel(p.id);
+                              loadProjectPersonnelList();
+                            }}>
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {projectPersonnelList.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                            No manpower enrolled in this project yet.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
             <TabsContent value="attendance">
               <Card>
@@ -355,103 +585,59 @@ export default function SitePersonnel() {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <Dialog open={editManpowerDialogOpen} onOpenChange={(open) => {
-                        setEditManpowerDialogOpen(open);
-                        if (open) loadProjectPersonnelList();
-                        else loadAttendanceData();
-                      }}>
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
                         <DialogTrigger asChild>
-                          <Button variant="outline">
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit Manpower List
+                          <Button>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower
                           </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                           <DialogHeader>
-                            <DialogTitle>Edit Enrolled Manpower</DialogTitle>
+                            <DialogTitle>Add Manpower to {attendanceDate} Roll Call</DialogTitle>
                           </DialogHeader>
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Name</TableHead>
-                                <TableHead>Position</TableHead>
-                                <TableHead className="w-32">Daily Rate</TableHead>
-                                <TableHead className="w-32">OT Rate</TableHead>
-                                <TableHead className="w-16"></TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {projectPersonnelList.map(p => (
-                                <TableRow key={p.id}>
-                                  <TableCell>
-                                    <Input 
-                                      value={p.name} 
-                                      onChange={e => {
-                                        const l = [...projectPersonnelList];
-                                        const i = l.findIndex(x => x.id === p.id);
-                                        l[i].name = e.target.value;
-                                        setProjectPersonnelList(l);
-                                      }}
-                                      onBlur={e => siteService.updatePersonnel(p.id, { name: e.target.value })}
-                                    />
-                                  </TableCell>
-                                  <TableCell>
-                                    <Input 
-                                      value={p.role} 
-                                      onChange={e => {
-                                        const l = [...projectPersonnelList];
-                                        const i = l.findIndex(x => x.id === p.id);
-                                        l[i].role = e.target.value;
-                                        setProjectPersonnelList(l);
-                                      }}
-                                      onBlur={e => siteService.updatePersonnel(p.id, { role: e.target.value })}
-                                    />
-                                  </TableCell>
-                                  <TableCell>
-                                    <Input 
-                                      type="number"
-                                      value={p.daily_rate} 
-                                      onChange={e => {
-                                        const l = [...projectPersonnelList];
-                                        const i = l.findIndex(x => x.id === p.id);
-                                        l[i].daily_rate = parseFloat(e.target.value) || 0;
-                                        setProjectPersonnelList(l);
-                                      }}
-                                      onBlur={e => siteService.updatePersonnel(p.id, { daily_rate: parseFloat(e.target.value) || 0 })}
-                                    />
-                                  </TableCell>
-                                  <TableCell>
-                                    <Input 
-                                      type="number"
-                                      value={p.overtime_rate} 
-                                      onChange={e => {
-                                        const l = [...projectPersonnelList];
-                                        const i = l.findIndex(x => x.id === p.id);
-                                        l[i].overtime_rate = parseFloat(e.target.value) || 0;
-                                        setProjectPersonnelList(l);
-                                      }}
-                                      onBlur={e => siteService.updatePersonnel(p.id, { overtime_rate: parseFloat(e.target.value) || 0 })}
-                                    />
-                                  </TableCell>
-                                  <TableCell>
-                                    <Button variant="ghost" size="sm" onClick={async () => {
-                                      await siteService.deletePersonnel(p.id);
-                                      loadProjectPersonnelList();
-                                    }}>
-                                      <Trash2 className="h-4 w-4 text-red-500" />
-                                    </Button>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                              {projectPersonnelList.length === 0 && (
-                                <TableRow>
-                                  <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">
-                                    No manpower enrolled in this project yet.
-                                  </TableCell>
-                                </TableRow>
-                              )}
-                            </TableBody>
-                          </Table>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList.filter(p => !attendanceList.find(a => a.personnel_id === p.id));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
                         </DialogContent>
                       </Dialog>
 
