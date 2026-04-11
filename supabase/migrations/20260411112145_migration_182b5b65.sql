@@ -1,0 +1,2 @@
+ALTER TABLE site_attendance ADD COLUMN IF NOT EXISTS overtime_hours numeric(5,2) DEFAULT 0;
+ALTER TABLE site_attendance ADD COLUMN IF NOT EXISTS bom_scope_id uuid REFERENCES bom_scope_of_work(id) ON DELETE SET NULL;

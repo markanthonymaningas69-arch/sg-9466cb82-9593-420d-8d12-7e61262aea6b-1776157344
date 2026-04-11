@@ -802,36 +802,49 @@ export type Database = {
       }
       site_attendance: {
         Row: {
+          bom_scope_id: string | null
           created_at: string | null
           date: string
           hours_worked: number | null
           id: string
           notes: string | null
+          overtime_hours: number | null
           personnel_id: string
           project_id: string
           status: string | null
         }
         Insert: {
+          bom_scope_id?: string | null
           created_at?: string | null
           date: string
           hours_worked?: number | null
           id?: string
           notes?: string | null
+          overtime_hours?: number | null
           personnel_id: string
           project_id: string
           status?: string | null
         }
         Update: {
+          bom_scope_id?: string | null
           created_at?: string | null
           date?: string
           hours_worked?: number | null
           id?: string
           notes?: string | null
+          overtime_hours?: number | null
           personnel_id?: string
           project_id?: string
           status?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "site_attendance_bom_scope_id_fkey"
+            columns: ["bom_scope_id"]
+            isOneToOne: false
+            referencedRelation: "bom_scope_of_work"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "site_attendance_personnel_id_fkey"
             columns: ["personnel_id"]

@@ -12,6 +12,33 @@ type ProgressUpdateInsert = Database["public"]["Tables"]["progress_updates"]["In
 
 export const siteService = {
   // Site Attendance Management
+  async getProjectPersonnel(projectId: string) {
+    const { data, error } = await supabase
+      .from("personnel")
+      .select("*")
+      .eq("project_id", projectId)
+      .order("name");
+    return { data: data || [], error };
+  },
+
+  async enrollPersonnel(personnel: any) {
+    const { data, error } = await supabase
+      .from("personnel")
+      .insert(personnel)
+      .select()
+      .single();
+    return { data, error };
+  },
+
+  async upsertAttendance(attendance: any) {
+    const { data, error } = await supabase
+      .from("site_attendance")
+      .upsert(attendance, { onConflict: 'project_id, personnel_id, date' })
+      .select()
+      .single();
+    return { data, error };
+  },
+
   async getSiteAttendance(projectId: string, date?: string) {
     let query = supabase
       .from("site_attendance")

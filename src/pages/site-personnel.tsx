@@ -10,14 +10,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { siteService } from "@/services/siteService";
 import { projectService } from "@/services/projectService";
 import { personnelService } from "@/services/personnelService";
 import { Plus, Pencil, Trash2, Users, Truck, ClipboardList, ArrowUp, ArrowDown } from "lucide-react";
 
 type Project = { id: string; name: string; location: string; status: string };
-type Personnel = { id: string; name: string; role: string };
-type SiteAttendance = { id: string; personnel_id: string; project_id: string; date: string; status: string; hours_worked: number; notes: string; personnel?: { name: string; role: string } };
+type Personnel = { id: string; name: string; role: string; hourly_rate: number };
+type SiteAttendance = { id: string; personnel_id: string; project_id: string; date: string; status: string; hours_worked: number; overtime_hours?: number; bom_scope_id?: string; notes: string; personnel?: { name: string; role: string } };
+type AttendanceRow = { personnel_id: string; name: string; role: string; hourly_rate: number; status: string; hours_worked: number; overtime_hours: number; bom_scope_id: string | null };
 type Delivery = { id: string; project_id: string; delivery_date: string; item_name: string; quantity: number; unit: string; supplier: string; received_by: string; status: string; notes: string; receipt_number?: string };
 type ScopeOfWork = { id: string; name: string; description?: string; order_number: number; completion_percentage?: number; status?: string; bom_id: string };
 
@@ -28,16 +30,13 @@ export default function SitePersonnel() {
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split("T")[0]);
   const [activeTab, setActiveTab] = useState("attendance");
   
-  // Site Attendance
-  const [attendance, setAttendance] = useState<SiteAttendance[]>([]);
-  const [attendanceDialogOpen, setAttendanceDialogOpen] = useState(false);
-  const [attendanceForm, setAttendanceForm] = useState({
-    personnel_id: "",
-    project_id: "",
-    date: new Date().toISOString().split("T")[0],
-    status: "present",
-    hours_worked: 8,
-    notes: ""
+  // Site Attendance (Roll Call)
+  const [attendanceList, setAttendanceList] = useState<AttendanceRow[]>([]);
+  const [enrollDialogOpen, setEnrollDialogOpen] = useState(false);
+  const [enrollForm, setEnrollForm] = useState({
+    name: "",
+    role: "",
+    hourly_rate: 0
   });
 
   // Deliveries
@@ -70,7 +69,7 @@ export default function SitePersonnel() {
 
   useEffect(() => {
     if (selectedProject) {
-      loadAttendance();
+      loadAttendanceData();
       loadDeliveries();
       loadScopes();
       loadBomMaterials();
@@ -83,14 +82,28 @@ export default function SitePersonnel() {
   };
 
   const loadPersonnel = async () => {
-    const { data } = await personnelService.getAll();
-    setPersonnel(data || []);
+    // Only needed globally if you want, but we rely on project specific personnel now
   };
 
-  const loadAttendance = async () => {
+  const loadAttendanceData = async () => {
     if (!selectedProject) return;
-    const { data } = await siteService.getSiteAttendance(selectedProject, selectedDate);
-    setAttendance(data || []);
+    const { data: projectPersonnel } = await siteService.getProjectPersonnel(selectedProject);
+    const { data: attendance } = await siteService.getSiteAttendance(selectedProject, selectedDate);
+
+    const merged = projectPersonnel.map((p: any) => {
+      const att = attendance.find((a: any) => a.personnel_id === p.id);
+      return {
+        personnel_id: p.id,
+        name: p.name,
+        role: p.role,
+        hourly_rate: p.hourly_rate || 0,
+        status: att?.status || "present",
+        hours_worked: att?.hours_worked ?? 8,
+        overtime_hours: att?.overtime_hours ?? 0,
+        bom_scope_id: att?.bom_scope_id || null,
+      };
+    });
+    setAttendanceList(merged);
   };
 
   const loadDeliveries = async () => {
@@ -129,15 +142,50 @@ export default function SitePersonnel() {
     loadScopes();
   };
 
-  const handleAttendanceSubmit = async (e: React.FormEvent) => {
+  const handleEnrollSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await siteService.markAttendance({
-      ...attendanceForm,
-      project_id: selectedProject
+    await siteService.enrollPersonnel({
+      project_id: selectedProject,
+      name: enrollForm.name,
+      role: enrollForm.role,
+      hourly_rate: enrollForm.hourly_rate,
+      status: "active",
+      hire_date: new Date().toISOString().split("T")[0],
+      email: `${enrollForm.name.replace(/\s+/g, '').toLowerCase()}${Date.now()}@example.com`
     });
-    setAttendanceDialogOpen(false);
-    resetAttendanceForm();
-    loadAttendance();
+    setEnrollDialogOpen(false);
+    setEnrollForm({ name: "", role: "", hourly_rate: 0 });
+    loadAttendanceData();
+  };
+
+  const handleAttendanceChange = async (personnel_id: string, field: string, value: any) => {
+    const list = [...attendanceList];
+    const idx = list.findIndex(r => r.personnel_id === personnel_id);
+    if (idx === -1) return;
+
+    const newRow = { ...list[idx], [field]: value };
+    
+    // Auto-adjust hours based on presence
+    if (field === "status" && value === "absent") {
+      newRow.hours_worked = 0;
+      newRow.overtime_hours = 0;
+      newRow.bom_scope_id = null;
+    } else if (field === "status" && value === "present") {
+      newRow.hours_worked = 8;
+    }
+
+    list[idx] = newRow;
+    setAttendanceList(list);
+
+    await siteService.upsertAttendance({
+      project_id: selectedProject,
+      personnel_id: personnel_id,
+      date: selectedDate,
+      status: newRow.status,
+      hours_worked: newRow.hours_worked,
+      overtime_hours: newRow.overtime_hours,
+      bom_scope_id: newRow.bom_scope_id
+    });
   };
 
   const handleDeliverySubmit = async (e: React.FormEvent) => {
@@ -258,79 +306,54 @@ export default function SitePersonnel() {
                 <CardHeader>
                   <div className="flex justify-between items-center">
                     <div>
-                      <CardTitle>Daily Attendance</CardTitle>
-                      <CardDescription>Track worker attendance for {selectedDate}</CardDescription>
+                      <CardTitle>Daily Roll Call & Assignment</CardTitle>
+                      <CardDescription>Manage presence, overtime, and tasks for {selectedDate}</CardDescription>
                     </div>
-                    <Dialog open={attendanceDialogOpen} onOpenChange={setAttendanceDialogOpen}>
+                    <Dialog open={enrollDialogOpen} onOpenChange={setEnrollDialogOpen}>
                       <DialogTrigger asChild>
                         <Button>
                           <Plus className="h-4 w-4 mr-2" />
-                          Mark Attendance
+                          Enroll Manpower
                         </Button>
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
-                          <DialogTitle>Mark Attendance</DialogTitle>
+                          <DialogTitle>Enroll New Worker to Project</DialogTitle>
                         </DialogHeader>
-                        <form onSubmit={handleAttendanceSubmit} className="space-y-4">
+                        <form onSubmit={handleEnrollSubmit} className="space-y-4">
                           <div className="space-y-2">
-                            <Label htmlFor="personnel">Personnel</Label>
-                            <Select 
-                              value={attendanceForm.personnel_id} 
-                              onValueChange={(value) => setAttendanceForm({ ...attendanceForm, personnel_id: value })}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select worker" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {personnel.map((p) => (
-                                  <SelectItem key={p.id} value={p.id}>
-                                    {p.name} - {p.role}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="status">Status</Label>
-                            <Select 
-                              value={attendanceForm.status} 
-                              onValueChange={(value) => setAttendanceForm({ ...attendanceForm, status: value })}
-                            >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="present">Present</SelectItem>
-                                <SelectItem value="absent">Absent</SelectItem>
-                                <SelectItem value="late">Late</SelectItem>
-                                <SelectItem value="half_day">Half Day</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="hours">Hours Worked</Label>
+                            <Label>Full Name</Label>
                             <Input
-                              id="hours"
-                              type="number"
-                              step="0.5"
-                              value={attendanceForm.hours_worked}
-                              onChange={(e) => setAttendanceForm({ ...attendanceForm, hours_worked: parseFloat(e.target.value) })}
+                              required
+                              value={enrollForm.name}
+                              onChange={(e) => setEnrollForm({ ...enrollForm, name: e.target.value })}
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="notes">Notes</Label>
-                            <Textarea
-                              id="notes"
-                              value={attendanceForm.notes}
-                              onChange={(e) => setAttendanceForm({ ...attendanceForm, notes: e.target.value })}
+                            <Label>Position / Role</Label>
+                            <Input
+                              required
+                              value={enrollForm.role}
+                              onChange={(e) => setEnrollForm({ ...enrollForm, role: e.target.value })}
+                              placeholder="e.g., Mason, Carpenter, Laborer"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Hourly Rate (₱)</Label>
+                            <Input
+                              required
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={enrollForm.hourly_rate}
+                              onChange={(e) => setEnrollForm({ ...enrollForm, hourly_rate: parseFloat(e.target.value) || 0 })}
                             />
                           </div>
                           <div className="flex justify-end gap-2 pt-4">
-                            <Button type="button" variant="outline" onClick={() => setAttendanceDialogOpen(false)}>
+                            <Button type="button" variant="outline" onClick={() => setEnrollDialogOpen(false)}>
                               Cancel
                             </Button>
-                            <Button type="submit">Save</Button>
+                            <Button type="submit">Enroll Worker</Button>
                           </div>
                         </form>
                       </DialogContent>
@@ -342,30 +365,72 @@ export default function SitePersonnel() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Worker</TableHead>
-                        <TableHead>Role</TableHead>
+                        <TableHead>Position</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Hours</TableHead>
-                        <TableHead>Notes</TableHead>
-                        <TableHead>Actions</TableHead>
+                        <TableHead className="w-32 text-center">Overtime (Hrs)</TableHead>
+                        <TableHead className="w-[250px]">Scope Assignment</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {attendance.map((record) => (
-                        <TableRow key={record.id}>
-                          <TableCell className="font-medium">{record.personnel?.name}</TableCell>
-                          <TableCell>{record.personnel?.role}</TableCell>
-                          <TableCell>{getStatusBadge(record.status)}</TableCell>
-                          <TableCell>{record.hours_worked}</TableCell>
-                          <TableCell>{record.notes}</TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              <Button size="sm" variant="ghost" onClick={() => siteService.deleteAttendance(record.id).then(loadAttendance)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
+                      {attendanceList.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                            No manpower enrolled. Click "Enroll Manpower" to add workers to this project.
                           </TableCell>
                         </TableRow>
-                      ))}
+                      ) : (
+                        attendanceList.map((row) => (
+                          <TableRow key={row.personnel_id} className={row.status === "absent" ? "bg-muted/50 opacity-75" : ""}>
+                            <TableCell className="font-medium">{row.name}</TableCell>
+                            <TableCell>{row.role}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <Switch
+                                  checked={row.status === "present"}
+                                  onCheckedChange={(checked) => handleAttendanceChange(row.personnel_id, "status", checked ? "present" : "absent")}
+                                />
+                                <span className={`text-sm font-semibold ${row.status === "present" ? "text-green-600" : "text-red-500"}`}>
+                                  {row.status === "present" ? "Present" : "Absent"}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.5"
+                                className="w-20 mx-auto text-center"
+                                value={row.overtime_hours}
+                                disabled={row.status === "absent"}
+                                onChange={(e) => {
+                                  const list = [...attendanceList];
+                                  const idx = list.findIndex(l => l.personnel_id === row.personnel_id);
+                                  list[idx].overtime_hours = parseFloat(e.target.value) || 0;
+                                  setAttendanceList(list);
+                                }}
+                                onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Select
+                                value={row.bom_scope_id || "unassigned"}
+                                disabled={row.status === "absent"}
+                                onValueChange={(val) => handleAttendanceChange(row.personnel_id, "bom_scope_id", val === "unassigned" ? null : val)}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Assign task..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="unassigned" className="text-muted-foreground italic">Unassigned</SelectItem>
+                                  {scopes.map((s) => (
+                                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
                     </TableBody>
                   </Table>
                 </CardContent>
