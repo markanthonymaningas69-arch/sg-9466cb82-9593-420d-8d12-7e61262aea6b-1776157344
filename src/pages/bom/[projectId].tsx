@@ -197,29 +197,87 @@ export default function BillOfMaterials() {
     return total;
   };
 
-  const handleAddOrUpdateIndirect = () => {
+  const saveIndirectCostsToDB = async (newList: UnifiedIndirectCost[]) => {
+    if (!bom) return;
+
+    let vat = 0, tax = 0, ocm = 0, profit = 0;
+    const other_costs: any[] = [];
+    
+    const directCost = calculateTotalDirectCost();
+    let totalIndirect = 0;
+
+    newList.forEach(c => {
+      const val = parseFloat(c.value.replace(/,/g, "") || "0");
+      if (['VAT', 'Tax', 'OCM', 'Profit'].includes(c.type)) {
+        totalIndirect += directCost * (val / 100);
+      } else {
+        totalIndirect += val;
+      }
+
+      if (c.type === 'VAT') vat += val;
+      else if (c.type === 'Tax') tax += val;
+      else if (c.type === 'OCM') ocm += val;
+      else if (c.type === 'Profit') profit += val;
+      else if (c.type === 'Others') other_costs.push({ id: c.id, description: c.description, amount: val });
+    });
+
+    const indirectData: Database["public"]["Tables"]["bom_indirect_costs"]["Insert"] = {
+      bom_id: bom.id,
+      vat_percentage: vat,
+      tax_percentage: tax,
+      ocm_percentage: ocm,
+      profit_percentage: profit,
+      other_costs: other_costs as any,
+      total_indirect: totalIndirect
+    };
+
+    if (indirectCosts.length > 0) {
+      await bomService.updateIndirectCost(indirectCosts[0].id as string, indirectData);
+    } else {
+      await bomService.createIndirectCost(indirectData);
+    }
+
+    await bomService.update(bom.id as string, {
+      total_direct_cost: directCost,
+      total_indirect_cost: totalIndirect,
+      grand_total: directCost + totalIndirect
+    });
+
+    if (bom.project_id) {
+      await loadData(bom.project_id as string);
+    }
+  };
+
+  const handleAddOrUpdateIndirect = async () => {
     const val = parseFloat(indirectRowForm.value.replace(/,/g, "") || "0");
-    if (val <= 0) {
+    if (val <= 0 && indirectRowForm.type !== 'Others') {
       alert("Please enter a valid amount or percentage.");
       return;
     }
 
     const rowToSave = { ...indirectRowForm, description: indirectRowForm.type === 'Others' ? 'Others' : indirectRowForm.description };
 
+    let newList;
     if (indirectRowForm.id) {
-      setIndirectCostsList(prev => prev.map(c => c.id === indirectRowForm.id ? rowToSave : c));
+      newList = indirectCostsList.map(c => c.id === indirectRowForm.id ? rowToSave : c);
     } else {
-      setIndirectCostsList(prev => [...prev, { ...rowToSave, id: Math.random().toString(36).substr(2, 9) }]);
+      newList = [...indirectCostsList, { ...rowToSave, id: Math.random().toString(36).substr(2, 9) }];
     }
+    
+    setIndirectCostsList(newList);
     setIndirectRowForm({ id: '', type: 'VAT', description: '', value: '' });
+    
+    await saveIndirectCostsToDB(newList);
   };
 
   const handleEditIndirect = (cost: UnifiedIndirectCost) => {
     setIndirectRowForm(cost);
   };
 
-  const handleDeleteIndirect = (id: string) => {
-    setIndirectCostsList(prev => prev.filter(c => c.id !== id));
+  const handleDeleteIndirect = async (id: string) => {
+    const newList = indirectCostsList.filter(c => c.id !== id);
+    setIndirectCostsList(newList);
+    await saveIndirectCostsToDB(newList);
   };
 
   const calculateGrandTotal = (): number => {
@@ -252,19 +310,6 @@ export default function BillOfMaterials() {
       newScopes[index] = newScopes[index + 1];
       newScopes[index + 1] = temp;
       setScopes(newScopes);
-    }
-  };
-
-  const handleSaveOrder = async () => {
-    const updates = scopes.map((s, idx) => ({ id: s.id as string, order_number: idx + 1 }));
-    const { error } = await bomService.updateScopeOrder(updates);
-    if (error) {
-      alert("Error saving order: " + error.message);
-      return;
-    }
-    setReorderMode(false);
-    if (bom?.project_id) {
-      await loadData(bom.project_id as string);
     }
   };
 
@@ -571,92 +616,6 @@ export default function BillOfMaterials() {
     }
     resetLaborForm();
     if (bom?.project_id) {
-      await loadData(bom.project_id as string);
-    }
-  };
-
-  const handleSaveIndirectCosts = async () => {
-    if (!bom) return;
-
-    let vat = 0, tax = 0, ocm = 0, profit = 0;
-    const other_costs: any[] = [];
-    indirectCostsList.forEach(c => {
-      const val = parseFloat(c.value.replace(/,/g, "") || "0");
-      if (c.type === 'VAT') vat += val;
-      else if (c.type === 'Tax') tax += val;
-      else if (c.type === 'OCM') ocm += val;
-      else if (c.type === 'Profit') profit += val;
-      else if (c.type === 'Others') other_costs.push({ id: c.id, description: c.description, amount: val });
-    });
-
-    const indirectData: Database["public"]["Tables"]["bom_indirect_costs"]["Insert"] = {
-      bom_id: bom.id,
-      vat_percentage: vat,
-      tax_percentage: tax,
-      ocm_percentage: ocm,
-      profit_percentage: profit,
-      other_costs: other_costs as any,
-      total_indirect: calculateIndirectCost()
-    };
-
-    if (indirectCosts.length > 0) {
-      await bomService.updateIndirectCost(indirectCosts[0].id as string, indirectData);
-    } else {
-      await bomService.createIndirectCost(indirectData);
-    }
-
-    await bomService.update(bom.id as string, {
-      total_direct_cost: calculateTotalDirectCost(),
-      total_indirect_cost: calculateIndirectCost(),
-      grand_total: calculateGrandTotal()
-    });
-
-    if (bom.project_id) {
-      await loadData(bom.project_id as string);
-    }
-  };
-
-  const handleSaveBOM = async () => {
-    if (!bom) return;
-    setSaving(true);
-
-    await bomService.update(bom.id as string, {
-      total_direct_cost: calculateTotalDirectCost(),
-      total_indirect_cost: calculateIndirectCost(),
-      grand_total: calculateGrandTotal()
-    });
-
-    if (showIndirectCosts) {
-      let vat = 0, tax = 0, ocm = 0, profit = 0;
-      const other_costs: any[] = [];
-      indirectCostsList.forEach(c => {
-        const val = parseFloat(c.value.replace(/,/g, "") || "0");
-        if (c.type === 'VAT') vat += val;
-        else if (c.type === 'Tax') tax += val;
-        else if (c.type === 'OCM') ocm += val;
-        else if (c.type === 'Profit') profit += val;
-        else if (c.type === 'Others') other_costs.push({ id: c.id, description: c.description, amount: val });
-      });
-
-      const indirectData: Database["public"]["Tables"]["bom_indirect_costs"]["Insert"] = {
-        bom_id: bom.id,
-        vat_percentage: vat,
-        tax_percentage: tax,
-        ocm_percentage: ocm,
-        profit_percentage: profit,
-        other_costs: other_costs as any,
-        total_indirect: calculateIndirectCost()
-      };
-
-      if (indirectCosts.length > 0) {
-        await bomService.updateIndirectCost(indirectCosts[0].id as string, indirectData);
-      } else {
-        await bomService.createIndirectCost(indirectData);
-      }
-    }
-
-    setSaving(false);
-    if (bom.project_id) {
       await loadData(bom.project_id as string);
     }
   };
@@ -1415,7 +1374,7 @@ export default function BillOfMaterials() {
                           <Button variant="ghost" size="icon" className="h-6 w-6 text-green-600 hover:text-green-700" onClick={() => handleEditIndirect(cost)}>
                             <Pencil className="w-3 h-3" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-red-600 hover:text-red-700" onClick={() => handleDeleteIndirect(cost.id)}>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-red-600 hover:text-red-700" onClick={() => void handleDeleteIndirect(cost.id)}>
                             <Trash2 className="w-3 h-3" />
                           </Button>
                         </div>
@@ -1462,7 +1421,7 @@ export default function BillOfMaterials() {
                     </TableCell>
                     <TableCell className="text-right py-1">
                       <div className="flex justify-end gap-1 items-center">
-                        <Button size="sm" className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={handleAddOrUpdateIndirect}>
+                        <Button size="sm" className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={() => void handleAddOrUpdateIndirect()}>
                             {indirectRowForm.id ? 'Update' : 'Add'}
                         </Button>
                         {indirectRowForm.id && (
