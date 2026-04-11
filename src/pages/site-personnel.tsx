@@ -123,12 +123,12 @@ export default function SitePersonnel() {
 
       // Only show personnel who actually have an attendance record for this date
       const merged = (attendance || []).map((att: any) => {
-        const p = projectPersonnel?.find((p: any) => p.id === att.personnel_id) || {};
+        const p = projectPersonnel?.find((p: any) => p.id === att.personnel_id);
         return {
           personnel_id: att.personnel_id,
-          name: p.name || "Unknown",
-          role: p.role || "Unknown",
-          daily_rate: p.daily_rate || 0,
+          name: p?.name || "Unknown",
+          role: p?.role || "Unknown",
+          daily_rate: p?.daily_rate || 0,
           status: att.status || "present",
           hours_worked: att.hours_worked ?? 8,
           overtime_hours: att.overtime_hours ?? 0,
