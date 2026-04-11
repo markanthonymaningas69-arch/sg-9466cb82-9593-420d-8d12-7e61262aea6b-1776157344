@@ -24,7 +24,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useSettings } from "@/contexts/SettingsProvider";
 import { bomService } from "@/services/bomService";
 import { projectService } from "@/services/projectService";
-import { Plus, Pencil, Trash2, ArrowLeft, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Pencil, Trash2, ArrowLeft, ArrowUp, ArrowDown, FileDown } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
 type BOM = Database["public"]["Tables"]["bill_of_materials"]["Row"];
@@ -55,6 +55,7 @@ export default function BillOfMaterials() {
   const [indirectDialogOpen, setIndirectDialogOpen] = useState(false);
   const [indirectCollapsed, setIndirectCollapsed] = useState(false);
   const [reorderMode, setReorderMode] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const [showScopeInput, setShowScopeInput] = useState(false);
   const [newScopeName, setNewScopeName] = useState("");
@@ -380,6 +381,37 @@ export default function BillOfMaterials() {
       handleHideAllScopes();
     }
     setReorderMode(!reorderMode);
+  };
+
+  const handleExportPDF = async () => {
+    setIsExporting(true);
+    const previousCollapsed = { ...collapsedScopes };
+    setCollapsedScopes({});
+    setIndirectCollapsed(false);
+
+    setTimeout(async () => {
+      try {
+        const element = document.getElementById("bom-export-area");
+        if (!element) return;
+        
+        const html2pdf = (await import("html2pdf.js")).default;
+        const opt = {
+          margin:       0.4,
+          filename:     `${bom?.bom_number || 'BOM'}-${project?.name || 'Project'}.pdf`,
+          image:        { type: 'jpeg', quality: 0.98 },
+          html2canvas:  { scale: 2, useCORS: true },
+          jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+        };
+        
+        await html2pdf().from(element).set(opt).save();
+      } catch (err) {
+        console.error("PDF Export error:", err);
+        alert("Failed to export PDF");
+      } finally {
+        setIsExporting(false);
+        setCollapsedScopes(previousCollapsed);
+      }
+    }, 500);
   };
 
   const moveScope = (index: number, direction: 'up' | 'down') => {
@@ -731,50 +763,68 @@ export default function BillOfMaterials() {
   return (
     <Layout>
       <div className="space-y-4">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" onClick={() => router.push("/projects")}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-heading font-bold">Bill of Materials</h1>
-            <p className="text-muted-foreground mt-1">{project?.name}</p>
+        <div className="flex justify-between items-center w-full">
+          <div className="flex items-center gap-4">
+            <Button variant="outline" size="icon" onClick={() => router.push("/projects")}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div>
+              <h1 className="text-3xl font-heading font-bold">Bill of Materials</h1>
+              <p className="text-muted-foreground mt-1">{project?.name}</p>
+            </div>
           </div>
+          <Button 
+            onClick={handleExportPDF} 
+            disabled={isExporting || scopes.length === 0} 
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            <FileDown className="h-4 w-4 mr-2" />
+            {isExporting ? "Preparing PDF..." : "Export PDF"}
+          </Button>
         </div>
 
-        {scopes.length === 0 ?
-        <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2">
-                <Input
-                placeholder="Enter the scope name"
-                value={newScopeName}
-                onChange={(e) => setNewScopeName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    void handleSaveScopeInline();
-                  }
-                }}
-                autoFocus
-                className="flex-1" />
-              
-              </div>
-              <div className="flex justify-end mt-3">
-                <Button
-                size="sm"
-                onClick={() => void handleSaveScopeInline()}
-                disabled={!newScopeName.trim()}
-                className="bg-green-600 hover:bg-green-700 text-white">
+        <style dangerouslySetInnerHTML={{__html: `
+          .pdf-export-mode .hide-on-export { display: none !important; }
+          .pdf-export-mode button { display: none !important; }
+          .pdf-export-mode input { border: none !important; background: transparent !important; box-shadow: none !important; padding: 0 !important; }
+          .pdf-export-mode select { border: none !important; background: transparent !important; box-shadow: none !important; appearance: none !important; padding: 0 !important; }
+        `}} />
+
+        <div id="bom-export-area" className={`space-y-4 ${isExporting ? "pdf-export-mode" : ""}`}>
+          {scopes.length === 0 ?
+          <Card>
+              <CardContent className="pt-4">
+                <div className="flex items-center gap-2">
+                  <Input
+                  placeholder="Enter the scope name"
+                  value={newScopeName}
+                  onChange={(e) => setNewScopeName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      void handleSaveScopeInline();
+                    }
+                  }}
+                  autoFocus
+                  className="flex-1" />
                 
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Scope of Work
-                </Button>
-              </div>
-            </CardContent>
-          </Card> :
+                </div>
+                <div className="flex justify-end mt-3">
+                  <Button
+                  size="sm"
+                  onClick={() => void handleSaveScopeInline()}
+                  disabled={!newScopeName.trim()}
+                  className="bg-green-600 hover:bg-green-700 text-white">
+                  
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Scope of Work
+                  </Button>
+                </div>
+              </CardContent>
+            </Card> :
 
         <>
             {!showScopeInput ?
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 hide-on-export">
                 <Button
                   size="sm"
                   variant="outline"
@@ -1000,7 +1050,7 @@ export default function BillOfMaterials() {
                         <TableHead className="w-40 h-8 py-1">Unit</TableHead>
                         <TableHead className="w-48 text-right h-8 py-1">Unit Cost</TableHead>
                         <TableHead className="w-32 text-right h-8 py-1">Amount</TableHead>
-                        <TableHead className="w-28 text-right h-8 py-1" />
+                        <TableHead className="w-28 text-right h-8 py-1 hide-on-export" />
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1027,7 +1077,7 @@ export default function BillOfMaterials() {
                         return formatCurrency(total);
                       })()}
                           </TableCell>
-                          <TableCell className="text-right py-1">
+                          <TableCell className="text-right py-1 hide-on-export">
                             <div className="flex justify-end gap-1">
                               <Button
                           size="icon"
@@ -1124,7 +1174,7 @@ export default function BillOfMaterials() {
                             ...materialForm,
                             unit: e.target.value
                           })
-                          } />
+                        } />
 
                         }
                             </div>
@@ -1159,7 +1209,7 @@ export default function BillOfMaterials() {
                         return formatCurrency(amount);
                       })()}
                           </TableCell>
-                          <TableCell className="text-right py-1">
+                          <TableCell className="text-right py-1 hide-on-export">
                             <div className="flex justify-end items-center gap-1">
                               <Button
                           size="sm"
@@ -1450,7 +1500,7 @@ export default function BillOfMaterials() {
                     <TableHead className="h-8 py-1 w-32">Type</TableHead>
                     <TableHead className="text-right h-8 py-1 w-32">Value</TableHead>
                     <TableHead className="text-right h-8 py-1 w-32">Amount</TableHead>
-                    <TableHead className="text-right h-8 py-1 w-24"></TableHead>
+                    <TableHead className="text-right h-8 py-1 w-24 hide-on-export"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1460,14 +1510,14 @@ export default function BillOfMaterials() {
                       <TableCell className="text-right py-1 text-sm">
                         {cost.type !== 'Others' ? `${cost.value}%` : formatCurrency(parseFloat(cost.value.replace(/,/g, "") || "0"))}
                       </TableCell>
-                      <TableCell className="text-right font-semibold py-1 text-sm text-muted-foreground">
+                      <TableCell className="text-right font-semibold py-1 text-sm">
                         {formatCurrency(
                           ['VAT', 'OCM', 'Profit', 'Tax'].includes(cost.type)
                           ? calculateTotalDirectCost() * (parseFloat(cost.value.replace(/,/g, "") || "0") / 100)
                           : parseFloat(cost.value.replace(/,/g, "") || "0")
                         )}
                       </TableCell>
-                      <TableCell className="text-right py-1">
+                      <TableCell className="text-right py-1 hide-on-export">
                         <div className="flex justify-end gap-1 items-center">
                           <Button variant="ghost" size="icon" className="h-6 w-6 text-green-600 hover:text-green-700" onClick={() => handleEditIndirect(cost)}>
                             <Pencil className="w-3 h-3" />
@@ -1517,7 +1567,7 @@ export default function BillOfMaterials() {
                           : parseFloat(indirectRowForm.value.replace(/,/g, "") || "0")
                         )}
                     </TableCell>
-                    <TableCell className="text-right py-1">
+                    <TableCell className="text-right py-1 hide-on-export">
                       <div className="flex justify-end gap-1">
                         <Button size="sm" className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={() => void handleAddOrUpdateIndirect()}>
                             {indirectRowForm.id ? 'Update' : 'Add'}

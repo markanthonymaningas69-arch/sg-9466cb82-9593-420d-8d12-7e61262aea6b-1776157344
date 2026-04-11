@@ -261,7 +261,7 @@ export default function Projects() {
                       <div className="flex justify-end gap-2 items-center">
                         <Button 
                           size="sm" 
-                          className="bg-blue-600 hover:bg-blue-700 text-white h-8" 
+                          className="bg-green-600 hover:bg-green-700 text-white h-8" 
                           onClick={() => handleBOM(project.id)}
                         >
                           <FileText className="h-3.5 w-3.5 mr-1" /> Add/Edit BOM
