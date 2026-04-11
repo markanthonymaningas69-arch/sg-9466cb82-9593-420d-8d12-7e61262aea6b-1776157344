@@ -116,6 +116,60 @@ export default function BillOfMaterials() {
     }
   }, [projectId]);
 
+  // Auto-sync BOM totals and Project Contract Amount
+  useEffect(() => {
+    if (loading || !project || !bom) return;
+
+    const directCost = scopes.reduce((sum, scope) => {
+      const matTotal = (scope.bom_materials || []).reduce((mSum, m) => {
+        const qty = typeof m.quantity === "number" && Number.isFinite(m.quantity) ? m.quantity : 0;
+        const cost = typeof m.unit_cost === "number" && Number.isFinite(m.unit_cost) ? m.unit_cost : 0;
+        return mSum + (m.total_cost != null ? m.total_cost : qty * cost);
+      }, 0);
+      
+      const labTotal = (scope.bom_labor || []).reduce((lSum, l) => {
+        const lTotal = l.total_cost ?? ((l.hours as number || 0) * (l.hourly_rate as number || 0));
+        return lSum + (typeof lTotal === "number" && Number.isFinite(lTotal) ? lTotal : 0);
+      }, 0);
+      
+      return sum + matTotal + labTotal;
+    }, 0);
+
+    let indirectCost = 0;
+    indirectCostsList.forEach(c => {
+      const val = parseFloat(c.value.replace(/,/g, "") || "0");
+      if (['VAT', 'Tax', 'OCM', 'Profit'].includes(c.type)) {
+        indirectCost += directCost * (val / 100);
+      } else {
+        indirectCost += val;
+      }
+    });
+
+    const grandTotal = directCost + indirectCost;
+
+    const syncToDB = async () => {
+      const bomNeedsUpdate = Math.abs((bom.grand_total || 0) - grandTotal) > 0.01 || 
+                             Math.abs((bom.total_direct_cost || 0) - directCost) > 0.01;
+      const projectNeedsUpdate = Math.abs((project.budget || 0) - grandTotal) > 0.01;
+
+      if (bomNeedsUpdate) {
+        await bomService.update(bom.id as string, {
+          total_direct_cost: directCost,
+          total_indirect_cost: indirectCost,
+          grand_total: grandTotal
+        });
+        setBom(prev => prev ? { ...prev, total_direct_cost: directCost, total_indirect_cost: indirectCost, grand_total: grandTotal } : prev);
+      }
+
+      if (projectNeedsUpdate) {
+        await projectService.update(project.id as string, { budget: grandTotal });
+        setProject(prev => prev ? { ...prev, budget: grandTotal } : prev);
+      }
+    };
+
+    void syncToDB();
+  }, [scopes, indirectCostsList, bom, project, loading]);
+
   const loadData = async (id: string) => {
     setLoading(true);
 
