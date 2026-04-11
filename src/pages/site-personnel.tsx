@@ -18,8 +18,8 @@ import { Plus, Pencil, Trash2, Users, Truck, ClipboardList, ArrowUp, ArrowDown, 
 
 type Project = { id: string; name: string; location: string; status: string };
 type Personnel = { id: string; name: string; role: string; daily_rate: number; overtime_rate: number };
-type SiteAttendance = { id: string; personnel_id: string; project_id: string; date: string; status: string; hours_worked: number; overtime_hours?: number; bom_scope_id?: string; notes: string; personnel?: { name: string; role: string } };
-type AttendanceRow = { personnel_id: string; name: string; role: string; daily_rate: number; status: string; hours_worked: number; overtime_hours: number; bom_scope_id: string | null };
+type SiteAttendance = { id: string; personnel_id: string; project_id: string; date: string; status: string; hours_worked: number; overtime_hours?: number; bom_scope_id?: string; notes: string; personnel?: { name: string; role: string; daily_rate: number; overtime_rate: number } };
+type AttendanceRow = { personnel_id: string; name: string; role: string; daily_rate: number; overtime_rate: number; status: string; hours_worked: number; overtime_hours: number; bom_scope_id: string | null };
 type Delivery = { id: string; project_id: string; delivery_date: string; item_name: string; quantity: number; unit: string; supplier: string; received_by: string; status: string; notes: string; receipt_number?: string };
 type ScopeOfWork = { id: string; name: string; description?: string; order_number: number; completion_percentage?: number; status?: string; bom_id: string };
 
@@ -133,6 +133,7 @@ export default function SitePersonnel() {
           name: p?.name || "Unknown",
           role: p?.role || "Unknown",
           daily_rate: p?.daily_rate || 0,
+          overtime_rate: p?.overtime_rate || 0,
           status: att.status || "present",
           hours_worked: att.hours_worked ?? 8,
           overtime_hours: att.overtime_hours ?? 0,
@@ -761,97 +762,145 @@ export default function SitePersonnel() {
                 <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
                   {attendanceDate ? (
                     <div className="flex flex-col flex-1 overflow-hidden space-y-4">
-                      {attendanceList.length > 0 && (
-                        <div className="flex justify-end shrink-0">
-                          {!isEditMode ? (
-                            <Button variant="outline" onClick={() => setIsEditMode(true)}>
-                              <Pencil className="h-4 w-4 mr-2" />
-                              Edit Roll Call
-                            </Button>
-                          ) : (
-                            <Button onClick={() => setIsEditMode(false)}>
-                              <Check className="h-4 w-4 mr-2" />
-                              Done Editing
-                            </Button>
-                          )}
-                        </div>
-                      )}
+                      {attendanceList.length > 0 && (() => {
+                        const presentWorkers = attendanceList.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked || 0;
+                          const oth = r.overtime_hours || 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: ₱{totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button variant="outline" onClick={() => setIsEditMode(true)}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button onClick={() => setIsEditMode(false)}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
                       <div className="overflow-y-auto h-full border rounded-md relative">
                         <Table>
                           <TableHeader>
                             <TableRow>
+                              <TableHead className="w-12 text-center">#</TableHead>
                               <TableHead>Worker</TableHead>
                               <TableHead>Position</TableHead>
+                              <TableHead className="w-[200px]">Scope Assignment</TableHead>
+                              <TableHead className="text-right">Daily Rate</TableHead>
                               <TableHead>Status</TableHead>
                               <TableHead className="w-32 text-center">Overtime (Hrs)</TableHead>
-                              <TableHead className="w-[250px]">Scope Assignment</TableHead>
+                              <TableHead className="text-right">Total Cost</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {attendanceList.length === 0 ? (
                               <TableRow>
-                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground border-2 border-dashed">
                                   No manpower enrolled. Click "Add Manpower from List" to add workers to this roll call.
                                 </TableCell>
                               </TableRow>
                             ) : (
-                              attendanceList.map((row) => {
-                                const canEdit = isEditMode;
-                                return (
-                                  <TableRow key={row.personnel_id} className={row.status === "absent" ? "bg-muted/50 opacity-75" : ""}>
-                                    <TableCell>
-                                      <span className="font-medium">{row.name}</span>
-                                    </TableCell>
-                                    <TableCell>{row.role}</TableCell>
-                                    <TableCell>
-                                      <div className="flex items-center gap-3">
-                                        <Switch
-                                          checked={row.status === "present"}
-                                          disabled={!canEdit}
-                                          onCheckedChange={(checked) => handleAttendanceChange(row.personnel_id, "status", checked ? "present" : "absent")}
+                              (() => {
+                                const sortedAttendance = [...attendanceList].sort((a, b) => {
+                                  const scopeA = scopes.find(s => s.id === a.bom_scope_id)?.name || "Z_Unassigned";
+                                  const scopeB = scopes.find(s => s.id === b.bom_scope_id)?.name || "Z_Unassigned";
+                                  return scopeA.localeCompare(scopeB);
+                                });
+
+                                return sortedAttendance.map((row, index) => {
+                                  const canEdit = isEditMode;
+                                  const daily = row.daily_rate || 0;
+                                  const ot = row.overtime_rate || 0;
+                                  const hrs = row.hours_worked || 0;
+                                  const oth = row.overtime_hours || 0;
+                                  const rowCost = row.status === "absent" ? 0 : ((daily / 8) * hrs) + (ot * oth);
+
+                                  return (
+                                    <TableRow key={row.personnel_id} className={row.status === "absent" ? "bg-muted/50 opacity-75" : ""}>
+                                      <TableCell className="text-center text-muted-foreground">{index + 1}</TableCell>
+                                      <TableCell>
+                                        <span className="font-medium">{row.name}</span>
+                                      </TableCell>
+                                      <TableCell>{row.role}</TableCell>
+                                      <TableCell>
+                                        <Select
+                                          value={row.bom_scope_id || "unassigned"}
+                                          disabled={!canEdit || row.status === "absent"}
+                                          onValueChange={(val) => handleAttendanceChange(row.personnel_id, "bom_scope_id", val === "unassigned" ? null : val)}
+                                        >
+                                          <SelectTrigger className="h-8">
+                                            <SelectValue placeholder="Assign task..." />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="unassigned" className="text-muted-foreground italic">Unassigned</SelectItem>
+                                            {scopes.map((s) => (
+                                              <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </TableCell>
+                                      <TableCell className="text-right">₱{daily.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                                      <TableCell>
+                                        <div className="flex items-center gap-2">
+                                          <Switch
+                                            checked={row.status === "present"}
+                                            disabled={!canEdit}
+                                            onCheckedChange={(checked) => handleAttendanceChange(row.personnel_id, "status", checked ? "present" : "absent")}
+                                          />
+                                          <span className={`text-xs font-semibold ${row.status === "present" ? "text-green-600" : "text-red-500"}`}>
+                                            {row.status === "present" ? "Present" : "Absent"}
+                                          </span>
+                                        </div>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Input
+                                          type="number"
+                                          min="0"
+                                          step="0.5"
+                                          className="w-20 mx-auto text-center h-8"
+                                          value={row.overtime_hours}
+                                          disabled={!canEdit || row.status === "absent"}
+                                          onChange={(e) => {
+                                            const list = [...attendanceList];
+                                            const idx = list.findIndex(l => l.personnel_id === row.personnel_id);
+                                            list[idx].overtime_hours = parseFloat(e.target.value) || 0;
+                                            setAttendanceList(list);
+                                          }}
+                                          onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
                                         />
-                                        <span className={`text-sm font-semibold ${row.status === "present" ? "text-green-600" : "text-red-500"}`}>
-                                          {row.status === "present" ? "Present" : "Absent"}
-                                        </span>
-                                      </div>
-                                    </TableCell>
-                                    <TableCell>
-                                      <Input
-                                        type="number"
-                                        min="0"
-                                        step="0.5"
-                                        className="w-20 mx-auto text-center"
-                                        value={row.overtime_hours}
-                                        disabled={!canEdit || row.status === "absent"}
-                                        onChange={(e) => {
-                                          const list = [...attendanceList];
-                                          const idx = list.findIndex(l => l.personnel_id === row.personnel_id);
-                                          list[idx].overtime_hours = parseFloat(e.target.value) || 0;
-                                          setAttendanceList(list);
-                                        }}
-                                        onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
-                                      />
-                                    </TableCell>
-                                    <TableCell>
-                                      <Select
-                                        value={row.bom_scope_id || "unassigned"}
-                                        disabled={!canEdit || row.status === "absent"}
-                                        onValueChange={(val) => handleAttendanceChange(row.personnel_id, "bom_scope_id", val === "unassigned" ? null : val)}
-                                      >
-                                        <SelectTrigger>
-                                          <SelectValue placeholder="Assign task..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="unassigned" className="text-muted-foreground italic">Unassigned</SelectItem>
-                                          {scopes.map((s) => (
-                                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              })
+                                      </TableCell>
+                                      <TableCell className="text-right font-semibold text-primary">
+                                        ₱{rowCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                });
+                              })()
                             )}
                           </TableBody>
                         </Table>
@@ -871,37 +920,75 @@ export default function SitePersonnel() {
                                 <Users className="h-4 w-4" />
                                 {date}
                               </div>
-                              <div className="flex items-center gap-4">
-                                <div className="text-sm font-medium">{records.filter(r => r.status === 'present').length} Present</div>
-                                {isExpanded ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
-                              </div>
+                              {(() => {
+                                const presentWorkers = records.filter(r => r.status !== 'absent');
+                                const dailyTotal = presentWorkers.reduce((sum, r) => {
+                                  const daily = r.personnel?.daily_rate || 0;
+                                  const ot = r.personnel?.overtime_rate || 0;
+                                  const hrs = r.hours_worked || 0;
+                                  const oth = r.overtime_hours || 0;
+                                  return sum + ((daily / 8) * hrs) + (ot * oth);
+                                }, 0);
+                                
+                                return (
+                                  <div className="flex items-center gap-4">
+                                    <div className="text-sm font-bold text-primary">₱{dailyTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                    <div className="text-sm font-medium">{presentWorkers.length} Workers</div>
+                                    {isExpanded ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+                                  </div>
+                                );
+                              })()}
                             </div>
                             
                             {isExpanded && (
                               <Table>
                                 <TableHeader>
                                   <TableRow>
+                                    <TableHead className="w-12 text-center">#</TableHead>
                                     <TableHead>Worker</TableHead>
                                     <TableHead>Position</TableHead>
+                                    <TableHead className="w-[200px]">Scope Assignment</TableHead>
+                                    <TableHead className="text-right">Daily Rate</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead className="text-center">Overtime (Hrs)</TableHead>
-                                    <TableHead>Scope Assignment</TableHead>
+                                    <TableHead className="text-right">Total Cost</TableHead>
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                  {records.map((record) => (
-                                    <TableRow key={record.id} className={record.status === "absent" ? "bg-muted/50 opacity-75" : ""}>
-                                      <TableCell className="font-medium">{record.personnel?.name || "Unknown"}</TableCell>
-                                      <TableCell>{record.personnel?.role}</TableCell>
-                                      <TableCell>
-                                        <span className={`text-sm font-semibold ${record.status === "present" ? "text-green-600" : "text-red-500"}`}>
-                                          {record.status === "present" ? "Present" : "Absent"}
-                                        </span>
-                                      </TableCell>
-                                      <TableCell className="text-center">{record.overtime_hours || 0}</TableCell>
-                                      <TableCell>{scopes.find(s => s.id === record.bom_scope_id)?.name || "Unassigned"}</TableCell>
-                                    </TableRow>
-                                  ))}
+                                  {(() => {
+                                    const sortedRecords = [...records].sort((a, b) => {
+                                      const scopeA = scopes.find(s => s.id === a.bom_scope_id)?.name || "Z_Unassigned";
+                                      const scopeB = scopes.find(s => s.id === b.bom_scope_id)?.name || "Z_Unassigned";
+                                      return scopeA.localeCompare(scopeB);
+                                    });
+
+                                    return sortedRecords.map((record, index) => {
+                                      const daily = record.personnel?.daily_rate || 0;
+                                      const ot = record.personnel?.overtime_rate || 0;
+                                      const hrs = record.hours_worked || 0;
+                                      const oth = record.overtime_hours || 0;
+                                      const rowCost = record.status === "absent" ? 0 : ((daily / 8) * hrs) + (ot * oth);
+
+                                      return (
+                                        <TableRow key={record.id} className={record.status === "absent" ? "bg-muted/50 opacity-75" : ""}>
+                                          <TableCell className="text-center text-muted-foreground">{index + 1}</TableCell>
+                                          <TableCell className="font-medium">{record.personnel?.name || "Unknown"}</TableCell>
+                                          <TableCell>{record.personnel?.role}</TableCell>
+                                          <TableCell>{scopes.find(s => s.id === record.bom_scope_id)?.name || "Unassigned"}</TableCell>
+                                          <TableCell className="text-right">₱{daily.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                                          <TableCell>
+                                            <span className={`text-sm font-semibold ${record.status === "present" ? "text-green-600" : "text-red-500"}`}>
+                                              {record.status === "present" ? "Present" : "Absent"}
+                                            </span>
+                                          </TableCell>
+                                          <TableCell className="text-center">{record.overtime_hours || 0}</TableCell>
+                                          <TableCell className="text-right font-semibold text-primary">
+                                            ₱{rowCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                          </TableCell>
+                                        </TableRow>
+                                      );
+                                    });
+                                  })()}
                                 </TableBody>
                               </Table>
                             )}
