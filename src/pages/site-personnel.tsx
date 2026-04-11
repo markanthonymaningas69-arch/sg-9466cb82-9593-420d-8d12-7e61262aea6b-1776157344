@@ -27,8 +27,11 @@ export default function SitePersonnel() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [personnel, setPersonnel] = useState<Personnel[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>("");
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split("T")[0]);
   const [activeTab, setActiveTab] = useState("attendance");
+  
+  const [attendanceDate, setAttendanceDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [deliveriesDate, setDeliveriesDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [scopeDate, setScopeDate] = useState<string>(new Date().toISOString().split("T")[0]);
   
   // Site Attendance (Roll Call)
   const [attendanceList, setAttendanceList] = useState<AttendanceRow[]>([]);
@@ -70,11 +73,21 @@ export default function SitePersonnel() {
   useEffect(() => {
     if (selectedProject) {
       loadAttendanceData();
+    }
+  }, [selectedProject, attendanceDate]);
+
+  useEffect(() => {
+    if (selectedProject) {
       loadDeliveries();
+    }
+  }, [selectedProject, deliveriesDate]);
+
+  useEffect(() => {
+    if (selectedProject) {
       loadScopes();
       loadBomMaterials();
     }
-  }, [selectedProject, selectedDate]);
+  }, [selectedProject]);
 
   const loadProjects = async () => {
     const { data } = await projectService.getAll();
@@ -88,7 +101,7 @@ export default function SitePersonnel() {
   const loadAttendanceData = async () => {
     if (!selectedProject) return;
     const { data: projectPersonnel } = await siteService.getProjectPersonnel(selectedProject);
-    const { data: attendance } = await siteService.getSiteAttendance(selectedProject, selectedDate);
+    const { data: attendance } = await siteService.getSiteAttendance(selectedProject, attendanceDate);
 
     const merged = projectPersonnel.map((p: any) => {
       const att = attendance.find((a: any) => a.personnel_id === p.id);
@@ -108,7 +121,7 @@ export default function SitePersonnel() {
 
   const loadDeliveries = async () => {
     if (!selectedProject) return;
-    const { data } = await siteService.getDeliveries(selectedProject);
+    const { data } = await siteService.getDeliveries(selectedProject, deliveriesDate);
     setDeliveries(data || []);
   };
 
@@ -131,13 +144,12 @@ export default function SitePersonnel() {
     const clamped = Math.min(Math.max(percentage, 0), 100);
     if (clamped === (scope.completion_percentage || 0)) return;
 
-    let status = 'in_progress';
-    if (clamped >= 100) status = 'completed';
-    if (clamped <= 0) status = 'not_started';
-
-    await siteService.updateScopeOfWork(scope.id, {
-      completion_percentage: clamped,
-      status: status
+    await siteService.createProgressUpdate({
+      bom_scope_id: scope.id,
+      percentage_completed: clamped,
+      update_date: scopeDate,
+      updated_by: "Site App",
+      notes: "Inline progress update"
     });
     loadScopes();
   };
@@ -180,7 +192,7 @@ export default function SitePersonnel() {
     await siteService.upsertAttendance({
       project_id: selectedProject,
       personnel_id: personnel_id,
-      date: selectedDate,
+      date: attendanceDate,
       status: newRow.status,
       hours_worked: newRow.hours_worked,
       overtime_hours: newRow.overtime_hours,
@@ -246,7 +258,7 @@ export default function SitePersonnel() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-1">
           <div>
             <Label htmlFor="project">Select Project</Label>
             <Select value={selectedProject} onValueChange={setSelectedProject}>
@@ -261,15 +273,6 @@ export default function SitePersonnel() {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div>
-            <Label htmlFor="date">Date</Label>
-            <Input
-              id="date"
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-            />
           </div>
         </div>
 
@@ -293,10 +296,19 @@ export default function SitePersonnel() {
             <TabsContent value="attendance">
               <Card>
                 <CardHeader>
-                  <div className="flex justify-between items-center">
+                  <div className="flex justify-between items-start">
                     <div>
                       <CardTitle>Daily Roll Call & Assignment</CardTitle>
-                      <CardDescription>Manage presence, overtime, and tasks for {selectedDate}</CardDescription>
+                      <CardDescription>Manage presence, overtime, and tasks</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date:</Label>
+                        <Input
+                          type="date"
+                          value={attendanceDate}
+                          onChange={(e) => setAttendanceDate(e.target.value)}
+                          className="w-auto h-9"
+                        />
+                      </div>
                     </div>
                     <Dialog open={enrollDialogOpen} onOpenChange={setEnrollDialogOpen}>
                       <DialogTrigger asChild>
@@ -429,10 +441,24 @@ export default function SitePersonnel() {
             <TabsContent value="deliveries">
               <Card>
                 <CardHeader>
-                  <div className="flex justify-between items-center">
+                  <div className="flex justify-between items-start">
                     <div>
                       <CardTitle>Material Deliveries</CardTitle>
                       <CardDescription>Track deliveries to site</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => setDeliveriesDate(e.target.value)}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => setDeliveriesDate("")} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     <Dialog open={deliveryDialogOpen} onOpenChange={setDeliveryDialogOpen}>
                       <DialogTrigger asChild>
@@ -708,6 +734,15 @@ export default function SitePersonnel() {
                 <CardHeader>
                   <CardTitle>Scope of Works (From BOM)</CardTitle>
                   <CardDescription>Track progress for scopes officially defined in the Bill of Materials</CardDescription>
+                  <div className="flex items-center gap-3 mt-4">
+                    <Label>Update Date:</Label>
+                    <Input
+                      type="date"
+                      value={scopeDate}
+                      onChange={(e) => setScopeDate(e.target.value)}
+                      className="w-auto h-9"
+                    />
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {scopes.length === 0 ? (

@@ -85,13 +85,18 @@ export const siteService = {
   },
 
   // Deliveries Management
-  async getDeliveries(projectId: string) {
-    const { data, error } = await supabase
+  async getDeliveries(projectId: string, dateFilter?: string) {
+    let query = supabase
       .from("deliveries")
       .select("*, projects(name)")
       .eq("project_id", projectId)
       .order("delivery_date", { ascending: false });
+      
+    if (dateFilter) {
+      query = query.eq("delivery_date", dateFilter);
+    }
     
+    const { data, error } = await query;
     return { data: data || [], error };
   },
 
