@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import { cacheManager, CACHE_KEYS, CACHE_TTL } from "@/lib/cache";
 
 type BOM = Database["public"]["Tables"]["bill_of_materials"]["Row"];
 type ScopeOfWork = Database["public"]["Tables"]["bom_scope_of_work"]["Row"];
@@ -10,6 +11,10 @@ type IndirectCost = Database["public"]["Tables"]["bom_indirect_costs"]["Row"];
 export const bomService = {
   // Get BOM with all related data
   async getByProjectId(projectId: string) {
+    const cacheKey = CACHE_KEYS.bomSummary(projectId);
+    const cached = cacheManager.get<any>(cacheKey);
+    if (cached) return cached;
+
     const { data, error } = await supabase
       .from("bill_of_materials")
       .select(`
@@ -50,7 +55,9 @@ export const bomService = {
     }
 
     console.log("BOM Query:", { data, error });
-    return { data, error };
+    const result = { data, error };
+    if (!error) cacheManager.set(cacheKey, result, CACHE_TTL.DASHBOARD);
+    return result;
   },
 
   // Create BOM
@@ -61,6 +68,7 @@ export const bomService = {
       .select()
       .single();
 
+    if (bomData.project_id) cacheManager.invalidate(CACHE_KEYS.bomSummary(bomData.project_id));
     console.log("Create BOM:", { data, error });
     return { data, error };
   },
@@ -74,6 +82,7 @@ export const bomService = {
       .select()
       .single();
 
+    cacheManager.invalidatePattern("BOMSummary");
     console.log("Update BOM:", { data, error });
     return { data, error };
   },
@@ -86,6 +95,7 @@ export const bomService = {
       .select()
       .single();
 
+    cacheManager.invalidatePattern("BOMSummary");
     console.log("Create Scope:", { data, error });
     return { data, error };
   },
@@ -98,6 +108,7 @@ export const bomService = {
       .select()
       .single();
 
+    cacheManager.invalidatePattern("BOMSummary");
     return { data, error };
   },
 
@@ -107,6 +118,8 @@ export const bomService = {
     );
     const results = await Promise.all(promises);
     const error = results.find(r => r.error)?.error;
+    
+    cacheManager.invalidatePattern("BOMSummary");
     return { error };
   },
 
@@ -116,6 +129,7 @@ export const bomService = {
       .delete()
       .eq("id", id);
 
+    cacheManager.invalidatePattern("BOMSummary");
     return { error };
   },
 
@@ -127,6 +141,8 @@ export const bomService = {
       .select()
       .single();
 
+    cacheManager.invalidatePattern("BOMSummary");
+    cacheManager.invalidatePattern("CompanyDashboard");
     return { data, error };
   },
 
@@ -138,6 +154,8 @@ export const bomService = {
       .select()
       .single();
 
+    cacheManager.invalidatePattern("BOMSummary");
+    cacheManager.invalidatePattern("CompanyDashboard");
     return { data, error };
   },
 
@@ -147,6 +165,8 @@ export const bomService = {
       .delete()
       .eq("id", id);
 
+    cacheManager.invalidatePattern("BOMSummary");
+    cacheManager.invalidatePattern("CompanyDashboard");
     return { error };
   },
 
@@ -158,6 +178,8 @@ export const bomService = {
       .select()
       .single();
 
+    cacheManager.invalidatePattern("BOMSummary");
+    cacheManager.invalidatePattern("CompanyDashboard");
     return { data, error };
   },
 
@@ -169,6 +191,8 @@ export const bomService = {
       .select()
       .single();
 
+    cacheManager.invalidatePattern("BOMSummary");
+    cacheManager.invalidatePattern("CompanyDashboard");
     return { data, error };
   },
 
@@ -178,6 +202,8 @@ export const bomService = {
       .delete()
       .eq("id", id);
 
+    cacheManager.invalidatePattern("BOMSummary");
+    cacheManager.invalidatePattern("CompanyDashboard");
     return { error };
   },
 
@@ -189,6 +215,7 @@ export const bomService = {
       .select()
       .single();
 
+    cacheManager.invalidatePattern("BOMSummary");
     return { data, error };
   },
 
@@ -200,6 +227,7 @@ export const bomService = {
       .select()
       .single();
 
+    cacheManager.invalidatePattern("BOMSummary");
     return { data, error };
   }
 };

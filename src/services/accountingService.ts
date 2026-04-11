@@ -1,10 +1,12 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import { cacheManager, CACHE_KEYS, CACHE_TTL } from "@/lib/cache";
 
 type Transaction = Database["public"]["Tables"]["transactions"]["Row"];
 type TransactionInsert = Database["public"]["Tables"]["transactions"]["Insert"];
 
 export const accountingService = {
+  // CRITICAL: Ledger and Transactions are NEVER cached to ensure financial integrity
   async getAll() {
     const { data, error } = await supabase
       .from("transactions")
@@ -15,6 +17,7 @@ export const accountingService = {
     return { data: data || [], error };
   },
 
+  // CRITICAL: Ledger and Transactions are NEVER cached to ensure financial integrity
   async getByProject(projectId: string) {
     const { data, error } = await supabase
       .from("transactions")
@@ -33,6 +36,14 @@ export const accountingService = {
       .select()
       .single();
     
+    // Invalidate dashboards and summaries because financials changed
+    if (transaction.project_id) {
+      cacheManager.invalidate(CACHE_KEYS.projectSummary(transaction.project_id));
+      cacheManager.invalidatePattern(`FinancialSummary_${transaction.project_id}`);
+    }
+    cacheManager.invalidatePattern("CompanyDashboard");
+    cacheManager.invalidatePattern("FinancialSummary_ALL");
+    
     console.log("Create transaction:", { data, error });
     return { data, error };
   },
@@ -45,6 +56,11 @@ export const accountingService = {
       .select()
       .single();
     
+    // Invalidate dashboards and summaries because financials changed
+    cacheManager.invalidatePattern("CompanyDashboard");
+    cacheManager.invalidatePattern("ProjectSummary");
+    cacheManager.invalidatePattern("FinancialSummary");
+    
     console.log("Update transaction:", { data, error });
     return { data, error };
   },
@@ -55,11 +71,21 @@ export const accountingService = {
       .delete()
       .eq("id", id);
     
+    // Invalidate dashboards and summaries because financials changed
+    cacheManager.invalidatePattern("CompanyDashboard");
+    cacheManager.invalidatePattern("ProjectSummary");
+    cacheManager.invalidatePattern("FinancialSummary");
+    
     console.log("Delete transaction:", { error });
     return { error };
   },
 
+  // Summaries are cached as they are aggregate reports
   async getSummary(projectId?: string) {
+    const cacheKey = `FinancialSummary_${projectId || 'ALL'}`;
+    const cached = cacheManager.get<any>(cacheKey);
+    if (cached) return cached;
+
     let query = supabase
       .from("transactions")
       .select("type, amount");
@@ -79,6 +105,9 @@ export const accountingService = {
       completed: data.reduce((sum, t) => sum + t.amount, 0),
     };
 
-    return { data: summary, error: null };
+    const result = { data: summary, error: null };
+    cacheManager.set(cacheKey, result, CACHE_TTL.REPORT); // 15 minute TTL for reports
+
+    return result;
   }
 };

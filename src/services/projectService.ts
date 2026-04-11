@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import { cacheManager, CACHE_KEYS, CACHE_TTL } from "@/lib/cache";
 
 type Project = Database["public"]["Tables"]["projects"]["Row"];
 type ProjectInsert = Database["public"]["Tables"]["projects"]["Insert"];
@@ -17,6 +18,10 @@ export const projectService = {
   },
 
   async getById(id: string) {
+    const cacheKey = CACHE_KEYS.projectSummary(id);
+    const cached = cacheManager.get<any>(cacheKey);
+    if (cached) return cached;
+
     const { data, error } = await supabase
       .from("projects")
       .select("*")
@@ -24,7 +29,9 @@ export const projectService = {
       .single();
     
     console.log("Project by ID:", { data, error });
-    return { data, error };
+    const result = { data, error };
+    if (!error) cacheManager.set(cacheKey, result, CACHE_TTL.DASHBOARD);
+    return result;
   },
 
   async create(project: ProjectInsert) {
@@ -33,6 +40,9 @@ export const projectService = {
       .insert(project)
       .select()
       .single();
+    
+    // Auto-invalidate dashboard caches
+    cacheManager.invalidatePattern("CompanyDashboard");
     
     console.log("Create project:", { data, error });
     return { data, error };
@@ -46,6 +56,10 @@ export const projectService = {
       .select()
       .single();
     
+    // Auto-invalidate specific project and general dashboards
+    cacheManager.invalidate(CACHE_KEYS.projectSummary(id));
+    cacheManager.invalidatePattern("CompanyDashboard");
+    
     console.log("Update project:", { data, error });
     return { data, error };
   },
@@ -56,11 +70,19 @@ export const projectService = {
       .delete()
       .eq("id", id);
     
+    // Auto-invalidate caches
+    cacheManager.invalidate(CACHE_KEYS.projectSummary(id));
+    cacheManager.invalidatePattern("CompanyDashboard");
+    
     console.log("Delete project:", { error });
     return { error };
   },
 
   async getStats() {
+    const cacheKey = CACHE_KEYS.companyDashboard("default");
+    const cached = cacheManager.get<any>(cacheKey);
+    if (cached) return cached;
+
     const { data, error } = await supabase
       .from("projects")
       .select("status, budget, spent");
@@ -75,6 +97,9 @@ export const projectService = {
       totalCost: data.reduce((sum, p) => sum + (p.spent || 0), 0),
     };
 
-    return { data: stats, error: null };
+    const result = { data: stats, error: null };
+    cacheManager.set(cacheKey, result, CACHE_TTL.DASHBOARD);
+    
+    return result;
   }
 };
