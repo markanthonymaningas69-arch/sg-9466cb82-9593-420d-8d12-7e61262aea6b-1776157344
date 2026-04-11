@@ -107,13 +107,28 @@ export const siteService = {
       
     if (!bom) return { data: [], error: null };
 
+    const { data: scopes } = await supabase
+      .from("bom_scope_of_work")
+      .select("id")
+      .eq("bom_id", bom.id);
+      
+    if (!scopes || scopes.length === 0) return { data: [], error: null };
+    
+    const scopeIds = scopes.map(s => s.id);
+
     const { data, error } = await supabase
       .from("bom_materials")
-      .select("id, name, unit")
-      .eq("bom_id", bom.id)
-      .order("name", { ascending: true });
+      .select("id, material_name, unit")
+      .in("scope_id", scopeIds)
+      .order("material_name", { ascending: true });
     
-    return { data: data || [], error };
+    const formattedData = data?.map(m => ({
+      id: m.id,
+      name: m.material_name || "Unknown Material",
+      unit: m.unit || ""
+    })) || [];
+    
+    return { data: formattedData as any, error };
   },
 
   // Scope of Works Management
