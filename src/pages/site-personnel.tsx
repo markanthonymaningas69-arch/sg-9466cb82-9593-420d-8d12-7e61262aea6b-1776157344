@@ -13,12 +13,12 @@ import { Badge } from "@/components/ui/badge";
 import { siteService } from "@/services/siteService";
 import { projectService } from "@/services/projectService";
 import { personnelService } from "@/services/personnelService";
-import { Plus, Pencil, Trash2, Users, Truck, ClipboardList } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Truck, ClipboardList, ArrowUp, ArrowDown } from "lucide-react";
 
 type Project = { id: string; name: string; location: string; status: string };
 type Personnel = { id: string; name: string; role: string };
 type SiteAttendance = { id: string; personnel_id: string; project_id: string; date: string; status: string; hours_worked: number; notes: string; personnel?: { name: string; role: string } };
-type Delivery = { id: string; project_id: string; delivery_date: string; item_name: string; quantity: number; unit: string; supplier: string; received_by: string; status: string; notes: string };
+type Delivery = { id: string; project_id: string; delivery_date: string; item_name: string; quantity: number; unit: string; supplier: string; received_by: string; status: string; notes: string; receipt_number?: string };
 type ScopeOfWork = { id: string; name: string; description?: string; order_number: number; completion_percentage?: number; status?: string; bom_id: string };
 
 export default function SitePersonnel() {
@@ -46,6 +46,7 @@ export default function SitePersonnel() {
   const [isManualItem, setIsManualItem] = useState(false);
   const [isManualUnit, setIsManualUnit] = useState(false);
   const [deliveryDialogOpen, setDeliveryDialogOpen] = useState(false);
+  const [expandedReceipts, setExpandedReceipts] = useState<Record<string, boolean>>({});
   const [deliveryForm, setDeliveryForm] = useState({
     project_id: "",
     delivery_date: new Date().toISOString().split("T")[0],
@@ -53,6 +54,7 @@ export default function SitePersonnel() {
     quantity: 0,
     unit: "",
     supplier: "",
+    receipt_number: "",
     received_by: "",
     status: "pending",
     notes: ""
@@ -170,6 +172,7 @@ export default function SitePersonnel() {
       quantity: 0,
       unit: "",
       supplier: "",
+      receipt_number: "",
       received_by: "",
       status: "pending",
       notes: ""
@@ -502,6 +505,26 @@ export default function SitePersonnel() {
                           </div>
                           <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
+                              <Label htmlFor="supplier">Supplier</Label>
+                              <Input
+                                id="supplier"
+                                value={deliveryForm.supplier}
+                                onChange={(e) => setDeliveryForm({ ...deliveryForm, supplier: e.target.value })}
+                                required
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="receipt_number">Receipt Number</Label>
+                              <Input
+                                id="receipt_number"
+                                value={deliveryForm.receipt_number || ""}
+                                onChange={(e) => setDeliveryForm({ ...deliveryForm, receipt_number: e.target.value })}
+                                placeholder="Optional"
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
                               <Label htmlFor="delivery_date">Delivery Date</Label>
                               <Input
                                 id="delivery_date"
@@ -559,38 +582,78 @@ export default function SitePersonnel() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Item</TableHead>
-                        <TableHead>Quantity</TableHead>
-                        <TableHead>Supplier</TableHead>
-                        <TableHead>Received By</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {deliveries.map((delivery) => (
-                        <TableRow key={delivery.id}>
-                          <TableCell>{delivery.delivery_date}</TableCell>
-                          <TableCell className="font-medium">{delivery.item_name}</TableCell>
-                          <TableCell>{delivery.quantity} {delivery.unit}</TableCell>
-                          <TableCell>{delivery.supplier}</TableCell>
-                          <TableCell>{delivery.received_by}</TableCell>
-                          <TableCell>{getStatusBadge(delivery.status)}</TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              <Button size="sm" variant="ghost" onClick={() => siteService.deleteDelivery(delivery.id).then(loadDeliveries)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                  <div className="space-y-4">
+                    {Object.entries(
+                      deliveries.reduce((acc, curr) => {
+                        const key = `${curr.supplier}::${curr.receipt_number || 'No Receipt'}::${curr.delivery_date}`;
+                        if (!acc[key]) acc[key] = [];
+                        acc[key].push(curr);
+                        return acc;
+                      }, {} as Record<string, Delivery[]>)
+                    ).map(([groupKey, groupDeliveries]) => {
+                      const [supplier, receipt, date] = groupKey.split('::');
+                      const isExpanded = expandedReceipts[groupKey];
+                      return (
+                        <div key={groupKey} className="border rounded-lg overflow-hidden">
+                          <div 
+                            className="bg-muted/50 p-4 flex justify-between items-center cursor-pointer hover:bg-muted transition-colors"
+                            onClick={() => setExpandedReceipts(prev => ({ ...prev, [groupKey]: !isExpanded }))}
+                          >
+                            <div className="flex items-center gap-4">
+                              <div>
+                                <h4 className="font-semibold">{supplier}</h4>
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  <span>{date}</span>
+                                  {receipt !== 'No Receipt' && (
+                                    <>
+                                      <span>•</span>
+                                      <Badge variant="outline">Receipt: {receipt}</Badge>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                            <div className="flex items-center gap-4">
+                              <div className="text-sm font-medium">{groupDeliveries.length} items</div>
+                              {isExpanded ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+                            </div>
+                          </div>
+                          
+                          {isExpanded && (
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Item</TableHead>
+                                  <TableHead>Quantity</TableHead>
+                                  <TableHead>Received By</TableHead>
+                                  <TableHead>Status</TableHead>
+                                  <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {groupDeliveries.map((delivery) => (
+                                  <TableRow key={delivery.id}>
+                                    <TableCell className="font-medium">{delivery.item_name}</TableCell>
+                                    <TableCell>{delivery.quantity} {delivery.unit}</TableCell>
+                                    <TableCell>{delivery.received_by}</TableCell>
+                                    <TableCell>{getStatusBadge(delivery.status)}</TableCell>
+                                    <TableCell className="text-right">
+                                      <Button size="sm" variant="ghost" onClick={(e) => {
+                                        e.stopPropagation();
+                                        siteService.deleteDelivery(delivery.id).then(loadDeliveries);
+                                      }}>
+                                        <Trash2 className="h-4 w-4 text-red-500" />
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>

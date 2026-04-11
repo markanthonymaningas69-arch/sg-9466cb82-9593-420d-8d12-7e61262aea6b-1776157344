@@ -3,8 +3,8 @@ import type { Database } from "@/integrations/supabase/types";
 
 type SiteAttendance = Database["public"]["Tables"]["site_attendance"]["Row"];
 type SiteAttendanceInsert = Database["public"]["Tables"]["site_attendance"]["Insert"];
-type Delivery = Database["public"]["Tables"]["deliveries"]["Row"];
-type DeliveryInsert = Database["public"]["Tables"]["deliveries"]["Insert"];
+type Delivery = Database["public"]["Tables"]["deliveries"]["Row"] & { receipt_number?: string };
+type DeliveryInsert = Database["public"]["Tables"]["deliveries"]["Insert"] & { receipt_number?: string };
 type ScopeOfWork = Database["public"]["Tables"]["bom_scope_of_work"]["Row"];
 type ScopeOfWorkInsert = Database["public"]["Tables"]["bom_scope_of_work"]["Insert"];
 type ProgressUpdate = Database["public"]["Tables"]["progress_updates"]["Row"];

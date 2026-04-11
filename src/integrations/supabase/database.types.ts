@@ -377,6 +377,7 @@ export type Database = {
           notes: string | null
           project_id: string
           quantity: number | null
+          receipt_number: string | null
           received_by: string | null
           status: string | null
           supplier: string
@@ -390,6 +391,7 @@ export type Database = {
           notes?: string | null
           project_id: string
           quantity?: number | null
+          receipt_number?: string | null
           received_by?: string | null
           status?: string | null
           supplier: string
@@ -403,6 +405,7 @@ export type Database = {
           notes?: string | null
           project_id?: string
           quantity?: number | null
+          receipt_number?: string | null
           received_by?: string | null
           status?: string | null
           supplier?: string
