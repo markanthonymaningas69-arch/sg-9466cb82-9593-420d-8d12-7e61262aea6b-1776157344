@@ -30,6 +30,16 @@ export const siteService = {
     return { data, error };
   },
 
+  async updatePersonnel(id: string, updates: any) {
+    const { data, error } = await supabase
+      .from("personnel")
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single();
+    return { data, error };
+  },
+
   async upsertAttendance(attendance: any) {
     const { data, error } = await supabase
       .from("site_attendance")

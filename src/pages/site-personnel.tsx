@@ -29,12 +29,16 @@ export default function SitePersonnel() {
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [activeTab, setActiveTab] = useState("attendance");
   
-  const [attendanceDate, setAttendanceDate] = useState<string>(new Date().toISOString().split("T")[0]);
-  const [deliveriesDate, setDeliveriesDate] = useState<string>(new Date().toISOString().split("T")[0]);
-  const [scopeDate, setScopeDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const todayStr = new Date().toISOString().split("T")[0];
+  const [attendanceDate, setAttendanceDate] = useState<string>(todayStr);
+  const [deliveriesDate, setDeliveriesDate] = useState<string>(todayStr);
+  const [scopeDate, setScopeDate] = useState<string>(todayStr);
   
   // Site Attendance (Roll Call)
   const [attendanceList, setAttendanceList] = useState<AttendanceRow[]>([]);
+  const [historicalAttendance, setHistoricalAttendance] = useState<Record<string, any[]>>({});
+  const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
+  const [isEditMode, setIsEditMode] = useState(false);
   const [enrollDialogOpen, setEnrollDialogOpen] = useState(false);
   const [isManualRole, setIsManualRole] = useState(false);
   const [enrollForm, setEnrollForm] = useState({
@@ -102,23 +106,35 @@ export default function SitePersonnel() {
 
   const loadAttendanceData = async () => {
     if (!selectedProject) return;
-    const { data: projectPersonnel } = await siteService.getProjectPersonnel(selectedProject);
-    const { data: attendance } = await siteService.getSiteAttendance(selectedProject, attendanceDate);
 
-    const merged = projectPersonnel.map((p: any) => {
-      const att = attendance.find((a: any) => a.personnel_id === p.id);
-      return {
-        personnel_id: p.id,
-        name: p.name,
-        role: p.role,
-        daily_rate: p.daily_rate || 0,
-        status: att?.status || "present",
-        hours_worked: att?.hours_worked ?? 8,
-        overtime_hours: att?.overtime_hours ?? 0,
-        bom_scope_id: att?.bom_scope_id || null,
-      };
-    });
-    setAttendanceList(merged);
+    if (attendanceDate) {
+      const { data: projectPersonnel } = await siteService.getProjectPersonnel(selectedProject);
+      const { data: attendance } = await siteService.getSiteAttendance(selectedProject, attendanceDate);
+
+      const merged = projectPersonnel.map((p: any) => {
+        const att = attendance.find((a: any) => a.personnel_id === p.id);
+        return {
+          personnel_id: p.id,
+          name: p.name,
+          role: p.role,
+          daily_rate: p.daily_rate || 0,
+          status: att?.status || "present",
+          hours_worked: att?.hours_worked ?? 8,
+          overtime_hours: att?.overtime_hours ?? 0,
+          bom_scope_id: att?.bom_scope_id || null,
+        };
+      });
+      setAttendanceList(merged);
+    } else {
+      const { data: attendance } = await siteService.getSiteAttendance(selectedProject);
+      const grouped = (attendance || []).reduce((acc: any, curr: any) => {
+        const d = curr.date;
+        if (!acc[d]) acc[d] = [];
+        acc[d].push(curr);
+        return acc;
+      }, {});
+      setHistoricalAttendance(grouped);
+    }
   };
 
   const loadDeliveries = async () => {
@@ -307,13 +323,24 @@ export default function SitePersonnel() {
                       <CardTitle>Daily Roll Call & Assignment</CardTitle>
                       <CardDescription>Manage presence, overtime, and tasks</CardDescription>
                       <div className="flex items-center gap-3 mt-4">
-                        <Label>Date:</Label>
+                        <Label>Date Filter:</Label>
                         <Input
                           type="date"
                           value={attendanceDate}
-                          onChange={(e) => setAttendanceDate(e.target.value)}
+                          onChange={(e) => {
+                            setAttendanceDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
                           className="w-auto h-9"
                         />
+                        {attendanceDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setAttendanceDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
                       </div>
                     </div>
                     <Dialog open={enrollDialogOpen} onOpenChange={setEnrollDialogOpen}>
@@ -417,78 +444,171 @@ export default function SitePersonnel() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Worker</TableHead>
-                        <TableHead>Position</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="w-32 text-center">Overtime (Hrs)</TableHead>
-                        <TableHead className="w-[250px]">Scope Assignment</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {attendanceList.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
-                            No manpower enrolled. Click "Enroll Manpower" to add workers to this project.
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        attendanceList.map((row) => (
-                          <TableRow key={row.personnel_id} className={row.status === "absent" ? "bg-muted/50 opacity-75" : ""}>
-                            <TableCell className="font-medium">{row.name}</TableCell>
-                            <TableCell>{row.role}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-3">
-                                <Switch
-                                  checked={row.status === "present"}
-                                  onCheckedChange={(checked) => handleAttendanceChange(row.personnel_id, "status", checked ? "present" : "absent")}
-                                />
-                                <span className={`text-sm font-semibold ${row.status === "present" ? "text-green-600" : "text-red-500"}`}>
-                                  {row.status === "present" ? "Present" : "Absent"}
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                type="number"
-                                min="0"
-                                step="0.5"
-                                className="w-20 mx-auto text-center"
-                                value={row.overtime_hours}
-                                disabled={row.status === "absent"}
-                                onChange={(e) => {
-                                  const list = [...attendanceList];
-                                  const idx = list.findIndex(l => l.personnel_id === row.personnel_id);
-                                  list[idx].overtime_hours = parseFloat(e.target.value) || 0;
-                                  setAttendanceList(list);
-                                }}
-                                onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Select
-                                value={row.bom_scope_id || "unassigned"}
-                                disabled={row.status === "absent"}
-                                onValueChange={(val) => handleAttendanceChange(row.personnel_id, "bom_scope_id", val === "unassigned" ? null : val)}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Assign task..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="unassigned" className="text-muted-foreground italic">Unassigned</SelectItem>
-                                  {scopes.map((s) => (
-                                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                          </TableRow>
-                        ))
+                  {attendanceDate ? (
+                    <div className="space-y-4">
+                      {attendanceDate !== todayStr && !isEditMode && attendanceList.length > 0 && (
+                        <div className="flex justify-end">
+                          <Button variant="outline" onClick={() => setIsEditMode(true)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit Roll Call
+                          </Button>
+                        </div>
                       )}
-                    </TableBody>
-                  </Table>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Worker</TableHead>
+                            <TableHead>Position</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="w-32 text-center">Overtime (Hrs)</TableHead>
+                            <TableHead className="w-[250px]">Scope Assignment</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {attendanceList.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                No manpower enrolled. Click "Enroll Manpower" to add workers to this project.
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            attendanceList.map((row) => {
+                              const canEdit = attendanceDate === todayStr || isEditMode;
+                              return (
+                                <TableRow key={row.personnel_id} className={row.status === "absent" ? "bg-muted/50 opacity-75" : ""}>
+                                  <TableCell>
+                                    {canEdit ? (
+                                      <Input 
+                                        className="h-8 w-[180px]"
+                                        value={row.name}
+                                        onChange={(e) => {
+                                          const list = [...attendanceList];
+                                          const idx = list.findIndex(l => l.personnel_id === row.personnel_id);
+                                          list[idx].name = e.target.value;
+                                          setAttendanceList(list);
+                                        }}
+                                        onBlur={(e) => {
+                                          if (e.target.value.trim()) {
+                                            siteService.updatePersonnel(row.personnel_id, { name: e.target.value });
+                                          }
+                                        }}
+                                      />
+                                    ) : (
+                                      <span className="font-medium">{row.name}</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>{row.role}</TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center gap-3">
+                                      <Switch
+                                        checked={row.status === "present"}
+                                        disabled={!canEdit}
+                                        onCheckedChange={(checked) => handleAttendanceChange(row.personnel_id, "status", checked ? "present" : "absent")}
+                                      />
+                                      <span className={`text-sm font-semibold ${row.status === "present" ? "text-green-600" : "text-red-500"}`}>
+                                        {row.status === "present" ? "Present" : "Absent"}
+                                      </span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      step="0.5"
+                                      className="w-20 mx-auto text-center"
+                                      value={row.overtime_hours}
+                                      disabled={!canEdit || row.status === "absent"}
+                                      onChange={(e) => {
+                                        const list = [...attendanceList];
+                                        const idx = list.findIndex(l => l.personnel_id === row.personnel_id);
+                                        list[idx].overtime_hours = parseFloat(e.target.value) || 0;
+                                        setAttendanceList(list);
+                                      }}
+                                      onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <Select
+                                      value={row.bom_scope_id || "unassigned"}
+                                      disabled={!canEdit || row.status === "absent"}
+                                      onValueChange={(val) => handleAttendanceChange(row.personnel_id, "bom_scope_id", val === "unassigned" ? null : val)}
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Assign task..." />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="unassigned" className="text-muted-foreground italic">Unassigned</SelectItem>
+                                        {scopes.map((s) => (
+                                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {Object.entries(historicalAttendance).sort(([a], [b]) => b.localeCompare(a)).map(([date, records]) => {
+                        const isExpanded = expandedDates[date];
+                        return (
+                          <div key={date} className="border rounded-lg overflow-hidden">
+                            <div 
+                              className="bg-muted/50 p-4 flex justify-between items-center cursor-pointer hover:bg-muted transition-colors"
+                              onClick={() => setExpandedDates(prev => ({ ...prev, [date]: !isExpanded }))}
+                            >
+                              <div className="font-semibold flex items-center gap-2">
+                                <Users className="h-4 w-4" />
+                                {date}
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <div className="text-sm font-medium">{records.filter(r => r.status === 'present').length} Present</div>
+                                {isExpanded ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+                              </div>
+                            </div>
+                            
+                            {isExpanded && (
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Worker</TableHead>
+                                    <TableHead>Position</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead className="text-center">Overtime (Hrs)</TableHead>
+                                    <TableHead>Scope Assignment</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {records.map((record) => (
+                                    <TableRow key={record.id} className={record.status === "absent" ? "bg-muted/50 opacity-75" : ""}>
+                                      <TableCell className="font-medium">{record.personnel?.name || "Unknown"}</TableCell>
+                                      <TableCell>{record.personnel?.role}</TableCell>
+                                      <TableCell>
+                                        <span className={`text-sm font-semibold ${record.status === "present" ? "text-green-600" : "text-red-500"}`}>
+                                          {record.status === "present" ? "Present" : "Absent"}
+                                        </span>
+                                      </TableCell>
+                                      <TableCell className="text-center">{record.overtime_hours || 0}</TableCell>
+                                      <TableCell>{scopes.find(s => s.id === record.bom_scope_id)?.name || "Unassigned"}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {Object.keys(historicalAttendance).length === 0 && (
+                        <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-md">
+                          No historical attendance records found for this project.
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
