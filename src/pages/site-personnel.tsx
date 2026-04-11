@@ -13,14 +13,13 @@ import { Badge } from "@/components/ui/badge";
 import { siteService } from "@/services/siteService";
 import { projectService } from "@/services/projectService";
 import { personnelService } from "@/services/personnelService";
-import { Plus, Pencil, Trash2, Users, Truck, ClipboardList, TrendingUp } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Truck, ClipboardList } from "lucide-react";
 
 type Project = { id: string; name: string; location: string; status: string };
 type Personnel = { id: string; name: string; role: string };
 type SiteAttendance = { id: string; personnel_id: string; project_id: string; date: string; status: string; hours_worked: number; notes: string; personnel?: { name: string; role: string } };
 type Delivery = { id: string; project_id: string; delivery_date: string; item_name: string; quantity: number; unit: string; supplier: string; received_by: string; status: string; notes: string };
 type ScopeOfWork = { id: string; name: string; description?: string; order_number: number; completion_percentage?: number; status?: string; bom_id: string };
-type ProgressUpdate = { id: string; bom_scope_id: string; update_date: string; percentage_completed: number; notes: string; updated_by: string };
 
 export default function SitePersonnel() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -59,18 +58,6 @@ export default function SitePersonnel() {
   // Scope of Works
   const [scopes, setScopes] = useState<ScopeOfWork[]>([]);
 
-  // Progress Updates
-  const [selectedScope, setSelectedScope] = useState<string>("");
-  const [progressUpdates, setProgressUpdates] = useState<ProgressUpdate[]>([]);
-  const [progressDialogOpen, setProgressDialogOpen] = useState(false);
-  const [progressForm, setProgressForm] = useState({
-    bom_scope_id: "",
-    update_date: new Date().toISOString().split("T")[0],
-    percentage_completed: 0,
-    notes: "",
-    updated_by: ""
-  });
-
   useEffect(() => {
     loadProjects();
     loadPersonnel();
@@ -83,12 +70,6 @@ export default function SitePersonnel() {
       loadScopes();
     }
   }, [selectedProject, selectedDate]);
-
-  useEffect(() => {
-    if (selectedScope) {
-      loadProgressUpdates();
-    }
-  }, [selectedScope]);
 
   const loadProjects = async () => {
     const { data } = await projectService.getAll();
@@ -118,10 +99,22 @@ export default function SitePersonnel() {
     setScopes(data || []);
   };
 
-  const loadProgressUpdates = async () => {
-    if (!selectedScope) return;
-    const { data } = await siteService.getProgressUpdates(selectedScope);
-    setProgressUpdates(data || []);
+  const handleUpdateProgress = async (scope: ScopeOfWork, newValue: string) => {
+    const percentage = parseFloat(newValue);
+    if (isNaN(percentage)) return;
+
+    const clamped = Math.min(Math.max(percentage, 0), 100);
+    if (clamped === (scope.completion_percentage || 0)) return;
+
+    let status = 'in_progress';
+    if (clamped >= 100) status = 'completed';
+    if (clamped <= 0) status = 'not_started';
+
+    await siteService.updateScopeOfWork(scope.id, {
+      completion_percentage: clamped,
+      status: status
+    });
+    loadScopes();
   };
 
   const handleAttendanceSubmit = async (e: React.FormEvent) => {
@@ -147,19 +140,6 @@ export default function SitePersonnel() {
     loadDeliveries();
   };
 
-  const handleProgressSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await siteService.createProgressUpdate({
-      ...progressForm,
-      bom_scope_id: selectedScope,
-      percentage_completed: parseFloat(progressForm.percentage_completed.toString())
-    });
-    setProgressDialogOpen(false);
-    resetProgressForm();
-    loadProgressUpdates();
-    loadScopes();
-  };
-
   const resetAttendanceForm = () => {
     setAttendanceForm({
       personnel_id: "",
@@ -182,16 +162,6 @@ export default function SitePersonnel() {
       received_by: "",
       status: "pending",
       notes: ""
-    });
-  };
-
-  const resetProgressForm = () => {
-    setProgressForm({
-      bom_scope_id: selectedScope,
-      update_date: new Date().toISOString().split("T")[0],
-      percentage_completed: 0,
-      notes: "",
-      updated_by: ""
     });
   };
 
@@ -249,7 +219,7 @@ export default function SitePersonnel() {
 
         {selectedProject && (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="attendance">
                 <Users className="h-4 w-4 mr-2" />
                 Attendance
@@ -261,10 +231,6 @@ export default function SitePersonnel() {
               <TabsTrigger value="scope">
                 <ClipboardList className="h-4 w-4 mr-2" />
                 Scope of Works
-              </TabsTrigger>
-              <TabsTrigger value="progress">
-                <TrendingUp className="h-4 w-4 mr-2" />
-                Progress Updates
               </TabsTrigger>
             </TabsList>
 
@@ -560,7 +526,7 @@ export default function SitePersonnel() {
                           <TableHead>Scope Name</TableHead>
                           <TableHead className="w-48">Completion</TableHead>
                           <TableHead className="w-32">Status</TableHead>
-                          <TableHead className="text-right w-40">Actions</TableHead>
+                          <TableHead className="text-right w-40">Update Progress</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -581,140 +547,25 @@ export default function SitePersonnel() {
                             </TableCell>
                             <TableCell>{getStatusBadge(scope.status || 'not_started')}</TableCell>
                             <TableCell className="text-right">
-                              <Button 
-                                size="sm" 
-                                variant="outline"
-                                className="bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 border-blue-200"
-                                onClick={() => {
-                                  setSelectedScope(scope.id);
-                                  setProgressForm({ ...progressForm, bom_scope_id: scope.id, percentage_completed: scope.completion_percentage || 0 });
-                                  setActiveTab("progress");
-                                }}
-                              >
-                                Update Progress
-                              </Button>
+                              <div className="flex items-center justify-end gap-2">
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  className="w-20 text-right h-8"
+                                  defaultValue={scope.completion_percentage || 0}
+                                  onBlur={(e) => handleUpdateProgress(scope, e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.currentTarget.blur();
+                                    }
+                                  }}
+                                />
+                                <span className="text-sm font-medium">%</span>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="progress">
-              <Card>
-                <CardHeader>
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <CardTitle>Progress Updates</CardTitle>
-                      <CardDescription>
-                        {selectedScope 
-                          ? `Tracking progress for: ${scopes.find(s => s.id === selectedScope)?.name}`
-                          : "Select a scope from the Scope of Works tab to view and add updates"}
-                      </CardDescription>
-                    </div>
-                    <Dialog open={progressDialogOpen} onOpenChange={setProgressDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button disabled={!selectedScope} className="bg-blue-600 hover:bg-blue-700 text-white">
-                          <Plus className="h-4 w-4 mr-2" />
-                          Log Progress
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Log Percentage Completion</DialogTitle>
-                        </DialogHeader>
-                        <form onSubmit={handleProgressSubmit} className="space-y-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="update_date">Date</Label>
-                            <Input
-                              id="update_date"
-                              type="date"
-                              value={progressForm.update_date}
-                              onChange={(e) => setProgressForm({ ...progressForm, update_date: e.target.value })}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="percentage_completed">Total Percentage Completed (%)</Label>
-                            <Input
-                              id="percentage_completed"
-                              type="number"
-                              min="0"
-                              max="100"
-                              step="0.01"
-                              value={progressForm.percentage_completed}
-                              onChange={(e) => setProgressForm({ ...progressForm, percentage_completed: parseFloat(e.target.value) })}
-                              required
-                            />
-                            <p className="text-xs text-muted-foreground">Enter the cumulative completion percentage (e.g., 50 for 50% complete).</p>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="updated_by">Updated By (Name)</Label>
-                            <Input
-                              id="updated_by"
-                              value={progressForm.updated_by}
-                              onChange={(e) => setProgressForm({ ...progressForm, updated_by: e.target.value })}
-                              required
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="prog_notes">Notes / Observations</Label>
-                            <Textarea
-                              id="prog_notes"
-                              value={progressForm.notes}
-                              onChange={(e) => setProgressForm({ ...progressForm, notes: e.target.value })}
-                            />
-                          </div>
-                          <div className="flex justify-end gap-2 pt-4">
-                            <Button type="button" variant="outline" onClick={() => setProgressDialogOpen(false)}>
-                              Cancel
-                            </Button>
-                            <Button type="submit">Save Progress</Button>
-                          </div>
-                        </form>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {!selectedScope ? (
-                    <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg bg-gray-50">
-                      <p className="mb-4">Select a scope from the "Scope of Works" tab to view or log progress updates.</p>
-                      <Button variant="outline" onClick={() => setActiveTab("scope")}>Go to Scope of Works</Button>
-                    </div>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Percentage</TableHead>
-                          <TableHead>Updated By</TableHead>
-                          <TableHead>Notes</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {progressUpdates.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">No progress updates logged yet.</TableCell>
-                          </TableRow>
-                        ) : (
-                          progressUpdates.map((update) => (
-                            <TableRow key={update.id}>
-                              <TableCell>{update.update_date}</TableCell>
-                              <TableCell className="font-medium text-green-600">{update.percentage_completed}%</TableCell>
-                              <TableCell>{update.updated_by}</TableCell>
-                              <TableCell>{update.notes}</TableCell>
-                              <TableCell className="text-right">
-                                <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => siteService.deleteProgressUpdate(update.id).then(loadProgressUpdates)}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        )}
                       </TableBody>
                     </Table>
                   )}
