@@ -373,6 +373,7 @@ export default function BillOfMaterials() {
     const allCollapsed: Record<string, boolean> = {};
     scopes.forEach(s => { allCollapsed[s.id as string] = true; });
     setCollapsedScopes(allCollapsed);
+    setIndirectCollapsed(true);
   };
 
   const handleToggleReorder = () => {
@@ -780,7 +781,7 @@ export default function BillOfMaterials() {
                   variant="outline"
                   onClick={handleHideAllScopes}
                 >
-                  Hide All Scopes
+                  Hide Contents
                 </Button>
                 {reorderMode ? (
                   <Button
@@ -1468,7 +1469,7 @@ export default function BillOfMaterials() {
                         )}
                       </TableCell>
                       <TableCell className="text-right py-1">
-                        <div className="flex justify-end gap-1 items-center">
+                        <div className="flex justify-end gap-1">
                           <Button variant="ghost" size="icon" className="h-6 w-6 text-green-600 hover:text-green-700" onClick={() => handleEditIndirect(cost)}>
                             <Pencil className="w-3 h-3" />
                           </Button>
