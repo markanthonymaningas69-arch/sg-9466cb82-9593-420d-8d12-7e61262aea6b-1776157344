@@ -485,6 +485,14 @@ export default function SitePersonnel() {
                                 const i = l.findIndex(x => x.id === p.id);
                                 l[i].name = e.target.value;
                                 setProjectPersonnelList(l);
+                                
+                                // Sync to attendance
+                                const attIdx = attendanceList.findIndex(a => a.personnel_id === p.id);
+                                if (attIdx > -1) {
+                                  const attList = [...attendanceList];
+                                  attList[attIdx].name = e.target.value;
+                                  setAttendanceList(attList);
+                                }
                               }}
                               onBlur={e => siteService.updatePersonnel(p.id, { name: e.target.value })}
                             />
@@ -500,6 +508,14 @@ export default function SitePersonnel() {
                                     const i = l.findIndex(x => x.id === p.id);
                                     l[i].role = e.target.value;
                                     setProjectPersonnelList(l);
+                                    
+                                    // Sync to attendance
+                                    const attIdx = attendanceList.findIndex(a => a.personnel_id === p.id);
+                                    if (attIdx > -1) {
+                                      const attList = [...attendanceList];
+                                      attList[attIdx].role = e.target.value;
+                                      setAttendanceList(attList);
+                                    }
                                   }}
                                   onBlur={e => siteService.updatePersonnel(p.id, { role: e.target.value })}
                                 />
@@ -509,6 +525,14 @@ export default function SitePersonnel() {
                                   const i = l.findIndex(x => x.id === p.id);
                                   l[i].role = "";
                                   setProjectPersonnelList(l);
+                                  
+                                  // Sync to attendance
+                                  const attIdx = attendanceList.findIndex(a => a.personnel_id === p.id);
+                                  if (attIdx > -1) {
+                                    const attList = [...attendanceList];
+                                    attList[attIdx].role = "";
+                                    setAttendanceList(attList);
+                                  }
                                 }}>
                                   List
                                 </Button>
@@ -523,12 +547,28 @@ export default function SitePersonnel() {
                                     const i = l.findIndex(x => x.id === p.id);
                                     l[i].role = "";
                                     setProjectPersonnelList(l);
+                                    
+                                    // Sync to attendance
+                                    const attIdx = attendanceList.findIndex(a => a.personnel_id === p.id);
+                                    if (attIdx > -1) {
+                                      const attList = [...attendanceList];
+                                      attList[attIdx].role = "";
+                                      setAttendanceList(attList);
+                                    }
                                   } else {
                                     const l = [...projectPersonnelList];
                                     const i = l.findIndex(x => x.id === p.id);
                                     l[i].role = val;
                                     setProjectPersonnelList(l);
                                     siteService.updatePersonnel(p.id, { role: val });
+                                    
+                                    // Sync to attendance
+                                    const attIdx = attendanceList.findIndex(a => a.personnel_id === p.id);
+                                    if (attIdx > -1) {
+                                      const attList = [...attendanceList];
+                                      attList[attIdx].role = val;
+                                      setAttendanceList(attList);
+                                    }
                                   }
                                 }}
                               >
@@ -551,6 +591,14 @@ export default function SitePersonnel() {
                                 const i = l.findIndex(x => x.id === p.id);
                                 l[i].daily_rate = parseFloat(e.target.value) || 0;
                                 setProjectPersonnelList(l);
+                                
+                                // Sync to attendance
+                                const attIdx = attendanceList.findIndex(a => a.personnel_id === p.id);
+                                if (attIdx > -1) {
+                                  const attList = [...attendanceList];
+                                  attList[attIdx].daily_rate = parseFloat(e.target.value) || 0;
+                                  setAttendanceList(attList);
+                                }
                               }}
                               onBlur={e => siteService.updatePersonnel(p.id, { daily_rate: parseFloat(e.target.value) || 0 })}
                             />
