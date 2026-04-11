@@ -313,6 +313,19 @@ export default function BillOfMaterials() {
     }
   };
 
+  const handleSaveOrder = async () => {
+    const updates = scopes.map((s, idx) => ({ id: s.id as string, order_number: idx + 1 }));
+    const { error } = await bomService.updateScopeOrder(updates);
+    if (error) {
+      alert("Error saving order: " + error.message);
+      return;
+    }
+    setReorderMode(false);
+    if (bom?.project_id) {
+      await loadData(bom.project_id as string);
+    }
+  };
+
   const handleAddScopeClick = () => {
     setShowScopeInput(true);
     setNewScopeName("");
