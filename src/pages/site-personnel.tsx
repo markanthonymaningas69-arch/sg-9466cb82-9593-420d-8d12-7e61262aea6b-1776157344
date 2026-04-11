@@ -370,16 +370,16 @@ export default function SitePersonnel() {
                       <CardTitle>Project Manpower</CardTitle>
                       <CardDescription>Master list of enrolled workers for this project</CardDescription>
                     </div>
-                    <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                    <Dialog open={enrollDialogOpen} onOpenChange={setEnrollDialogOpen}>
                       <DialogTrigger asChild>
-                        <Button disabled={!attendanceDate}>
+                        <Button>
                           <Plus className="h-4 w-4 mr-2" />
-                          Add Manpower from List
+                          Add Manpower
                         </Button>
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
-                          <DialogTitle>Enroll New Worker to Project</DialogTitle>
+                          <DialogTitle>Add New Worker to Project</DialogTitle>
                         </DialogHeader>
                         <form onSubmit={handleEnrollSubmit} className="space-y-4">
                           <div className="space-y-2">
@@ -454,7 +454,7 @@ export default function SitePersonnel() {
                             </div>
                           </div>
                           <div className="flex justify-end gap-2 pt-4">
-                            <Button type="button" variant="outline" onClick={() => setAddManpowerDialogOpen(false)}>
+                            <Button type="button" variant="outline" onClick={() => setEnrollDialogOpen(false)}>
                               Done / Close
                             </Button>
                             <Button type="submit">Add Worker</Button>
@@ -788,7 +788,7 @@ export default function SitePersonnel() {
                           {attendanceList.length === 0 ? (
                             <TableRow>
                               <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
-                                No manpower enrolled. Click "Enroll Manpower" to add workers to this project.
+                                No manpower enrolled. Click "Add Manpower from List" to add workers to this roll call.
                               </TableCell>
                             </TableRow>
                           ) : (
