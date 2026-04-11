@@ -44,6 +44,7 @@ export default function SitePersonnel() {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [bomMaterials, setBomMaterials] = useState<{id: string, name: string, unit: string}[]>([]);
   const [isManualItem, setIsManualItem] = useState(false);
+  const [isManualUnit, setIsManualUnit] = useState(false);
   const [deliveryDialogOpen, setDeliveryDialogOpen] = useState(false);
   const [deliveryForm, setDeliveryForm] = useState({
     project_id: "",
@@ -144,8 +145,9 @@ export default function SitePersonnel() {
       project_id: selectedProject,
       quantity: parseFloat(deliveryForm.quantity.toString())
     });
-    setDeliveryForm(prev => ({ ...prev, item_name: "" }));
+    setDeliveryForm(prev => ({ ...prev, item_name: "", quantity: 0, unit: "" }));
     setIsManualItem(false);
+    setIsManualUnit(false);
     loadDeliveries();
   };
 
@@ -173,6 +175,7 @@ export default function SitePersonnel() {
       notes: ""
     });
     setIsManualItem(false);
+    setIsManualUnit(false);
   };
 
   const getStatusBadge = (status: string) => {
@@ -189,6 +192,9 @@ export default function SitePersonnel() {
     };
     return <Badge className={colors[status]}>{status.replace("_", " ").toUpperCase()}</Badge>;
   };
+
+  const standardUnits = ["pcs", "bags", "m2", "m3", "kg", "ton", "L", "rolls", "length", "box", "set", "lot", "cu.m", "sq.m"];
+  const availableUnits = Array.from(new Set([...standardUnits, ...bomMaterials.map(m => m.unit).filter(Boolean)]));
 
   return (
     <Layout>
@@ -393,9 +399,11 @@ export default function SitePersonnel() {
                                     if (val === "others") {
                                       setIsManualItem(true);
                                       setDeliveryForm({ ...deliveryForm, item_name: "", unit: "" });
+                                      setIsManualUnit(false);
                                     } else {
                                       const mat = bomMaterials.find(m => m.name === val);
                                       setDeliveryForm({ ...deliveryForm, item_name: val, unit: mat?.unit || deliveryForm.unit });
+                                      setIsManualUnit(false);
                                     }
                                   }}
                                 >
@@ -451,13 +459,45 @@ export default function SitePersonnel() {
                             </div>
                             <div className="space-y-2">
                               <Label htmlFor="unit">Unit</Label>
-                              <Input
-                                id="unit"
-                                value={deliveryForm.unit}
-                                onChange={(e) => setDeliveryForm({ ...deliveryForm, unit: e.target.value })}
-                                placeholder="e.g., bags, m³, pcs"
-                                required
-                              />
+                              {!isManualUnit ? (
+                                <Select
+                                  value={deliveryForm.unit}
+                                  onValueChange={(val) => {
+                                    if (val === "others") {
+                                      setIsManualUnit(true);
+                                      setDeliveryForm({ ...deliveryForm, unit: "" });
+                                    } else {
+                                      setDeliveryForm({ ...deliveryForm, unit: val });
+                                    }
+                                  }}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select unit" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {availableUnits.map((u) => (
+                                      <SelectItem key={u} value={u}>{u}</SelectItem>
+                                    ))}
+                                    <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                <div className="flex gap-2">
+                                  <Input
+                                    id="unit"
+                                    value={deliveryForm.unit}
+                                    onChange={(e) => setDeliveryForm({ ...deliveryForm, unit: e.target.value })}
+                                    placeholder="Custom unit"
+                                    required
+                                  />
+                                  <Button type="button" variant="outline" className="px-2" onClick={() => {
+                                    setIsManualUnit(false);
+                                    setDeliveryForm({ ...deliveryForm, unit: "" });
+                                  }}>
+                                    List
+                                  </Button>
+                                </div>
+                              )}
                             </div>
                           </div>
                           <div className="grid grid-cols-2 gap-4">
