@@ -40,6 +40,14 @@ export const siteService = {
     return { data, error };
   },
 
+  async deletePersonnel(id: string) {
+    const { error } = await supabase
+      .from("personnel")
+      .delete()
+      .eq("id", id);
+    return { error };
+  },
+
   async upsertAttendance(attendance: any) {
     const { data, error } = await supabase
       .from("site_attendance")
