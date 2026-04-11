@@ -17,9 +17,9 @@ import { personnelService } from "@/services/personnelService";
 import { Plus, Pencil, Trash2, Users, Truck, ClipboardList, ArrowUp, ArrowDown } from "lucide-react";
 
 type Project = { id: string; name: string; location: string; status: string };
-type Personnel = { id: string; name: string; role: string; hourly_rate: number };
+type Personnel = { id: string; name: string; role: string; daily_rate: number; overtime_rate: number };
 type SiteAttendance = { id: string; personnel_id: string; project_id: string; date: string; status: string; hours_worked: number; overtime_hours?: number; bom_scope_id?: string; notes: string; personnel?: { name: string; role: string } };
-type AttendanceRow = { personnel_id: string; name: string; role: string; hourly_rate: number; status: string; hours_worked: number; overtime_hours: number; bom_scope_id: string | null };
+type AttendanceRow = { personnel_id: string; name: string; role: string; daily_rate: number; status: string; hours_worked: number; overtime_hours: number; bom_scope_id: string | null };
 type Delivery = { id: string; project_id: string; delivery_date: string; item_name: string; quantity: number; unit: string; supplier: string; received_by: string; status: string; notes: string; receipt_number?: string };
 type ScopeOfWork = { id: string; name: string; description?: string; order_number: number; completion_percentage?: number; status?: string; bom_id: string };
 
@@ -36,10 +36,12 @@ export default function SitePersonnel() {
   // Site Attendance (Roll Call)
   const [attendanceList, setAttendanceList] = useState<AttendanceRow[]>([]);
   const [enrollDialogOpen, setEnrollDialogOpen] = useState(false);
+  const [isManualRole, setIsManualRole] = useState(false);
   const [enrollForm, setEnrollForm] = useState({
     name: "",
     role: "",
-    hourly_rate: 0
+    daily_rate: 0,
+    overtime_rate: 0
   });
 
   // Deliveries
@@ -109,7 +111,7 @@ export default function SitePersonnel() {
         personnel_id: p.id,
         name: p.name,
         role: p.role,
-        hourly_rate: p.hourly_rate || 0,
+        daily_rate: p.daily_rate || 0,
         status: att?.status || "present",
         hours_worked: att?.hours_worked ?? 8,
         overtime_hours: att?.overtime_hours ?? 0,
@@ -160,13 +162,17 @@ export default function SitePersonnel() {
       project_id: selectedProject,
       name: enrollForm.name,
       role: enrollForm.role,
-      hourly_rate: enrollForm.hourly_rate,
+      daily_rate: enrollForm.daily_rate,
+      overtime_rate: enrollForm.overtime_rate,
+      hourly_rate: enrollForm.daily_rate > 0 ? enrollForm.daily_rate / 8 : 0, // Fallback compatibility
       status: "active",
       hire_date: new Date().toISOString().split("T")[0],
       email: `${enrollForm.name.replace(/\s+/g, '').toLowerCase()}${Date.now()}@example.com`
     });
-    setEnrollDialogOpen(false);
-    setEnrollForm({ name: "", role: "", hourly_rate: 0 });
+    
+    // Rapid Entry: Do NOT close dialog, just reset form
+    setEnrollForm({ name: "", role: "", daily_rate: 0, overtime_rate: 0 });
+    setIsManualRole(false);
     loadAttendanceData();
   };
 
@@ -332,29 +338,78 @@ export default function SitePersonnel() {
                           </div>
                           <div className="space-y-2">
                             <Label>Position / Role</Label>
-                            <Input
-                              required
-                              value={enrollForm.role}
-                              onChange={(e) => setEnrollForm({ ...enrollForm, role: e.target.value })}
-                              placeholder="e.g., Mason, Carpenter, Laborer"
-                            />
+                            {!isManualRole ? (
+                              <Select
+                                value={enrollForm.role}
+                                onValueChange={(val) => {
+                                  if (val === "others") {
+                                    setIsManualRole(true);
+                                    setEnrollForm({ ...enrollForm, role: "" });
+                                  } else {
+                                    setEnrollForm({ ...enrollForm, role: val });
+                                  }
+                                }}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select position" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Mason">Mason</SelectItem>
+                                  <SelectItem value="Carpenter">Carpenter</SelectItem>
+                                  <SelectItem value="Helper">Helper</SelectItem>
+                                  <SelectItem value="Skilled">Skilled</SelectItem>
+                                  <SelectItem value="Welder">Welder</SelectItem>
+                                  <SelectItem value="Plumber">Plumber</SelectItem>
+                                  <SelectItem value="Electrician">Electrician</SelectItem>
+                                  <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <div className="flex gap-2">
+                                <Input
+                                  placeholder="Custom position"
+                                  value={enrollForm.role}
+                                  onChange={(e) => setEnrollForm({ ...enrollForm, role: e.target.value })}
+                                  required
+                                />
+                                <Button type="button" variant="outline" className="px-2" onClick={() => {
+                                  setIsManualRole(false);
+                                  setEnrollForm({ ...enrollForm, role: "" });
+                                }}>
+                                  List
+                                </Button>
+                              </div>
+                            )}
                           </div>
-                          <div className="space-y-2">
-                            <Label>Hourly Rate (₱)</Label>
-                            <Input
-                              required
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={enrollForm.hourly_rate}
-                              onChange={(e) => setEnrollForm({ ...enrollForm, hourly_rate: parseFloat(e.target.value) || 0 })}
-                            />
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>Daily Rate (₱)</Label>
+                              <Input
+                                required
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={enrollForm.daily_rate}
+                                onChange={(e) => setEnrollForm({ ...enrollForm, daily_rate: parseFloat(e.target.value) || 0 })}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Overtime Rate (₱/hr)</Label>
+                              <Input
+                                required
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={enrollForm.overtime_rate}
+                                onChange={(e) => setEnrollForm({ ...enrollForm, overtime_rate: parseFloat(e.target.value) || 0 })}
+                              />
+                            </div>
                           </div>
                           <div className="flex justify-end gap-2 pt-4">
                             <Button type="button" variant="outline" onClick={() => setEnrollDialogOpen(false)}>
-                              Cancel
+                              Done / Close
                             </Button>
-                            <Button type="submit">Enroll Worker</Button>
+                            <Button type="submit">Add Worker</Button>
                           </div>
                         </form>
                       </DialogContent>
