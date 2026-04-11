@@ -374,7 +374,7 @@ export default function SitePersonnel() {
                       <DialogTrigger asChild>
                         <Button disabled={!attendanceDate}>
                           <Plus className="h-4 w-4 mr-2" />
-                          Add Manpower
+                          Add Manpower from List
                         </Button>
                       </DialogTrigger>
                       <DialogContent>
@@ -702,7 +702,7 @@ export default function SitePersonnel() {
                         <DialogTrigger asChild>
                           <Button disabled={!attendanceDate}>
                             <Plus className="h-4 w-4 mr-2" />
-                            Add Manpower
+                            Add Manpower from List
                           </Button>
                         </DialogTrigger>
                         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
