@@ -315,15 +315,15 @@ export default function SitePersonnel() {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
+      <div className="flex flex-col h-[calc(100vh-120px)] space-y-4 overflow-hidden">
+        <div className="flex justify-between items-center shrink-0">
           <div>
             <h1 className="text-3xl font-bold">Site Personnel</h1>
             <p className="text-muted-foreground">Daily site operations, attendance, deliveries & progress tracking</p>
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-1">
+        <div className="grid gap-4 md:grid-cols-1 shrink-0">
           <div>
             <Label htmlFor="project">Select Project</Label>
             <Select value={selectedProject} onValueChange={setSelectedProject}>
@@ -342,8 +342,8 @@ export default function SitePersonnel() {
         </div>
 
         {selectedProject && (
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-            <TabsList className="grid w-full grid-cols-4">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 overflow-hidden space-y-4">
+            <TabsList className="shrink-0 grid w-full grid-cols-4">
               <TabsTrigger value="manpower">
                 <Users className="h-4 w-4 mr-2" />
                 Project Manpower
@@ -362,9 +362,9 @@ export default function SitePersonnel() {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="manpower">
-              <Card>
-                <CardHeader>
+            <TabsContent value="manpower" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
                   <div className="flex justify-between items-start">
                     <div>
                       <CardTitle>Project Manpower</CardTitle>
@@ -464,8 +464,8 @@ export default function SitePersonnel() {
                     </Dialog>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="overflow-y-auto max-h-[60vh] border rounded-md relative">
+                <CardContent className="flex-1 overflow-hidden pb-4">
+                  <div className="overflow-y-auto h-full border rounded-md relative">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -671,9 +671,9 @@ export default function SitePersonnel() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="attendance">
-              <Card>
-                <CardHeader>
+            <TabsContent value="attendance" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
                   <div className="flex justify-between items-start">
                     <div>
                       <CardTitle>Daily Roll Call & Assignment</CardTitle>
@@ -758,11 +758,11 @@ export default function SitePersonnel() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
                   {attendanceDate ? (
-                    <div className="space-y-4">
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
                       {attendanceList.length > 0 && (
-                        <div className="flex justify-end">
+                        <div className="flex justify-end shrink-0">
                           {!isEditMode ? (
                             <Button variant="outline" onClick={() => setIsEditMode(true)}>
                               <Pencil className="h-4 w-4 mr-2" />
@@ -776,7 +776,7 @@ export default function SitePersonnel() {
                           )}
                         </div>
                       )}
-                      <div className="overflow-y-auto max-h-[60vh] border rounded-md relative">
+                      <div className="overflow-y-auto h-full border rounded-md relative">
                         <Table>
                           <TableHeader>
                             <TableRow>
@@ -858,7 +858,7 @@ export default function SitePersonnel() {
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-4 overflow-y-auto max-h-[60vh] pr-2">
+                    <div className="space-y-4 overflow-y-auto h-full pr-2">
                       {Object.entries(historicalAttendance).sort(([a], [b]) => b.localeCompare(a)).map(([date, records]) => {
                         const isExpanded = expandedDates[date];
                         return (
@@ -919,9 +919,9 @@ export default function SitePersonnel() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="deliveries">
-              <Card>
-                <CardHeader>
+            <TabsContent value="deliveries" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
                   <div className="flex justify-between items-start">
                     <div>
                       <CardTitle>Material Deliveries</CardTitle>
@@ -1133,8 +1133,8 @@ export default function SitePersonnel() {
                     </Dialog>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-4 overflow-y-auto max-h-[60vh] pr-2">
+                <CardContent className="flex-1 overflow-hidden pb-4">
+                  <div className="space-y-4 overflow-y-auto h-full pr-2">
                     {Object.entries(
                       deliveries.reduce((acc, curr) => {
                         const key = `${curr.supplier}::${curr.receipt_number || 'No Receipt'}::${curr.delivery_date}`;
@@ -1210,9 +1210,9 @@ export default function SitePersonnel() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="scope">
-              <Card>
-                <CardHeader>
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
                   <CardTitle>Update Progress</CardTitle>
                   <CardDescription>Track progress for scopes officially defined in the Bill of Materials</CardDescription>
                   <div className="flex items-center gap-3 mt-4">
@@ -1225,13 +1225,13 @@ export default function SitePersonnel() {
                     />
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex-1 overflow-hidden pb-4">
                   {scopes.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg bg-gray-50">
                       <p className="mb-4">No scopes found. Ensure a Bill of Materials is created for this project with defined Scope of Works.</p>
                     </div>
                   ) : (
-                    <div className="overflow-y-auto max-h-[60vh] border rounded-md relative">
+                    <div className="overflow-y-auto h-full border rounded-md relative">
                       <Table>
                         <TableHeader>
                           <TableRow>
