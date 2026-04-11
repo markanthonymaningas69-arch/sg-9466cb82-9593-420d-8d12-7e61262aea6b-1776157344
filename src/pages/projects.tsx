@@ -191,6 +191,7 @@ export default function Projects() {
                       step="0.01"
                       value={formData.budget}
                       onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
+                      disabled
                     />
                   </div>
                   <div className="space-y-2">
