@@ -136,13 +136,44 @@ export default function BillOfMaterials() {
       setBom(newBom);
       setScopes([]);
       setIndirectCosts([]);
+      setIndirectCostsList([]);
     } else if (bomData) {
       setBom(bomData as BOM);
       
       const sortedScopes = ((bomData as any).bom_scope_of_work || []).sort((a: any, b: any) => (a.order_number || 0) - (b.order_number || 0));
       setScopes(sortedScopes);
       
-      setIndirectCosts((bomData as any).bom_indirect_costs || []);
+      const rawIndirect = (bomData as any).bom_indirect_costs || [];
+      setIndirectCosts(rawIndirect);
+
+      if (rawIndirect.length > 0) {
+        const indirect = rawIndirect[0];
+        const loadedList: UnifiedIndirectCost[] = [];
+        
+        if (indirect.vat_percentage) loadedList.push({ id: 'vat', type: 'VAT', description: 'VAT', value: Number(indirect.vat_percentage).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
+        if (indirect.tax_percentage) loadedList.push({ id: 'tax', type: 'Tax', description: 'Tax', value: Number(indirect.tax_percentage).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
+        if (indirect.ocm_percentage) loadedList.push({ id: 'ocm', type: 'OCM', description: 'OCM', value: Number(indirect.ocm_percentage).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
+        if (indirect.profit_percentage) loadedList.push({ id: 'profit', type: 'Profit', description: 'Profit', value: Number(indirect.profit_percentage).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
+
+        try {
+          const rawOtherCosts = indirect.other_costs;
+          if (Array.isArray(rawOtherCosts)) {
+            rawOtherCosts.forEach((oc: any, index: number) => {
+              loadedList.push({
+                id: oc.id || `loaded-${index}`,
+                type: 'Others',
+                description: oc.description || "",
+                value: Number(oc.amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+              });
+            });
+          }
+        } catch (e) {
+          console.error("Error parsing other costs", e);
+        }
+        setIndirectCostsList(loadedList);
+      } else {
+        setIndirectCostsList([]);
+      }
     }
 
     setLoading(false);
