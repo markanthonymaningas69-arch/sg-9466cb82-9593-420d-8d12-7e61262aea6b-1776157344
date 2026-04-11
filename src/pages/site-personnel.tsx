@@ -465,20 +465,21 @@ export default function SitePersonnel() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Position</TableHead>
-                        <TableHead className="w-32">Daily Rate</TableHead>
-                        <TableHead className="w-32">OT Rate</TableHead>
-                        <TableHead className="w-16"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {projectPersonnelList.map(p => {
-                        const isEditing = editingPersonnelId === p.id;
-                        return (
+                  <div className="overflow-y-auto max-h-[60vh] border rounded-md relative">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Position</TableHead>
+                          <TableHead className="w-32">Daily Rate</TableHead>
+                          <TableHead className="w-32">OT Rate</TableHead>
+                          <TableHead className="w-16"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {projectPersonnelList.map(p => {
+                          const isEditing = editingPersonnelId === p.id;
+                          return (
                         <TableRow key={p.id}>
                           <TableCell>
                             {isEditing ? (
@@ -665,6 +666,7 @@ export default function SitePersonnel() {
                       )}
                     </TableBody>
                   </Table>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -774,87 +776,89 @@ export default function SitePersonnel() {
                           )}
                         </div>
                       )}
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Worker</TableHead>
-                            <TableHead>Position</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead className="w-32 text-center">Overtime (Hrs)</TableHead>
-                            <TableHead className="w-[250px]">Scope Assignment</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {attendanceList.length === 0 ? (
+                      <div className="overflow-y-auto max-h-[60vh] border rounded-md relative">
+                        <Table>
+                          <TableHeader>
                             <TableRow>
-                              <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
-                                No manpower enrolled. Click "Add Manpower from List" to add workers to this roll call.
-                              </TableCell>
+                              <TableHead>Worker</TableHead>
+                              <TableHead>Position</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead className="w-32 text-center">Overtime (Hrs)</TableHead>
+                              <TableHead className="w-[250px]">Scope Assignment</TableHead>
                             </TableRow>
-                          ) : (
-                            attendanceList.map((row) => {
-                              const canEdit = isEditMode;
-                              return (
-                                <TableRow key={row.personnel_id} className={row.status === "absent" ? "bg-muted/50 opacity-75" : ""}>
-                                  <TableCell>
-                                    <span className="font-medium">{row.name}</span>
-                                  </TableCell>
-                                  <TableCell>{row.role}</TableCell>
-                                  <TableCell>
-                                    <div className="flex items-center gap-3">
-                                      <Switch
-                                        checked={row.status === "present"}
-                                        disabled={!canEdit}
-                                        onCheckedChange={(checked) => handleAttendanceChange(row.personnel_id, "status", checked ? "present" : "absent")}
+                          </TableHeader>
+                          <TableBody>
+                            {attendanceList.length === 0 ? (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                  No manpower enrolled. Click "Add Manpower from List" to add workers to this roll call.
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              attendanceList.map((row) => {
+                                const canEdit = isEditMode;
+                                return (
+                                  <TableRow key={row.personnel_id} className={row.status === "absent" ? "bg-muted/50 opacity-75" : ""}>
+                                    <TableCell>
+                                      <span className="font-medium">{row.name}</span>
+                                    </TableCell>
+                                    <TableCell>{row.role}</TableCell>
+                                    <TableCell>
+                                      <div className="flex items-center gap-3">
+                                        <Switch
+                                          checked={row.status === "present"}
+                                          disabled={!canEdit}
+                                          onCheckedChange={(checked) => handleAttendanceChange(row.personnel_id, "status", checked ? "present" : "absent")}
+                                        />
+                                        <span className={`text-sm font-semibold ${row.status === "present" ? "text-green-600" : "text-red-500"}`}>
+                                          {row.status === "present" ? "Present" : "Absent"}
+                                        </span>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        step="0.5"
+                                        className="w-20 mx-auto text-center"
+                                        value={row.overtime_hours}
+                                        disabled={!canEdit || row.status === "absent"}
+                                        onChange={(e) => {
+                                          const list = [...attendanceList];
+                                          const idx = list.findIndex(l => l.personnel_id === row.personnel_id);
+                                          list[idx].overtime_hours = parseFloat(e.target.value) || 0;
+                                          setAttendanceList(list);
+                                        }}
+                                        onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
                                       />
-                                      <span className={`text-sm font-semibold ${row.status === "present" ? "text-green-600" : "text-red-500"}`}>
-                                        {row.status === "present" ? "Present" : "Absent"}
-                                      </span>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <Input
-                                      type="number"
-                                      min="0"
-                                      step="0.5"
-                                      className="w-20 mx-auto text-center"
-                                      value={row.overtime_hours}
-                                      disabled={!canEdit || row.status === "absent"}
-                                      onChange={(e) => {
-                                        const list = [...attendanceList];
-                                        const idx = list.findIndex(l => l.personnel_id === row.personnel_id);
-                                        list[idx].overtime_hours = parseFloat(e.target.value) || 0;
-                                        setAttendanceList(list);
-                                      }}
-                                      onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
-                                    />
-                                  </TableCell>
-                                  <TableCell>
-                                    <Select
-                                      value={row.bom_scope_id || "unassigned"}
-                                      disabled={!canEdit || row.status === "absent"}
-                                      onValueChange={(val) => handleAttendanceChange(row.personnel_id, "bom_scope_id", val === "unassigned" ? null : val)}
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Assign task..." />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="unassigned" className="text-muted-foreground italic">Unassigned</SelectItem>
-                                        {scopes.map((s) => (
-                                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })
-                          )}
-                        </TableBody>
-                      </Table>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Select
+                                        value={row.bom_scope_id || "unassigned"}
+                                        disabled={!canEdit || row.status === "absent"}
+                                        onValueChange={(val) => handleAttendanceChange(row.personnel_id, "bom_scope_id", val === "unassigned" ? null : val)}
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Assign task..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="unassigned" className="text-muted-foreground italic">Unassigned</SelectItem>
+                                          {scopes.map((s) => (
+                                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
                     </div>
                   ) : (
-                    <div className="space-y-4">
+                    <div className="space-y-4 overflow-y-auto max-h-[60vh] pr-2">
                       {Object.entries(historicalAttendance).sort(([a], [b]) => b.localeCompare(a)).map(([date, records]) => {
                         const isExpanded = expandedDates[date];
                         return (
@@ -1130,7 +1134,7 @@ export default function SitePersonnel() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
+                  <div className="space-y-4 overflow-y-auto max-h-[60vh] pr-2">
                     {Object.entries(
                       deliveries.reduce((acc, curr) => {
                         const key = `${curr.supplier}::${curr.receipt_number || 'No Receipt'}::${curr.delivery_date}`;
@@ -1227,55 +1231,57 @@ export default function SitePersonnel() {
                       <p className="mb-4">No scopes found. Ensure a Bill of Materials is created for this project with defined Scope of Works.</p>
                     </div>
                   ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-16">#</TableHead>
-                          <TableHead>Scope Name</TableHead>
-                          <TableHead className="w-48">Completion</TableHead>
-                          <TableHead className="w-32">Status</TableHead>
-                          <TableHead className="text-right w-40">Update Progress</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {scopes.map((scope) => (
-                          <TableRow key={scope.id}>
-                            <TableCell>{scope.order_number}</TableCell>
-                            <TableCell>
-                              <div className="font-medium">{scope.name}</div>
-                              {scope.description && <div className="text-sm text-muted-foreground">{scope.description}</div>}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-3">
-                                <div className="w-24 bg-secondary rounded-full h-2.5 overflow-hidden">
-                                  <div className="bg-green-500 h-full transition-all" style={{ width: `${scope.completion_percentage || 0}%` }} />
-                                </div>
-                                <span className="text-sm font-medium">{scope.completion_percentage || 0}%</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>{getStatusBadge(scope.status || 'not_started')}</TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  max="100"
-                                  className="w-20 text-right h-8"
-                                  defaultValue={scope.completion_percentage || 0}
-                                  onBlur={(e) => handleUpdateProgress(scope, e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      e.currentTarget.blur();
-                                    }
-                                  }}
-                                />
-                                <span className="text-sm font-medium">%</span>
-                              </div>
-                            </TableCell>
+                    <div className="overflow-y-auto max-h-[60vh] border rounded-md relative">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-16">#</TableHead>
+                            <TableHead>Scope Name</TableHead>
+                            <TableHead className="w-48">Completion</TableHead>
+                            <TableHead className="w-32">Status</TableHead>
+                            <TableHead className="text-right w-40">Update Progress</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {scopes.map((scope) => (
+                            <TableRow key={scope.id}>
+                              <TableCell>{scope.order_number}</TableCell>
+                              <TableCell>
+                                <div className="font-medium">{scope.name}</div>
+                                {scope.description && <div className="text-sm text-muted-foreground">{scope.description}</div>}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-3">
+                                  <div className="w-24 bg-secondary rounded-full h-2.5 overflow-hidden">
+                                    <div className="bg-green-500 h-full transition-all" style={{ width: `${scope.completion_percentage || 0}%` }} />
+                                  </div>
+                                  <span className="text-sm font-medium">{scope.completion_percentage || 0}%</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>{getStatusBadge(scope.status || 'not_started')}</TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    className="w-20 text-right h-8"
+                                    defaultValue={scope.completion_percentage || 0}
+                                    onBlur={(e) => handleUpdateProgress(scope, e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.currentTarget.blur();
+                                      }
+                                    }}
+                                  />
+                                  <span className="text-sm font-medium">%</span>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
                   )}
                 </CardContent>
               </Card>
