@@ -1225,7 +1225,6 @@ export default function SitePersonnel() {
                   {scopes.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg bg-gray-50">
                       <p className="mb-4">No scopes found. Ensure a Bill of Materials is created for this project with defined Scope of Works.</p>
-                      <Button variant="outline" onClick={() => setActiveTab("scope")}>Go to Scope of Works</Button>
                     </div>
                   ) : (
                     <Table>

@@ -674,7 +674,7 @@ export type Database = {
           notes: string | null
           percentage_completed: number | null
           quantity_completed: number | null
-          scope_id: string
+          scope_id: string | null
           update_date: string
           updated_by: string | null
         }
@@ -685,7 +685,7 @@ export type Database = {
           notes?: string | null
           percentage_completed?: number | null
           quantity_completed?: number | null
-          scope_id: string
+          scope_id?: string | null
           update_date: string
           updated_by?: string | null
         }
@@ -696,7 +696,7 @@ export type Database = {
           notes?: string | null
           percentage_completed?: number | null
           quantity_completed?: number | null
-          scope_id?: string
+          scope_id?: string | null
           update_date?: string
           updated_by?: string | null
         }

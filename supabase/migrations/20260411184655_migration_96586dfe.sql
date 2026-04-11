@@ -1,0 +1,1 @@
+ALTER TABLE progress_updates ALTER COLUMN scope_id DROP NOT NULL;
