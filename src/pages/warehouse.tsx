@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { warehouseService } from "@/services/warehouseService";
 import { projectService } from "@/services/projectService";
+import { useSettings } from "@/contexts/SettingsProvider";
 import { Plus, Pencil, Trash2, Package, Building2, Warehouse as WarehouseIcon } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -29,6 +30,7 @@ const STANDARD_CATEGORIES = [
 const STANDARD_UNITS = ["pcs", "bags", "kgs", "liters", "units", "set", "lot", "m", "sq.m", "cu.m", "length", "box", "roll"];
 
 export default function Warehouse() {
+  const { formatCurrency } = useSettings();
   const [items, setItems] = useState<WarehouseItem[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [masterItems, setMasterItems] = useState<any[]>([]);
@@ -323,7 +325,7 @@ export default function Warehouse() {
                     </div>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="unit_cost">Unit Cost (₱) *</Label>
+                      <Label htmlFor="unit_cost">Unit Cost *</Label>
                       <Input id="unit_cost" type="number" step="0.01" value={formData.unit_cost} onChange={(e) => setFormData({ ...formData, unit_cost: e.target.value })} required />
                     </div>
                     <div className="space-y-2">
@@ -417,7 +419,7 @@ export default function Warehouse() {
               <Package className="h-4 w-4 text-success" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-success">₱{totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              <div className="text-2xl font-bold text-success">{formatCurrency(totalValue)}</div>
             </CardContent>
           </Card>
         </div>
@@ -509,9 +511,9 @@ export default function Warehouse() {
                           </TableCell>
                           <TableCell className="text-right font-semibold">{item.quantity} {item.unit}</TableCell>
                           <TableCell className="text-right text-muted-foreground">{item.reorder_level || 0} {item.unit}</TableCell>
-                          <TableCell className="text-right">₱{item.unit_cost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(item.unit_cost)}</TableCell>
                           <TableCell className="text-right font-semibold text-primary">
-                            ₱{(item.quantity * item.unit_cost).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            {formatCurrency(item.quantity * item.unit_cost)}
                           </TableCell>
                           <TableCell>
                             {item.quantity <= (item.reorder_level || 0) ? (
@@ -584,7 +586,7 @@ export default function Warehouse() {
                           </TableCell>
                           <TableCell className="text-right font-semibold">{item.quantity} {item.unit}</TableCell>
                           <TableCell className="text-right font-semibold text-primary">
-                            ₱{(item.quantity * item.unit_cost).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            {formatCurrency(item.quantity * item.unit_cost)}
                           </TableCell>
                           <TableCell>
                             {item.quantity <= (item.reorder_level || 0) ? (

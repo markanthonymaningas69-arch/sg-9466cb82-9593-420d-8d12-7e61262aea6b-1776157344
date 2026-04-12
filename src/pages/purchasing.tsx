@@ -12,10 +12,12 @@ import { Badge } from "@/components/ui/badge";
 import { ShoppingCart, Plus, Search, Building2, Warehouse as WarehouseIcon, FilterX, List, Edit2, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { projectService } from "@/services/projectService";
+import { useSettings } from "@/contexts/SettingsProvider";
 
 const STANDARD_UNITS = ["pcs", "bags", "kgs", "liters", "units", "set", "lot", "m", "sq.m", "cu.m", "length", "box", "roll"];
 
 export default function Purchasing() {
+  const { formatCurrency } = useSettings();
   const [purchases, setPurchases] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
@@ -372,7 +374,7 @@ export default function Purchasing() {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label>Unit Cost (₱) *</Label>
+                      <Label>Unit Cost *</Label>
                       <Input type="number" step="0.01" value={formData.unit_cost} onChange={(e) => setFormData({ ...formData, unit_cost: e.target.value })} required />
                     </div>
                     
@@ -532,8 +534,8 @@ export default function Purchasing() {
                         <div className="text-xs text-muted-foreground">{p.category}</div>
                       </TableCell>
                       <TableCell className="text-right">{p.quantity} {p.unit}</TableCell>
-                      <TableCell className="text-right">₱{Number(p.unit_cost).toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
-                      <TableCell className="text-right font-bold">₱{Number(p.total_cost).toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(p.unit_cost)}</TableCell>
+                      <TableCell className="text-right font-bold">{formatCurrency(p.total_cost)}</TableCell>
                       <TableCell>
                         {p.destination_type === 'main_warehouse' ? (
                           <Badge variant="outline" className="flex w-fit items-center gap-1"><WarehouseIcon className="h-3 w-3" /> Main</Badge>
