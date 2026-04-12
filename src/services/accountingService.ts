@@ -109,18 +109,14 @@ export const accountingService = {
   },
 
   // Legacy support for older analytics/index dashboards
-  async getSummary() {
-    const { data: projects } = await supabase.from("projects").select("id");
-    const { data: personnel } = await supabase.from("personnel").select("id");
-    
+  async getSummary(projectId?: string) {
     // Calculate simple mock summary to keep dashboards running until they are fully migrated
     return {
       data: {
-        totalRevenue: 0,
-        totalExpenses: 0,
-        netProfit: 0,
-        activeProjects: projects?.length || 0,
-        activePersonnel: personnel?.length || 0
+        totalIncome: 0,
+        totalExpense: 0,
+        pending: 0,
+        completed: 0
       },
       error: null
     };
