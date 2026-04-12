@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { siteService } from "@/services/siteService";
 import { projectService } from "@/services/projectService";
 import { personnelService } from "@/services/personnelService";
-import { Plus, Pencil, Trash2, Users, Truck, ClipboardList, ArrowUp, ArrowDown, Check } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Truck, ClipboardList, ArrowUp, ArrowDown, Check, ArrowUpDown } from "lucide-react";
 
 type Project = { id: string; name: string; location: string; status: string };
 type Personnel = { id: string; name: string; role: string; daily_rate: number; overtime_rate: number };
@@ -47,6 +47,10 @@ export default function SitePersonnel() {
   const [editingPersonnelId, setEditingPersonnelId] = useState<string | null>(null);
   const [manualRoles, setManualRoles] = useState<Record<string, boolean>>({});
   const [isManualRole, setIsManualRole] = useState(false);
+  const [otFactor, setOtFactor] = useState<number>(1.25);
+  const [manpowerSort, setManpowerSort] = useState<{key: string, direction: 'asc' | 'desc'} | null>({ key: "name", direction: "asc" });
+  const [attendanceSort, setAttendanceSort] = useState<{key: string, direction: 'asc' | 'desc'} | null>({ key: "bom_scope_id", direction: "asc" });
+  
   const [enrollForm, setEnrollForm] = useState({
     name: "",
     role: "",
@@ -151,6 +155,27 @@ export default function SitePersonnel() {
       }, {});
       setHistoricalAttendance(grouped);
     }
+  };
+
+  const handleManpowerSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (manpowerSort && manpowerSort.key === key && manpowerSort.direction === 'asc') {
+      direction = 'desc';
+    }
+    setManpowerSort({ key, direction });
+  };
+
+  const handleAttendanceSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (attendanceSort && attendanceSort.key === key && attendanceSort.direction === 'asc') {
+      direction = 'desc';
+    }
+    setAttendanceSort({ key, direction });
+  };
+
+  const getSortIcon = (config: {key: string, direction: 'asc' | 'desc'} | null, key: string) => {
+    if (config?.key !== key) return <ArrowUpDown className="ml-1 h-3 w-3 inline opacity-50" />;
+    return config.direction === "asc" ? <ArrowUp className="ml-1 h-3 w-3 inline" /> : <ArrowDown className="ml-1 h-3 w-3 inline" />;
   };
 
   const handleAddWorkerToRollCall = async (personnel_id: string) => {
@@ -433,7 +458,7 @@ export default function SitePersonnel() {
                               </div>
                             )}
                           </div>
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-3 gap-4">
                             <div className="space-y-2">
                               <Label>Daily Rate (₱)</Label>
                               <Input
@@ -442,8 +467,37 @@ export default function SitePersonnel() {
                                 min="0"
                                 step="0.01"
                                 value={enrollForm.daily_rate}
-                                onChange={(e) => setEnrollForm({ ...enrollForm, daily_rate: parseFloat(e.target.value) || 0 })}
+                                onChange={(e) => {
+                                  const rate = parseFloat(e.target.value) || 0;
+                                  setEnrollForm({ 
+                                    ...enrollForm, 
+                                    daily_rate: rate,
+                                    overtime_rate: (rate / 8) * otFactor
+                                  });
+                                }}
                               />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>OT Factor</Label>
+                              <Select value={otFactor.toString()} onValueChange={(val) => {
+                                const factor = parseFloat(val);
+                                setOtFactor(factor);
+                                setEnrollForm(prev => ({
+                                  ...prev,
+                                  overtime_rate: (prev.daily_rate / 8) * factor
+                                }));
+                              }}>
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="1">1.0x (Regular)</SelectItem>
+                                  <SelectItem value="1.25">1.25x (Standard OT)</SelectItem>
+                                  <SelectItem value="1.3">1.3x (Special/Rest)</SelectItem>
+                                  <SelectItem value="1.5">1.5x (Night Shift)</SelectItem>
+                                  <SelectItem value="2">2.0x (Double Pay)</SelectItem>
+                                </SelectContent>
+                              </Select>
                             </div>
                             <div className="space-y-2">
                               <Label>Overtime Rate (₱/hr)</Label>
@@ -473,45 +527,59 @@ export default function SitePersonnel() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Position</TableHead>
-                          <TableHead className="w-32">Daily Rate</TableHead>
+                          <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleManpowerSort("name")}>Name {getSortIcon(manpowerSort, "name")}</TableHead>
+                          <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleManpowerSort("role")}>Position {getSortIcon(manpowerSort, "role")}</TableHead>
+                          <TableHead className="w-32 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleManpowerSort("daily_rate")}>Daily Rate {getSortIcon(manpowerSort, "daily_rate")}</TableHead>
                           <TableHead className="w-32">OT Rate</TableHead>
                           <TableHead className="w-16"></TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {[...projectPersonnelList].sort((a, b) => a.name.localeCompare(b.name)).map(p => {
-                          const isEditing = editingPersonnelId === p.id;
-                          return (
-                        <TableRow key={p.id}>
-                          <TableCell>
-                            {isEditing ? (
-                              <Input 
-                                value={p.name} 
-                                onChange={e => {
-                                  const l = [...projectPersonnelList];
-                                  const i = l.findIndex(x => x.id === p.id);
-                                  l[i].name = e.target.value;
-                                  setProjectPersonnelList(l);
+                        {(() => {
+                          const sortedManpower = [...projectPersonnelList].sort((a, b) => {
+                            if (!manpowerSort) return a.name.localeCompare(b.name);
+                            let comparison = 0;
+                            if (manpowerSort.key === "name") {
+                              comparison = a.name.localeCompare(b.name);
+                            } else if (manpowerSort.key === "role") {
+                              comparison = (a.role || "").localeCompare(b.role || "");
+                            } else if (manpowerSort.key === "daily_rate") {
+                              comparison = (a.daily_rate || 0) - (b.daily_rate || 0);
+                            }
+                            return manpowerSort.direction === "asc" ? comparison : -comparison;
+                          });
+
+                          return sortedManpower.map(p => {
+                            const isEditing = editingPersonnelId === p.id;
+                            return (
+                          <TableRow key={p.id}>
+                            <TableCell>
+                              {isEditing ? (
+                                <Input 
+                                  value={p.name} 
+                                  onChange={e => {
+                                    const l = [...projectPersonnelList];
+                                    const i = l.findIndex(x => x.id === p.id);
+                                    l[i].name = e.target.value;
+                                    setProjectPersonnelList(l);
                                   
-                                  // Sync to attendance
-                                  const attIdx = attendanceList.findIndex(a => a.personnel_id === p.id);
-                                  if (attIdx > -1) {
-                                    const attList = [...attendanceList];
-                                    attList[attIdx].name = e.target.value;
-                                    setAttendanceList(attList);
-                                  }
-                                }}
-                                onBlur={e => siteService.updatePersonnel(p.id, { name: e.target.value })}
-                              />
-                            ) : (
-                              <span>{p.name}</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {isEditing ? (
-                              manualRoles[p.id] || (p.role && !STANDARD_ROLES.includes(p.role)) ? (
+                                    // Sync to attendance
+                                    const attIdx = attendanceList.findIndex(a => a.personnel_id === p.id);
+                                    if (attIdx > -1) {
+                                      const attList = [...attendanceList];
+                                      attList[attIdx].name = e.target.value;
+                                      setAttendanceList(attList);
+                                    }
+                                  }}
+                                  onBlur={e => siteService.updatePersonnel(p.id, { name: e.target.value })}
+                                />
+                              ) : (
+                                <span>{p.name}</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {isEditing ? (
+                                manualRoles[p.id] || (p.role && !STANDARD_ROLES.includes(p.role)) ? (
                                 <div className="flex gap-2">
                                   <Input 
                                     placeholder="Custom position"
@@ -593,14 +661,11 @@ export default function SitePersonnel() {
                                     <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
                                   </SelectContent>
                                 </Select>
-                              )
-                            ) : (
-                              <span>{p.role}</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {isEditing ? (
-                              <Input 
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {isEditing ? (
+                                <Input 
                                 type="number"
                                 value={p.daily_rate} 
                                 onChange={e => {
@@ -661,15 +726,16 @@ export default function SitePersonnel() {
                           </TableCell>
                         </TableRow>
                       )})}
-                      {projectPersonnelList.length === 0 && (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
-                            No manpower enrolled in this project yet.
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
+                        )()}
+                        {projectPersonnelList.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                              No manpower enrolled in this project yet.
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
                   </div>
                 </CardContent>
               </Card>
@@ -813,13 +879,13 @@ export default function SitePersonnel() {
                           <TableHeader>
                             <TableRow>
                               <TableHead className="w-12 text-center">#</TableHead>
-                              <TableHead>Worker</TableHead>
-                              <TableHead>Position</TableHead>
-                              <TableHead className="w-[200px]">Scope Assignment</TableHead>
-                              <TableHead className="text-right">Daily Rate</TableHead>
+                              <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleAttendanceSort("name")}>Worker {getSortIcon(attendanceSort, "name")}</TableHead>
+                              <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleAttendanceSort("role")}>Position {getSortIcon(attendanceSort, "role")}</TableHead>
+                              <TableHead className="w-[200px] cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleAttendanceSort("bom_scope_id")}>Scope Assignment {getSortIcon(attendanceSort, "bom_scope_id")}</TableHead>
+                              <TableHead className="text-right cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleAttendanceSort("daily_rate")}>Daily Rate {getSortIcon(attendanceSort, "daily_rate")}</TableHead>
                               <TableHead>Status</TableHead>
                               <TableHead className="w-32 text-center">Overtime (Hrs)</TableHead>
-                              <TableHead className="text-right">Total Cost</TableHead>
+                              <TableHead className="text-right cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleAttendanceSort("total_cost")}>Total Cost</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
