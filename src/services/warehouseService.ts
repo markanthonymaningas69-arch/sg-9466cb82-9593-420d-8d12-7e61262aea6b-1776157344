@@ -70,5 +70,54 @@ export const warehouseService = {
 
     const newQuantity = current.quantity + adjustment;
     return this.update(id, { quantity: newQuantity });
+  },
+
+  async deployItem(mainItemId: string, targetProjectId: string, quantityToDeploy: number) {
+    // 1. Get the original item
+    const { data: mainItem } = await supabase
+      .from("inventory")
+      .select("*")
+      .eq("id", mainItemId)
+      .single();
+
+    if (!mainItem) return { error: new Error("Item not found") };
+    if (mainItem.quantity < quantityToDeploy) return { error: new Error("Insufficient quantity") };
+
+    // 2. See if the same item already exists in that project
+    const { data: existingProjectItem } = await supabase
+      .from("inventory")
+      .select("*")
+      .eq("project_id", targetProjectId)
+      .eq("name", mainItem.name)
+      .eq("category", mainItem.category || "")
+      .eq("unit", mainItem.unit)
+      .maybeSingle();
+
+    if (existingProjectItem) {
+      // Add quantity to existing project item
+      await this.update(existingProjectItem.id, { 
+        quantity: existingProjectItem.quantity + quantityToDeploy 
+      });
+    } else {
+      // Create new record for this project
+      const { id, created_at, ...itemData } = mainItem;
+      await this.create({
+        ...itemData,
+        project_id: targetProjectId,
+        quantity: quantityToDeploy
+      });
+    }
+
+    // 3. Deduct from main warehouse
+    const remainingQuantity = mainItem.quantity - quantityToDeploy;
+    if (remainingQuantity <= 0) {
+      // If none left, just delete the main warehouse record
+      await this.delete(mainItem.id);
+    } else {
+      // Update with remaining amount
+      await this.update(mainItem.id, { quantity: remainingQuantity });
+    }
+
+    return { success: true };
   }
 };

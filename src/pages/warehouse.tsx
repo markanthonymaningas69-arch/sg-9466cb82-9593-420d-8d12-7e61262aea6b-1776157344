@@ -40,7 +40,10 @@ export default function Warehouse() {
   
   // Form State
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deployDialogOpen, setDeployDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<WarehouseItem | null>(null);
+  const [deployingItem, setDeployingItem] = useState<WarehouseItem | null>(null);
+  const [deployForm, setDeployForm] = useState({ project_id: "", quantity: 1 });
   const [isManualCategory, setIsManualCategory] = useState(false);
   const [isManualUnit, setIsManualUnit] = useState(false);
   const [formData, setFormData] = useState({
@@ -152,6 +155,18 @@ export default function Warehouse() {
   const mainWarehouseItems = items.filter(item => !item.project_id);
   const projectWarehouseItems = items.filter(item => item.project_id);
 
+  const handleDeploySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deployingItem || !deployForm.project_id) return;
+    
+    await warehouseService.deployItem(deployingItem.id, deployForm.project_id, deployForm.quantity);
+    
+    setDeployDialogOpen(false);
+    setDeployingItem(null);
+    setDeployForm({ project_id: "", quantity: 1 });
+    loadData();
+  };
+
   const filteredMain = mainWarehouseItems.filter(item => categoryFilter === "all" || getCategoryLabel(item.category || "Uncategorized") === categoryFilter);
   const filteredProject = projectWarehouseItems.filter(item => {
     const matchCategory = categoryFilter === "all" || getCategoryLabel(item.category || "Uncategorized") === categoryFilter;
@@ -179,116 +194,151 @@ export default function Warehouse() {
             <h1 className="text-3xl font-heading font-bold">Inventory Management</h1>
             <p className="text-muted-foreground mt-1">Track materials, tools, equipment, and PPE</p>
           </div>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={resetForm}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Item
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>{editingItem ? "Edit Item" : "Add New Item"}</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Item Name *</Label>
-                    <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Category *</Label>
-                    {!isManualCategory ? (
-                      <Select value={formData.category} onValueChange={(val) => {
-                        if (val === "others") {
-                          setIsManualCategory(true);
-                          setFormData({ ...formData, category: "" });
-                        } else {
-                          setFormData({ ...formData, category: val });
-                        }
-                      }} required>
-                        <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                        <SelectContent>
-                          {STANDARD_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                          <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <div className="flex gap-2">
-                        <Input
-                          value={formData.category}
-                          onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                          placeholder="Custom category"
-                          required
-                        />
-                        <Button type="button" variant="outline" className="px-2" onClick={() => {
-                          setIsManualCategory(false);
-                          setFormData({ ...formData, category: "" });
-                        }}>List</Button>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="quantity">Quantity *</Label>
-                    <Input id="quantity" type="number" value={formData.quantity} onChange={(e) => setFormData({ ...formData, quantity: e.target.value })} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="unit">Unit *</Label>
-                    {!isManualUnit ? (
-                      <Select value={formData.unit} onValueChange={(val) => {
-                        if (val === "others") {
-                          setIsManualUnit(true);
-                          setFormData({ ...formData, unit: "" });
-                        } else {
-                          setFormData({ ...formData, unit: val });
-                        }
-                      }} required>
-                        <SelectTrigger><SelectValue placeholder="Select unit" /></SelectTrigger>
-                        <SelectContent>
-                          {STANDARD_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                          <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <div className="flex gap-2">
-                        <Input id="unit" value={formData.unit} onChange={(e) => setFormData({ ...formData, unit: e.target.value })} placeholder="Custom unit" required />
-                        <Button type="button" variant="outline" className="px-2" onClick={() => {
-                          setIsManualUnit(false);
-                          setFormData({ ...formData, unit: "" });
-                        }}>List</Button>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="unit_cost">Unit Cost (₱) *</Label>
-                    <Input id="unit_cost" type="number" step="0.01" value={formData.unit_cost} onChange={(e) => setFormData({ ...formData, unit_cost: e.target.value })} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="reorder_level">Low Stock Alert Level *</Label>
-                    <Input id="reorder_level" type="number" value={formData.reorder_level} onChange={(e) => setFormData({ ...formData, reorder_level: e.target.value })} required />
-                  </div>
-                  
-                  <div className="space-y-2 col-span-2 p-4 bg-muted/30 border rounded-lg">
-                    <Label className="text-base font-semibold mb-2 block">Deployment</Label>
+          {activeTab === "main" && (
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={resetForm}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Item
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>{editingItem ? "Edit Item" : "Add New Item"}</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Assignment</Label>
-                      <Select value={formData.project_id} onValueChange={(value) => setFormData({ ...formData, project_id: value })}>
-                        <SelectTrigger><SelectValue placeholder="Where is this item?" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="main" className="font-semibold text-primary">Main Warehouse</SelectItem>
-                          {projects.map(p => <SelectItem key={p.id} value={p.id}>Deployed to: {p.name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
+                      <Label htmlFor="name">Item Name *</Label>
+                      <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Category *</Label>
+                      {!isManualCategory ? (
+                        <Select value={formData.category} onValueChange={(val) => {
+                          if (val === "others") {
+                            setIsManualCategory(true);
+                            setFormData({ ...formData, category: "" });
+                          } else {
+                            setFormData({ ...formData, category: val });
+                          }
+                        }} required>
+                          <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                          <SelectContent>
+                            {STANDARD_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                            <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Input
+                            value={formData.category}
+                            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                            placeholder="Custom category"
+                            required
+                          />
+                          <Button type="button" variant="outline" className="px-2" onClick={() => {
+                            setIsManualCategory(false);
+                            setFormData({ ...formData, category: "" });
+                          }}>List</Button>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="quantity">Quantity *</Label>
+                      <Input id="quantity" type="number" value={formData.quantity} onChange={(e) => setFormData({ ...formData, quantity: e.target.value })} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="unit">Unit *</Label>
+                      {!isManualUnit ? (
+                        <Select value={formData.unit} onValueChange={(val) => {
+                          if (val === "others") {
+                            setIsManualUnit(true);
+                            setFormData({ ...formData, unit: "" });
+                          } else {
+                            setFormData({ ...formData, unit: val });
+                          }
+                        }} required>
+                          <SelectTrigger><SelectValue placeholder="Select unit" /></SelectTrigger>
+                          <SelectContent>
+                            {STANDARD_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                            <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Input id="unit" value={formData.unit} onChange={(e) => setFormData({ ...formData, unit: e.target.value })} placeholder="Custom unit" required />
+                          <Button type="button" variant="outline" className="px-2" onClick={() => {
+                            setIsManualUnit(false);
+                            setFormData({ ...formData, unit: "" });
+                          }}>List</Button>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="unit_cost">Unit Cost (₱) *</Label>
+                      <Input id="unit_cost" type="number" step="0.01" value={formData.unit_cost} onChange={(e) => setFormData({ ...formData, unit_cost: e.target.value })} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="reorder_level">Low Stock Alert Level *</Label>
+                      <Input id="reorder_level" type="number" value={formData.reorder_level} onChange={(e) => setFormData({ ...formData, reorder_level: e.target.value })} required />
                     </div>
                   </div>
-                </div>
-                <div className="flex justify-end gap-2 pt-4">
-                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                  <Button type="submit">{editingItem ? "Update" : "Add Item"}</Button>
-                </div>
-              </form>
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+                    <Button type="submit">{editingItem ? "Update" : "Add Item"}</Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
+
+          <Dialog open={deployDialogOpen} onOpenChange={setDeployDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Deploy Item to Project</DialogTitle>
+              </DialogHeader>
+              {deployingItem && (
+                <form onSubmit={handleDeploySubmit} className="space-y-4">
+                  <div className="bg-muted p-4 rounded-lg">
+                    <div className="font-semibold text-lg">{deployingItem.name}</div>
+                    <div className="text-sm text-muted-foreground">Available in Main Warehouse: {deployingItem.quantity} {deployingItem.unit}</div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Target Project *</Label>
+                    <Select 
+                      value={deployForm.project_id} 
+                      onValueChange={(val) => setDeployForm({ ...deployForm, project_id: val })} 
+                      required
+                    >
+                      <SelectTrigger><SelectValue placeholder="Select active project" /></SelectTrigger>
+                      <SelectContent>
+                        {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Quantity to Deploy ({deployingItem.unit}) *</Label>
+                    <Input 
+                      type="number" 
+                      min="1" 
+                      max={deployingItem.quantity} 
+                      value={deployForm.quantity} 
+                      onChange={(e) => setDeployForm({ ...deployForm, quantity: parseInt(e.target.value) || 1 })} 
+                      required 
+                    />
+                  </div>
+                  
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button type="button" variant="outline" onClick={() => setDeployDialogOpen(false)}>Cancel</Button>
+                    <Button type="submit">Confirm Deployment</Button>
+                  </div>
+                </form>
+              )}
             </DialogContent>
           </Dialog>
         </div>
@@ -406,6 +456,13 @@ export default function Warehouse() {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
+                              <Button size="sm" variant="default" className="bg-blue-600 hover:bg-blue-700" onClick={() => {
+                                setDeployingItem(item);
+                                setDeployForm({ project_id: "", quantity: 1 });
+                                setDeployDialogOpen(true);
+                              }}>
+                                Deploy
+                              </Button>
                               <Button size="sm" variant="ghost" onClick={() => handleEdit(item)}>
                                 <Pencil className="h-4 w-4" />
                               </Button>
