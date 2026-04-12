@@ -726,7 +726,8 @@ export default function SitePersonnel() {
                           </TableCell>
                         </TableRow>
                       );
-                    })}
+                    });
+                  })()}
                         {projectPersonnelList.length === 0 && (
                           <TableRow>
                             <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
