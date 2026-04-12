@@ -16,6 +16,6 @@ position: 4
 
 ## Checklist
 - [x] Create database tables for accounting
-- [ ] Build Accounting Tabs Layout
-- [ ] Implement Mini Dashboard (Revenue, OpEx, Cash Flow)
-- [ ] Implement General Journal & OpEx Entry Form
+- [x] Build Accounting Tabs Layout
+- [x] Implement Mini Dashboard (Revenue, OpEx, Cash Flow)
+- [x] Implement General Journal & OpEx Entry Form
