@@ -174,6 +174,17 @@ export const siteService = {
     return { data, error };
   },
 
+  async updateMaterialConsumption(id: string, updates: any) {
+    const { data, error } = await supabase
+      .from("material_consumption")
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single();
+    
+    return { data, error };
+  },
+
   async deleteMaterialConsumption(id: string) {
     const { error } = await supabase
       .from("material_consumption")
@@ -203,14 +214,15 @@ export const siteService = {
 
     const { data, error } = await supabase
       .from("bom_materials")
-      .select("id, material_name, unit")
+      .select("id, material_name, unit, scope_id")
       .in("scope_id", scopeIds)
       .order("material_name", { ascending: true });
     
     const formattedData = data?.map(m => ({
       id: m.id,
       name: m.material_name || "Unknown Material",
-      unit: m.unit || ""
+      unit: m.unit || "",
+      scope_id: m.scope_id
     })) || [];
     
     return { data: formattedData as any, error };

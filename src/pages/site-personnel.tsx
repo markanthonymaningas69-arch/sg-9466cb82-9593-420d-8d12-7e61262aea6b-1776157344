@@ -62,7 +62,7 @@ export default function SitePersonnel() {
 
   // Deliveries
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
-  const [bomMaterials, setBomMaterials] = useState<{id: string, name: string, unit: string}[]>([]);
+  const [bomMaterials, setBomMaterials] = useState<{id: string, name: string, unit: string, scope_id?: string}[]>([]);
   const [isManualItem, setIsManualItem] = useState(false);
   const [isManualUnit, setIsManualUnit] = useState(false);
   const [deliveryDialogOpen, setDeliveryDialogOpen] = useState(false);
@@ -84,6 +84,7 @@ export default function SitePersonnel() {
   const [consumptions, setConsumptions] = useState<MaterialConsumption[]>([]);
   const [consumptionDate, setConsumptionDate] = useState<string>(todayStr);
   const [consumptionDialogOpen, setConsumptionDialogOpen] = useState(false);
+  const [editingConsumptionId, setEditingConsumptionId] = useState<string | null>(null);
   const [consumptionForm, setConsumptionForm] = useState({
     bom_scope_id: "",
     date_used: new Date().toISOString().split("T")[0],
@@ -1550,7 +1551,9 @@ export default function SitePersonnel() {
                                     <SelectValue placeholder="Select material" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    {bomMaterials.map((mat) => (
+                                    {bomMaterials
+                                      .filter(mat => !consumptionForm.bom_scope_id || consumptionForm.bom_scope_id === "unassigned" || mat.scope_id === consumptionForm.bom_scope_id)
+                                      .map((mat) => (
                                       <SelectItem key={mat.id} value={mat.name}>{mat.name}</SelectItem>
                                     ))}
                                     <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
@@ -1683,38 +1686,137 @@ export default function SitePersonnel() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Date</TableHead>
-                            <TableHead>Item</TableHead>
+                            <TableHead className="w-12 text-center">Date</TableHead>
+                            <TableHead className="font-medium">Item</TableHead>
                             <TableHead>Quantity</TableHead>
                             <TableHead>Scope Assignment</TableHead>
                             <TableHead>Recorded By</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
+                            <TableHead className="text-right w-40">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {consumptions.map((row) => (
+                          {consumptions.map((row) => {
+                            const isEditing = editingConsumptionId === row.id;
+                            return (
                             <TableRow key={row.id}>
-                              <TableCell className="whitespace-nowrap">{row.date_used}</TableCell>
-                              <TableCell className="font-medium">{row.item_name}</TableCell>
-                              <TableCell>{row.quantity} {row.unit}</TableCell>
-                              <TableCell>
-                                {row.bom_scope_id ? (
-                                  <Badge variant="secondary">{row.bom_scope_of_work?.name || "Unknown Scope"}</Badge>
+                              <TableCell className="whitespace-nowrap">
+                                {isEditing ? (
+                                  <Input
+                                    type="date"
+                                    value={row.date_used}
+                                    className="w-32 h-8"
+                                    onChange={(e) => {
+                                      const list = [...consumptions];
+                                      const idx = list.findIndex(l => l.id === row.id);
+                                      list[idx].date_used = e.target.value;
+                                      setConsumptions(list);
+                                    }}
+                                    onBlur={(e) => siteService.updateMaterialConsumption(row.id, { date_used: e.target.value })}
+                                  />
                                 ) : (
-                                  <span className="text-muted-foreground italic">Unassigned</span>
+                                  row.date_used
+                                )}
+                              </TableCell>
+                              <TableCell className="font-medium">
+                                {isEditing ? (
+                                  <Input
+                                    value={row.item_name}
+                                    className="h-8"
+                                    onChange={(e) => {
+                                      const list = [...consumptions];
+                                      const idx = list.findIndex(l => l.id === row.id);
+                                      list[idx].item_name = e.target.value;
+                                      setConsumptions(list);
+                                    }}
+                                    onBlur={(e) => siteService.updateMaterialConsumption(row.id, { item_name: e.target.value })}
+                                  />
+                                ) : (
+                                  row.item_name
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {isEditing ? (
+                                  <div className="flex items-center gap-2">
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      className="w-20 h-8"
+                                      value={row.quantity}
+                                      onChange={(e) => {
+                                        const list = [...consumptions];
+                                        const idx = list.findIndex(l => l.id === row.id);
+                                        list[idx].quantity = parseFloat(e.target.value) || 0;
+                                        setConsumptions(list);
+                                      }}
+                                      onBlur={(e) => siteService.updateMaterialConsumption(row.id, { quantity: parseFloat(e.target.value) || 0 })}
+                                    />
+                                    <span>{row.unit}</span>
+                                  </div>
+                                ) : (
+                                  `${row.quantity} ${row.unit}`
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {isEditing ? (
+                                  <Select
+                                    value={row.bom_scope_id || "unassigned"}
+                                    onValueChange={(val) => {
+                                      const list = [...consumptions];
+                                      const idx = list.findIndex(l => l.id === row.id);
+                                      list[idx].bom_scope_id = val === "unassigned" ? null : val;
+                                      
+                                      const scopeName = val === "unassigned" ? undefined : scopes.find(s => s.id === val)?.name;
+                                      if (scopeName) {
+                                        list[idx].bom_scope_of_work = { name: scopeName };
+                                      } else {
+                                        delete list[idx].bom_scope_of_work;
+                                      }
+                                      
+                                      setConsumptions(list);
+                                      siteService.updateMaterialConsumption(row.id, { bom_scope_id: val === "unassigned" ? null : val });
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-8">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="unassigned" className="text-muted-foreground italic">Unassigned</SelectItem>
+                                      {scopes.map((s) => (
+                                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  row.bom_scope_id ? (
+                                    <Badge variant="secondary">{row.bom_scope_of_work?.name || "Unknown Scope"}</Badge>
+                                  ) : (
+                                    <span className="text-muted-foreground italic">Unassigned</span>
+                                  )
                                 )}
                               </TableCell>
                               <TableCell>{row.recorded_by || "-"}</TableCell>
                               <TableCell className="text-right">
-                                <Button size="sm" variant="ghost" onClick={async () => {
-                                  await siteService.deleteMaterialConsumption(row.id);
-                                  loadConsumptions();
-                                }}>
-                                  <Trash2 className="h-4 w-4 text-red-500" />
-                                </Button>
+                                {isEditing ? (
+                                  <Button variant="ghost" size="sm" onClick={() => setEditingConsumptionId(null)}>
+                                    <Check className="h-4 w-4 text-green-500" />
+                                  </Button>
+                                ) : (
+                                  <div className="flex justify-end gap-2">
+                                    <Button size="sm" variant="ghost" onClick={() => setEditingConsumptionId(row.id)}>
+                                      <Pencil className="h-4 w-4 text-blue-500" />
+                                    </Button>
+                                    <Button size="sm" variant="ghost" onClick={async () => {
+                                      await siteService.deleteMaterialConsumption(row.id);
+                                      loadConsumptions();
+                                    }}>
+                                      <Trash2 className="h-4 w-4 text-red-500" />
+                                    </Button>
+                                  </div>
+                                )}
                               </TableCell>
                             </TableRow>
-                          ))}
+                          );
+                        })}
                         </TableBody>
                       </Table>
                     </div>
