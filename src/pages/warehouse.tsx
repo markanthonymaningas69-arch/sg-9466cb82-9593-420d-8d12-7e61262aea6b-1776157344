@@ -37,6 +37,7 @@ export default function Warehouse() {
   const [activeTab, setActiveTab] = useState("main");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [projectFilter, setProjectFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState("");
   
   // Form State
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -53,7 +54,7 @@ export default function Warehouse() {
     unit: "",
     unit_cost: "",
     reorder_level: "",
-    project_id: "main" // "main" = null in db
+    last_restocked: new Date().toISOString().split("T")[0]
   });
 
   useEffect(() => {
@@ -81,8 +82,8 @@ export default function Warehouse() {
       unit: formData.unit,
       unit_cost: parseFloat(formData.unit_cost) || 0,
       reorder_level: parseInt(formData.reorder_level) || 0,
-      location: null, // Removed field, setting null for database compatibility
-      project_id: formData.project_id === "main" ? null : formData.project_id
+      last_restocked: formData.last_restocked,
+      project_id: null // Always add to main warehouse first
     };
 
     if (editingItem) {
@@ -113,7 +114,7 @@ export default function Warehouse() {
       unit: item.unit,
       unit_cost: item.unit_cost.toString(),
       reorder_level: item.reorder_level?.toString() || "0",
-      project_id: item.project_id || "main"
+      last_restocked: item.last_restocked || new Date().toISOString().split("T")[0]
     });
     
     setIsManualCategory(cat ? !STANDARD_CATEGORIES.includes(cat) : false);
@@ -136,7 +137,7 @@ export default function Warehouse() {
       unit: "",
       unit_cost: "",
       reorder_level: "",
-      project_id: "main"
+      last_restocked: new Date().toISOString().split("T")[0]
     });
     setEditingItem(null);
     setIsManualCategory(false);
@@ -167,11 +168,17 @@ export default function Warehouse() {
     loadData();
   };
 
-  const filteredMain = mainWarehouseItems.filter(item => categoryFilter === "all" || getCategoryLabel(item.category || "Uncategorized") === categoryFilter);
+  const filteredMain = mainWarehouseItems.filter(item => {
+    const matchCategory = categoryFilter === "all" || getCategoryLabel(item.category || "Uncategorized") === categoryFilter;
+    const matchDate = !dateFilter || item.last_restocked === dateFilter;
+    return matchCategory && matchDate;
+  });
+
   const filteredProject = projectWarehouseItems.filter(item => {
     const matchCategory = categoryFilter === "all" || getCategoryLabel(item.category || "Uncategorized") === categoryFilter;
     const matchProject = projectFilter === "all" || item.project_id === projectFilter;
-    return matchCategory && matchProject;
+    const matchDate = !dateFilter || item.last_restocked === dateFilter || item.created_at?.startsWith(dateFilter);
+    return matchCategory && matchProject && matchDate;
   });
 
   const totalValue = items.reduce((sum, item) => sum + (item.quantity * item.unit_cost), 0);
@@ -285,6 +292,10 @@ export default function Warehouse() {
                       <Label htmlFor="reorder_level">Low Stock Alert Level *</Label>
                       <Input id="reorder_level" type="number" value={formData.reorder_level} onChange={(e) => setFormData({ ...formData, reorder_level: e.target.value })} required />
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="last_restocked">Re-stock Date *</Label>
+                      <Input id="last_restocked" type="date" value={formData.last_restocked} onChange={(e) => setFormData({ ...formData, last_restocked: e.target.value })} required />
+                    </div>
                   </div>
                   <div className="flex justify-end gap-2 pt-4">
                     <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
@@ -373,7 +384,7 @@ export default function Warehouse() {
           </Card>
         </div>
 
-        <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); setCategoryFilter("all"); setProjectFilter("all"); }} className="flex-1 flex flex-col min-h-0">
+        <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); setCategoryFilter("all"); setProjectFilter("all"); setDateFilter(""); }} className="flex-1 flex flex-col min-h-0">
           <TabsList className="w-full justify-start shrink-0">
             <TabsTrigger value="main" className="flex items-center gap-2">
               <WarehouseIcon className="h-4 w-4" /> Main Warehouse
@@ -383,11 +394,11 @@ export default function Warehouse() {
             </TabsTrigger>
           </TabsList>
 
-          <div className="bg-muted/30 p-3 mt-4 border rounded-lg flex gap-4 shrink-0">
+          <div className="bg-muted/30 p-3 mt-4 border rounded-lg flex flex-wrap gap-4 shrink-0">
             <div className="space-y-1">
               <Label className="text-xs">Filter by Category:</Label>
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-[250px] h-9 bg-white dark:bg-background">
+                <SelectTrigger className="w-[200px] h-9 bg-white dark:bg-background">
                   <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
@@ -401,7 +412,7 @@ export default function Warehouse() {
               <div className="space-y-1">
                 <Label className="text-xs">Filter by Project:</Label>
                 <Select value={projectFilter} onValueChange={setProjectFilter}>
-                  <SelectTrigger className="w-[250px] h-9 bg-white dark:bg-background">
+                  <SelectTrigger className="w-[200px] h-9 bg-white dark:bg-background">
                     <SelectValue placeholder="All Projects" />
                   </SelectTrigger>
                   <SelectContent>
@@ -411,6 +422,19 @@ export default function Warehouse() {
                 </Select>
               </div>
             )}
+
+            <div className="space-y-1">
+              <Label className="text-xs flex justify-between w-[200px]">
+                <span>Filter by Date:</span>
+                {dateFilter && <button className="text-destructive hover:underline" onClick={() => setDateFilter("")}>Clear</button>}
+              </Label>
+              <Input 
+                type="date" 
+                className="w-[200px] h-9 bg-white dark:bg-background" 
+                value={dateFilter} 
+                onChange={(e) => setDateFilter(e.target.value)} 
+              />
+            </div>
           </div>
 
           <TabsContent value="main" className="flex-1 mt-4 data-[state=active]:flex flex-col min-h-0">
@@ -419,6 +443,7 @@ export default function Warehouse() {
                 <Table>
                   <TableHeader className="sticky top-0 bg-background z-10">
                     <TableRow>
+                      <TableHead>Date</TableHead>
                       <TableHead>Item Name</TableHead>
                       <TableHead>Category</TableHead>
                       <TableHead className="text-right">Quantity</TableHead>
@@ -431,13 +456,14 @@ export default function Warehouse() {
                   <TableBody>
                     {filteredMain.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                           No items found in the Main Warehouse.
                         </TableCell>
                       </TableRow>
                     ) : (
                       filteredMain.map((item) => (
                         <TableRow key={item.id}>
+                          <TableCell className="text-muted-foreground whitespace-nowrap">{item.last_restocked || "-"}</TableCell>
                           <TableCell className="font-medium">{item.name}</TableCell>
                           <TableCell>
                             <Badge variant="outline">{getCategoryLabel(item.category || "-")}</Badge>
@@ -486,6 +512,7 @@ export default function Warehouse() {
                 <Table>
                   <TableHeader className="sticky top-0 bg-background z-10">
                     <TableRow>
+                      <TableHead>Date</TableHead>
                       <TableHead>Item Name</TableHead>
                       <TableHead>Category</TableHead>
                       <TableHead>Deployed To</TableHead>
@@ -498,13 +525,14 @@ export default function Warehouse() {
                   <TableBody>
                     {filteredProject.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                           No items currently deployed to projects.
                         </TableCell>
                       </TableRow>
                     ) : (
                       filteredProject.map((item) => (
                         <TableRow key={item.id}>
+                          <TableCell className="text-muted-foreground whitespace-nowrap">{item.last_restocked || item.created_at?.split("T")[0] || "-"}</TableCell>
                           <TableCell className="font-medium">{item.name}</TableCell>
                           <TableCell>
                             <Badge variant="outline">{getCategoryLabel(item.category || "-")}</Badge>
