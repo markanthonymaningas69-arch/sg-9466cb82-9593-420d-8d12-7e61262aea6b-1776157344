@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -520,6 +520,60 @@ export type Database = {
             columns: ["personnel_id"]
             isOneToOne: false
             referencedRelation: "personnel"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      material_consumption: {
+        Row: {
+          bom_scope_id: string | null
+          created_at: string | null
+          date_used: string
+          id: string
+          item_name: string
+          notes: string | null
+          project_id: string
+          quantity: number
+          recorded_by: string | null
+          unit: string
+        }
+        Insert: {
+          bom_scope_id?: string | null
+          created_at?: string | null
+          date_used?: string
+          id?: string
+          item_name: string
+          notes?: string | null
+          project_id: string
+          quantity: number
+          recorded_by?: string | null
+          unit: string
+        }
+        Update: {
+          bom_scope_id?: string | null
+          created_at?: string | null
+          date_used?: string
+          id?: string
+          item_name?: string
+          notes?: string | null
+          project_id?: string
+          quantity?: number
+          recorded_by?: string | null
+          unit?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_consumption_bom_scope_id_fkey"
+            columns: ["bom_scope_id"]
+            isOneToOne: false
+            referencedRelation: "bom_scope_of_work"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_consumption_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
