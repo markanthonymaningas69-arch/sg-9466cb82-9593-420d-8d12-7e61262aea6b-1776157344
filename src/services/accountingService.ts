@@ -93,6 +93,16 @@ export const accountingService = {
     return { data, error };
   },
 
+  async updateLiquidation(id: string, updates: any) {
+    const { data, error } = await supabase
+      .from("liquidations")
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single();
+    return { data, error };
+  },
+
   // === Payroll Integration (Site Attendance) ===
   async getPayrollData(startDate: string, endDate: string, projectId?: string) {
     let query = supabase

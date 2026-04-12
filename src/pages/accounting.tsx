@@ -5,6 +5,8 @@ import { AccountingDashboard } from "@/components/accounting/AccountingDashboard
 import { JournalOpEx } from "@/components/accounting/JournalOpEx";
 import { PayrollTab } from "@/components/accounting/PayrollTab";
 import { VouchersTab } from "@/components/accounting/VouchersTab";
+import { LiquidationsTab } from "@/components/accounting/LiquidationsTab";
+import { TaxReportTab } from "@/components/accounting/TaxReportTab";
 import { Card, CardContent } from "@/components/ui/card";
 import { Landmark, FileSpreadsheet, Users, Receipt, CircleDollarSign, FileText } from "lucide-react";
 
@@ -60,23 +62,11 @@ export default function Accounting() {
           </TabsContent>
 
           <TabsContent value="liquidations" className="flex-1 mt-0">
-            <Card className="mt-4 border-t-0 rounded-t-none shadow-none">
-              <CardContent className="py-12 text-center text-muted-foreground">
-                <CircleDollarSign className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                <h3 className="text-lg font-semibold mb-2">Liquidations Tracker Pending</h3>
-                <p>Cash advance vs Actual tracking is being installed...</p>
-              </CardContent>
-            </Card>
+            <LiquidationsTab />
           </TabsContent>
 
           <TabsContent value="tax" className="flex-1 mt-0">
-            <Card className="mt-4 border-t-0 rounded-t-none shadow-none">
-              <CardContent className="py-12 text-center text-muted-foreground">
-                <FileText className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                <h3 className="text-lg font-semibold mb-2">UAE Tax Reporting Pending</h3>
-                <p>Dubai VAT (Output vs Input) computation engine is being installed...</p>
-              </CardContent>
-            </Card>
+            <TaxReportTab />
           </TabsContent>
         </Tabs>
       </div>

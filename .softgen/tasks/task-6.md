@@ -14,5 +14,5 @@ position: 6
 - Dubai VAT 5% reporting on relevant transactions
 
 ## Checklist
-- [ ] Implement Liquidations Tab & Form
-- [ ] Implement UAE Taxation Tab (Output Tax vs Input Tax)
+- [x] Implement Liquidations Tab & Form
+- [x] Implement UAE Taxation Tab (Output Tax vs Input Tax)
