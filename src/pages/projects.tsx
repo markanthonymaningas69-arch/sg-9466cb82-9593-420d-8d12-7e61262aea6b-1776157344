@@ -352,12 +352,14 @@ export default function Projects() {
                             <Label>Link to Scopes of Work</Label>
                             <p className="text-xs text-muted-foreground mb-2">Select which scopes use this item (e.g., Cement for Concrete, Masonry)</p>
                             <div className="flex gap-2">
-                              <Select key={currentScopeSelection === "" ? "empty-select" : "filled-select"} value={currentScopeSelection || undefined} onValueChange={setCurrentScopeSelection}>
-                                <SelectTrigger><SelectValue placeholder="Select a scope..." /></SelectTrigger>
-                                <SelectContent>
-                                  {masterScopes.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
+                              <select 
+                                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                value={currentScopeSelection}
+                                onChange={(e) => setCurrentScopeSelection(e.target.value)}
+                              >
+                                <option value="" disabled hidden>Select a scope...</option>
+                                {masterScopes.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                              </select>
                               <Button type="button" onClick={handleAddScopeToItem} variant="secondary"><Plus className="h-4 w-4" /></Button>
                             </div>
                             {masterForm.associated_scopes.length > 0 && (
