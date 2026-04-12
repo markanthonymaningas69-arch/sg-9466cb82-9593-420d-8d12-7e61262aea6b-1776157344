@@ -318,7 +318,7 @@ export default function Projects() {
                   <TabsContent value="items" className="flex-1 min-h-0 flex flex-col mt-4 border-t pt-4">
                     <div className="grid grid-cols-3 gap-6 flex-1 min-h-0">
                       <div className="col-span-1 border-r pr-6 flex flex-col justify-start overflow-y-auto">
-                        <div className="flex justify-between items-center mb-4">
+                        <div className="flex justify-between items-center mb-4 shrink-0">
                           <h3 className="font-semibold text-lg text-primary">{editingMasterItemId ? "Edit Catalog Item" : "Add New Item"}</h3>
                           {editingMasterItemId && (
                             <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-muted-foreground" onClick={() => {
@@ -330,7 +330,7 @@ export default function Projects() {
                             }}>Cancel Edit</Button>
                           )}
                         </div>
-                        <form onSubmit={handleMasterItemSubmit} className="space-y-5">
+                        <form onSubmit={handleMasterItemSubmit} className="space-y-5 bg-slate-50 p-4 rounded-lg border border-slate-100 shadow-sm">
                           <div className="space-y-1.5">
                             <Label className="font-semibold">Item Name <span className="text-red-500">*</span></Label>
                             <Input 
@@ -446,7 +446,7 @@ export default function Projects() {
                       </div>
 
                       <div className="col-span-2 flex flex-col min-h-0">
-                        <div className="font-semibold mb-4 text-lg flex justify-between items-center">
+                        <div className="font-semibold mb-4 text-lg flex justify-between items-center shrink-0">
                           <span className="text-primary">Encoded Materials & Tools</span>
                           <Badge variant="outline" className="bg-slate-50">{filteredMasterItems.length} Items</Badge>
                         </div>
@@ -563,7 +563,7 @@ export default function Projects() {
                         </form>
                       </div>
 
-                      <div className="col-span-2 flex flex-col justify-start h-[65vh]">
+                      <div className="col-span-2 flex flex-col min-h-0">
                         <div className="font-semibold mb-4 text-lg flex justify-between items-center shrink-0">
                           <span className="text-primary">Encoded Scopes of Work</span>
                           <Badge variant="outline" className="bg-slate-50">{masterScopes.length} Scopes</Badge>
