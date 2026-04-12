@@ -83,9 +83,68 @@ export default function Analytics() {
 
   // 1. SWA Data
   const swaData = useMemo(() => {
-    if (!bom?.bom_scope_of_work || !Array.isArray(bom.bom_scope_of_work)) return [];
-    // Spread into a new array to prevent "Cannot assign to read only property" in strict mode sorting
-    return [...bom.bom_scope_of_work].sort((a: any, b: any) => (a.order_number || 0) - (b.order_number || 0));
+    if (!bom) return { rows: [], totals: { cost: 0, wtPercentage: 0, accomplishment: 0, amountOfCompletion: 0 } };
+
+    const scopes = Array.isArray(bom.bom_scope_of_work) ? bom.bom_scope_of_work : [];
+    const indirects = Array.isArray(bom.bom_indirect_costs) ? bom.bom_indirect_costs : [];
+
+    let grandTotalCost = 0;
+
+    const scopeRows = scopes.map((scope: any) => {
+      const matCost = Array.isArray(scope.bom_materials) 
+        ? scope.bom_materials.reduce((sum: number, m: any) => sum + (Number(m.quantity || 0) * Number(m.unit_cost || 0)), 0)
+        : 0;
+      const labCost = Array.isArray(scope.bom_labor)
+        ? scope.bom_labor.reduce((sum: number, l: any) => sum + (Number(l.no_of_workers || 0) * Number(l.daily_rate || 0) * Number(l.duration_days || 0)), 0)
+        : 0;
+      
+      const cost = matCost + labCost;
+      grandTotalCost += cost;
+
+      return {
+        id: scope.id,
+        name: scope.name || "Unknown Scope",
+        type: "scope",
+        cost,
+        completion: Number(scope.completion_percentage || 0),
+        order_number: scope.order_number || 0
+      };
+    }).sort((a, b) => a.order_number - b.order_number);
+
+    const icRows = indirects.map((ic: any) => {
+      const cost = Number(ic.amount || 0);
+      grandTotalCost += cost;
+
+      return {
+        id: ic.id,
+        name: ic.name || "Unknown Indirect Cost",
+        type: "indirect",
+        cost,
+        completion: 0 // Indirect costs default to 0% completed for SWA logic
+      };
+    });
+
+    const allRows = [...scopeRows, ...icRows].map(row => {
+      const wtPercentage = grandTotalCost > 0 ? (row.cost / grandTotalCost) * 100 : 0;
+      const accomplishment = wtPercentage * (row.completion / 100);
+      const amountOfCompletion = row.cost * (row.completion / 100);
+
+      return {
+        ...row,
+        wtPercentage,
+        accomplishment,
+        amountOfCompletion
+      };
+    });
+
+    const totals = {
+      cost: grandTotalCost,
+      wtPercentage: grandTotalCost > 0 ? 100 : 0,
+      accomplishment: allRows.reduce((sum, r) => sum + r.accomplishment, 0),
+      amountOfCompletion: allRows.reduce((sum, r) => sum + r.amountOfCompletion, 0)
+    };
+
+    return { rows: allRows, totals };
   }, [bom]);
 
   // 2. Material Usage vs Allocated
@@ -279,7 +338,7 @@ export default function Analytics() {
             <TabsList className="grid grid-cols-2 md:grid-cols-5 w-full h-auto gap-2 bg-transparent">
               <TabsTrigger value="swa" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-card py-2">
                 <ClipboardList className="h-4 w-4" />
-                <span className="hidden lg:inline">SWA Accomplishment</span>
+                <span className="hidden lg:inline">Statement of Work Accomplishment</span>
                 <span className="lg:hidden">SWA</span>
               </TabsTrigger>
               <TabsTrigger value="materials" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-card py-2">
@@ -308,43 +367,52 @@ export default function Analytics() {
             <TabsContent value="swa">
               <Card>
                 <CardHeader>
-                  <CardTitle>Statement of Work Accomplishment (SWA)</CardTitle>
-                  <CardDescription>Progress and completion status per scope of work.</CardDescription>
+                  <CardTitle>Statement of Work Accomplishment</CardTitle>
+                  <CardDescription>Weighted progress and financial completion status per scope and indirect costs.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Scope of Work</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="w-[30%]">Progress</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead className="text-right">Total Cost</TableHead>
+                        <TableHead className="text-right">Wt. %</TableHead>
                         <TableHead className="text-right">Completed %</TableHead>
+                        <TableHead className="text-right">Accomplishment</TableHead>
+                        <TableHead className="text-right">Amount of Completion</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {swaData.length === 0 ? (
+                      {swaData.rows.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                            No scopes defined in BOM.
+                          <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                            No scopes or indirect costs defined in BOM.
                           </TableCell>
                         </TableRow>
                       ) : (
-                        swaData.map((scope: any) => (
-                          <TableRow key={scope.id}>
-                            <TableCell className="font-medium">{scope.name}</TableCell>
-                            <TableCell>
-                              <Badge variant={scope.completion_percentage >= 100 ? "default" : scope.completion_percentage > 0 ? "secondary" : "outline"}>
-                                {scope.completion_percentage >= 100 ? "Completed" : scope.completion_percentage > 0 ? "In Progress" : "Not Started"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Progress value={scope.completion_percentage || 0} className="h-2" />
-                            </TableCell>
-                            <TableCell className="text-right font-bold">
-                              {Number(scope.completion_percentage || 0).toFixed(1)}%
-                            </TableCell>
+                        <>
+                          {swaData.rows.map((row: any) => (
+                            <TableRow key={row.id}>
+                              <TableCell className="font-medium">
+                                {row.name}
+                                {row.type === "indirect" && <Badge variant="outline" className="ml-2 text-[10px] h-5">Indirect Cost</Badge>}
+                              </TableCell>
+                              <TableCell className="text-right">{formatCurrency(row.cost)}</TableCell>
+                              <TableCell className="text-right">{row.wtPercentage.toFixed(2)}%</TableCell>
+                              <TableCell className="text-right">{row.completion.toFixed(2)}%</TableCell>
+                              <TableCell className="text-right font-bold text-primary">{row.accomplishment.toFixed(2)}%</TableCell>
+                              <TableCell className="text-right font-bold text-primary">{formatCurrency(row.amountOfCompletion)}</TableCell>
+                            </TableRow>
+                          ))}
+                          <TableRow className="bg-muted/50 font-bold hover:bg-muted/50">
+                            <TableCell>GRAND TOTAL</TableCell>
+                            <TableCell className="text-right text-primary">{formatCurrency(swaData.totals.cost)}</TableCell>
+                            <TableCell className="text-right text-primary">{swaData.totals.wtPercentage.toFixed(2)}%</TableCell>
+                            <TableCell className="text-right">-</TableCell>
+                            <TableCell className="text-right text-primary">{swaData.totals.accomplishment.toFixed(2)}%</TableCell>
+                            <TableCell className="text-right text-primary">{formatCurrency(swaData.totals.amountOfCompletion)}</TableCell>
                           </TableRow>
-                        ))
+                        </>
                       )}
                     </TableBody>
                   </Table>
