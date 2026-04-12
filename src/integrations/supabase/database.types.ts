@@ -606,6 +606,7 @@ export type Database = {
       }
       master_items: {
         Row: {
+          associated_scopes: Json | null
           category: string
           created_at: string | null
           default_cost: number | null
@@ -614,6 +615,7 @@ export type Database = {
           unit: string
         }
         Insert: {
+          associated_scopes?: Json | null
           category: string
           created_at?: string | null
           default_cost?: number | null
@@ -622,12 +624,34 @@ export type Database = {
           unit: string
         }
         Update: {
+          associated_scopes?: Json | null
           category?: string
           created_at?: string | null
           default_cost?: number | null
           id?: string
           name?: string
           unit?: string
+        }
+        Relationships: []
+      }
+      master_scopes: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
         }
         Relationships: []
       }

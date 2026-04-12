@@ -98,6 +98,21 @@ export const projectService = {
     return { error };
   },
 
+  async getMasterScopes() {
+    const { data, error } = await supabase.from("master_scopes").select("*").order("name");
+    return { data: data || [], error };
+  },
+
+  async createMasterScope(scope: any) {
+    const { data, error } = await supabase.from("master_scopes").insert(scope).select().single();
+    return { data, error };
+  },
+
+  async deleteMasterScope(id: string) {
+    const { error } = await supabase.from("master_scopes").delete().eq("id", id);
+    return { error };
+  },
+
   async getStats() {
     const cacheKey = CACHE_KEYS.companyDashboard("default");
     const cached = cacheManager.get<any>(cacheKey);

@@ -7,11 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { projectService } from "@/services/projectService";
-import { Plus, Pencil, Trash2, FileText, Database } from "lucide-react";
+import { Plus, Pencil, Trash2, FileText, Database, X } from "lucide-react";
 import type { Database as SupabaseDatabase } from "@/integrations/supabase/types";
 
 type Project = SupabaseDatabase["public"]["Tables"]["projects"]["Row"];
@@ -36,9 +37,14 @@ export default function Projects() {
   // Master Items State
   const [encodeDialogOpen, setEncodeDialogOpen] = useState(false);
   const [masterItems, setMasterItems] = useState<any[]>([]);
-  const [masterForm, setMasterForm] = useState({ name: "", category: "", unit: "" });
+  const [masterForm, setMasterForm] = useState({ name: "", category: "", unit: "", associated_scopes: [] as string[] });
   const [isManualMasterCategory, setIsManualMasterCategory] = useState(false);
   const [isManualMasterUnit, setIsManualMasterUnit] = useState(false);
+  const [currentScopeSelection, setCurrentScopeSelection] = useState("");
+
+  // Master Scopes State
+  const [masterScopes, setMasterScopes] = useState<any[]>([]);
+  const [masterScopeForm, setMasterScopeForm] = useState({ name: "", description: "" });
 
   const STANDARD_CATEGORIES = ["Construction Materials", "Tools", "Hand Tools", "Equipments", "PPE"];
   const STANDARD_UNITS = ["pcs", "bags", "kgs", "liters", "units", "set", "lot", "m", "sq.m", "cu.m", "length", "box", "roll"];
@@ -46,11 +52,17 @@ export default function Projects() {
   useEffect(() => {
     loadProjects();
     loadMasterItems();
+    loadMasterScopes();
   }, []);
 
   const loadMasterItems = async () => {
     const { data } = await projectService.getMasterItems();
     setMasterItems(data || []);
+  };
+
+  const loadMasterScopes = async () => {
+    const { data } = await projectService.getMasterScopes();
+    setMasterScopes(data || []);
   };
 
   const loadProjects = async () => {
@@ -89,11 +101,13 @@ export default function Projects() {
     await projectService.createMasterItem({
       name: masterForm.name,
       category: masterForm.category,
-      unit: masterForm.unit
+      unit: masterForm.unit,
+      associated_scopes: masterForm.associated_scopes
     });
-    setMasterForm({ name: "", category: "", unit: "" });
+    setMasterForm({ name: "", category: "", unit: "", associated_scopes: [] });
     setIsManualMasterCategory(false);
     setIsManualMasterUnit(false);
+    setCurrentScopeSelection("");
     loadMasterItems();
   };
 
@@ -102,6 +116,40 @@ export default function Projects() {
       await projectService.deleteMasterItem(id);
       loadMasterItems();
     }
+  };
+
+  const handleMasterScopeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await projectService.createMasterScope({
+      name: masterScopeForm.name,
+      description: masterScopeForm.description
+    });
+    setMasterScopeForm({ name: "", description: "" });
+    loadMasterScopes();
+  };
+
+  const handleDeleteMasterScope = async (id: string) => {
+    if (confirm("Delete this master scope?")) {
+      await projectService.deleteMasterScope(id);
+      loadMasterScopes();
+    }
+  };
+
+  const handleAddScopeToItem = () => {
+    if (currentScopeSelection && !masterForm.associated_scopes.includes(currentScopeSelection)) {
+      setMasterForm({
+        ...masterForm,
+        associated_scopes: [...masterForm.associated_scopes, currentScopeSelection]
+      });
+      setCurrentScopeSelection("");
+    }
+  };
+
+  const handleRemoveScopeFromItem = (scopeName: string) => {
+    setMasterForm({
+      ...masterForm,
+      associated_scopes: masterForm.associated_scopes.filter(s => s !== scopeName)
+    });
   };
 
   const handleEdit = (project: Project) => {
@@ -175,98 +223,191 @@ export default function Projects() {
                   Encode Master Items
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
+              <DialogContent className="max-w-6xl h-[85vh] flex flex-col">
                 <DialogHeader>
-                  <DialogTitle>Master Item Catalog</DialogTitle>
+                  <DialogTitle>Master Catalog Engine</DialogTitle>
                 </DialogHeader>
-                <div className="grid grid-cols-3 gap-6 flex-1 min-h-0">
-                  <div className="col-span-1 border-r pr-6 flex flex-col">
-                    <h3 className="font-semibold mb-4 text-lg">Add New Item</h3>
-                    <form onSubmit={handleMasterItemSubmit} className="space-y-4 flex-1 overflow-y-auto pr-2">
-                      <div className="space-y-2">
-                        <Label>Item Name *</Label>
-                        <Input value={masterForm.name} onChange={(e) => setMasterForm({...masterForm, name: e.target.value})} required />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Category *</Label>
-                        {!isManualMasterCategory ? (
-                          <Select value={masterForm.category} onValueChange={(val) => {
-                            if (val === "others") { setIsManualMasterCategory(true); setMasterForm({...masterForm, category: ""}); }
-                            else setMasterForm({...masterForm, category: val});
-                          }} required>
-                            <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                            <SelectContent>
-                              {STANDARD_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                              <SelectItem value="others" className="text-blue-600 font-semibold">Others (Input)</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <div className="flex gap-2">
-                            <Input value={masterForm.category} onChange={(e) => setMasterForm({...masterForm, category: e.target.value})} required />
-                            <Button type="button" variant="outline" className="px-2" onClick={() => setIsManualMasterCategory(false)}>List</Button>
+                <Tabs defaultValue="items" className="flex-1 flex flex-col min-h-0">
+                  <TabsList>
+                    <TabsTrigger value="items">Materials, Tools & PPE</TabsTrigger>
+                    <TabsTrigger value="scopes">Scopes of Work</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="items" className="flex-1 min-h-0 flex flex-col mt-4">
+                    <div className="grid grid-cols-3 gap-6 flex-1 min-h-0">
+                      <div className="col-span-1 border-r pr-6 flex flex-col">
+                        <h3 className="font-semibold mb-4 text-lg">Add New Item</h3>
+                        <form onSubmit={handleMasterItemSubmit} className="space-y-4 flex-1 overflow-y-auto pr-2 pb-4">
+                          <div className="space-y-2">
+                            <Label>Item Name *</Label>
+                            <Input value={masterForm.name} onChange={(e) => setMasterForm({...masterForm, name: e.target.value})} required />
                           </div>
-                        )}
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Default Unit *</Label>
-                        {!isManualMasterUnit ? (
-                          <Select value={masterForm.unit} onValueChange={(val) => {
-                            if (val === "others") { setIsManualMasterUnit(true); setMasterForm({...masterForm, unit: ""}); }
-                            else setMasterForm({...masterForm, unit: val});
-                          }} required>
-                            <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                            <SelectContent>
-                              {STANDARD_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                              <SelectItem value="others" className="text-blue-600 font-semibold">Others (Input)</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <div className="flex gap-2">
-                            <Input value={masterForm.unit} onChange={(e) => setMasterForm({...masterForm, unit: e.target.value})} required />
-                            <Button type="button" variant="outline" className="px-2" onClick={() => setIsManualMasterUnit(false)}>List</Button>
+                          <div className="space-y-2">
+                            <Label>Category *</Label>
+                            {!isManualMasterCategory ? (
+                              <Select value={masterForm.category} onValueChange={(val) => {
+                                if (val === "others") { setIsManualMasterCategory(true); setMasterForm({...masterForm, category: ""}); }
+                                else setMasterForm({...masterForm, category: val});
+                              }} required>
+                                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                                <SelectContent>
+                                  {STANDARD_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                                  <SelectItem value="others" className="text-blue-600 font-semibold">Others (Input)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <div className="flex gap-2">
+                                <Input value={masterForm.category} onChange={(e) => setMasterForm({...masterForm, category: e.target.value})} required />
+                                <Button type="button" variant="outline" className="px-2" onClick={() => setIsManualMasterCategory(false)}>List</Button>
+                              </div>
+                            )}
                           </div>
-                        )}
+                          <div className="space-y-2">
+                            <Label>Default Unit *</Label>
+                            {!isManualMasterUnit ? (
+                              <Select value={masterForm.unit} onValueChange={(val) => {
+                                if (val === "others") { setIsManualMasterUnit(true); setMasterForm({...masterForm, unit: ""}); }
+                                else setMasterForm({...masterForm, unit: val});
+                              }} required>
+                                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                                <SelectContent>
+                                  {STANDARD_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                                  <SelectItem value="others" className="text-blue-600 font-semibold">Others (Input)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <div className="flex gap-2">
+                                <Input value={masterForm.unit} onChange={(e) => setMasterForm({...masterForm, unit: e.target.value})} required />
+                                <Button type="button" variant="outline" className="px-2" onClick={() => setIsManualMasterUnit(false)}>List</Button>
+                              </div>
+                            )}
+                          </div>
+                          <div className="space-y-2 pt-2 border-t mt-4">
+                            <Label>Link to Scopes of Work</Label>
+                            <p className="text-xs text-muted-foreground mb-2">Select which scopes use this item (e.g., Cement for Concrete, Masonry)</p>
+                            <div className="flex gap-2">
+                              <Select value={currentScopeSelection} onValueChange={setCurrentScopeSelection}>
+                                <SelectTrigger><SelectValue placeholder="Select a scope..." /></SelectTrigger>
+                                <SelectContent>
+                                  {masterScopes.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                              <Button type="button" onClick={handleAddScopeToItem} variant="secondary"><Plus className="h-4 w-4" /></Button>
+                            </div>
+                            {masterForm.associated_scopes.length > 0 && (
+                              <div className="flex flex-wrap gap-2 mt-3 p-2 bg-muted/50 rounded-md">
+                                {masterForm.associated_scopes.map(scope => (
+                                  <Badge key={scope} variant="default" className="flex items-center gap-1 bg-blue-100 text-blue-800 hover:bg-blue-200 border-blue-200">
+                                    {scope}
+                                    <X className="h-3 w-3 cursor-pointer text-blue-500 hover:text-blue-900" onClick={() => handleRemoveScopeFromItem(scope)} />
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <Button type="submit" className="w-full mt-4">Save to Catalog</Button>
+                        </form>
                       </div>
-                      <Button type="submit" className="w-full mt-4">Save to Catalog</Button>
-                    </form>
-                  </div>
-                  <div className="col-span-2 flex flex-col min-h-0">
-                    <h3 className="font-semibold mb-4 text-lg flex justify-between">
-                      <span>Encoded Items</span>
-                      <Badge variant="secondary">{masterItems.length} Total</Badge>
-                    </h3>
-                    <div className="border rounded-md overflow-y-auto flex-1">
-                      <Table>
-                        <TableHeader className="sticky top-0 bg-white z-10">
-                          <TableRow>
-                            <TableHead>Name</TableHead>
-                            <TableHead>Category</TableHead>
-                            <TableHead>Unit</TableHead>
-                            <TableHead className="w-12"></TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {masterItems.length === 0 ? (
-                            <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No items encoded yet.</TableCell></TableRow>
-                          ) : (
-                            masterItems.map(item => (
-                              <TableRow key={item.id}>
-                                <TableCell className="font-medium">{item.name}</TableCell>
-                                <TableCell>{item.category}</TableCell>
-                                <TableCell>{item.unit}</TableCell>
-                                <TableCell>
-                                  <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDeleteMasterItem(item.id)}>
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </TableCell>
+                      <div className="col-span-2 flex flex-col min-h-0">
+                        <h3 className="font-semibold mb-4 text-lg flex justify-between">
+                          <span>Encoded Materials & Tools</span>
+                          <Badge variant="secondary">{masterItems.length} Total</Badge>
+                        </h3>
+                        <div className="border rounded-md overflow-y-auto flex-1">
+                          <Table>
+                            <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
+                              <TableRow>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Category</TableHead>
+                                <TableHead>Unit</TableHead>
+                                <TableHead>Linked Scopes</TableHead>
+                                <TableHead className="w-12"></TableHead>
                               </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
+                            </TableHeader>
+                            <TableBody>
+                              {masterItems.length === 0 ? (
+                                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No items encoded yet.</TableCell></TableRow>
+                              ) : (
+                                masterItems.map(item => (
+                                  <TableRow key={item.id}>
+                                    <TableCell className="font-medium">{item.name}</TableCell>
+                                    <TableCell>{item.category}</TableCell>
+                                    <TableCell>{item.unit}</TableCell>
+                                    <TableCell>
+                                      <div className="flex flex-wrap gap-1">
+                                        {(item.associated_scopes || []).map((s: string) => (
+                                          <Badge key={s} variant="outline" className="text-[10px] py-0">{s}</Badge>
+                                        ))}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDeleteMasterItem(item.id)}>
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+                                ))
+                              )}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  </TabsContent>
+
+                  <TabsContent value="scopes" className="flex-1 min-h-0 flex flex-col mt-4">
+                    <div className="grid grid-cols-3 gap-6 flex-1 min-h-0">
+                      <div className="col-span-1 border-r pr-6 flex flex-col">
+                        <h3 className="font-semibold mb-4 text-lg">Add Master Scope</h3>
+                        <form onSubmit={handleMasterScopeSubmit} className="space-y-4">
+                          <div className="space-y-2">
+                            <Label>Scope Name *</Label>
+                            <Input value={masterScopeForm.name} onChange={(e) => setMasterScopeForm({...masterScopeForm, name: e.target.value})} placeholder="e.g. Concrete Works" required />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Description (Optional)</Label>
+                            <Input value={masterScopeForm.description} onChange={(e) => setMasterScopeForm({...masterScopeForm, description: e.target.value})} />
+                          </div>
+                          <Button type="submit" className="w-full mt-4">Save Scope</Button>
+                        </form>
+                      </div>
+                      <div className="col-span-2 flex flex-col min-h-0">
+                        <h3 className="font-semibold mb-4 text-lg flex justify-between">
+                          <span>Encoded Scopes of Work</span>
+                          <Badge variant="secondary">{masterScopes.length} Total</Badge>
+                        </h3>
+                        <div className="border rounded-md overflow-y-auto flex-1">
+                          <Table>
+                            <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
+                              <TableRow>
+                                <TableHead>Scope Name</TableHead>
+                                <TableHead>Description</TableHead>
+                                <TableHead className="w-12"></TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {masterScopes.length === 0 ? (
+                                <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No scopes encoded yet.</TableCell></TableRow>
+                              ) : (
+                                masterScopes.map(scope => (
+                                  <TableRow key={scope.id}>
+                                    <TableCell className="font-medium">{scope.name}</TableCell>
+                                    <TableCell className="text-muted-foreground">{scope.description}</TableCell>
+                                    <TableCell>
+                                      <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDeleteMasterScope(scope.id)}>
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+                                ))
+                              )}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </DialogContent>
             </Dialog>
 
