@@ -11,20 +11,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { warehouseService } from "@/services/warehouseService";
 import { projectService } from "@/services/projectService";
-import { Plus, Pencil, Trash2, Package, AlertTriangle, Building2, Warehouse as WarehouseIcon } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, Building2, Warehouse as WarehouseIcon } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
-// Extend the base row type to include our joined project name
 type WarehouseItem = Database["public"]["Tables"]["inventory"]["Row"] & {
   projects?: { name: string } | null;
 };
 
-const CATEGORIES = [
-  { value: "materials", label: "Construction Materials" },
-  { value: "tools", label: "Tools" },
-  { value: "equipment", label: "Equipments" },
-  { value: "safety", label: "PPE" }
+const STANDARD_CATEGORIES = [
+  "Construction Materials",
+  "Tools",
+  "Hand Tools",
+  "Equipments",
+  "PPE"
 ];
+
+const STANDARD_UNITS = ["pcs", "bags", "kgs", "liters", "units", "set", "lot", "m", "sq.m", "cu.m", "length", "box", "roll"];
 
 export default function Warehouse() {
   const [items, setItems] = useState<WarehouseItem[]>([]);
@@ -39,6 +41,8 @@ export default function Warehouse() {
   // Form State
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<WarehouseItem | null>(null);
+  const [isManualCategory, setIsManualCategory] = useState(false);
+  const [isManualUnit, setIsManualUnit] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     category: "",
@@ -46,7 +50,6 @@ export default function Warehouse() {
     unit: "",
     unit_cost: "",
     reorder_level: "",
-    location: "",
     project_id: "main" // "main" = null in db
   });
 
@@ -75,7 +78,7 @@ export default function Warehouse() {
       unit: formData.unit,
       unit_cost: parseFloat(formData.unit_cost) || 0,
       reorder_level: parseInt(formData.reorder_level) || 0,
-      location: formData.location || null,
+      location: null, // Removed field, setting null for database compatibility
       project_id: formData.project_id === "main" ? null : formData.project_id
     };
 
@@ -92,16 +95,26 @@ export default function Warehouse() {
 
   const handleEdit = (item: WarehouseItem) => {
     setEditingItem(item);
+    
+    // Convert legacy database categories to standard labels
+    let cat = item.category || "";
+    if (cat === "materials") cat = "Construction Materials";
+    if (cat === "tools") cat = "Tools";
+    if (cat === "equipment") cat = "Equipments";
+    if (cat === "safety") cat = "PPE";
+
     setFormData({
       name: item.name,
-      category: item.category || "",
+      category: cat,
       quantity: item.quantity.toString(),
       unit: item.unit,
       unit_cost: item.unit_cost.toString(),
       reorder_level: item.reorder_level?.toString() || "0",
-      location: item.location || "",
       project_id: item.project_id || "main"
     });
+    
+    setIsManualCategory(cat ? !STANDARD_CATEGORIES.includes(cat) : false);
+    setIsManualUnit(item.unit ? !STANDARD_UNITS.includes(item.unit) : false);
     setDialogOpen(true);
   };
 
@@ -120,28 +133,32 @@ export default function Warehouse() {
       unit: "",
       unit_cost: "",
       reorder_level: "",
-      location: "",
       project_id: "main"
     });
     setEditingItem(null);
+    setIsManualCategory(false);
+    setIsManualUnit(false);
   };
 
   const getCategoryLabel = (val: string) => {
-    return CATEGORIES.find(c => c.value === val)?.label || val;
+    const legacyMap: Record<string, string> = { materials: "Construction Materials", tools: "Tools", equipment: "Equipments", safety: "PPE" };
+    return legacyMap[val] || val;
   };
+
+  // Generate dynamic unique categories from the actual items in the database
+  const uniqueCategories = Array.from(new Set(items.map(i => getCategoryLabel(i.category || "Uncategorized"))));
 
   // Splitting and Filtering Logic
   const mainWarehouseItems = items.filter(item => !item.project_id);
   const projectWarehouseItems = items.filter(item => item.project_id);
 
-  const filteredMain = mainWarehouseItems.filter(item => categoryFilter === "all" || item.category === categoryFilter);
+  const filteredMain = mainWarehouseItems.filter(item => categoryFilter === "all" || getCategoryLabel(item.category || "Uncategorized") === categoryFilter);
   const filteredProject = projectWarehouseItems.filter(item => {
-    const matchCategory = categoryFilter === "all" || item.category === categoryFilter;
+    const matchCategory = categoryFilter === "all" || getCategoryLabel(item.category || "Uncategorized") === categoryFilter;
     const matchProject = projectFilter === "all" || item.project_id === projectFilter;
     return matchCategory && matchProject;
   });
 
-  const lowStockItems = items.filter(item => item.quantity <= (item.reorder_level || 0));
   const totalValue = items.reduce((sum, item) => sum + (item.quantity * item.unit_cost), 0);
 
   if (loading) {
@@ -181,12 +198,35 @@ export default function Warehouse() {
                   </div>
                   <div className="space-y-2">
                     <Label>Category *</Label>
-                    <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })} required>
-                      <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                      <SelectContent>
-                        {CATEGORIES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    {!isManualCategory ? (
+                      <Select value={formData.category} onValueChange={(val) => {
+                        if (val === "others") {
+                          setIsManualCategory(true);
+                          setFormData({ ...formData, category: "" });
+                        } else {
+                          setFormData({ ...formData, category: val });
+                        }
+                      }} required>
+                        <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                        <SelectContent>
+                          {STANDARD_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                          <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="flex gap-2">
+                        <Input
+                          value={formData.category}
+                          onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                          placeholder="Custom category"
+                          required
+                        />
+                        <Button type="button" variant="outline" className="px-2" onClick={() => {
+                          setIsManualCategory(false);
+                          setFormData({ ...formData, category: "" });
+                        }}>List</Button>
+                      </div>
+                    )}
                   </div>
                   
                   <div className="space-y-2">
@@ -195,7 +235,30 @@ export default function Warehouse() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="unit">Unit *</Label>
-                    <Input id="unit" value={formData.unit} onChange={(e) => setFormData({ ...formData, unit: e.target.value })} placeholder="e.g., bags, pcs, units" required />
+                    {!isManualUnit ? (
+                      <Select value={formData.unit} onValueChange={(val) => {
+                        if (val === "others") {
+                          setIsManualUnit(true);
+                          setFormData({ ...formData, unit: "" });
+                        } else {
+                          setFormData({ ...formData, unit: val });
+                        }
+                      }} required>
+                        <SelectTrigger><SelectValue placeholder="Select unit" /></SelectTrigger>
+                        <SelectContent>
+                          {STANDARD_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                          <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="flex gap-2">
+                        <Input id="unit" value={formData.unit} onChange={(e) => setFormData({ ...formData, unit: e.target.value })} placeholder="Custom unit" required />
+                        <Button type="button" variant="outline" className="px-2" onClick={() => {
+                          setIsManualUnit(false);
+                          setFormData({ ...formData, unit: "" });
+                        }}>List</Button>
+                      </div>
+                    )}
                   </div>
                   
                   <div className="space-y-2">
@@ -208,22 +271,16 @@ export default function Warehouse() {
                   </div>
                   
                   <div className="space-y-2 col-span-2 p-4 bg-muted/30 border rounded-lg">
-                    <Label className="text-base font-semibold mb-2 block">Storage & Deployment</Label>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Location / Assignment</Label>
-                        <Select value={formData.project_id} onValueChange={(value) => setFormData({ ...formData, project_id: value })}>
-                          <SelectTrigger><SelectValue placeholder="Where is this item?" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="main" className="font-semibold text-primary">Main Warehouse</SelectItem>
-                            {projects.map(p => <SelectItem key={p.id} value={p.id}>Deployed to: {p.name}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="location">Specific Shelf/Area</Label>
-                        <Input id="location" value={formData.location} onChange={(e) => setFormData({ ...formData, location: e.target.value })} placeholder="e.g., Shelf 3, Tool Box A" />
-                      </div>
+                    <Label className="text-base font-semibold mb-2 block">Deployment</Label>
+                    <div className="space-y-2">
+                      <Label>Assignment</Label>
+                      <Select value={formData.project_id} onValueChange={(value) => setFormData({ ...formData, project_id: value })}>
+                        <SelectTrigger><SelectValue placeholder="Where is this item?" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="main" className="font-semibold text-primary">Main Warehouse</SelectItem>
+                          {projects.map(p => <SelectItem key={p.id} value={p.id}>Deployed to: {p.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 </div>
@@ -285,7 +342,7 @@ export default function Warehouse() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  {CATEGORIES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                  {uniqueCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -314,7 +371,6 @@ export default function Warehouse() {
                     <TableRow>
                       <TableHead>Item Name</TableHead>
                       <TableHead>Category</TableHead>
-                      <TableHead>Location</TableHead>
                       <TableHead className="text-right">Quantity</TableHead>
                       <TableHead className="text-right">Unit Price</TableHead>
                       <TableHead className="text-right">Total Value</TableHead>
@@ -325,7 +381,7 @@ export default function Warehouse() {
                   <TableBody>
                     {filteredMain.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                           No items found in the Main Warehouse.
                         </TableCell>
                       </TableRow>
@@ -336,7 +392,6 @@ export default function Warehouse() {
                           <TableCell>
                             <Badge variant="outline">{getCategoryLabel(item.category || "-")}</Badge>
                           </TableCell>
-                          <TableCell>{item.location || "General Storage"}</TableCell>
                           <TableCell className="text-right font-semibold">{item.quantity} {item.unit}</TableCell>
                           <TableCell className="text-right">₱{item.unit_cost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
                           <TableCell className="text-right font-semibold text-primary">
@@ -377,7 +432,6 @@ export default function Warehouse() {
                       <TableHead>Item Name</TableHead>
                       <TableHead>Category</TableHead>
                       <TableHead>Deployed To</TableHead>
-                      <TableHead>Specific Area</TableHead>
                       <TableHead className="text-right">Quantity</TableHead>
                       <TableHead className="text-right">Total Value</TableHead>
                       <TableHead>Status</TableHead>
@@ -387,7 +441,7 @@ export default function Warehouse() {
                   <TableBody>
                     {filteredProject.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                           No items currently deployed to projects.
                         </TableCell>
                       </TableRow>
@@ -403,7 +457,6 @@ export default function Warehouse() {
                               {item.projects?.name || "Unknown Project"}
                             </Badge>
                           </TableCell>
-                          <TableCell>{item.location || "-"}</TableCell>
                           <TableCell className="text-right font-semibold">{item.quantity} {item.unit}</TableCell>
                           <TableCell className="text-right font-semibold text-primary">
                             ₱{(item.quantity * item.unit_cost).toLocaleString(undefined, { minimumFractionDigits: 2 })}
