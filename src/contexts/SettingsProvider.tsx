@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 
-type CurrencyType = "USD" | "EUR" | "GBP" | "JPY" | "PHP";
+type CurrencyType = "USD" | "EUR" | "GBP" | "JPY" | "PHP" | "AUD" | "CAD" | "SGD" | "AED" | "INR";
+const SUPPORTED_CURRENCIES = ["USD", "EUR", "GBP", "JPY", "PHP", "AUD", "CAD", "SGD", "AED", "INR"];
 
 interface SettingsContextType {
   currency: CurrencyType;
@@ -17,7 +18,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const savedCurrency = localStorage.getItem("app_currency") as CurrencyType;
-    if (savedCurrency && ["USD", "EUR", "GBP", "JPY", "PHP"].includes(savedCurrency)) {
+    if (savedCurrency && SUPPORTED_CURRENCIES.includes(savedCurrency)) {
       setCurrency(savedCurrency);
     }
   }, []);
