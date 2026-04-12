@@ -352,7 +352,7 @@ export default function Projects() {
                             <Label>Link to Scopes of Work</Label>
                             <p className="text-xs text-muted-foreground mb-2">Select which scopes use this item (e.g., Cement for Concrete, Masonry)</p>
                             <div className="flex gap-2">
-                              <Select value={currentScopeSelection} onValueChange={setCurrentScopeSelection}>
+                              <Select key={currentScopeSelection === "" ? "empty-select" : "filled-select"} value={currentScopeSelection || undefined} onValueChange={setCurrentScopeSelection}>
                                 <SelectTrigger><SelectValue placeholder="Select a scope..." /></SelectTrigger>
                                 <SelectContent>
                                   {masterScopes.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
