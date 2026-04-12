@@ -12,7 +12,8 @@ import {
   CreditCard,
   Menu,
   X,
-  ClipboardList
+  ClipboardList,
+  ShoppingCart
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Project Profile", href: "/projects", icon: FolderKanban },
   { name: "Site Personnel", href: "/site-personnel", icon: ClipboardList },
+  { name: "Purchasing", href: "/purchasing", icon: ShoppingCart },
   { name: "Accounting", href: "/accounting", icon: Calculator },
   { name: "Human Resources", href: "/personnel", icon: Users },
   { name: "Warehouse", href: "/warehouse", icon: Warehouse },
