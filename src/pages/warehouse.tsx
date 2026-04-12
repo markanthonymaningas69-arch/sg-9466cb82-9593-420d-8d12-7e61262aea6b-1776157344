@@ -485,6 +485,7 @@ export default function Warehouse() {
                       <TableHead>Item Name</TableHead>
                       <TableHead>Category</TableHead>
                       <TableHead className="text-right">Quantity</TableHead>
+                      <TableHead className="text-right">Restock Value</TableHead>
                       <TableHead className="text-right">Unit Price</TableHead>
                       <TableHead className="text-right">Total Value</TableHead>
                       <TableHead>Status</TableHead>
@@ -494,7 +495,7 @@ export default function Warehouse() {
                   <TableBody>
                     {filteredMain.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                           No items found in the Main Warehouse.
                         </TableCell>
                       </TableRow>
@@ -507,6 +508,7 @@ export default function Warehouse() {
                             <Badge variant="outline">{getCategoryLabel(item.category || "-")}</Badge>
                           </TableCell>
                           <TableCell className="text-right font-semibold">{item.quantity} {item.unit}</TableCell>
+                          <TableCell className="text-right text-muted-foreground">{item.reorder_level || 0} {item.unit}</TableCell>
                           <TableCell className="text-right">₱{item.unit_cost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
                           <TableCell className="text-right font-semibold text-primary">
                             ₱{(item.quantity * item.unit_cost).toLocaleString(undefined, { minimumFractionDigits: 2 })}
