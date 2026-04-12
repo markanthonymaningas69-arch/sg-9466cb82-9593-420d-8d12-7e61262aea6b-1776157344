@@ -964,6 +964,7 @@ export type Database = {
           total_cost: number | null
           unit: string
           unit_cost: number
+          voucher_number: string | null
         }
         Insert: {
           category: string
@@ -981,6 +982,7 @@ export type Database = {
           total_cost?: number | null
           unit: string
           unit_cost: number
+          voucher_number?: string | null
         }
         Update: {
           category?: string
@@ -998,6 +1000,7 @@ export type Database = {
           total_cost?: number | null
           unit?: string
           unit_cost?: number
+          voucher_number?: string | null
         }
         Relationships: [
           {

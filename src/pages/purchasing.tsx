@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingCart, Plus, Search, Building2, Warehouse as WarehouseIcon } from "lucide-react";
+import { ShoppingCart, Plus, Search, Building2, Warehouse as WarehouseIcon, FilterX } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { projectService } from "@/services/projectService";
 
@@ -17,10 +17,16 @@ export default function Purchasing() {
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  
+  // Filters
+  const [filterSupplier, setFilterSupplier] = useState("all");
+  const [filterDate, setFilterDate] = useState("");
+  const [filterItem, setFilterItem] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
   
   const [formData, setFormData] = useState({
     order_number: `PO-${Math.floor(Math.random() * 10000)}`,
+    voucher_number: "",
     order_date: new Date().toISOString().split("T")[0],
     supplier: "",
     item_name: "",
@@ -72,6 +78,7 @@ export default function Purchasing() {
       setDialogOpen(false);
       setFormData({
         order_number: `PO-${Math.floor(Math.random() * 10000)}`,
+        voucher_number: "",
         order_date: new Date().toISOString().split("T")[0],
         supplier: "",
         item_name: "",
@@ -87,11 +94,15 @@ export default function Purchasing() {
     }
   };
 
-  const filteredPurchases = purchases.filter(p => 
-    p.item_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    p.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.supplier.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const uniqueSuppliers = Array.from(new Set(purchases.map(p => p.supplier))).filter(Boolean);
+
+  const filteredPurchases = purchases.filter(p => {
+    const matchSupplier = filterSupplier === "all" || p.supplier === filterSupplier;
+    const matchDate = !filterDate || p.order_date === filterDate;
+    const matchItem = !filterItem || p.item_name.toLowerCase().includes(filterItem.toLowerCase());
+    const matchStatus = filterStatus === "all" || p.status === filterStatus;
+    return matchSupplier && matchDate && matchItem && matchStatus;
+  });
 
   return (
     <Layout>
@@ -117,6 +128,10 @@ export default function Purchasing() {
                   <div className="space-y-2">
                     <Label>PO Number *</Label>
                     <Input value={formData.order_number} onChange={(e) => setFormData({ ...formData, order_number: e.target.value })} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Voucher Number</Label>
+                    <Input value={formData.voucher_number} onChange={(e) => setFormData({ ...formData, voucher_number: e.target.value })} placeholder="Optional" />
                   </div>
                   <div className="space-y-2">
                     <Label>Order Date *</Label>
@@ -191,27 +206,87 @@ export default function Purchasing() {
         </div>
 
         <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none">
-          <div className="flex items-center gap-4 pb-4">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <div className="bg-muted/30 p-3 mb-4 border rounded-lg flex flex-wrap gap-4 shrink-0">
+            <div className="space-y-1">
+              <Label className="text-xs">Filter by Supplier:</Label>
+              <Select value={filterSupplier} onValueChange={setFilterSupplier}>
+                <SelectTrigger className="w-[180px] h-9 bg-white dark:bg-background">
+                  <SelectValue placeholder="All Suppliers" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Suppliers</SelectItem>
+                  {uniqueSuppliers.map((s: any) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-1">
+              <Label className="text-xs">Filter by Status:</Label>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-[160px] h-9 bg-white dark:bg-background">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="ordered">Ordered</SelectItem>
+                  <SelectItem value="delivered">Delivered</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs">Search Item:</Label>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  type="text" 
+                  placeholder="Item name..." 
+                  className="w-[180px] h-9 pl-8 bg-white dark:bg-background"
+                  value={filterItem}
+                  onChange={(e) => setFilterItem(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs">Filter by Date:</Label>
               <Input 
-                type="search" 
-                placeholder="Search PO, item, or supplier..." 
-                className="pl-8 bg-white dark:bg-background"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                type="date" 
+                className="w-[160px] h-9 bg-white dark:bg-background" 
+                value={filterDate} 
+                onChange={(e) => setFilterDate(e.target.value)} 
               />
             </div>
+
+            <div className="space-y-1 flex items-end pb-0.5">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-8 text-muted-foreground"
+                onClick={() => {
+                  setFilterSupplier("all");
+                  setFilterStatus("all");
+                  setFilterItem("");
+                  setFilterDate("");
+                }}
+              >
+                <FilterX className="h-4 w-4 mr-2" />
+                Clear
+              </Button>
+            </div>
           </div>
+
           <div className="overflow-y-auto rounded-md border h-full relative">
             <Table>
               <TableHeader className="sticky top-0 bg-background z-10">
                 <TableRow>
                   <TableHead>PO Number</TableHead>
+                  <TableHead>Voucher No.</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Supplier</TableHead>
                   <TableHead>Item</TableHead>
                   <TableHead className="text-right">Qty</TableHead>
+                  <TableHead className="text-right">Unit Cost</TableHead>
                   <TableHead className="text-right">Total Cost</TableHead>
                   <TableHead>Destination</TableHead>
                   <TableHead>Status</TableHead>
@@ -220,16 +295,17 @@ export default function Purchasing() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Loading purchases...</TableCell>
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">Loading purchases...</TableCell>
                   </TableRow>
                 ) : filteredPurchases.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No purchase orders found.</TableCell>
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">No purchase orders found.</TableCell>
                   </TableRow>
                 ) : (
                   filteredPurchases.map((p) => (
                     <TableRow key={p.id}>
                       <TableCell className="font-medium text-primary">{p.order_number}</TableCell>
+                      <TableCell className="text-muted-foreground">{p.voucher_number || "-"}</TableCell>
                       <TableCell className="text-muted-foreground">{p.order_date}</TableCell>
                       <TableCell>{p.supplier}</TableCell>
                       <TableCell className="font-medium">
@@ -237,6 +313,7 @@ export default function Purchasing() {
                         <div className="text-xs text-muted-foreground">{p.category}</div>
                       </TableCell>
                       <TableCell className="text-right">{p.quantity} {p.unit}</TableCell>
+                      <TableCell className="text-right">₱{Number(p.unit_cost).toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
                       <TableCell className="text-right font-bold">₱{Number(p.total_cost).toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
                       <TableCell>
                         {p.destination_type === 'main_warehouse' ? (
