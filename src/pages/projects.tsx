@@ -36,7 +36,7 @@ export default function Projects() {
   // Master Items State
   const [encodeDialogOpen, setEncodeDialogOpen] = useState(false);
   const [masterItems, setMasterItems] = useState<any[]>([]);
-  const [masterForm, setMasterForm] = useState({ name: "", category: "", unit: "", default_cost: "" });
+  const [masterForm, setMasterForm] = useState({ name: "", category: "", unit: "" });
   const [isManualMasterCategory, setIsManualMasterCategory] = useState(false);
   const [isManualMasterUnit, setIsManualMasterUnit] = useState(false);
 
@@ -89,10 +89,9 @@ export default function Projects() {
     await projectService.createMasterItem({
       name: masterForm.name,
       category: masterForm.category,
-      unit: masterForm.unit,
-      default_cost: parseFloat(masterForm.default_cost) || 0
+      unit: masterForm.unit
     });
-    setMasterForm({ name: "", category: "", unit: "", default_cost: "" });
+    setMasterForm({ name: "", category: "", unit: "" });
     setIsManualMasterCategory(false);
     setIsManualMasterUnit(false);
     loadMasterItems();
@@ -228,10 +227,6 @@ export default function Projects() {
                           </div>
                         )}
                       </div>
-                      <div className="space-y-2">
-                        <Label>Default Unit Cost *</Label>
-                        <Input type="number" step="0.01" value={masterForm.default_cost} onChange={(e) => setMasterForm({...masterForm, default_cost: e.target.value})} required />
-                      </div>
                       <Button type="submit" className="w-full mt-4">Save to Catalog</Button>
                     </form>
                   </div>
@@ -247,20 +242,18 @@ export default function Projects() {
                             <TableHead>Name</TableHead>
                             <TableHead>Category</TableHead>
                             <TableHead>Unit</TableHead>
-                            <TableHead className="text-right">Cost</TableHead>
                             <TableHead className="w-12"></TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {masterItems.length === 0 ? (
-                            <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No items encoded yet.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No items encoded yet.</TableCell></TableRow>
                           ) : (
                             masterItems.map(item => (
                               <TableRow key={item.id}>
                                 <TableCell className="font-medium">{item.name}</TableCell>
                                 <TableCell>{item.category}</TableCell>
                                 <TableCell>{item.unit}</TableCell>
-                                <TableCell className="text-right">{formatCurrency(item.default_cost)}</TableCell>
                                 <TableCell>
                                   <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDeleteMasterItem(item.id)}>
                                     <Trash2 className="h-3 w-3" />
