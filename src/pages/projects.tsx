@@ -460,8 +460,8 @@ export default function Projects() {
 
                   <TabsContent value="scopes" className="flex-1 min-h-0 flex flex-col mt-4">
                     <div className="grid grid-cols-3 gap-6 flex-1 min-h-0">
-                      <div className="col-span-1 border-r pr-6 flex flex-col">
-                        <div className="flex justify-between items-center mb-4">
+                      <div className="col-span-1 border-r pr-6 flex flex-col justify-start">
+                        <div className="flex justify-between items-center mb-4 shrink-0">
                           <h3 className="font-semibold text-lg">{editingMasterScopeId ? "Edit Scope" : "Add Master Scope"}</h3>
                           {editingMasterScopeId && (
                             <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => {
@@ -470,7 +470,7 @@ export default function Projects() {
                             }}>Cancel Edit</Button>
                           )}
                         </div>
-                        <form onSubmit={handleMasterScopeSubmit} className="space-y-4 flex-1 overflow-y-auto pr-2 pb-4">
+                        <form onSubmit={handleMasterScopeSubmit} className="space-y-4">
                           <div className="space-y-2">
                             <Label>Scope Name *</Label>
                             <Input value={masterScopeForm.name} onChange={(e) => setMasterScopeForm({...masterScopeForm, name: e.target.value})} placeholder="e.g. Concrete Works" />
@@ -478,17 +478,17 @@ export default function Projects() {
                           <Button type="submit" className="w-full mt-4">{editingMasterScopeId ? "Update Scope" : "Save Scope"}</Button>
                         </form>
                       </div>
-                      <div className="col-span-2 flex flex-col min-h-0">
-                        <div className="font-semibold mb-4 text-lg flex justify-between items-center">
+                      <div className="col-span-2 flex flex-col justify-start h-[65vh]">
+                        <div className="font-semibold mb-4 text-lg flex justify-between items-center shrink-0">
                           <span>Encoded Scopes of Work</span>
                           <Badge variant="secondary">{masterScopes.length} Total</Badge>
                         </div>
-                        <div className="border rounded-md overflow-y-auto flex-1">
+                        <div className="border rounded-md overflow-y-auto flex-1 bg-white">
                           <Table>
                             <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
                               <TableRow>
                                 <TableHead>Scope Name</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
+                                <TableHead className="text-right w-24">Actions</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -497,8 +497,8 @@ export default function Projects() {
                               ) : (
                                 masterScopes.map(scope => (
                                   <TableRow key={scope.id}>
-                                    <TableCell className="font-medium">{scope.name}</TableCell>
-                                    <TableCell className="text-right">
+                                    <TableCell className="font-medium align-top py-3">{scope.name}</TableCell>
+                                    <TableCell className="text-right align-top py-3">
                                       <div className="flex justify-end gap-1">
                                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleEditMasterScope(scope)}>
                                           <Pencil className="h-3 w-3" />
