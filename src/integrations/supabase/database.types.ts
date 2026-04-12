@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -15,6 +15,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      accounting_transactions: {
+        Row: {
+          account_name: string
+          amount: number
+          category: string
+          created_at: string | null
+          date: string
+          description: string
+          id: string
+          project_id: string | null
+          tax_amount: number | null
+          type: string
+        }
+        Insert: {
+          account_name: string
+          amount: number
+          category: string
+          created_at?: string | null
+          date: string
+          description: string
+          id?: string
+          project_id?: string | null
+          tax_amount?: number | null
+          type: string
+        }
+        Update: {
+          account_name?: string
+          amount?: number
+          category?: string
+          created_at?: string | null
+          date?: string
+          description?: string
+          id?: string
+          project_id?: string | null
+          tax_amount?: number | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounting_transactions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       attendance: {
         Row: {
           check_in: string | null
@@ -523,6 +570,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      liquidations: {
+        Row: {
+          actual_amount: number
+          advance_amount: number
+          created_at: string | null
+          date: string
+          id: string
+          purpose: string
+          status: string | null
+          submitted_by: string
+        }
+        Insert: {
+          actual_amount?: number
+          advance_amount?: number
+          created_at?: string | null
+          date: string
+          id?: string
+          purpose: string
+          status?: string | null
+          submitted_by: string
+        }
+        Update: {
+          actual_amount?: number
+          advance_amount?: number
+          created_at?: string | null
+          date?: string
+          id?: string
+          purpose?: string
+          status?: string | null
+          submitted_by?: string
+        }
+        Relationships: []
       }
       material_consumption: {
         Row: {
@@ -1064,6 +1144,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      vouchers: {
+        Row: {
+          amount: number
+          created_at: string | null
+          date: string
+          description: string | null
+          id: string
+          payee: string
+          status: string | null
+          type: string
+          voucher_number: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          date: string
+          description?: string | null
+          id?: string
+          payee: string
+          status?: string | null
+          type: string
+          voucher_number: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          date?: string
+          description?: string | null
+          id?: string
+          payee?: string
+          status?: string | null
+          type?: string
+          voucher_number?: string
+        }
+        Relationships: []
       }
     }
     Views: {

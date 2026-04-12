@@ -989,8 +989,8 @@ export default function SitePersonnel() {
                             ) : (
                               (() => {
                                 const sortedAttendance = [...attendanceList].sort((a, b) => {
-                                  const scopeA = scopes.find(s => s.id === a.bom_scope_id)?.name || "Z_Unassigned";
-                                  const scopeB = scopes.find(s => s.id === b.bom_scope_id)?.name || "Z_Unassigned";
+                                  const scopeA = scopes.find(s => s.id === a.bom_scope_id)?.name || "Z_Admin / Unassigned";
+                                  const scopeB = scopes.find(s => s.id === b.bom_scope_id)?.name || "Z_Admin / Unassigned";
                                   return scopeA.localeCompare(scopeB);
                                 });
 
@@ -1019,7 +1019,7 @@ export default function SitePersonnel() {
                                             <SelectValue placeholder="Assign task..." />
                                           </SelectTrigger>
                                           <SelectContent>
-                                            <SelectItem value="unassigned" className="text-muted-foreground italic">Unassigned</SelectItem>
+                                            <SelectItem value="unassigned" className="text-muted-foreground italic">Admin / Unassigned</SelectItem>
                                             {scopes.map((s) => (
                                               <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                                             ))}
@@ -1159,8 +1159,8 @@ export default function SitePersonnel() {
                                 <TableBody>
                                   {(() => {
                                     const sortedRecords = [...records].sort((a, b) => {
-                                      const scopeA = scopes.find(s => s.id === a.bom_scope_id)?.name || "Z_Unassigned";
-                                      const scopeB = scopes.find(s => s.id === b.bom_scope_id)?.name || "Z_Unassigned";
+                                      const scopeA = scopes.find(s => s.id === a.bom_scope_id)?.name || "Z_Admin / Unassigned";
+                                      const scopeB = scopes.find(s => s.id === b.bom_scope_id)?.name || "Z_Admin / Unassigned";
                                       return scopeA.localeCompare(scopeB);
                                     });
 
@@ -1176,7 +1176,7 @@ export default function SitePersonnel() {
                                           <TableCell className="text-center text-muted-foreground">{index + 1}</TableCell>
                                           <TableCell className="font-medium">{record.personnel?.name || "Unknown"}</TableCell>
                                           <TableCell>{record.personnel?.role}</TableCell>
-                                          <TableCell>{scopes.find(s => s.id === record.bom_scope_id)?.name || "Unassigned"}</TableCell>
+                                          <TableCell>{scopes.find(s => s.id === record.bom_scope_id)?.name || "Admin / Unassigned"}</TableCell>
                                           <TableCell className="text-right">₱{daily.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                                           <TableCell>
                                             <span className={`text-sm font-semibold ${record.status === "present" ? "text-green-600" : "text-red-500"}`}>
@@ -1860,7 +1860,7 @@ export default function SitePersonnel() {
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value="unassigned" className="text-muted-foreground italic">Unassigned</SelectItem>
+                                      <SelectItem value="unassigned" className="text-muted-foreground italic">Admin / Unassigned</SelectItem>
                                       {scopes.map((s) => (
                                         <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                                       ))}
@@ -1870,7 +1870,7 @@ export default function SitePersonnel() {
                                   row.bom_scope_id ? (
                                     <Badge variant="secondary">{row.bom_scope_of_work?.name || "Unknown Scope"}</Badge>
                                   ) : (
-                                    <span className="text-muted-foreground italic">Unassigned</span>
+                                    <span className="text-muted-foreground italic">Admin / Unassigned</span>
                                   )
                                 )}
                               </TableCell>
@@ -2058,7 +2058,7 @@ export default function SitePersonnel() {
                                               <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
-                                              <SelectItem value="unassigned" className="text-muted-foreground italic">Unassigned</SelectItem>
+                                              <SelectItem value="unassigned" className="text-muted-foreground italic">Admin / Unassigned</SelectItem>
                                               {scopes.map((s) => (
                                                 <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                                               ))}
@@ -2068,7 +2068,7 @@ export default function SitePersonnel() {
                                           row.bom_scope_id ? (
                                             <Badge variant="secondary">{row.bom_scope_of_work?.name || "Unknown Scope"}</Badge>
                                           ) : (
-                                            <span className="text-muted-foreground italic">Unassigned</span>
+                                            <span className="text-muted-foreground italic">Admin / Unassigned</span>
                                           )
                                         )}
                                       </TableCell>
