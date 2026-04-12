@@ -40,7 +40,7 @@ export default function Purchasing() {
         if (!isNaN(num) && num > max) max = num;
       }
     });
-    return `PO-${String(max + 1).padStart(4, '0')}`;
+    return `PO-${String(max + 1).padStart(5, '0')}`;
   };
 
   const [formData, setFormData] = useState({
@@ -318,7 +318,7 @@ export default function Purchasing() {
                         <SelectTrigger><SelectValue placeholder="Select issued voucher" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">-- None --</SelectItem>
-                          {vouchers.map(v => <SelectItem key={v.id} value={v.voucher_no}>{v.voucher_no} ({v.payee})</SelectItem>)}
+                          {vouchers.map(v => <SelectItem key={v.id} value={v.voucher_number}>{v.voucher_number} ({v.payee})</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
