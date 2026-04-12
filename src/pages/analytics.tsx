@@ -277,36 +277,28 @@ export default function Analytics() {
 
   // 5. Warehouse Deployment vs Site Received
   const deliveryData = useMemo(() => {
-    // calculate project-wide allocated quantities per item to compare
-    const allocatedPerItem: Record<string, number> = {};
-    if (bom?.bom_scope_of_work && Array.isArray(bom.bom_scope_of_work)) {
-       bom.bom_scope_of_work.forEach(scope => {
-         if (Array.isArray(scope.bom_materials)) {
-            scope.bom_materials.forEach(m => {
-               const name = m.material_name || "Unknown";
-               allocatedPerItem[name] = (allocatedPerItem[name] || 0) + Number(m.quantity || 0);
-            });
-         }
-       });
-    }
+    const itemMap: Record<string, { itemName: string; unit: string; totalDelivered: number; totalReceived: number }> = {};
 
-    return (deliveries || []).map(d => {
+    (deliveries || []).forEach(d => {
       const name = d.item_name || "Unknown Item";
-      const allocated = allocatedPerItem[name] || 0;
-
-      return {
-        id: d.id,
-        date: d.delivery_date,
-        supplier: d.supplier || "Warehouse",
-        status: d.status,
-        receiptNumber: d.receipt_number,
-        itemName: name,
-        quantity: Number(d.quantity || 0),
-        unit: d.unit || "",
-        allocated
-      };
+      if (!itemMap[name]) {
+        itemMap[name] = { itemName: name, unit: d.unit || "", totalDelivered: 0, totalReceived: 0 };
+      }
+      
+      const qty = Number(d.quantity || 0);
+      itemMap[name].totalDelivered += qty;
+      
+      if (d.status === "received") {
+        itemMap[name].totalReceived += qty;
+      }
     });
-  }, [deliveries, bom]);
+
+    return Object.values(itemMap).map((data, index) => ({
+      id: `delivery-summary-${index}`,
+      ...data,
+      variance: data.totalDelivered - data.totalReceived
+    }));
+  }, [deliveries]);
 
   if (loading && projects.length === 0) {
     return (
@@ -598,39 +590,39 @@ export default function Analytics() {
                     <Truck className="h-5 w-5 text-primary" />
                     Warehouse Deployment vs Site Received
                   </CardTitle>
-                  <CardDescription>Track deliveries deployed from warehouse against what was actually received at the site, compared to BOM allocation.</CardDescription>
+                  <CardDescription>Compare total materials deployed to the site against what has been officially received.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Source/Supplier</TableHead>
                         <TableHead>Item Name</TableHead>
-                        <TableHead className="text-right">Project Allocated Qty</TableHead>
-                        <TableHead className="text-right">Delivered Qty</TableHead>
-                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Total Deployed Qty</TableHead>
+                        <TableHead className="text-right">Total Received Qty</TableHead>
+                        <TableHead className="text-right">Pending / In Transit</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {deliveryData.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                          <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                             No deployment or delivery records found.
                           </TableCell>
                         </TableRow>
                       ) : (
                         deliveryData.map((row: any) => (
                           <TableRow key={row.id}>
-                            <TableCell>{new Date(row.date).toLocaleDateString()}</TableCell>
-                            <TableCell className="font-medium text-sm text-muted-foreground">{row.supplier}</TableCell>
                             <TableCell className="font-medium">{row.itemName}</TableCell>
-                            <TableCell className="text-right text-muted-foreground">{row.allocated} {row.unit}</TableCell>
-                            <TableCell className="text-right font-bold">{row.quantity} {row.unit}</TableCell>
-                            <TableCell>
-                              <Badge variant={row.status === "received" ? "default" : "secondary"}>
-                                {row.status === "received" ? "Received at Site" : "Pending/In Transit"}
-                              </Badge>
+                            <TableCell className="text-right text-muted-foreground">{row.totalDelivered} {row.unit}</TableCell>
+                            <TableCell className="text-right font-bold text-success">{row.totalReceived} {row.unit}</TableCell>
+                            <TableCell className="text-right">
+                              {row.variance > 0 ? (
+                                <Badge variant="secondary" className="bg-warning/20 text-warning-foreground hover:bg-warning/30">
+                                  {row.variance} {row.unit} Pending
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-success border-success">All Received</Badge>
+                              )}
                             </TableCell>
                           </TableRow>
                         ))

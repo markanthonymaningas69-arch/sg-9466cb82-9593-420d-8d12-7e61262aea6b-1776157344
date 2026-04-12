@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { siteService } from "@/services/siteService";
 import { projectService } from "@/services/projectService";
 import { personnelService } from "@/services/personnelService";
@@ -73,7 +74,8 @@ export default function SitePersonnel() {
     item_name: "",
     quantity: 0,
     unit: "",
-    supplier: "",
+    source_type: "warehouse", // 'warehouse' or 'supplier'
+    supplier: "Main Warehouse",
     receipt_number: "",
     received_by: "",
     status: "pending",
@@ -352,9 +354,17 @@ export default function SitePersonnel() {
     await siteService.createDelivery({
       ...deliveryForm,
       project_id: selectedProject,
+      supplier: deliveryForm.source_type === "warehouse" ? "Main Warehouse" : deliveryForm.supplier,
       quantity: parseFloat(deliveryForm.quantity.toString())
     });
-    setDeliveryForm(prev => ({ ...prev, item_name: "", quantity: 0, unit: "" }));
+    setDeliveryForm(prev => ({ 
+      ...prev, 
+      item_name: "", 
+      quantity: 0, 
+      unit: "", 
+      receipt_number: "", 
+      notes: "" 
+    }));
     setIsManualItem(false);
     setIsManualUnit(false);
     loadDeliveries();
@@ -367,7 +377,8 @@ export default function SitePersonnel() {
       item_name: "",
       quantity: 0,
       unit: "",
-      supplier: "",
+      source_type: "warehouse",
+      supplier: "Main Warehouse",
       receipt_number: "",
       received_by: "",
       status: "pending",
@@ -1243,7 +1254,29 @@ export default function SitePersonnel() {
                           <DialogTitle>Record Delivery</DialogTitle>
                         </DialogHeader>
                         <form onSubmit={handleDeliverySubmit} className="space-y-4">
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-3 pb-2 border-b">
+                            <Label>Source of Delivery</Label>
+                            <RadioGroup 
+                              value={deliveryForm.source_type} 
+                              onValueChange={(val) => setDeliveryForm({ 
+                                ...deliveryForm, 
+                                source_type: val,
+                                supplier: val === "warehouse" ? "Main Warehouse" : ""
+                              })}
+                              className="flex gap-4"
+                            >
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="warehouse" id="r-warehouse" />
+                                <Label htmlFor="r-warehouse" className="font-normal cursor-pointer">Main Warehouse</Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="supplier" id="r-supplier" />
+                                <Label htmlFor="r-supplier" className="font-normal cursor-pointer">Direct from Supplier</Label>
+                              </div>
+                            </RadioGroup>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4 pt-2">
                             <div className="space-y-2">
                               <Label htmlFor="item">Item Name</Label>
                               {!isManualItem ? (
@@ -1290,12 +1323,14 @@ export default function SitePersonnel() {
                               )}
                             </div>
                             <div className="space-y-2">
-                              <Label htmlFor="supplier">Supplier</Label>
+                              <Label htmlFor="supplier">Supplier Name</Label>
                               <Input
                                 id="supplier"
                                 value={deliveryForm.supplier}
                                 onChange={(e) => setDeliveryForm({ ...deliveryForm, supplier: e.target.value })}
+                                disabled={deliveryForm.source_type === "warehouse"}
                                 required
+                                placeholder={deliveryForm.source_type === "warehouse" ? "Main Warehouse" : "Enter supplier name"}
                               />
                             </div>
                           </div>
