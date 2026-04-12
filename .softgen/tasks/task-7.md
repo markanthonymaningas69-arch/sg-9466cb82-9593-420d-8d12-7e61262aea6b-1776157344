@@ -1,6 +1,6 @@
 ---
 title: Reset Analytics Module
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [analytics, reports]
@@ -13,8 +13,8 @@ position: 7
 Reset analytics page to include 5 specific reports for a selected project.
 
 ## Checklist
-- [ ] 1. Statement of work Accomplishment (SWA) in list form
-- [ ] 2. Material usage table vs. allocated, with filters
-- [ ] 3. Actual amount spent per scope (labor and materials) vs allocated
-- [ ] 4. Actual materials used but not in BOM (categorized as OCM)
-- [ ] 5. Warehouse deployment vs actual received at site
+- [x] 1. Statement of work Accomplishment (SWA) in list form
+- [x] 2. Material usage table vs. allocated, with filters
+- [x] 3. Actual amount spent per scope (labor and materials) vs allocated
+- [x] 4. Actual materials used but not in BOM (categorized as OCM)
+- [x] 5. Warehouse deployment vs actual received at site
