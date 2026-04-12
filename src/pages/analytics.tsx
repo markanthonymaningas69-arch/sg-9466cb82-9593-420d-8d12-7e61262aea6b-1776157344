@@ -83,9 +83,9 @@ export default function Analytics() {
 
   // 1. SWA Data
   const swaData = useMemo(() => {
-    if (!bom) return { rows: [], totals: { cost: 0, wtPercentage: 0, accomplishment: 0, amountOfCompletion: 0 } };
+    if (!bom?.bom_scope_of_work || !Array.isArray(bom.bom_scope_of_work)) return { rows: [], totals: { cost: 0, wtPercentage: 0, accomplishment: 0, amountOfCompletion: 0 } };
 
-    const scopes = Array.isArray(bom.bom_scope_of_work) ? bom.bom_scope_of_work : [];
+    const scopes = [...bom.bom_scope_of_work].sort((a: any, b: any) => (a.order_number || 0) - (b.order_number || 0));
     const indirects = Array.isArray(bom.bom_indirect_costs) ? bom.bom_indirect_costs : [];
 
     let grandTotalCost = 0;
@@ -95,7 +95,7 @@ export default function Analytics() {
         ? scope.bom_materials.reduce((sum: number, m: any) => sum + (Number(m.quantity || 0) * Number(m.unit_cost || 0)), 0)
         : 0;
       const labCost = Array.isArray(scope.bom_labor)
-        ? scope.bom_labor.reduce((sum: number, l: any) => sum + (Number(l.no_of_workers || 0) * Number(l.daily_rate || 0) * Number(l.duration_days || 0)), 0)
+        ? scope.bom_labor.reduce((sum: number, l: any) => sum + Number(l.total_cost || (Number(l.hours || 0) * Number(l.hourly_rate || 0))), 0)
         : 0;
       
       const cost = matCost + labCost;
@@ -109,18 +109,22 @@ export default function Analytics() {
         completion: Number(scope.completion_percentage || 0),
         order_number: scope.order_number || 0
       };
-    }).sort((a, b) => a.order_number - b.order_number);
+    });
+
+    const avgCompletion = scopeRows.length > 0 
+      ? scopeRows.reduce((sum, r) => sum + r.completion, 0) / scopeRows.length 
+      : 0;
 
     const icRows = indirects.map((ic: any) => {
-      const cost = Number(ic.amount || 0);
+      const cost = Number(ic.total_indirect || 0); // Get value straight from BOM
       grandTotalCost += cost;
 
       return {
-        id: ic.id,
-        name: ic.name || "Unknown Indirect Cost",
+        id: ic.id || "indirect",
+        name: "Indirect Cost",
         type: "indirect",
         cost,
-        completion: 0 // Indirect costs default to 0% completed for SWA logic
+        completion: avgCompletion // Average completion of all scopes
       };
     });
 
@@ -173,14 +177,15 @@ export default function Analytics() {
     (consumption || []).forEach((cons: any) => {
       if (usageScopeFilter !== "all" && cons.bom_scope_id !== usageScopeFilter) return;
 
-      const name = cons.material_name || "Unknown";
+      const name = cons.item_name || cons.material_name || "Unknown";
+      const qty = Number(cons.quantity || cons.quantity_used || 0);
       const key = `${cons.bom_scope_id}_${name}`;
       const scope = bom.bom_scope_of_work.find((s: any) => s.id === cons.bom_scope_id);
       
       if (!usageMap[key]) {
         usageMap[key] = { allocated: 0, actual: 0, unit: cons.unit || "", scopeName: scope?.name || "Unknown Scope" };
       }
-      usageMap[key].actual += Number(cons.quantity_used || 0);
+      usageMap[key].actual += qty;
     });
 
     return Object.entries(usageMap).map(([key, data]) => {
@@ -206,7 +211,7 @@ export default function Analytics() {
       
       // Allocated Labor
       const allocatedLabCost = Array.isArray(scope.bom_labor)
-        ? scope.bom_labor.reduce((sum: number, l: any) => sum + (Number(l.no_of_workers || 0) * Number(l.daily_rate || 0) * Number(l.duration_days || 0)), 0)
+        ? scope.bom_labor.reduce((sum: number, l: any) => sum + Number(l.total_cost || (Number(l.hours || 0) * Number(l.hourly_rate || 0))), 0)
         : 0;
 
       // Actual Materials
@@ -214,10 +219,18 @@ export default function Analytics() {
         .filter(c => c.bom_scope_id === scope.id)
         .reduce((sum: number, c: any) => {
           const bomMat = Array.isArray(scope.bom_materials)
-            ? scope.bom_materials.find((m: any) => m.material_name === c.material_name)
+            ? scope.bom_materials.find((m: any) => m.material_name === (c.item_name || c.material_name))
             : null;
           const unitCost = bomMat ? Number(bomMat.unit_cost || 0) : 0;
-          return sum + (Number(c.quantity_used || 0) * unitCost);
+          return sum + (Number(c.quantity || c.quantity_used || 0) * unitCost);
+        }, 0);
+
+      // Actual Labor
+      const actualLabCost = (attendance || [])
+        .filter(a => a.bom_scope_id === scope.id)
+        .reduce((sum: number, a: any) => {
+          const hrRate = Number(a.personnel?.hourly_rate || (a.personnel?.daily_rate ? a.personnel.daily_rate / 8 : 0));
+          return sum + (Number(a.hours_worked || 0) * hrRate);
         }, 0);
 
       return {
@@ -226,10 +239,11 @@ export default function Analytics() {
         allocatedLabCost,
         totalAllocated: allocatedMatCost + allocatedLabCost,
         actualMatCost,
-        totalActual: actualMatCost
+        actualLabCost,
+        totalActual: actualMatCost + actualLabCost
       };
     });
-  }, [bom, consumption]);
+  }, [bom, consumption, attendance]);
 
   // 4. OCM (Materials used but not in BOM)
   const ocmData = useMemo(() => {
@@ -240,7 +254,7 @@ export default function Analytics() {
     (consumption || []).forEach((cons: any) => {
       const scope = bom.bom_scope_of_work.find((s: any) => s.id === cons.bom_scope_id);
       if (scope) {
-        const consName = cons.material_name?.toLowerCase() || "";
+        const consName = (cons.item_name || cons.material_name || "").toLowerCase();
         const isInBom = Array.isArray(scope.bom_materials) && scope.bom_materials.some((m: any) => 
           (m.material_name?.toLowerCase() || "") === consName
         );
@@ -249,10 +263,10 @@ export default function Analytics() {
           ocmList.push({
             date: cons.date_used,
             scopeName: scope.name || "Unknown Scope",
-            materialName: cons.material_name || "Unknown Material",
-            quantity: cons.quantity_used || 0,
+            materialName: cons.item_name || cons.material_name || "Unknown Material",
+            quantity: Number(cons.quantity || cons.quantity_used || 0),
             unit: cons.unit || "",
-            remarks: cons.remarks || "-"
+            remarks: cons.notes || cons.remarks || "-"
           });
         }
       }
@@ -263,17 +277,22 @@ export default function Analytics() {
 
   // 5. Warehouse Deployment vs Site Received
   const deliveryData = useMemo(() => {
+    // calculate project-wide allocated quantities per item to compare
+    const allocatedPerItem: Record<string, number> = {};
+    if (bom?.bom_scope_of_work && Array.isArray(bom.bom_scope_of_work)) {
+       bom.bom_scope_of_work.forEach(scope => {
+         if (Array.isArray(scope.bom_materials)) {
+            scope.bom_materials.forEach(m => {
+               const name = m.material_name || "Unknown";
+               allocatedPerItem[name] = (allocatedPerItem[name] || 0) + Number(m.quantity || 0);
+            });
+         }
+       });
+    }
+
     return (deliveries || []).map(d => {
-      let items = [];
-      try {
-        if (typeof d.items === 'string') {
-          items = JSON.parse(d.items);
-        } else if (Array.isArray(d.items)) {
-          items = d.items;
-        }
-      } catch (e) {
-        // ignore
-      }
+      const name = d.item_name || "Unknown Item";
+      const allocated = allocatedPerItem[name] || 0;
 
       return {
         id: d.id,
@@ -281,11 +300,13 @@ export default function Analytics() {
         supplier: d.supplier || "Warehouse",
         status: d.status,
         receiptNumber: d.receipt_number,
-        itemsCount: items.length,
-        items
+        itemName: name,
+        quantity: Number(d.quantity || 0),
+        unit: d.unit || "",
+        allocated
       };
     });
-  }, [deliveries]);
+  }, [deliveries, bom]);
 
   if (loading && projects.length === 0) {
     return (
@@ -335,31 +356,26 @@ export default function Analytics() {
           </Card>
         ) : (
           <Tabs defaultValue="swa" className="space-y-6">
-            <TabsList className="grid grid-cols-2 md:grid-cols-5 w-full h-auto gap-2 bg-transparent">
-              <TabsTrigger value="swa" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-card py-2">
-                <ClipboardList className="h-4 w-4" />
-                <span className="hidden lg:inline">Statement of Work Accomplishment</span>
-                <span className="lg:hidden">SWA</span>
+            <TabsList className="flex flex-wrap w-full gap-2 bg-transparent justify-start pb-4">
+              <TabsTrigger value="swa" className="flex-1 min-w-[160px] max-w-[250px] flex-col items-center justify-center gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-card py-2 h-auto text-center whitespace-normal leading-tight">
+                <ClipboardList className="h-4 w-4 shrink-0" />
+                <span className="text-xs md:text-sm font-medium">Statement of Work Accomplishment</span>
               </TabsTrigger>
-              <TabsTrigger value="materials" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-card py-2">
-                <Package className="h-4 w-4" />
-                <span className="hidden lg:inline">Material Usage</span>
-                <span className="lg:hidden">Usage</span>
+              <TabsTrigger value="materials" className="flex-1 min-w-[120px] max-w-[180px] flex-col items-center justify-center gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-card py-2 h-auto text-center whitespace-normal leading-tight">
+                <Package className="h-4 w-4 shrink-0" />
+                <span className="text-xs md:text-sm font-medium">Material Usage</span>
               </TabsTrigger>
-              <TabsTrigger value="spent" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-card py-2">
-                <DollarSign className="h-4 w-4" />
-                <span className="hidden lg:inline">Spent vs Allocated</span>
-                <span className="lg:hidden">Spending</span>
+              <TabsTrigger value="spent" className="flex-1 min-w-[120px] max-w-[180px] flex-col items-center justify-center gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-card py-2 h-auto text-center whitespace-normal leading-tight">
+                <DollarSign className="h-4 w-4 shrink-0" />
+                <span className="text-xs md:text-sm font-medium">Spent vs Allocated</span>
               </TabsTrigger>
-              <TabsTrigger value="ocm" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-card py-2">
-                <AlertCircle className="h-4 w-4" />
-                <span className="hidden lg:inline">OCM Materials</span>
-                <span className="lg:hidden">OCM</span>
+              <TabsTrigger value="ocm" className="flex-1 min-w-[120px] max-w-[180px] flex-col items-center justify-center gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-card py-2 h-auto text-center whitespace-normal leading-tight">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span className="text-xs md:text-sm font-medium">OCM Materials</span>
               </TabsTrigger>
-              <TabsTrigger value="warehouse" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-card py-2">
-                <Truck className="h-4 w-4" />
-                <span className="hidden lg:inline">Warehouse Deployment</span>
-                <span className="lg:hidden">Deliveries</span>
+              <TabsTrigger value="warehouse" className="flex-1 min-w-[160px] max-w-[220px] flex-col items-center justify-center gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-card py-2 h-auto text-center whitespace-normal leading-tight">
+                <Truck className="h-4 w-4 shrink-0" />
+                <span className="text-xs md:text-sm font-medium">Warehouse Deployment</span>
               </TabsTrigger>
             </TabsList>
 
@@ -491,14 +507,16 @@ export default function Analytics() {
                         <TableHead>Scope</TableHead>
                         <TableHead className="text-right">Allocated Materials</TableHead>
                         <TableHead className="text-right">Allocated Labor</TableHead>
-                        <TableHead className="text-right">Total Allocated</TableHead>
-                        <TableHead className="text-right border-l">Actual Materials</TableHead>
+                        <TableHead className="text-right border-r">Total Allocated</TableHead>
+                        <TableHead className="text-right bg-muted/30">Actual Materials</TableHead>
+                        <TableHead className="text-right bg-muted/30">Actual Labor</TableHead>
+                        <TableHead className="text-right bg-muted/30">Total Actual</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {scopeSpendingData.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                          <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                             No scope data available.
                           </TableCell>
                         </TableRow>
@@ -508,9 +526,15 @@ export default function Analytics() {
                             <TableCell className="font-medium">{row.scopeName}</TableCell>
                             <TableCell className="text-right">{formatCurrency(row.allocatedMatCost)}</TableCell>
                             <TableCell className="text-right">{formatCurrency(row.allocatedLabCost)}</TableCell>
-                            <TableCell className="text-right font-bold text-primary">{formatCurrency(row.totalAllocated)}</TableCell>
-                            <TableCell className={`text-right border-l font-medium ${row.actualMatCost > row.allocatedMatCost ? 'text-destructive' : ''}`}>
+                            <TableCell className="text-right font-bold text-primary border-r">{formatCurrency(row.totalAllocated)}</TableCell>
+                            <TableCell className={`text-right bg-muted/10 font-medium ${row.actualMatCost > row.allocatedMatCost ? 'text-destructive' : ''}`}>
                               {formatCurrency(row.actualMatCost)}
+                            </TableCell>
+                            <TableCell className={`text-right bg-muted/10 font-medium ${row.actualLabCost > row.allocatedLabCost ? 'text-destructive' : ''}`}>
+                              {formatCurrency(row.actualLabCost)}
+                            </TableCell>
+                            <TableCell className={`text-right bg-muted/10 font-bold ${row.totalActual > row.totalAllocated ? 'text-destructive' : 'text-primary'}`}>
+                              {formatCurrency(row.totalActual)}
                             </TableCell>
                           </TableRow>
                         ))
@@ -574,7 +598,7 @@ export default function Analytics() {
                     <Truck className="h-5 w-5 text-primary" />
                     Warehouse Deployment vs Site Received
                   </CardTitle>
-                  <CardDescription>Track deliveries deployed from warehouse against what was actually received at the site.</CardDescription>
+                  <CardDescription>Track deliveries deployed from warehouse against what was actually received at the site, compared to BOM allocation.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Table>
@@ -582,15 +606,16 @@ export default function Analytics() {
                       <TableRow>
                         <TableHead>Date</TableHead>
                         <TableHead>Source/Supplier</TableHead>
-                        <TableHead>Receipt No.</TableHead>
-                        <TableHead>Items Count</TableHead>
+                        <TableHead>Item Name</TableHead>
+                        <TableHead className="text-right">Project Allocated Qty</TableHead>
+                        <TableHead className="text-right">Delivered Qty</TableHead>
                         <TableHead>Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {deliveryData.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                          <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                             No deployment or delivery records found.
                           </TableCell>
                         </TableRow>
@@ -598,9 +623,10 @@ export default function Analytics() {
                         deliveryData.map((row: any) => (
                           <TableRow key={row.id}>
                             <TableCell>{new Date(row.date).toLocaleDateString()}</TableCell>
-                            <TableCell className="font-medium">{row.supplier}</TableCell>
-                            <TableCell>{row.receiptNumber || "-"}</TableCell>
-                            <TableCell>{row.itemsCount} items</TableCell>
+                            <TableCell className="font-medium text-sm text-muted-foreground">{row.supplier}</TableCell>
+                            <TableCell className="font-medium">{row.itemName}</TableCell>
+                            <TableCell className="text-right text-muted-foreground">{row.allocated} {row.unit}</TableCell>
+                            <TableCell className="text-right font-bold">{row.quantity} {row.unit}</TableCell>
                             <TableCell>
                               <Badge variant={row.status === "received" ? "default" : "secondary"}>
                                 {row.status === "received" ? "Received at Site" : "Pending/In Transit"}
