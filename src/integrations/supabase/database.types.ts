@@ -578,7 +578,10 @@ export type Database = {
           created_at: string | null
           date: string
           id: string
+          personnel_id: string | null
+          project_id: string | null
           purpose: string
+          receipt_attached: boolean | null
           status: string | null
           submitted_by: string
         }
@@ -588,7 +591,10 @@ export type Database = {
           created_at?: string | null
           date: string
           id?: string
+          personnel_id?: string | null
+          project_id?: string | null
           purpose: string
+          receipt_attached?: boolean | null
           status?: string | null
           submitted_by: string
         }
@@ -598,11 +604,29 @@ export type Database = {
           created_at?: string | null
           date?: string
           id?: string
+          personnel_id?: string | null
+          project_id?: string | null
           purpose?: string
+          receipt_attached?: boolean | null
           status?: string | null
           submitted_by?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "liquidations_personnel_id_fkey"
+            columns: ["personnel_id"]
+            isOneToOne: false
+            referencedRelation: "personnel"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "liquidations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       master_items: {
         Row: {
@@ -1302,6 +1326,7 @@ export type Database = {
           description: string | null
           id: string
           payee: string
+          project_id: string | null
           status: string | null
           type: string
           voucher_number: string
@@ -1313,6 +1338,7 @@ export type Database = {
           description?: string | null
           id?: string
           payee: string
+          project_id?: string | null
           status?: string | null
           type: string
           voucher_number: string
@@ -1324,11 +1350,20 @@ export type Database = {
           description?: string | null
           id?: string
           payee?: string
+          project_id?: string | null
           status?: string | null
           type?: string
           voucher_number?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "vouchers_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

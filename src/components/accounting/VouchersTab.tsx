@@ -48,8 +48,12 @@ export function VouchersTab() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await accountingService.createVoucher({
-      ...form,
+      type: form.type,
+      voucher_number: form.voucher_number,
+      date: form.date,
       amount: parseFloat(form.amount) || 0,
+      payee: form.payee,
+      description: form.particulars, // Mapped to correct DB column
       project_id: form.project_id === "office" ? null : form.project_id
     });
     

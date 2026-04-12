@@ -65,11 +65,21 @@ export function LiquidationsTab() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Fallback for the required submitted_by column
+    const person = personnel.find(p => p.id === form.personnel_id);
+    const submittedBy = person ? person.name : "Unknown Employee";
+
     await accountingService.createLiquidation({
-      ...form,
+      date: form.date,
+      personnel_id: form.personnel_id,
+      project_id: form.project_id === "office" ? null : form.project_id,
       advance_amount: parseFloat(form.advance_amount) || 0,
       actual_amount: parseFloat(form.actual_amount) || 0,
-      project_id: form.project_id === "office" ? null : form.project_id
+      purpose: form.particulars, // Mapped to correct DB column
+      status: form.status,
+      receipt_attached: form.receipt_attached,
+      submitted_by: submittedBy
     });
     
     setDialogOpen(false);
