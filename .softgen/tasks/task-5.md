@@ -1,6 +1,6 @@
 ---
 title: "Payroll Summaries & Vouchers"
-status: "todo"
+status: "done"
 priority: "high"
 type: "feature"
 tags: ["accounting", "payroll", "vouchers"]
