@@ -12,11 +12,16 @@ import { ShoppingCart, Plus, Search, Building2, Warehouse as WarehouseIcon, Filt
 import { supabase } from "@/integrations/supabase/client";
 import { projectService } from "@/services/projectService";
 
+const STANDARD_UNITS = ["pcs", "bags", "kgs", "liters", "units", "set", "lot", "m", "sq.m", "cu.m", "length", "box", "roll"];
+
 export default function Purchasing() {
   const [purchases, setPurchases] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [vouchers, setVouchers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [supplierDialogOpen, setSupplierDialogOpen] = useState(false);
   
   // Filters
   const [filterSupplier, setFilterSupplier] = useState("all");
@@ -26,7 +31,7 @@ export default function Purchasing() {
   
   const [formData, setFormData] = useState({
     order_number: `PO-${Math.floor(Math.random() * 10000)}`,
-    voucher_number: "",
+    voucher_number: "none",
     order_date: new Date().toISOString().split("T")[0],
     supplier: "",
     item_name: "",
@@ -39,20 +44,41 @@ export default function Purchasing() {
     status: "ordered"
   });
 
+  const [supplierForm, setSupplierForm] = useState({
+    name: "",
+    contact_person: "",
+    phone: "",
+    address: ""
+  });
+
   useEffect(() => {
     loadData();
   }, []);
 
   const loadData = async () => {
     setLoading(true);
-    const [{ data: pData }, { data: projData }] = await Promise.all([
+    const [{ data: pData }, { data: projData }, { data: supData }, { data: vouchData }] = await Promise.all([
       supabase.from("purchases").select(`*, projects(name)`).order('created_at', { ascending: false }),
-      projectService.getAll()
+      projectService.getAll(),
+      supabase.from("suppliers").select("*").order("name"),
+      supabase.from("vouchers").select("*").order("created_at", { ascending: false })
     ]);
     
     setPurchases(pData || []);
     setProjects(projData || []);
+    setSuppliers(supData || []);
+    setVouchers(vouchData || []);
     setLoading(false);
+  };
+
+  const handleSupplierSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const { error } = await supabase.from("suppliers").insert(supplierForm);
+    if (!error) {
+      setSupplierDialogOpen(false);
+      setSupplierForm({ name: "", contact_person: "", phone: "", address: "" });
+      loadData();
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -67,28 +93,23 @@ export default function Purchasing() {
       quantity: parseFloat(formData.quantity) || 0,
       unit: formData.unit,
       unit_cost: parseFloat(formData.unit_cost) || 0,
+      total_cost: (parseFloat(formData.quantity) || 0) * (parseFloat(formData.unit_cost) || 0),
       destination_type: formData.destination_type,
       project_id: formData.destination_type === "project_warehouse" && formData.project_id !== "none" ? formData.project_id : null,
-      status: formData.status
+      status: formData.status,
+      voucher_number: formData.voucher_number === "none" ? null : formData.voucher_number
     };
 
     const { error } = await supabase.from("purchases").insert(payload);
     
     if (!error) {
-      setDialogOpen(false);
+      // Do not close dialog. Only clear item-specific fields for fast multi-item entry
       setFormData({
-        order_number: `PO-${Math.floor(Math.random() * 10000)}`,
-        voucher_number: "",
-        order_date: new Date().toISOString().split("T")[0],
-        supplier: "",
+        ...formData,
         item_name: "",
-        category: "Construction Materials",
         quantity: "",
         unit: "pcs",
-        unit_cost: "",
-        destination_type: "main_warehouse",
-        project_id: "none",
-        status: "ordered"
+        unit_cost: ""
       });
       loadData();
     }
@@ -112,97 +133,155 @@ export default function Purchasing() {
             <h1 className="text-3xl font-heading font-bold">Purchasing</h1>
             <p className="text-muted-foreground mt-1">Manage purchase orders and direct deliveries to warehouses</p>
           </div>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                New Purchase Order
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Create Purchase Order</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+          <div className="flex items-center gap-2">
+            <Dialog open={supplierDialogOpen} onOpenChange={setSupplierDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Register Supplier
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Register New Supplier</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSupplierSubmit} className="space-y-4">
                   <div className="space-y-2">
-                    <Label>PO Number *</Label>
-                    <Input value={formData.order_number} onChange={(e) => setFormData({ ...formData, order_number: e.target.value })} required />
+                    <Label>Supplier Name *</Label>
+                    <Input value={supplierForm.name} onChange={(e) => setSupplierForm({...supplierForm, name: e.target.value})} required />
                   </div>
                   <div className="space-y-2">
-                    <Label>Voucher Number</Label>
-                    <Input value={formData.voucher_number} onChange={(e) => setFormData({ ...formData, voucher_number: e.target.value })} placeholder="Optional" />
+                    <Label>Contact Person</Label>
+                    <Input value={supplierForm.contact_person} onChange={(e) => setSupplierForm({...supplierForm, contact_person: e.target.value})} />
                   </div>
                   <div className="space-y-2">
-                    <Label>Order Date *</Label>
-                    <Input type="date" value={formData.order_date} onChange={(e) => setFormData({ ...formData, order_date: e.target.value })} required />
+                    <Label>Phone Number</Label>
+                    <Input value={supplierForm.phone} onChange={(e) => setSupplierForm({...supplierForm, phone: e.target.value})} />
                   </div>
                   <div className="space-y-2">
-                    <Label>Supplier *</Label>
-                    <Input value={formData.supplier} onChange={(e) => setFormData({ ...formData, supplier: e.target.value })} required />
+                    <Label>Address</Label>
+                    <Input value={supplierForm.address} onChange={(e) => setSupplierForm({...supplierForm, address: e.target.value})} />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Category *</Label>
-                    <Select value={formData.category} onValueChange={(val) => setFormData({ ...formData, category: val })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Construction Materials">Construction Materials</SelectItem>
-                        <SelectItem value="Tools">Tools</SelectItem>
-                        <SelectItem value="Equipments">Equipments</SelectItem>
-                        <SelectItem value="PPE">PPE</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button type="button" variant="outline" onClick={() => setSupplierDialogOpen(false)}>Cancel</Button>
+                    <Button type="submit">Save Supplier</Button>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Item Name *</Label>
-                    <Input value={formData.item_name} onChange={(e) => setFormData({ ...formData, item_name: e.target.value })} required />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
+                </form>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Purchase Order
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Create Purchase Order</DialogTitle>
+                  <p className="text-sm text-muted-foreground">PO Header details remain saved to easily add multiple items.</p>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Quantity *</Label>
-                      <Input type="number" value={formData.quantity} onChange={(e) => setFormData({ ...formData, quantity: e.target.value })} required />
+                      <Label>PO Number *</Label>
+                      <Input value={formData.order_number} onChange={(e) => setFormData({ ...formData, order_number: e.target.value })} required />
                     </div>
                     <div className="space-y-2">
-                      <Label>Unit *</Label>
-                      <Input value={formData.unit} onChange={(e) => setFormData({ ...formData, unit: e.target.value })} required />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Unit Cost (₱) *</Label>
-                    <Input type="number" step="0.01" value={formData.unit_cost} onChange={(e) => setFormData({ ...formData, unit_cost: e.target.value })} required />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label>Destination *</Label>
-                    <Select value={formData.destination_type} onValueChange={(val) => setFormData({ ...formData, destination_type: val })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="main_warehouse">Main Warehouse</SelectItem>
-                        <SelectItem value="project_warehouse">Project Warehouse</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  {formData.destination_type === "project_warehouse" && (
-                    <div className="space-y-2 col-span-2">
-                      <Label>Select Project *</Label>
-                      <Select value={formData.project_id} onValueChange={(val) => setFormData({ ...formData, project_id: val })}>
-                        <SelectTrigger><SelectValue placeholder="Select active project" /></SelectTrigger>
+                      <Label>Voucher Number</Label>
+                      <Select value={formData.voucher_number} onValueChange={(val) => setFormData({ ...formData, voucher_number: val })}>
+                        <SelectTrigger><SelectValue placeholder="Select issued voucher" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">-- Select Project --</SelectItem>
-                          {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                          <SelectItem value="none">-- None --</SelectItem>
+                          {vouchers.map(v => <SelectItem key={v.id} value={v.voucher_no}>{v.voucher_no} ({v.payee})</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
-                  )}
-                </div>
-                <div className="flex justify-end gap-2 pt-4">
-                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                  <Button type="submit">Save PO</Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+                    <div className="space-y-2">
+                      <Label>Order Date *</Label>
+                      <Input type="date" value={formData.order_date} onChange={(e) => setFormData({ ...formData, order_date: e.target.value })} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Supplier *</Label>
+                      <Select value={formData.supplier} onValueChange={(val) => setFormData({ ...formData, supplier: val })} required>
+                        <SelectTrigger><SelectValue placeholder="Select registered supplier" /></SelectTrigger>
+                        <SelectContent>
+                          {suppliers.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Category *</Label>
+                      <Select value={formData.category} onValueChange={(val) => setFormData({ ...formData, category: val })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Construction Materials">Construction Materials</SelectItem>
+                          <SelectItem value="Tools">Tools</SelectItem>
+                          <SelectItem value="Equipments">Equipments</SelectItem>
+                          <SelectItem value="PPE">PPE</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Item Name *</Label>
+                      <Input value={formData.item_name} onChange={(e) => setFormData({ ...formData, item_name: e.target.value })} required />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-2">
+                        <Label>Quantity *</Label>
+                        <Input type="number" value={formData.quantity} onChange={(e) => setFormData({ ...formData, quantity: e.target.value })} required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Unit *</Label>
+                        <Select value={formData.unit} onValueChange={(val) => setFormData({ ...formData, unit: val })} required>
+                          <SelectTrigger><SelectValue placeholder="Select unit" /></SelectTrigger>
+                          <SelectContent>
+                            {STANDARD_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Unit Cost (₱) *</Label>
+                      <Input type="number" step="0.01" value={formData.unit_cost} onChange={(e) => setFormData({ ...formData, unit_cost: e.target.value })} required />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label>Destination *</Label>
+                      <Select value={formData.destination_type} onValueChange={(val) => setFormData({ ...formData, destination_type: val })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="main_warehouse">Main Warehouse</SelectItem>
+                          <SelectItem value="project_warehouse">Project Warehouse</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {formData.destination_type === "project_warehouse" && (
+                      <div className="space-y-2 col-span-2">
+                        <Label>Select Project *</Label>
+                        <Select value={formData.project_id} onValueChange={(val) => setFormData({ ...formData, project_id: val })}>
+                          <SelectTrigger><SelectValue placeholder="Select active project" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">-- Select Project --</SelectItem>
+                            {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex justify-between items-center pt-4 border-t">
+                    <p className="text-xs text-muted-foreground">* Click Save Item to record and clear fields for the next item</p>
+                    <div className="flex gap-2">
+                      <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Close</Button>
+                      <Button type="submit">Save Item to PO</Button>
+                    </div>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none">
