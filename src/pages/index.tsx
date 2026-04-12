@@ -25,69 +25,112 @@ export default function Dashboard() {
 
   const loadDashboardData = async () => {
     setLoading(true);
-    // Fetch all projects
-    const { data: projects } = await supabase
-      .from('projects')
-      .select('*')
-      .order('created_at', { ascending: false });
-      
-    // Fetch BOMs and Scopes to calculate physical accomplishment
-    const { data: boms } = await supabase
-      .from('bill_of_materials')
-      .select('project_id, bom_scope_of_work(subtotal, completion_percentage)');
+    
+    const [
+      { data: projectsData },
+      { data: bomsData },
+      { data: consumptionsData },
+      { data: attendancesData }
+    ] = await Promise.all([
+      supabase.from('projects').select('*').order('created_at', { ascending: false }),
+      supabase.from('bill_of_materials').select('project_id, bom_scope_of_work(*, bom_materials(*), bom_labor(*)), bom_indirect_costs(*)'),
+      supabase.from('material_consumption').select('*'),
+      supabase.from('site_attendance').select('*, personnel(*)')
+    ]);
 
+    const projects = projectsData || [];
+    const boms = bomsData || [];
+    const consumptions = consumptionsData || [];
+    const attendances = attendancesData || [];
+    
     let totalVal = 0;
     let totalCst = 0;
     let totalWeightedCompletion = 0;
 
-    const projectsData = (projects || []).map(p => {
+    const projectsDataResult = projects.map(p => {
       const budget = Number(p.budget) || 0;
-      const spent = Number(p.spent) || 0;
-      const margin = budget > 0 ? ((budget - spent) / budget) * 100 : 0;
       
-      // Calculate accomplishment based on BOM scopes
-      const projectBoms = (boms || []).filter(b => b.project_id === p.id);
-      let projCompletion = 0;
-      
-      if (projectBoms.length > 0) {
-        let totalSub = 0;
-        let weightedComp = 0;
-        projectBoms.forEach(bom => {
-          (bom.bom_scope_of_work || []).forEach((scope: any) => {
-            const sub = Number(scope.subtotal) || 0;
-            const comp = Number(scope.completion_percentage) || 0;
-            totalSub += sub;
-            weightedComp += (comp * sub);
-          });
+      // --- ACCOMPLISHMENT (From Analytics SWA) ---
+      const projectBom = boms.find(b => b.project_id === p.id);
+      let grandTotalCost = 0;
+      let accomplishmentAmount = 0;
+      let accomplishmentPct = 0;
+
+      if (projectBom) {
+        const scopes = projectBom.bom_scope_of_work || [];
+        const indirects = projectBom.bom_indirect_costs || [];
+
+        const scopeRows = scopes.map((scope: any) => {
+          const matCost = (scope.bom_materials || []).reduce((sum: number, m: any) => sum + (Number(m.quantity || 0) * Number(m.unit_cost || 0)), 0);
+          const labCost = (scope.bom_labor || []).reduce((sum: number, l: any) => sum + Number(l.total_cost || (Number(l.hours || 0) * Number(l.hourly_rate || 0))), 0);
+          const cost = matCost + labCost;
+          grandTotalCost += cost;
+          return { cost, completion: Number(scope.completion_percentage || 0) };
         });
-        // If scopes have no costs assigned yet, default to simple average
-        if (totalSub === 0) {
-          let count = 0;
-          let sumComp = 0;
-          projectBoms.forEach(bom => {
-            (bom.bom_scope_of_work || []).forEach((scope: any) => {
-              sumComp += Number(scope.completion_percentage) || 0;
-              count++;
-            });
-          });
-          projCompletion = count > 0 ? sumComp / count : 0;
-        } else {
-          projCompletion = weightedComp / totalSub;
-        }
+
+        const avgCompletion = scopeRows.length > 0 ? scopeRows.reduce((sum, r) => sum + r.completion, 0) / scopeRows.length : 0;
+
+        const icRows = indirects.map((ic: any) => {
+          const cost = Number(ic.total_indirect || 0);
+          grandTotalCost += cost;
+          return { cost, completion: avgCompletion };
+        });
+
+        const allRows = [...scopeRows, ...icRows];
+        
+        allRows.forEach(row => {
+          const wtPercentage = grandTotalCost > 0 ? (row.cost / grandTotalCost) * 100 : 0;
+          const accomp = wtPercentage * (row.completion / 100);
+          accomplishmentPct += accomp;
+          accomplishmentAmount += row.cost * (row.completion / 100);
+        });
       }
 
-      totalVal += budget;
-      totalCst += spent;
-      totalWeightedCompletion += (projCompletion * budget); // weight by project budget for portfolio avg
+      // --- ACTUAL COST TO DATE (From Site Personnel/Analytics) ---
+      const projCons = consumptions.filter(c => c.project_id === p.id);
+      const projAtt = attendances.filter(a => a.project_id === p.id);
+
+      let actualMatCost = 0;
+      projCons.forEach((c: any) => {
+        let unitCost = 0;
+        if (projectBom) {
+          const scope = (projectBom.bom_scope_of_work || []).find((s:any) => s.id === c.bom_scope_id);
+          if (scope && scope.bom_materials) {
+            const bomMat = scope.bom_materials.find((m:any) => m.material_name === (c.item_name || c.material_name));
+            if (bomMat) unitCost = Number(bomMat.unit_cost || 0);
+          }
+        }
+        actualMatCost += (Number(c.quantity || c.quantity_used || 0) * unitCost);
+      });
+
+      let actualLabCost = 0;
+      projAtt.forEach((a: any) => {
+        const hrRate = Number(a.personnel?.hourly_rate || (a.personnel?.daily_rate ? a.personnel.daily_rate / 8 : 0));
+        actualLabCost += (Number(a.hours_worked || 0) * hrRate);
+      });
+
+      const totalActualCost = actualMatCost + actualLabCost;
+
+      // Base financial calculations on BOM Grand Total if available, otherwise fallback to project budget
+      const activeBudget = grandTotalCost > 0 ? grandTotalCost : budget;
+      const margin = activeBudget > 0 ? ((activeBudget - totalActualCost) / activeBudget) * 100 : 0;
+
+      totalVal += activeBudget;
+      totalCst += totalActualCost;
+      // Weight completion by budget for the portfolio average
+      totalWeightedCompletion += (accomplishmentPct * activeBudget);
 
       return {
         ...p,
-        margin,
-        completion: projCompletion
+        contractAmount: activeBudget,
+        costToDate: totalActualCost,
+        margin: margin,
+        completion: accomplishmentPct,
+        amountOfCompletion: accomplishmentAmount
       };
     });
 
-    setPortfolio(projectsData);
+    setPortfolio(projectsDataResult);
     setSummary({
       totalValue: totalVal,
       totalCost: totalCst,
@@ -214,10 +257,10 @@ export default function Dashboard() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right font-medium">
-                          {formatCurrency(project.budget)}
+                          {formatCurrency(project.contractAmount)}
                         </TableCell>
                         <TableCell className="text-right text-muted-foreground">
-                          {formatCurrency(project.spent)}
+                          {formatCurrency(project.costToDate)}
                         </TableCell>
                         <TableCell className="text-right">
                           <span className={`font-semibold ${project.margin >= 0 ? 'text-success' : 'text-destructive'}`}>
