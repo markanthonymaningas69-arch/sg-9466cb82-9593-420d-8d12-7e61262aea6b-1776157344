@@ -294,6 +294,7 @@ export default function Projects() {
                             <Label>Item Name *</Label>
                             <Input value={masterForm.name} onChange={(e) => setMasterForm({...masterForm, name: e.target.value})} required />
                           </div>
+                          
                           <div className="space-y-2">
                             <Label>Category *</Label>
                             {!isManualMasterCategory ? (
@@ -314,6 +315,7 @@ export default function Projects() {
                               </div>
                             )}
                           </div>
+                          
                           <div className="space-y-2">
                             <Label>Default Unit *</Label>
                             {!isManualMasterUnit ? (
@@ -334,6 +336,7 @@ export default function Projects() {
                               </div>
                             )}
                           </div>
+                          
                           <div className="space-y-2 pt-2 border-t mt-4">
                             <Label>Link to Scopes of Work</Label>
                             <p className="text-xs text-muted-foreground mb-2">Select which scopes use this item (e.g., Cement for Concrete, Masonry)</p>
@@ -357,6 +360,7 @@ export default function Projects() {
                               </div>
                             )}
                           </div>
+                          
                           <Button type="submit" className="w-full mt-4">{editingMasterItemId ? "Update Item" : "Save to Catalog"}</Button>
                         </form>
                       </div>
