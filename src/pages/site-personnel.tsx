@@ -23,7 +23,7 @@ type AttendanceRow = { personnel_id: string; name: string; role: string; daily_r
 type Delivery = { id: string; project_id: string; delivery_date: string; item_name: string; quantity: number; unit: string; supplier: string; received_by: string; status: string; notes: string; receipt_number?: string };
 type ScopeOfWork = { id: string; name: string; description?: string; order_number: number; completion_percentage?: number; status?: string; bom_id: string };
 
-const STANDARD_ROLES = ["Admin", "Carpenter", "Electrician", "Helper", "Mason", "Plumber", "Skilled", "Tile Mason", "Welder"];
+const STANDARD_ROLES = ["Admin", "Carpenter", "Electrician", "Helper", "Mason", "Plumber", "Skilled", "Steelman", "Tile Mason", "Welder"];
 
 export default function SitePersonnel() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -579,50 +579,29 @@ export default function SitePersonnel() {
                             </TableCell>
                             <TableCell>
                               {isEditing ? (
-                                <div className="flex gap-2">
-                                  <Input 
-                                    placeholder="Custom position"
-                                    value={p.role} 
-                                    onChange={e => {
-                                      const l = [...projectPersonnelList];
-                                      const i = l.findIndex(x => x.id === p.id);
-                                      l[i].role = e.target.value;
-                                      setProjectPersonnelList(l);
-                                      
-                                      // Sync to attendance
-                                      const attIdx = attendanceList.findIndex(a => a.personnel_id === p.id);
-                                      if (attIdx > -1) {
-                                        const attList = [...attendanceList];
-                                        attList[attIdx].role = e.target.value;
-                                        setAttendanceList(attList);
-                                      }
-                                    }}
-                                    onBlur={e => siteService.updatePersonnel(p.id, { role: e.target.value })}
-                                  />
-                                  <Button type="button" variant="outline" className="px-2" onClick={() => {
-                                    setManualRoles(prev => ({ ...prev, [p.id]: false }));
-                                    const l = [...projectPersonnelList];
-                                    const i = l.findIndex(x => x.id === p.id);
-                                    l[i].role = "";
-                                    setProjectPersonnelList(l);
-                                    
-                                    // Sync to attendance
-                                    const attIdx = attendanceList.findIndex(a => a.personnel_id === p.id);
-                                    if (attIdx > -1) {
-                                      const attList = [...attendanceList];
-                                      attList[attIdx].role = "";
-                                      setAttendanceList(attList);
-                                    }
-                                  }}>
-                                    List
-                                  </Button>
-                                </div>
-                              ) : (
-                                <Select 
-                                  value={p.role || ""} 
-                                  onValueChange={val => {
-                                    if (val === "others") {
-                                      setManualRoles(prev => ({ ...prev, [p.id]: true }));
+                                manualRoles[p.id] || (p.role && !STANDARD_ROLES.includes(p.role)) ? (
+                                  <div className="flex gap-2">
+                                    <Input 
+                                      placeholder="Custom position"
+                                      value={p.role} 
+                                      onChange={e => {
+                                        const l = [...projectPersonnelList];
+                                        const i = l.findIndex(x => x.id === p.id);
+                                        l[i].role = e.target.value;
+                                        setProjectPersonnelList(l);
+                                        
+                                        // Sync to attendance
+                                        const attIdx = attendanceList.findIndex(a => a.personnel_id === p.id);
+                                        if (attIdx > -1) {
+                                          const attList = [...attendanceList];
+                                          attList[attIdx].role = e.target.value;
+                                          setAttendanceList(attList);
+                                        }
+                                      }}
+                                      onBlur={e => siteService.updatePersonnel(p.id, { role: e.target.value })}
+                                    />
+                                    <Button type="button" variant="outline" className="px-2" onClick={() => {
+                                      setManualRoles(prev => ({ ...prev, [p.id]: false }));
                                       const l = [...projectPersonnelList];
                                       const i = l.findIndex(x => x.id === p.id);
                                       l[i].role = "";
@@ -635,31 +614,56 @@ export default function SitePersonnel() {
                                         attList[attIdx].role = "";
                                         setAttendanceList(attList);
                                       }
-                                    } else {
-                                      const l = [...projectPersonnelList];
-                                      const i = l.findIndex(x => x.id === p.id);
-                                      l[i].role = val;
-                                      setProjectPersonnelList(l);
-                                      siteService.updatePersonnel(p.id, { role: val });
+                                    }}>
+                                      List
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <Select 
+                                    value={p.role || ""} 
+                                    onValueChange={val => {
+                                      if (val === "others") {
+                                        setManualRoles(prev => ({ ...prev, [p.id]: true }));
+                                        const l = [...projectPersonnelList];
+                                        const i = l.findIndex(x => x.id === p.id);
+                                        l[i].role = "";
+                                        setProjectPersonnelList(l);
                                       
-                                      // Sync to attendance
-                                      const attIdx = attendanceList.findIndex(a => a.personnel_id === p.id);
-                                      if (attIdx > -1) {
-                                        const attList = [...attendanceList];
-                                        attList[attIdx].role = val;
-                                        setAttendanceList(attList);
+                                        // Sync to attendance
+                                        const attIdx = attendanceList.findIndex(a => a.personnel_id === p.id);
+                                        if (attIdx > -1) {
+                                          const attList = [...attendanceList];
+                                          attList[attIdx].role = "";
+                                          setAttendanceList(attList);
+                                        }
+                                      } else {
+                                        const l = [...projectPersonnelList];
+                                        const i = l.findIndex(x => x.id === p.id);
+                                        l[i].role = val;
+                                        setProjectPersonnelList(l);
+                                        siteService.updatePersonnel(p.id, { role: val });
+                                      
+                                        // Sync to attendance
+                                        const attIdx = attendanceList.findIndex(a => a.personnel_id === p.id);
+                                        if (attIdx > -1) {
+                                          const attList = [...attendanceList];
+                                          attList[attIdx].role = val;
+                                          setAttendanceList(attList);
+                                        }
                                       }
-                                    }
-                                  }}
-                                >
-                                  <SelectTrigger className="h-9">
-                                    <SelectValue placeholder="Position" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {STANDARD_ROLES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                                    <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
-                                  </SelectContent>
-                                </Select>
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-9">
+                                      <SelectValue placeholder="Position" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {STANDARD_ROLES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                                      <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                )
+                              ) : (
+                                <span>{p.role}</span>
                               )}
                             </TableCell>
                             <TableCell>
@@ -884,6 +888,7 @@ export default function SitePersonnel() {
                               <TableHead className="w-[200px] cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleAttendanceSort("bom_scope_id")}>Scope Assignment {getSortIcon(attendanceSort, "bom_scope_id")}</TableHead>
                               <TableHead className="text-right cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleAttendanceSort("daily_rate")}>Daily Rate {getSortIcon(attendanceSort, "daily_rate")}</TableHead>
                               <TableHead>Status</TableHead>
+                              <TableHead className="w-24 text-center">Reg. Hrs</TableHead>
                               <TableHead className="w-32 text-center">Overtime (Hrs)</TableHead>
                               <TableHead className="text-right cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleAttendanceSort("total_cost")}>Total Cost</TableHead>
                             </TableRow>
@@ -947,6 +952,24 @@ export default function SitePersonnel() {
                                             {row.status === "present" ? "Present" : "Absent"}
                                           </span>
                                         </div>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Input
+                                          type="number"
+                                          min="0"
+                                          max="24"
+                                          step="0.5"
+                                          className="w-16 mx-auto text-center h-8"
+                                          value={row.hours_worked}
+                                          disabled={!canEdit || row.status === "absent"}
+                                          onChange={(e) => {
+                                            const list = [...attendanceList];
+                                            const idx = list.findIndex(l => l.personnel_id === row.personnel_id);
+                                            list[idx].hours_worked = parseFloat(e.target.value) || 0;
+                                            setAttendanceList(list);
+                                          }}
+                                          onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                        />
                                       </TableCell>
                                       <TableCell>
                                         <Input
@@ -1052,6 +1075,7 @@ export default function SitePersonnel() {
                                               {record.status === "present" ? "Present" : "Absent"}
                                             </span>
                                           </TableCell>
+                                          <TableCell className="text-center">{record.hours_worked || 0}</TableCell>
                                           <TableCell className="text-center">{record.overtime_hours || 0}</TableCell>
                                           <TableCell className="text-right font-semibold text-primary">
                                             ₱{rowCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

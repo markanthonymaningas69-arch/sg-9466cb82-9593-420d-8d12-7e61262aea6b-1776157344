@@ -60,7 +60,7 @@ export const siteService = {
   async getSiteAttendance(projectId: string, date?: string) {
     let query = supabase
       .from("site_attendance")
-      .select("*, personnel(name, role), projects(name)")
+      .select("*, personnel(name, role, daily_rate, overtime_rate), projects(name)")
       .eq("project_id", projectId)
       .order("date", { ascending: false });
     
