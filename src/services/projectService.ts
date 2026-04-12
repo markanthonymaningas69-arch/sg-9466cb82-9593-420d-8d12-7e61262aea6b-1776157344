@@ -78,6 +78,26 @@ export const projectService = {
     return { error };
   },
 
+  async getMasterItems() {
+    const { data, error } = await supabase.from("master_items").select("*").order("name");
+    return { data: data || [], error };
+  },
+
+  async createMasterItem(item: any) {
+    const { data, error } = await supabase.from("master_items").insert(item).select().single();
+    return { data, error };
+  },
+
+  async updateMasterItem(id: string, updates: any) {
+    const { data, error } = await supabase.from("master_items").update(updates).eq("id", id).select().single();
+    return { data, error };
+  },
+
+  async deleteMasterItem(id: string) {
+    const { error } = await supabase.from("master_items").delete().eq("id", id);
+    return { error };
+  },
+
   async getStats() {
     const cacheKey = CACHE_KEYS.companyDashboard("default");
     const cached = cacheManager.get<any>(cacheKey);

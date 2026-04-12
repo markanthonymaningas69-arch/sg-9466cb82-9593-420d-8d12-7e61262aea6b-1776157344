@@ -31,6 +31,7 @@ const STANDARD_UNITS = ["pcs", "bags", "kgs", "liters", "units", "set", "lot", "
 export default function Warehouse() {
   const [items, setItems] = useState<WarehouseItem[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
+  const [masterItems, setMasterItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Tabs and Filters
@@ -45,6 +46,7 @@ export default function Warehouse() {
   const [editingItem, setEditingItem] = useState<WarehouseItem | null>(null);
   const [deployingItem, setDeployingItem] = useState<WarehouseItem | null>(null);
   const [deployForm, setDeployForm] = useState({ project_id: "", quantity: 1 });
+  const [isManualName, setIsManualName] = useState(false);
   const [isManualCategory, setIsManualCategory] = useState(false);
   const [isManualUnit, setIsManualUnit] = useState(false);
   const [formData, setFormData] = useState({
@@ -63,12 +65,14 @@ export default function Warehouse() {
 
   const loadData = async () => {
     setLoading(true);
-    const [{ data: itemsData }, { data: projectsData }] = await Promise.all([
+    const [{ data: itemsData }, { data: projectsData }, { data: masterData }] = await Promise.all([
       warehouseService.getAll(),
-      projectService.getAll()
+      projectService.getAll(),
+      projectService.getMasterItems()
     ]);
     setItems(itemsData as WarehouseItem[] || []);
     setProjects(projectsData || []);
+    setMasterItems(masterData || []);
     setLoading(false);
   };
 
@@ -140,6 +144,7 @@ export default function Warehouse() {
       last_restocked: new Date().toISOString().split("T")[0]
     });
     setEditingItem(null);
+    setIsManualName(false);
     setIsManualCategory(false);
     setIsManualUnit(false);
   };
@@ -217,7 +222,40 @@ export default function Warehouse() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="name">Item Name *</Label>
-                      <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
+                      {!isManualName ? (
+                        <Select value={formData.name} onValueChange={(val) => {
+                          if (val === "others") {
+                            setIsManualName(true);
+                            setFormData({ ...formData, name: "" });
+                          } else {
+                            const item = masterItems.find(m => m.name === val);
+                            if (item) {
+                              setFormData({
+                                ...formData,
+                                name: val,
+                                category: item.category,
+                                unit: item.unit,
+                                unit_cost: item.default_cost.toString()
+                              });
+                              setIsManualCategory(item.category ? !STANDARD_CATEGORIES.includes(item.category) : false);
+                              setIsManualUnit(item.unit ? !STANDARD_UNITS.includes(item.unit) : false);
+                            } else {
+                              setFormData({ ...formData, name: val });
+                            }
+                          }
+                        }} required>
+                          <SelectTrigger><SelectValue placeholder="Select from catalog" /></SelectTrigger>
+                          <SelectContent>
+                            {masterItems.map(m => <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>)}
+                            <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Custom item name" required />
+                          <Button type="button" variant="outline" className="px-2" onClick={() => { setIsManualName(false); setFormData({ ...formData, name: "" }); }}>List</Button>
+                        </div>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label>Category *</Label>

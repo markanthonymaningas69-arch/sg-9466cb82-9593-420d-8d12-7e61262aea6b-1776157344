@@ -49,6 +49,7 @@ export default function BillOfMaterials() {
   const [bom, setBom] = useState<BOM | null>(null);
   const [scopes, setScopes] = useState<ScopeOfWork[]>([]);
   const [indirectCosts, setIndirectCosts] = useState<IndirectCost[]>([]);
+  const [masterItems, setMasterItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showIndirectCosts, setShowIndirectCosts] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -66,6 +67,7 @@ export default function BillOfMaterials() {
   const [collapsedScopes, setCollapsedScopes] = useState<Record<string, boolean>>({});
   const [editingScopeId, setEditingScopeId] = useState<string | null>(null);
   const [editingScopeName, setEditingScopeName] = useState<string>("");
+  const [isManualMaterial, setIsManualMaterial] = useState(false);
 
   const [materialForm, setMaterialForm] = useState({
     name: "",
@@ -173,8 +175,13 @@ export default function BillOfMaterials() {
   const loadData = async (id: string) => {
     setLoading(true);
 
-    const { data: projectData } = await projectService.getById(id);
+    const [{ data: projectData }, { data: masterData }] = await Promise.all([
+      projectService.getById(id),
+      projectService.getMasterItems()
+    ]);
+    
     setProject(projectData);
+    setMasterItems(masterData || []);
 
     const { data: bomData, error } = await bomService.getByProjectId(id);
 
@@ -512,6 +519,7 @@ export default function BillOfMaterials() {
       unit_cost: ""
     });
     setEditingMaterial(null);
+    setIsManualMaterial(false);
   };
 
   const handleMaterialSubmitInline = async () => {
@@ -555,9 +563,13 @@ export default function BillOfMaterials() {
 
   const handleEditMaterial = (material: Material) => {
     setSelectedScopeId(material.scope_id as string);
-    const knownUnits = ["Cu.m", "Sq.m", "Lin.m", "Pc", "Kg", "Box"];
+    const knownUnits = ["Cu.m", "Sq.m", "Lin.m", "Pc", "Kg", "Box", "lot", "bags", "pails", "gal", "liters", "bd.ft", "sets", "pairs", "rolls", "Other"];
     const unit = material.unit || "";
     const isKnown = knownUnits.includes(unit);
+    
+    // Check if description exists in masterItems to decide if we should show manual input or dropdown
+    const existsInMaster = masterItems.some(m => m.name === (material.description || material.material_name));
+    setIsManualMaterial(!existsInMaster && !!(material.description || material.material_name));
 
     setMaterialForm({
       name: material.material_name || "",
@@ -988,83 +1000,46 @@ export default function BillOfMaterials() {
                     </Button>
                   </div>
 
-                  {(scope.bom_materials || []).length > 0 || selectedScopeId === scope.id ?
-            <div className="mt-2">
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="font-semibold text-lg">Materials</h3>
-                  </div>
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="h-8">
-                        <TableHead className="h-8 py-1">Material Description</TableHead>
-                        <TableHead className="w-40 text-right h-8 py-1">Qty</TableHead>
-                        <TableHead className="w-40 h-8 py-1">Unit</TableHead>
-                        <TableHead className="w-48 text-right h-8 py-1">Unit Cost</TableHead>
-                        <TableHead className="w-32 text-right h-8 py-1">Amount</TableHead>
-                        <TableHead className="w-28 text-right h-8 py-1" />
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {(scope.bom_materials || []).map((material) =>
-                  <TableRow key={material.id} className="h-8">
-                          <TableCell className="py-1">
-                            <div className="font-medium text-sm">
-                              {material.description || material.material_name}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right py-1 text-sm">
-                            {formatNumber(material.quantity as number || 0)}
-                          </TableCell>
-                          <TableCell className="py-1 text-sm">{material.unit}</TableCell>
-                          <TableCell className="text-right py-1 text-sm">
-                            {formatCurrency(material.unit_cost as number ?? 0)}
-                          </TableCell>
-                          <TableCell className="text-right font-semibold py-1 text-sm">
-                            {(() => {
-                        const total =
-                        material.total_cost as number ??
-                        (material.quantity || 0) * (
-                        material.unit_cost as number || 0);
-                        return formatCurrency(total);
-                      })()}
-                          </TableCell>
-                          <TableCell className="text-right py-1">
-                            <div className="flex justify-end gap-1">
-                              <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-6 w-6 text-green-600 hover:text-green-700"
-                          onClick={() => handleEditMaterial(material)}>
-                          
-                                <Pencil className="h-3 w-3" />
-                              </Button>
-                              <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-6 w-6 text-red-600 hover:text-red-700"
-                          onClick={() => void handleDeleteMaterial(material.id as string)}>
-                          
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                  )}
-
-                      {selectedScopeId === scope.id &&
+                  {selectedScopeId === scope.id &&
                   <TableRow className="h-8">
                           <TableCell className="py-1">
-                            <Input
-                        placeholder="Material description"
-                        className="h-7 text-xs"
-                        value={materialForm.description}
-                        onChange={(e) =>
-                        setMaterialForm({
-                          ...materialForm,
-                          description: e.target.value
-                        })
-                        } />
-                      
+                            {!isManualMaterial ? (
+                              <Select value={materialForm.description} onValueChange={(val) => {
+                                if (val === "others") {
+                                  setIsManualMaterial(true);
+                                  setMaterialForm({ ...materialForm, description: "" });
+                                } else {
+                                  const item = masterItems.find(m => m.name === val);
+                                  if (item) {
+                                    setMaterialForm({
+                                      ...materialForm,
+                                      description: val,
+                                      unit: item.unit,
+                                      unit_selection: ["Cu.m", "Sq.m", "Lin.m", "Pc", "Kg", "Box", "lot", "bags", "pails", "gal", "liters", "bd.ft", "sets", "pairs", "rolls"].includes(item.unit) ? item.unit : "Other",
+                                      unit_cost: Number(item.default_cost).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                    });
+                                  } else {
+                                    setMaterialForm({ ...materialForm, description: val });
+                                  }
+                                }
+                              }}>
+                                <SelectTrigger className="h-7 text-xs w-full min-w-[140px]"><SelectValue placeholder="Select catalog item" /></SelectTrigger>
+                                <SelectContent>
+                                  {masterItems.map(m => <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>)}
+                                  <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <div className="flex gap-1">
+                                <Input
+                                  placeholder="Material description"
+                                  className="h-7 text-xs"
+                                  value={materialForm.description}
+                                  onChange={(e) => setMaterialForm({ ...materialForm, description: e.target.value })}
+                                />
+                                <Button type="button" variant="outline" className="h-7 px-2 text-xs" onClick={() => { setIsManualMaterial(false); setMaterialForm({ ...materialForm, description: "" }); }}>List</Button>
+                              </div>
+                            )}
                           </TableCell>
                           <TableCell className="text-right py-1">
                             <Input
@@ -1161,7 +1136,7 @@ export default function BillOfMaterials() {
                       })()}
                           </TableCell>
                           <TableCell className="text-right py-1">
-                            <div className="flex justify-end items-center gap-1">
+                            <div className="flex justify-end gap-1">
                               <Button
                           size="sm"
                           className="bg-green-600 hover:bg-green-700 text-white h-7 px-2 text-xs"
