@@ -85,6 +85,7 @@ export default function SitePersonnel() {
   const [consumptionDate, setConsumptionDate] = useState<string>(todayStr);
   const [consumptionDialogOpen, setConsumptionDialogOpen] = useState(false);
   const [editingConsumptionId, setEditingConsumptionId] = useState<string | null>(null);
+  const [manualEditItems, setManualEditItems] = useState<Record<string, boolean>>({});
   const [consumptionForm, setConsumptionForm] = useState({
     bom_scope_id: "",
     date_used: new Date().toISOString().split("T")[0],
@@ -1704,7 +1705,7 @@ export default function SitePersonnel() {
                                   <Input
                                     type="date"
                                     value={row.date_used}
-                                    className="w-32 h-8"
+                                    className="w-40 h-8"
                                     onChange={(e) => {
                                       const list = [...consumptions];
                                       const idx = list.findIndex(l => l.id === row.id);
@@ -1719,17 +1720,67 @@ export default function SitePersonnel() {
                               </TableCell>
                               <TableCell className="font-medium">
                                 {isEditing ? (
-                                  <Input
-                                    value={row.item_name}
-                                    className="h-8"
-                                    onChange={(e) => {
-                                      const list = [...consumptions];
-                                      const idx = list.findIndex(l => l.id === row.id);
-                                      list[idx].item_name = e.target.value;
-                                      setConsumptions(list);
-                                    }}
-                                    onBlur={(e) => siteService.updateMaterialConsumption(row.id, { item_name: e.target.value })}
-                                  />
+                                  manualEditItems[row.id] || (row.item_name && !bomMaterials.find(m => m.name === row.item_name)) ? (
+                                    <div className="flex gap-2">
+                                      <Input
+                                        value={row.item_name}
+                                        className="h-8 w-full min-w-[120px]"
+                                        placeholder="Custom material"
+                                        onChange={(e) => {
+                                          const list = [...consumptions];
+                                          const idx = list.findIndex(l => l.id === row.id);
+                                          list[idx].item_name = e.target.value;
+                                          setConsumptions(list);
+                                        }}
+                                        onBlur={(e) => siteService.updateMaterialConsumption(row.id, { item_name: e.target.value })}
+                                      />
+                                      <Button type="button" variant="outline" size="sm" className="h-8 px-2" onClick={() => {
+                                        setManualEditItems(prev => ({ ...prev, [row.id]: false }));
+                                        const list = [...consumptions];
+                                        const idx = list.findIndex(l => l.id === row.id);
+                                        list[idx].item_name = "";
+                                        setConsumptions(list);
+                                      }}>
+                                        List
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    <Select
+                                      value={row.item_name || ""}
+                                      onValueChange={(val) => {
+                                        if (val === "others") {
+                                          setManualEditItems(prev => ({ ...prev, [row.id]: true }));
+                                          const list = [...consumptions];
+                                          const idx = list.findIndex(l => l.id === row.id);
+                                          list[idx].item_name = "";
+                                          setConsumptions(list);
+                                        } else {
+                                          const mat = bomMaterials.find(m => m.name === val);
+                                          const list = [...consumptions];
+                                          const idx = list.findIndex(l => l.id === row.id);
+                                          list[idx].item_name = val;
+                                          if (mat?.unit) list[idx].unit = mat.unit;
+                                          setConsumptions(list);
+                                          siteService.updateMaterialConsumption(row.id, { 
+                                            item_name: val,
+                                            unit: mat?.unit || list[idx].unit
+                                          });
+                                        }
+                                      }}
+                                    >
+                                      <SelectTrigger className="h-8 w-full min-w-[160px]">
+                                        <SelectValue placeholder="Select material" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {bomMaterials
+                                          .filter(mat => !row.bom_scope_id || row.bom_scope_id === "unassigned" || mat.scope_id === row.bom_scope_id)
+                                          .map((mat) => (
+                                          <SelectItem key={mat.id} value={mat.name}>{mat.name}</SelectItem>
+                                        ))}
+                                        <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  )
                                 ) : (
                                   row.item_name
                                 )}
