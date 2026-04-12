@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -601,6 +601,33 @@ export type Database = {
           purpose?: string
           status?: string | null
           submitted_by?: string
+        }
+        Relationships: []
+      }
+      master_items: {
+        Row: {
+          category: string
+          created_at: string | null
+          default_cost: number | null
+          id: string
+          name: string
+          unit: string
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          default_cost?: number | null
+          id?: string
+          name: string
+          unit: string
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          default_cost?: number | null
+          id?: string
+          name?: string
+          unit?: string
         }
         Relationships: []
       }
