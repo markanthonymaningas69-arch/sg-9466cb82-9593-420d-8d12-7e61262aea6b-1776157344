@@ -73,6 +73,15 @@ export const bomService = {
     return { data, error };
   },
 
+  // Get Master Scopes
+  async getMasterScopes() {
+    const { data, error } = await supabase
+      .from("master_scopes")
+      .select("*")
+      .order("name");
+    return { data, error };
+  },
+
   // Update BOM
   async update(id: string, bomData: Database["public"]["Tables"]["bill_of_materials"]["Update"]) {
     const { data, error } = await supabase
