@@ -22,6 +22,7 @@ type SiteAttendance = { id: string; personnel_id: string; project_id: string; da
 type AttendanceRow = { personnel_id: string; name: string; role: string; daily_rate: number; overtime_rate: number; status: string; hours_worked: number; overtime_hours: number; bom_scope_id: string | null };
 type Delivery = { id: string; project_id: string; delivery_date: string; item_name: string; quantity: number; unit: string; supplier: string; received_by: string; status: string; notes: string; receipt_number?: string };
 type ScopeOfWork = { id: string; name: string; description?: string; order_number: number; completion_percentage?: number; status?: string; bom_id: string };
+type MaterialConsumption = { id: string; project_id: string; bom_scope_id: string | null; date_used: string; item_name: string; quantity: number; unit: string; recorded_by: string; notes: string; bom_scope_of_work?: { name: string } };
 
 const STANDARD_ROLES = ["Admin", "Carpenter", "Electrician", "Helper", "Mason", "Plumber", "Skilled", "Steelman", "Tile Mason", "Welder"];
 
@@ -39,6 +40,7 @@ export default function SitePersonnel() {
   // Site Attendance (Roll Call)
   const [attendanceList, setAttendanceList] = useState<AttendanceRow[]>([]);
   const [historicalAttendance, setHistoricalAttendance] = useState<Record<string, any[]>>({});
+  const [attendanceMonthFilter, setAttendanceMonthFilter] = useState<string>("");
   const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
   const [isEditMode, setIsEditMode] = useState(false);
   const [enrollDialogOpen, setEnrollDialogOpen] = useState(false);
@@ -78,6 +80,20 @@ export default function SitePersonnel() {
     notes: ""
   });
 
+  // Material Consumption
+  const [consumptions, setConsumptions] = useState<MaterialConsumption[]>([]);
+  const [consumptionDate, setConsumptionDate] = useState<string>(todayStr);
+  const [consumptionDialogOpen, setConsumptionDialogOpen] = useState(false);
+  const [consumptionForm, setConsumptionForm] = useState({
+    bom_scope_id: "",
+    date_used: new Date().toISOString().split("T")[0],
+    item_name: "",
+    quantity: 0,
+    unit: "",
+    recorded_by: "",
+    notes: ""
+  });
+
   // Scope of Works
   const [scopes, setScopes] = useState<ScopeOfWork[]>([]);
 
@@ -103,8 +119,9 @@ export default function SitePersonnel() {
   useEffect(() => {
     if (selectedProject) {
       loadDeliveries();
+      loadConsumptions();
     }
-  }, [selectedProject, deliveriesDate]);
+  }, [selectedProject, deliveriesDate, consumptionDate]);
 
   const loadProjects = async () => {
     const { data } = await projectService.getAll();
@@ -212,6 +229,12 @@ export default function SitePersonnel() {
     if (!selectedProject) return;
     const { data } = await siteService.getDeliveries(selectedProject, deliveriesDate);
     setDeliveries(data || []);
+  };
+
+  const loadConsumptions = async () => {
+    if (!selectedProject) return;
+    const { data } = await siteService.getMaterialConsumption(selectedProject, consumptionDate === "" ? undefined : consumptionDate);
+    setConsumptions(data || []);
   };
 
   const loadScopes = async () => {
@@ -323,6 +346,34 @@ export default function SitePersonnel() {
     setIsManualUnit(false);
   };
 
+  const handleConsumptionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await siteService.createMaterialConsumption({
+      ...consumptionForm,
+      bom_scope_id: consumptionForm.bom_scope_id === "unassigned" ? null : consumptionForm.bom_scope_id,
+      project_id: selectedProject,
+      quantity: parseFloat(consumptionForm.quantity.toString())
+    });
+    setConsumptionForm(prev => ({ ...prev, item_name: "", quantity: 0, unit: "" }));
+    setIsManualItem(false);
+    setIsManualUnit(false);
+    loadConsumptions();
+  };
+
+  const resetConsumptionForm = () => {
+    setConsumptionForm({
+      bom_scope_id: "",
+      date_used: new Date().toISOString().split("T")[0],
+      item_name: "",
+      quantity: 0,
+      unit: "",
+      recorded_by: "",
+      notes: ""
+    });
+    setIsManualItem(false);
+    setIsManualUnit(false);
+  };
+
   const getStatusBadge = (status: string) => {
     const colors: Record<string, string> = {
       present: "bg-green-500",
@@ -371,7 +422,7 @@ export default function SitePersonnel() {
 
         {selectedProject && (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 overflow-hidden space-y-4">
-            <TabsList className="shrink-0 grid w-full grid-cols-4">
+            <TabsList className="shrink-0 grid w-full grid-cols-5">
               <TabsTrigger value="manpower">
                 <Users className="h-4 w-4 mr-2" />
                 Project Manpower
@@ -383,6 +434,10 @@ export default function SitePersonnel() {
               <TabsTrigger value="deliveries">
                 <Truck className="h-4 w-4 mr-2" />
                 Deliveries
+              </TabsTrigger>
+              <TabsTrigger value="consumption">
+                <ClipboardList className="h-4 w-4 mr-2" />
+                Material Usage
               </TabsTrigger>
               <TabsTrigger value="scope">
                 <Plus className="h-4 w-4 mr-2" />
@@ -589,7 +644,7 @@ export default function SitePersonnel() {
                                         const i = l.findIndex(x => x.id === p.id);
                                         l[i].role = e.target.value;
                                         setProjectPersonnelList(l);
-                                        
+                                      
                                         // Sync to attendance
                                         const attIdx = attendanceList.findIndex(a => a.personnel_id === p.id);
                                         if (attIdx > -1) {
@@ -1002,7 +1057,29 @@ export default function SitePersonnel() {
                     </div>
                   ) : (
                     <div className="space-y-4 overflow-y-auto h-full pr-2">
-                      {Object.entries(historicalAttendance).sort(([a], [b]) => b.localeCompare(a)).map(([date, records]) => {
+                      <div className="flex items-center gap-3 bg-muted/30 p-4 rounded-lg border shrink-0">
+                        <Label>Month Filter:</Label>
+                        <Input
+                          type="month"
+                          value={attendanceMonthFilter}
+                          onChange={(e) => setAttendanceMonthFilter(e.target.value)}
+                          className="w-auto h-9"
+                        />
+                        {attendanceMonthFilter && (
+                          <Button variant="ghost" size="sm" onClick={() => setAttendanceMonthFilter("")} className="text-muted-foreground h-9">
+                            Clear
+                          </Button>
+                        )}
+                        <span className="text-sm text-muted-foreground ml-4">Select a month to see all weeks/days inside it.</span>
+                      </div>
+                      
+                      {Object.entries(historicalAttendance)
+                        .filter(([date]) => {
+                          if (!attendanceMonthFilter) return true;
+                          return date.startsWith(attendanceMonthFilter);
+                        })
+                        .sort(([a], [b]) => b.localeCompare(a))
+                        .map(([date, records]) => {
                         const isExpanded = expandedDates[date];
                         return (
                           <div key={date} className="border rounded-lg overflow-hidden">
@@ -1381,6 +1458,13 @@ export default function SitePersonnel() {
                                     </TableCell>
                                   </TableRow>
                                 ))}
+                                {groupDeliveries.length === 0 && (
+                                  <TableRow>
+                                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                      No deliveries recorded for this date.
+                                    </TableCell>
+                                  </TableRow>
+                                )}
                               </TableBody>
                             </Table>
                           )}
@@ -1388,6 +1472,253 @@ export default function SitePersonnel() {
                       );
                     })}
                   </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="consumption" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Material Consumption</CardTitle>
+                      <CardDescription>Track materials used and assign them to specific Scopes of Work</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={consumptionDate}
+                          onChange={(e) => setConsumptionDate(e.target.value)}
+                          className="w-auto h-9"
+                        />
+                        {consumptionDate && (
+                          <Button variant="ghost" size="sm" onClick={() => setConsumptionDate("")} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <Dialog open={consumptionDialogOpen} onOpenChange={setConsumptionDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Log Usage
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Log Material Consumption</DialogTitle>
+                        </DialogHeader>
+                        <form onSubmit={handleConsumptionSubmit} className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="bom_scope_id">Scope of Work</Label>
+                            <Select
+                              value={consumptionForm.bom_scope_id}
+                              onValueChange={(val) => setConsumptionForm({ ...consumptionForm, bom_scope_id: val })}
+                              required
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Assign to scope..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="unassigned" className="text-muted-foreground italic">General / Unassigned</SelectItem>
+                                {scopes.map((s) => (
+                                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="item">Item Name</Label>
+                              {!isManualItem ? (
+                                <Select
+                                  value={consumptionForm.item_name}
+                                  onValueChange={(val) => {
+                                    if (val === "others") {
+                                      setIsManualItem(true);
+                                      setConsumptionForm({ ...consumptionForm, item_name: "", unit: "" });
+                                      setIsManualUnit(false);
+                                    } else {
+                                      const mat = bomMaterials.find(m => m.name === val);
+                                      setConsumptionForm({ ...consumptionForm, item_name: val, unit: mat?.unit || consumptionForm.unit });
+                                      setIsManualUnit(false);
+                                    }
+                                  }}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select material" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {bomMaterials.map((mat) => (
+                                      <SelectItem key={mat.id} value={mat.name}>{mat.name}</SelectItem>
+                                    ))}
+                                    <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                <div className="flex gap-2">
+                                  <Input
+                                    id="item"
+                                    placeholder="Custom material"
+                                    value={consumptionForm.item_name}
+                                    onChange={(e) => setConsumptionForm({ ...consumptionForm, item_name: e.target.value })}
+                                    required
+                                  />
+                                  <Button type="button" variant="outline" className="px-2" onClick={() => {
+                                    setIsManualItem(false);
+                                    setConsumptionForm({ ...consumptionForm, item_name: "", unit: "" });
+                                  }}>
+                                    List
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="date_used">Date Used</Label>
+                              <Input
+                                id="date_used"
+                                type="date"
+                                value={consumptionForm.date_used}
+                                onChange={(e) => setConsumptionForm({ ...consumptionForm, date_used: e.target.value })}
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="qty">Quantity Used</Label>
+                              <Input
+                                id="qty"
+                                type="number"
+                                step="0.01"
+                                min="0.01"
+                                value={consumptionForm.quantity}
+                                onChange={(e) => setConsumptionForm({ ...consumptionForm, quantity: parseFloat(e.target.value) })}
+                                required
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="unit">Unit</Label>
+                              {!isManualUnit ? (
+                                <Select
+                                  value={consumptionForm.unit}
+                                  onValueChange={(val) => {
+                                    if (val === "others") {
+                                      setIsManualUnit(true);
+                                      setConsumptionForm({ ...consumptionForm, unit: "" });
+                                    } else {
+                                      setConsumptionForm({ ...consumptionForm, unit: val });
+                                    }
+                                  }}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select unit" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {availableUnits.map((u) => (
+                                      <SelectItem key={u} value={u}>{u}</SelectItem>
+                                    ))}
+                                    <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                <div className="flex gap-2">
+                                  <Input
+                                    id="unit"
+                                    value={consumptionForm.unit}
+                                    onChange={(e) => setConsumptionForm({ ...consumptionForm, unit: e.target.value })}
+                                    placeholder="Custom unit"
+                                    required
+                                  />
+                                  <Button type="button" variant="outline" className="px-2" onClick={() => {
+                                    setIsManualUnit(false);
+                                    setConsumptionForm({ ...consumptionForm, unit: "" });
+                                  }}>
+                                    List
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="recorded_by">Recorded By</Label>
+                            <Input
+                              id="recorded_by"
+                              value={consumptionForm.recorded_by}
+                              onChange={(e) => setConsumptionForm({ ...consumptionForm, recorded_by: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="con_notes">Notes</Label>
+                            <Textarea
+                              id="con_notes"
+                              value={consumptionForm.notes}
+                              onChange={(e) => setConsumptionForm({ ...consumptionForm, notes: e.target.value })}
+                            />
+                          </div>
+                          <div className="flex justify-between items-center pt-4">
+                            <Button type="button" variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={resetConsumptionForm}>
+                              Clear
+                            </Button>
+                            <div className="flex gap-2">
+                              <Button type="button" variant="outline" onClick={() => setConsumptionDialogOpen(false)}>
+                                Done / Close
+                              </Button>
+                              <Button type="submit">Save Usage</Button>
+                            </div>
+                          </div>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4">
+                  {consumptions.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg bg-gray-50">
+                      <p className="mb-4">No material consumption recorded yet.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-y-auto h-full border rounded-md relative">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Item</TableHead>
+                            <TableHead>Quantity</TableHead>
+                            <TableHead>Scope Assignment</TableHead>
+                            <TableHead>Recorded By</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {consumptions.map((row) => (
+                            <TableRow key={row.id}>
+                              <TableCell className="whitespace-nowrap">{row.date_used}</TableCell>
+                              <TableCell className="font-medium">{row.item_name}</TableCell>
+                              <TableCell>{row.quantity} {row.unit}</TableCell>
+                              <TableCell>
+                                {row.bom_scope_id ? (
+                                  <Badge variant="secondary">{row.bom_scope_of_work?.name || "Unknown Scope"}</Badge>
+                                ) : (
+                                  <span className="text-muted-foreground italic">Unassigned</span>
+                                )}
+                              </TableCell>
+                              <TableCell>{row.recorded_by || "-"}</TableCell>
+                              <TableCell className="text-right">
+                                <Button size="sm" variant="ghost" onClick={async () => {
+                                  await siteService.deleteMaterialConsumption(row.id);
+                                  loadConsumptions();
+                                }}>
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

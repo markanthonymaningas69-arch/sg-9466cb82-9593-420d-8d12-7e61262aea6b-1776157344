@@ -148,6 +148,41 @@ export const siteService = {
     return { error };
   },
 
+  // Material Consumption
+  async getMaterialConsumption(projectId: string, dateFilter?: string) {
+    let query = supabase
+      .from("material_consumption")
+      .select("*, bom_scope_of_work(name)")
+      .eq("project_id", projectId)
+      .order("date_used", { ascending: false });
+      
+    if (dateFilter) {
+      query = query.eq("date_used", dateFilter);
+    }
+    
+    const { data, error } = await query;
+    return { data: data || [], error };
+  },
+
+  async createMaterialConsumption(record: any) {
+    const { data, error } = await supabase
+      .from("material_consumption")
+      .insert(record)
+      .select()
+      .single();
+    
+    return { data, error };
+  },
+
+  async deleteMaterialConsumption(id: string) {
+    const { error } = await supabase
+      .from("material_consumption")
+      .delete()
+      .eq("id", id);
+    
+    return { error };
+  },
+
   async getBomMaterials(projectId: string) {
     const { data: bom } = await supabase
       .from("bill_of_materials")
