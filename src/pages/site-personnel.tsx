@@ -579,7 +579,6 @@ export default function SitePersonnel() {
                             </TableCell>
                             <TableCell>
                               {isEditing ? (
-                                manualRoles[p.id] || (p.role && !STANDARD_ROLES.includes(p.role)) ? (
                                 <div className="flex gap-2">
                                   <Input 
                                     placeholder="Custom position"
