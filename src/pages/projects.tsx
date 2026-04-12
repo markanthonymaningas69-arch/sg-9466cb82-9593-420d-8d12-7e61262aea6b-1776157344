@@ -376,10 +376,10 @@ export default function Projects() {
                         </form>
                       </div>
                       <div className="col-span-2 flex flex-col min-h-0">
-                        <h3 className="font-semibold mb-4 text-lg flex justify-between">
+                        <div className="font-semibold mb-4 text-lg flex justify-between items-center">
                           <span>Encoded Materials & Tools</span>
                           <Badge variant="secondary">{filteredMasterItems.length} Total</Badge>
-                        </h3>
+                        </div>
                         
                         <div className="flex flex-wrap gap-2 mb-4 bg-muted/30 p-2 rounded-md border shrink-0">
                           <Input 
@@ -479,10 +479,10 @@ export default function Projects() {
                         </form>
                       </div>
                       <div className="col-span-2 flex flex-col min-h-0">
-                        <h3 className="font-semibold mb-4 text-lg flex justify-between">
+                        <div className="font-semibold mb-4 text-lg flex justify-between items-center">
                           <span>Encoded Scopes of Work</span>
                           <Badge variant="secondary">{masterScopes.length} Total</Badge>
-                        </h3>
+                        </div>
                         <div className="border rounded-md overflow-y-auto max-h-[500px]">
                           <Table>
                             <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
@@ -646,8 +646,8 @@ export default function Projects() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right font-medium">{formatCurrency(project.budget || 0)}</TableCell>
-                    <TableCell>{project.start_date ? new Date(project.start_date).toLocaleDateString() : "-"}</TableCell>
-                    <TableCell>{project.end_date ? new Date(project.end_date).toLocaleDateString() : "-"}</TableCell>
+                    <TableCell>{project.start_date || "-"}</TableCell>
+                    <TableCell>{project.end_date || "-"}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2 items-center">
                         <Button 
