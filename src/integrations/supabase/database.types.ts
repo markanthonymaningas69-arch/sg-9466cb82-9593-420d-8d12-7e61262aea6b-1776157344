@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -946,6 +946,68 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      purchases: {
+        Row: {
+          category: string
+          created_at: string | null
+          destination_type: string
+          id: string
+          item_name: string
+          notes: string | null
+          order_date: string
+          order_number: string
+          project_id: string | null
+          quantity: number
+          status: string
+          supplier: string
+          total_cost: number | null
+          unit: string
+          unit_cost: number
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          destination_type: string
+          id?: string
+          item_name: string
+          notes?: string | null
+          order_date?: string
+          order_number: string
+          project_id?: string | null
+          quantity: number
+          status?: string
+          supplier: string
+          total_cost?: number | null
+          unit: string
+          unit_cost: number
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          destination_type?: string
+          id?: string
+          item_name?: string
+          notes?: string | null
+          order_date?: string
+          order_number?: string
+          project_id?: string | null
+          quantity?: number
+          status?: string
+          supplier?: string
+          total_cost?: number | null
+          unit?: string
+          unit_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchases_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       scope_of_works: {
         Row: {
