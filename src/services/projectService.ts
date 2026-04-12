@@ -108,6 +108,11 @@ export const projectService = {
     return { data, error };
   },
 
+  async updateMasterScope(id: string, updates: any) {
+    const { data, error } = await supabase.from("master_scopes").update(updates).eq("id", id).select().single();
+    return { data, error };
+  },
+
   async deleteMasterScope(id: string) {
     const { error } = await supabase.from("master_scopes").delete().eq("id", id);
     return { error };

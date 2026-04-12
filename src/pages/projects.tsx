@@ -41,10 +41,17 @@ export default function Projects() {
   const [isManualMasterCategory, setIsManualMasterCategory] = useState(false);
   const [isManualMasterUnit, setIsManualMasterUnit] = useState(false);
   const [currentScopeSelection, setCurrentScopeSelection] = useState("");
+  const [editingMasterItemId, setEditingMasterItemId] = useState<string | null>(null);
+
+  // Master Items Filters
+  const [masterItemSearch, setMasterItemSearch] = useState("");
+  const [masterItemCategoryFilter, setMasterItemCategoryFilter] = useState("all");
+  const [masterItemScopeFilter, setMasterItemScopeFilter] = useState("all");
 
   // Master Scopes State
   const [masterScopes, setMasterScopes] = useState<any[]>([]);
-  const [masterScopeForm, setMasterScopeForm] = useState({ name: "", description: "" });
+  const [masterScopeForm, setMasterScopeForm] = useState({ name: "" });
+  const [editingMasterScopeId, setEditingMasterScopeId] = useState<string | null>(null);
 
   const STANDARD_CATEGORIES = ["Construction Materials", "Tools", "Hand Tools", "Equipments", "PPE"];
   const STANDARD_UNITS = ["pcs", "bags", "kgs", "liters", "units", "set", "lot", "m", "sq.m", "cu.m", "length", "box", "roll"];
@@ -98,17 +105,38 @@ export default function Projects() {
 
   const handleMasterItemSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await projectService.createMasterItem({
+    
+    const payload = {
       name: masterForm.name,
       category: masterForm.category,
       unit: masterForm.unit,
-      associated_scopes: masterForm.associated_scopes
-    });
+      associated_scopes: masterForm.associated_scopes || []
+    };
+
+    if (editingMasterItemId) {
+      await projectService.updateMasterItem(editingMasterItemId, payload);
+    } else {
+      await projectService.createMasterItem(payload);
+    }
+    
     setMasterForm({ name: "", category: "", unit: "", associated_scopes: [] });
     setIsManualMasterCategory(false);
     setIsManualMasterUnit(false);
     setCurrentScopeSelection("");
+    setEditingMasterItemId(null);
     loadMasterItems();
+  };
+
+  const handleEditMasterItem = (item: any) => {
+    setEditingMasterItemId(item.id);
+    setMasterForm({
+      name: item.name,
+      category: item.category,
+      unit: item.unit,
+      associated_scopes: item.associated_scopes || []
+    });
+    setIsManualMasterCategory(!STANDARD_CATEGORIES.includes(item.category));
+    setIsManualMasterUnit(!STANDARD_UNITS.includes(item.unit));
   };
 
   const handleDeleteMasterItem = async (id: string) => {
@@ -120,12 +148,19 @@ export default function Projects() {
 
   const handleMasterScopeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await projectService.createMasterScope({
-      name: masterScopeForm.name,
-      description: masterScopeForm.description
-    });
-    setMasterScopeForm({ name: "", description: "" });
+    if (editingMasterScopeId) {
+      await projectService.updateMasterScope(editingMasterScopeId, { name: masterScopeForm.name });
+    } else {
+      await projectService.createMasterScope({ name: masterScopeForm.name });
+    }
+    setMasterScopeForm({ name: "" });
+    setEditingMasterScopeId(null);
     loadMasterScopes();
+  };
+
+  const handleEditMasterScope = (scope: any) => {
+    setEditingMasterScopeId(scope.id);
+    setMasterScopeForm({ name: scope.name });
   };
 
   const handleDeleteMasterScope = async (id: string) => {
@@ -136,10 +171,10 @@ export default function Projects() {
   };
 
   const handleAddScopeToItem = () => {
-    if (currentScopeSelection && !masterForm.associated_scopes.includes(currentScopeSelection)) {
+    if (currentScopeSelection && !(masterForm.associated_scopes || []).includes(currentScopeSelection)) {
       setMasterForm({
         ...masterForm,
-        associated_scopes: [...masterForm.associated_scopes, currentScopeSelection]
+        associated_scopes: [...(masterForm.associated_scopes || []), currentScopeSelection]
       });
       setCurrentScopeSelection("");
     }
@@ -148,7 +183,7 @@ export default function Projects() {
   const handleRemoveScopeFromItem = (scopeName: string) => {
     setMasterForm({
       ...masterForm,
-      associated_scopes: masterForm.associated_scopes.filter(s => s !== scopeName)
+      associated_scopes: (masterForm.associated_scopes || []).filter(s => s !== scopeName)
     });
   };
 
@@ -197,6 +232,13 @@ export default function Projects() {
     completed: "bg-gray-100 text-gray-800"
   };
 
+  const filteredMasterItems = masterItems.filter(item => {
+    const matchSearch = item.name.toLowerCase().includes(masterItemSearch.toLowerCase());
+    const matchCategory = masterItemCategoryFilter === "all" || item.category === masterItemCategoryFilter;
+    const matchScope = masterItemScopeFilter === "all" || (item.associated_scopes && item.associated_scopes.includes(masterItemScopeFilter));
+    return matchSearch && matchCategory && matchScope;
+  });
+
   if (loading) {
     return (
       <Layout>
@@ -236,7 +278,17 @@ export default function Projects() {
                   <TabsContent value="items" className="flex-1 min-h-0 flex flex-col mt-4">
                     <div className="grid grid-cols-3 gap-6 flex-1 min-h-0">
                       <div className="col-span-1 border-r pr-6 flex flex-col">
-                        <h3 className="font-semibold mb-4 text-lg">Add New Item</h3>
+                        <div className="flex justify-between items-center mb-4">
+                          <h3 className="font-semibold text-lg">{editingMasterItemId ? "Edit Item" : "Add New Item"}</h3>
+                          {editingMasterItemId && (
+                            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => {
+                              setEditingMasterItemId(null);
+                              setMasterForm({ name: "", category: "", unit: "", associated_scopes: [] });
+                              setIsManualMasterCategory(false);
+                              setIsManualMasterUnit(false);
+                            }}>Cancel Edit</Button>
+                          )}
+                        </div>
                         <form onSubmit={handleMasterItemSubmit} className="space-y-4 flex-1 overflow-y-auto pr-2 pb-4">
                           <div className="space-y-2">
                             <Label>Item Name *</Label>
@@ -305,14 +357,45 @@ export default function Projects() {
                               </div>
                             )}
                           </div>
-                          <Button type="submit" className="w-full mt-4">Save to Catalog</Button>
+                          <Button type="submit" className="w-full mt-4">{editingMasterItemId ? "Update Item" : "Save to Catalog"}</Button>
                         </form>
                       </div>
                       <div className="col-span-2 flex flex-col min-h-0">
                         <h3 className="font-semibold mb-4 text-lg flex justify-between">
                           <span>Encoded Materials & Tools</span>
-                          <Badge variant="secondary">{masterItems.length} Total</Badge>
+                          <Badge variant="secondary">{filteredMasterItems.length} Total</Badge>
                         </h3>
+                        
+                        <div className="flex flex-wrap gap-2 mb-4 bg-muted/30 p-2 rounded-md border shrink-0">
+                          <Input 
+                            placeholder="Search item name..." 
+                            className="h-8 w-[160px] bg-white text-xs" 
+                            value={masterItemSearch}
+                            onChange={(e) => setMasterItemSearch(e.target.value)}
+                          />
+                          <Select value={masterItemCategoryFilter} onValueChange={setMasterItemCategoryFilter}>
+                            <SelectTrigger className="h-8 w-[150px] bg-white text-xs"><SelectValue placeholder="Category" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Categories</SelectItem>
+                              {Array.from(new Set(masterItems.map(i => i.category))).filter(Boolean).map(c => <SelectItem key={c as string} value={c as string}>{c as string}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                          <Select value={masterItemScopeFilter} onValueChange={setMasterItemScopeFilter}>
+                            <SelectTrigger className="h-8 w-[150px] bg-white text-xs"><SelectValue placeholder="Linked Scope" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Scopes</SelectItem>
+                              {masterScopes.map(s => <SelectItem key={s.name} value={s.name}>{s.name}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                          {(masterItemSearch || masterItemCategoryFilter !== "all" || masterItemScopeFilter !== "all") && (
+                            <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-destructive" onClick={() => {
+                              setMasterItemSearch("");
+                              setMasterItemCategoryFilter("all");
+                              setMasterItemScopeFilter("all");
+                            }}>Clear</Button>
+                          )}
+                        </div>
+
                         <div className="border rounded-md overflow-y-auto flex-1">
                           <Table>
                             <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
@@ -321,14 +404,14 @@ export default function Projects() {
                                 <TableHead>Category</TableHead>
                                 <TableHead>Unit</TableHead>
                                 <TableHead>Linked Scopes</TableHead>
-                                <TableHead className="w-12"></TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {masterItems.length === 0 ? (
-                                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No items encoded yet.</TableCell></TableRow>
+                              {filteredMasterItems.length === 0 ? (
+                                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No items found.</TableCell></TableRow>
                               ) : (
-                                masterItems.map(item => (
+                                filteredMasterItems.map(item => (
                                   <TableRow key={item.id}>
                                     <TableCell className="font-medium">{item.name}</TableCell>
                                     <TableCell>{item.category}</TableCell>
@@ -340,10 +423,15 @@ export default function Projects() {
                                         ))}
                                       </div>
                                     </TableCell>
-                                    <TableCell>
-                                      <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDeleteMasterItem(item.id)}>
-                                        <Trash2 className="h-3 w-3" />
-                                      </Button>
+                                    <TableCell className="text-right">
+                                      <div className="flex justify-end gap-1">
+                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleEditMasterItem(item)}>
+                                          <Pencil className="h-3 w-3" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDeleteMasterItem(item.id)}>
+                                          <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                      </div>
                                     </TableCell>
                                   </TableRow>
                                 ))
@@ -356,19 +444,23 @@ export default function Projects() {
                   </TabsContent>
 
                   <TabsContent value="scopes" className="flex-1 min-h-0 flex flex-col mt-4">
-                    <div className="grid grid-cols-3 gap-6 flex-1 min-h-0">
+                    <div className="grid grid-cols-3 gap-6 flex-1 min-h-0 items-start">
                       <div className="col-span-1 border-r pr-6 flex flex-col">
-                        <h3 className="font-semibold mb-4 text-lg">Add Master Scope</h3>
+                        <div className="flex justify-between items-center mb-4">
+                          <h3 className="font-semibold text-lg">{editingMasterScopeId ? "Edit Scope" : "Add Master Scope"}</h3>
+                          {editingMasterScopeId && (
+                            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => {
+                              setEditingMasterScopeId(null);
+                              setMasterScopeForm({ name: "" });
+                            }}>Cancel Edit</Button>
+                          )}
+                        </div>
                         <form onSubmit={handleMasterScopeSubmit} className="space-y-4">
                           <div className="space-y-2">
                             <Label>Scope Name *</Label>
                             <Input value={masterScopeForm.name} onChange={(e) => setMasterScopeForm({...masterScopeForm, name: e.target.value})} placeholder="e.g. Concrete Works" required />
                           </div>
-                          <div className="space-y-2">
-                            <Label>Description (Optional)</Label>
-                            <Input value={masterScopeForm.description} onChange={(e) => setMasterScopeForm({...masterScopeForm, description: e.target.value})} />
-                          </div>
-                          <Button type="submit" className="w-full mt-4">Save Scope</Button>
+                          <Button type="submit" className="w-full mt-4">{editingMasterScopeId ? "Update Scope" : "Save Scope"}</Button>
                         </form>
                       </div>
                       <div className="col-span-2 flex flex-col min-h-0">
@@ -376,27 +468,30 @@ export default function Projects() {
                           <span>Encoded Scopes of Work</span>
                           <Badge variant="secondary">{masterScopes.length} Total</Badge>
                         </h3>
-                        <div className="border rounded-md overflow-y-auto flex-1">
+                        <div className="border rounded-md overflow-y-auto max-h-[500px]">
                           <Table>
                             <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
                               <TableRow>
                                 <TableHead>Scope Name</TableHead>
-                                <TableHead>Description</TableHead>
-                                <TableHead className="w-12"></TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
                               {masterScopes.length === 0 ? (
-                                <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No scopes encoded yet.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={2} className="text-center text-muted-foreground py-8">No scopes encoded yet.</TableCell></TableRow>
                               ) : (
                                 masterScopes.map(scope => (
                                   <TableRow key={scope.id}>
                                     <TableCell className="font-medium">{scope.name}</TableCell>
-                                    <TableCell className="text-muted-foreground">{scope.description}</TableCell>
-                                    <TableCell>
-                                      <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDeleteMasterScope(scope.id)}>
-                                        <Trash2 className="h-3 w-3" />
-                                      </Button>
+                                    <TableCell className="text-right">
+                                      <div className="flex justify-end gap-1">
+                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleEditMasterScope(scope)}>
+                                          <Pencil className="h-3 w-3" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDeleteMasterScope(scope.id)}>
+                                          <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                      </div>
                                     </TableCell>
                                   </TableRow>
                                 ))
