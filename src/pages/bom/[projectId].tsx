@@ -589,6 +589,18 @@ export default function BillOfMaterials() {
       return;
     }
 
+    if (isManualMaterial && materialData.material_name) {
+      const exists = masterItems.some(m => m.name.toLowerCase() === materialData.material_name.toLowerCase());
+      if (!exists) {
+        await projectService.createMasterItem({
+          name: materialData.material_name,
+          category: "Other",
+          unit: materialData.unit,
+          default_cost: unitCost
+        });
+      }
+    }
+
     resetMaterialForm();
     setSelectedScopeId("");
     if (bom?.project_id) {
