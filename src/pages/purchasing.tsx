@@ -123,6 +123,12 @@ export default function Purchasing() {
       ? await supabase.from("purchases").update(payload).eq("id", editingId)
       : await supabase.from("purchases").insert(payload);
     
+    if (error) {
+      console.error("Error saving PO item:", error);
+      alert("Failed to save item: " + error.message);
+      return;
+    }
+
     if (!error) {
       if (editingId) {
         setEditingId(null);
