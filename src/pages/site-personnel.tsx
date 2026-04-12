@@ -351,12 +351,23 @@ export default function SitePersonnel() {
 
   const handleDeliverySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await siteService.createDelivery({
-      ...deliveryForm,
+    
+    // Explicitly define payload so we don't send `source_type` to DB
+    const payload = {
       project_id: selectedProject,
+      delivery_date: deliveryForm.delivery_date,
+      item_name: deliveryForm.item_name,
+      quantity: parseFloat(deliveryForm.quantity.toString()),
+      unit: deliveryForm.unit,
       supplier: deliveryForm.source_type === "warehouse" ? "Main Warehouse" : deliveryForm.supplier,
-      quantity: parseFloat(deliveryForm.quantity.toString())
-    });
+      receipt_number: deliveryForm.receipt_number || "",
+      received_by: deliveryForm.received_by,
+      status: deliveryForm.status,
+      notes: deliveryForm.notes
+    };
+
+    await siteService.createDelivery(payload);
+    
     setDeliveryForm(prev => ({ 
       ...prev, 
       item_name: "", 
@@ -1259,11 +1270,13 @@ export default function SitePersonnel() {
                             <Label>Source of Delivery</Label>
                             <RadioGroup 
                               value={deliveryForm.source_type} 
-                              onValueChange={(val) => setDeliveryForm({ 
-                                ...deliveryForm, 
-                                source_type: val,
-                                supplier: val === "warehouse" ? "Main Warehouse" : ""
-                              })}
+                              onValueChange={(val) => {
+                                if (val === "warehouse") {
+                                  setDeliveryForm({ ...deliveryForm, supplier: "Main Warehouse" });
+                                } else {
+                                  setDeliveryForm({ ...deliveryForm, supplier: "" });
+                                }
+                              }}
                               className="flex gap-4"
                             >
                               <div className="flex items-center space-x-2">
