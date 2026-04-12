@@ -112,7 +112,6 @@ export default function Purchasing() {
       quantity: parseFloat(formData.quantity) || 0,
       unit: formData.unit,
       unit_cost: parseFloat(formData.unit_cost) || 0,
-      total_cost: (parseFloat(formData.quantity) || 0) * (parseFloat(formData.unit_cost) || 0),
       destination_type: formData.destination_type,
       project_id: formData.destination_type === "project_warehouse" && formData.project_id !== "none" ? formData.project_id : null,
       status: formData.status,
