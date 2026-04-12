@@ -153,6 +153,12 @@ export default function Projects() {
 
   const handleMasterScopeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!masterScopeForm.name || !masterScopeForm.name.trim()) {
+      alert("Please enter a Scope Name.");
+      return;
+    }
+
     if (editingMasterScopeId) {
       await projectService.updateMasterScope(editingMasterScopeId, { name: masterScopeForm.name });
     } else {
@@ -466,7 +472,7 @@ export default function Projects() {
                         </div>
                         <form onSubmit={handleMasterScopeSubmit} className="space-y-4">
                           <div className="space-y-2">
-                            <Label>Scope Name *</Label>
+                            <Label>Scope Name</Label>
                             <Input value={masterScopeForm.name} onChange={(e) => setMasterScopeForm({...masterScopeForm, name: e.target.value})} placeholder="e.g. Concrete Works" />
                           </div>
                           <Button type="submit" className="w-full mt-4">{editingMasterScopeId ? "Update Scope" : "Save Scope"}</Button>
