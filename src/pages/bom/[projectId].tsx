@@ -592,12 +592,19 @@ export default function BillOfMaterials() {
     if (isManualMaterial && materialData.material_name) {
       const exists = masterItems.some(m => m.name.toLowerCase() === materialData.material_name.toLowerCase());
       if (!exists) {
-        await projectService.createMasterItem({
+        const { data: newMasterItem } = await projectService.createMasterItem({
           name: materialData.material_name,
           category: "Other",
-          unit: materialData.unit,
+          unit: materialData.unit || "Other",
           default_cost: unitCost
         });
+        
+        if (newMasterItem) {
+          setMasterItems(prev => {
+            const updated = [...prev, newMasterItem];
+            return updated.sort((a, b) => a.name.localeCompare(b.name));
+          });
+        }
       }
     }
 
