@@ -23,7 +23,7 @@ type AttendanceRow = { personnel_id: string; name: string; role: string; daily_r
 type Delivery = { id: string; project_id: string; delivery_date: string; item_name: string; quantity: number; unit: string; supplier: string; received_by: string; status: string; notes: string; receipt_number?: string };
 type ScopeOfWork = { id: string; name: string; description?: string; order_number: number; completion_percentage?: number; status?: string; bom_id: string };
 
-const STANDARD_ROLES = ["Mason", "Carpenter", "Helper", "Skilled", "Welder", "Plumber", "Electrician"];
+const STANDARD_ROLES = ["Admin", "Carpenter", "Electrician", "Helper", "Mason", "Plumber", "Skilled", "Tile Mason", "Welder"];
 
 export default function SitePersonnel() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -167,7 +167,9 @@ export default function SitePersonnel() {
   };
 
   const handleAddAllToRollCall = async () => {
-    const availableToAdd = projectPersonnelList.filter(p => !attendanceList.find(a => a.personnel_id === p.id));
+    const availableToAdd = projectPersonnelList
+      .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+      .sort((a, b) => a.name.localeCompare(b.name));
     await Promise.all(availableToAdd.map(p => siteService.upsertAttendance({
       project_id: selectedProject,
       personnel_id: p.id,
@@ -384,9 +386,10 @@ export default function SitePersonnel() {
                         </DialogHeader>
                         <form onSubmit={handleEnrollSubmit} className="space-y-4">
                           <div className="space-y-2">
-                            <Label>Full Name</Label>
+                            <Label>Name (Surname, First Name, Middle Name)</Label>
                             <Input
                               required
+                              placeholder="e.g. Dela Cruz, Juan, Santos"
                               value={enrollForm.name}
                               onChange={(e) => setEnrollForm({ ...enrollForm, name: e.target.value })}
                             />
@@ -478,7 +481,7 @@ export default function SitePersonnel() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {projectPersonnelList.map(p => {
+                        {[...projectPersonnelList].sort((a, b) => a.name.localeCompare(b.name)).map(p => {
                           const isEditing = editingPersonnelId === p.id;
                           return (
                         <TableRow key={p.id}>
@@ -713,7 +716,9 @@ export default function SitePersonnel() {
                             <DialogTitle>Add Manpower to {attendanceDate || 'Selected'} Roll Call</DialogTitle>
                           </DialogHeader>
                           {(() => {
-                            const availableToAdd = projectPersonnelList.filter(p => !attendanceList.find(a => a.personnel_id === p.id));
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
                             return (
                               <div className="space-y-4 mt-4">
                                 <div className="flex justify-between items-center border-b pb-4">
@@ -790,12 +795,12 @@ export default function SitePersonnel() {
                               </div>
                             </div>
                             {!isEditMode ? (
-                              <Button variant="outline" onClick={() => setIsEditMode(true)}>
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }}>
                                 <Pencil className="h-4 w-4 mr-2" />
                                 Edit Roll Call
                               </Button>
                             ) : (
-                              <Button onClick={() => setIsEditMode(false)}>
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
                                 <Check className="h-4 w-4 mr-2" />
                                 Done Editing
                               </Button>
