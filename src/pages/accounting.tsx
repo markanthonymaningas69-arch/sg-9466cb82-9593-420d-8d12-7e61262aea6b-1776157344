@@ -3,6 +3,8 @@ import { Layout } from "@/components/Layout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AccountingDashboard } from "@/components/accounting/AccountingDashboard";
 import { JournalOpEx } from "@/components/accounting/JournalOpEx";
+import { PayrollTab } from "@/components/accounting/PayrollTab";
+import { VouchersTab } from "@/components/accounting/VouchersTab";
 import { Card, CardContent } from "@/components/ui/card";
 import { Landmark, FileSpreadsheet, Users, Receipt, CircleDollarSign, FileText } from "lucide-react";
 
@@ -50,23 +52,11 @@ export default function Accounting() {
           </TabsContent>
           
           <TabsContent value="payroll" className="flex-1 mt-0">
-            <Card className="mt-4 border-t-0 rounded-t-none shadow-none">
-              <CardContent className="py-12 text-center text-muted-foreground">
-                <Users className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                <h3 className="text-lg font-semibold mb-2">Payroll Module Pending</h3>
-                <p>Advanced daily/weekly/monthly payroll engine connected to Site Attendance is being installed...</p>
-              </CardContent>
-            </Card>
+            <PayrollTab />
           </TabsContent>
 
           <TabsContent value="vouchers" className="flex-1 mt-0">
-            <Card className="mt-4 border-t-0 rounded-t-none shadow-none">
-              <CardContent className="py-12 text-center text-muted-foreground">
-                <Receipt className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                <h3 className="text-lg font-semibold mb-2">Voucher Management Pending</h3>
-                <p>Payment, Receipt, and Journal vouchers are being installed...</p>
-              </CardContent>
-            </Card>
+            <VouchersTab />
           </TabsContent>
 
           <TabsContent value="liquidations" className="flex-1 mt-0">

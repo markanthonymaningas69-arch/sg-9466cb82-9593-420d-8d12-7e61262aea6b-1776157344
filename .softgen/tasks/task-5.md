@@ -16,6 +16,6 @@ position: 5
 - Voucher management (Payment/Receipt)
 
 ## Checklist
-- [ ] Build Payroll View tab
-- [ ] Create Payroll calculation logic via accountingService
-- [ ] Implement Vouchers Tab & Form
+- [x] Build Payroll View tab
+- [x] Create Payroll calculation logic via accountingService
+- [x] Implement Vouchers Tab & Form

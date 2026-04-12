@@ -94,11 +94,13 @@ export const accountingService = {
   },
 
   // === Payroll Integration (Site Attendance) ===
-  async getPayrollSummary(period: 'daily' | 'weekly' | 'monthly', projectId?: string) {
+  async getPayrollData(startDate: string, endDate: string, projectId?: string) {
     let query = supabase
       .from("site_attendance")
-      .select("date, hours_worked, overtime_hours, personnel(name, daily_rate, overtime_rate), projects(name)")
-      .eq("status", "present");
+      .select("date, hours_worked, overtime_hours, personnel(id, name, role, daily_rate, overtime_rate), projects(id, name)")
+      .eq("status", "present")
+      .gte("date", startDate)
+      .lte("date", endDate);
       
     if (projectId && projectId !== "all") {
       query = query.eq("project_id", projectId);
