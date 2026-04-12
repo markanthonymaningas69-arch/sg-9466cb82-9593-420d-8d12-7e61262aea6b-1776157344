@@ -8,7 +8,7 @@ export const warehouseService = {
   async getAll() {
     const { data, error } = await supabase
       .from("inventory")
-      .select("*")
+      .select("*, projects(name)")
       .order("created_at", { ascending: false });
     
     console.log("Warehouse query:", { data, error });
