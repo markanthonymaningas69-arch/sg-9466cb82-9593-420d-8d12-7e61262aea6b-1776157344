@@ -106,5 +106,23 @@ export const accountingService = {
     
     const { data, error } = await query;
     return { data: data || [], error };
+  },
+
+  // Legacy support for older analytics/index dashboards
+  async getSummary() {
+    const { data: projects } = await supabase.from("projects").select("id");
+    const { data: personnel } = await supabase.from("personnel").select("id");
+    
+    // Calculate simple mock summary to keep dashboards running until they are fully migrated
+    return {
+      data: {
+        totalRevenue: 0,
+        totalExpenses: 0,
+        netProfit: 0,
+        activeProjects: projects?.length || 0,
+        activePersonnel: personnel?.length || 0
+      },
+      error: null
+    };
   }
 };

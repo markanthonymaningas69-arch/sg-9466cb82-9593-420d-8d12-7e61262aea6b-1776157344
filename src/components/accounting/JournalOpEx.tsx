@@ -14,6 +14,8 @@ import { accountingService } from "@/services/accountingService";
 import { projectService } from "@/services/projectService";
 import { Plus, Trash2 } from "lucide-react";
 
+type EntryType = "debit" | "credit";
+
 export function JournalOpEx() {
   const { formatCurrency } = useSettings();
   const [entries, setEntries] = useState<any[]>([]);
@@ -25,7 +27,7 @@ export function JournalOpEx() {
     date: new Date().toISOString().split("T")[0],
     description: "",
     account_name: "",
-    type: "debit" as const,
+    type: "debit" as EntryType,
     category: "operational",
     amount: "",
     project_id: "office"
