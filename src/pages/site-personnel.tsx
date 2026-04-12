@@ -367,6 +367,7 @@ export default function SitePersonnel() {
     }));
     setIsManualItem(false);
     setIsManualUnit(false);
+    setDeliveryDialogOpen(false);
     loadDeliveries();
   };
 
@@ -1329,7 +1330,7 @@ export default function SitePersonnel() {
                                 value={deliveryForm.supplier}
                                 onChange={(e) => setDeliveryForm({ ...deliveryForm, supplier: e.target.value })}
                                 disabled={deliveryForm.source_type === "warehouse"}
-                                required
+                                required={deliveryForm.source_type !== "warehouse"}
                                 placeholder={deliveryForm.source_type === "warehouse" ? "Main Warehouse" : "Enter supplier name"}
                               />
                             </div>
