@@ -15,7 +15,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { siteService } from "@/services/siteService";
 import { projectService } from "@/services/projectService";
 import { personnelService } from "@/services/personnelService";
-import { Plus, Pencil, Trash2, Users, Truck, ClipboardList, ArrowUp, ArrowDown, Check, ArrowUpDown } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Truck, ClipboardList, ArrowUp, ArrowDown, Check, ArrowUpDown, ShoppingCart } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 type Project = { id: string; name: string; location: string; status: string };
 type Personnel = { id: string; name: string; role: string; daily_rate: number; overtime_rate: number };
@@ -99,6 +100,22 @@ export default function SitePersonnel() {
     notes: ""
   });
 
+  // Requests
+  const [requests, setRequests] = useState<any[]>([]);
+  const [requestDate, setRequestDate] = useState<string>(todayStr);
+  const [requestDialogOpen, setRequestDialogOpen] = useState(false);
+  const [isManualRequestItem, setIsManualRequestItem] = useState(false);
+  const [isManualRequestUnit, setIsManualRequestUnit] = useState(false);
+  const [requestForm, setRequestForm] = useState({
+    bom_scope_id: "unassigned",
+    request_date: todayStr,
+    item_name: "",
+    quantity: 0,
+    unit: "",
+    requested_by: "",
+    notes: ""
+  });
+
   // Scope of Works
   const [scopes, setScopes] = useState<ScopeOfWork[]>([]);
 
@@ -125,8 +142,9 @@ export default function SitePersonnel() {
     if (selectedProject) {
       loadDeliveries();
       loadConsumptions();
+      loadRequests();
     }
-  }, [selectedProject, deliveriesDate, consumptionDate]);
+  }, [selectedProject, deliveriesDate, consumptionDate, requestDate]);
 
   const loadProjects = async () => {
     const { data } = await projectService.getAll();
@@ -240,6 +258,16 @@ export default function SitePersonnel() {
     if (!selectedProject) return;
     const { data } = await siteService.getMaterialConsumption(selectedProject, consumptionDate === "" ? undefined : consumptionDate);
     setConsumptions(data || []);
+  };
+
+  const loadRequests = async () => {
+    if (!selectedProject) return;
+    let query = supabase.from('site_requests').select(`*, bom_scope_of_work(name)`).eq('project_id', selectedProject).order('request_date', { ascending: false });
+    if (requestDate) {
+      query = query.eq('request_date', requestDate);
+    }
+    const { data } = await query;
+    setRequests(data || []);
   };
 
   const loadScopes = async () => {
@@ -428,6 +456,38 @@ export default function SitePersonnel() {
     setIsManualUnit(false);
   };
 
+  const handleRequestSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await supabase.from('site_requests').insert({
+      project_id: selectedProject,
+      bom_scope_id: requestForm.bom_scope_id === "unassigned" ? null : requestForm.bom_scope_id,
+      request_date: requestForm.request_date,
+      item_name: requestForm.item_name,
+      quantity: parseFloat(requestForm.quantity.toString()),
+      unit: requestForm.unit,
+      requested_by: requestForm.requested_by,
+      notes: requestForm.notes,
+      status: 'pending'
+    });
+    setRequestDialogOpen(false);
+    resetRequestForm();
+    loadRequests();
+  };
+  
+  const resetRequestForm = () => {
+    setRequestForm({
+      bom_scope_id: "unassigned",
+      request_date: todayStr,
+      item_name: "",
+      quantity: 0,
+      unit: "",
+      requested_by: "",
+      notes: ""
+    });
+    setIsManualRequestItem(false);
+    setIsManualRequestUnit(false);
+  };
+
   const getStatusBadge = (status: string) => {
     const colors: Record<string, string> = {
       present: "bg-green-500",
@@ -476,7 +536,7 @@ export default function SitePersonnel() {
 
         {selectedProject && (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 overflow-hidden space-y-4">
-            <TabsList className="shrink-0 grid w-full grid-cols-5">
+            <TabsList className="shrink-0 grid w-full grid-cols-6">
               <TabsTrigger value="manpower">
                 <Users className="h-4 w-4 mr-2" />
                 Project Manpower
@@ -492,6 +552,10 @@ export default function SitePersonnel() {
               <TabsTrigger value="consumption">
                 <ClipboardList className="h-4 w-4 mr-2" />
                 Material Usage
+              </TabsTrigger>
+              <TabsTrigger value="request">
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                Requests
               </TabsTrigger>
               <TabsTrigger value="scope">
                 <Plus className="h-4 w-4 mr-2" />
@@ -1676,7 +1740,7 @@ export default function SitePersonnel() {
                                 step="0.01"
                                 min="0.01"
                                 value={consumptionForm.quantity}
-                                onChange={(e) => setConsumptionForm({ ...consumptionForm, quantity: parseFloat(e.target.value) })}
+                                onChange={(e) => setConsumptionForm({ ...consumptionForm, quantity: parseFloat(e.target.value) || 0 })}
                                 required
                               />
                             </div>
@@ -2156,19 +2220,284 @@ export default function SitePersonnel() {
               </Card>
             </TabsContent>
 
+            <TabsContent value="request" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Site Requests</CardTitle>
+                      <CardDescription>Request materials, tools, and equipment for the site</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={requestDate}
+                          onChange={(e) => setRequestDate(e.target.value)}
+                          className="w-auto h-9"
+                        />
+                        {requestDate && (
+                          <Button variant="ghost" size="sm" onClick={() => setRequestDate("")} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button>
+                          <Plus className="h-4 w-4 mr-2" />
+                          New Request
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Submit Site Request</DialogTitle>
+                        </DialogHeader>
+                        <form onSubmit={handleRequestSubmit} className="space-y-4">
+                          <div className="space-y-2">
+                            <Label>Scope of Work (Optional)</Label>
+                            <Select
+                              value={requestForm.bom_scope_id}
+                              onValueChange={(val) => setRequestForm({ ...requestForm, bom_scope_id: val })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Assign to scope..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="unassigned" className="text-muted-foreground italic">General / Unassigned</SelectItem>
+                                {scopes.map((s) => (
+                                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>Requested Item *</Label>
+                              {!isManualRequestItem ? (
+                                <Select
+                                  value={requestForm.item_name}
+                                  onValueChange={(val) => {
+                                    if (val === "others") {
+                                      setIsManualRequestItem(true);
+                                      setRequestForm({ ...requestForm, item_name: "", unit: "" });
+                                      setIsManualRequestUnit(false);
+                                    } else {
+                                      const mat = bomMaterials.find(m => m.name === val);
+                                      setRequestForm({ ...requestForm, item_name: val, unit: mat?.unit || requestForm.unit });
+                                      setIsManualRequestUnit(false);
+                                    }
+                                  }}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select from BOM" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {bomMaterials
+                                      .filter(mat => !requestForm.bom_scope_id || requestForm.bom_scope_id === "unassigned" || mat.scope_id === requestForm.bom_scope_id)
+                                      .map((mat) => (
+                                      <SelectItem key={mat.id} value={mat.name}>{mat.name}</SelectItem>
+                                    ))}
+                                    <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                <div className="flex gap-2">
+                                  <Input
+                                    placeholder="Type item name"
+                                    value={requestForm.item_name}
+                                    onChange={(e) => setRequestForm({ ...requestForm, item_name: e.target.value })}
+                                    required
+                                  />
+                                  <Button type="button" variant="outline" className="px-2" onClick={() => {
+                                    setIsManualRequestItem(false);
+                                    setRequestForm({ ...requestForm, item_name: "", unit: "" });
+                                  }}>
+                                    BOM
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Date Required *</Label>
+                              <Input
+                                type="date"
+                                value={requestForm.request_date}
+                                onChange={(e) => setRequestForm({ ...requestForm, request_date: e.target.value })}
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>Quantity *</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0.01"
+                                value={requestForm.quantity}
+                                onChange={(e) => setRequestForm({ ...requestForm, quantity: parseFloat(e.target.value) || 0 })}
+                                required
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Unit *</Label>
+                              {!isManualRequestUnit ? (
+                                <Select
+                                  value={requestForm.unit}
+                                  onValueChange={(val) => {
+                                    if (val === "others") {
+                                      setIsManualRequestUnit(true);
+                                      setRequestForm({ ...requestForm, unit: "" });
+                                    } else {
+                                      setRequestForm({ ...requestForm, unit: val });
+                                    }
+                                  }}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select unit" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {availableUnits.map((u) => (
+                                      <SelectItem key={u} value={u}>{u}</SelectItem>
+                                    ))}
+                                    <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                <div className="flex gap-2">
+                                  <Input
+                                    value={requestForm.unit}
+                                    onChange={(e) => setRequestForm({ ...requestForm, unit: e.target.value })}
+                                    placeholder="Custom unit"
+                                    required
+                                  />
+                                  <Button type="button" variant="outline" className="px-2" onClick={() => {
+                                    setIsManualRequestUnit(false);
+                                    setRequestForm({ ...requestForm, unit: "" });
+                                  }}>
+                                    List
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Requested By *</Label>
+                            <Input
+                              value={requestForm.requested_by}
+                              onChange={(e) => setRequestForm({ ...requestForm, requested_by: e.target.value })}
+                              required
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Notes / Justification</Label>
+                            <Textarea
+                              value={requestForm.notes}
+                              onChange={(e) => setRequestForm({ ...requestForm, notes: e.target.value })}
+                            />
+                          </div>
+                          <div className="flex justify-between items-center pt-4">
+                            <Button type="button" variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={resetRequestForm}>
+                              Clear
+                            </Button>
+                            <div className="flex gap-2">
+                              <Button type="button" variant="outline" onClick={() => setRequestDialogOpen(false)}>
+                                Cancel
+                              </Button>
+                              <Button type="submit">Submit Request</Button>
+                            </div>
+                          </div>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4">
+                  {requests.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg bg-gray-50">
+                      <p className="mb-4">No site requests found for the selected date.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-y-auto h-full border rounded-md relative">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-12 text-center">Date</TableHead>
+                            <TableHead>Item</TableHead>
+                            <TableHead>Quantity</TableHead>
+                            <TableHead>Scope</TableHead>
+                            <TableHead>Requested By</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right w-24">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {requests.map((row) => (
+                            <TableRow key={row.id}>
+                              <TableCell className="whitespace-nowrap">{row.request_date}</TableCell>
+                              <TableCell className="font-medium">{row.item_name}</TableCell>
+                              <TableCell>{row.quantity} {row.unit}</TableCell>
+                              <TableCell>
+                                {row.bom_scope_id ? (
+                                  <Badge variant="secondary">{row.bom_scope_of_work?.name || "Unknown Scope"}</Badge>
+                                ) : (
+                                  <span className="text-muted-foreground italic">General</span>
+                                )}
+                              </TableCell>
+                              <TableCell>{row.requested_by}</TableCell>
+                              <TableCell>
+                                <Badge 
+                                  variant="outline" 
+                                  className={
+                                    row.status === 'fulfilled' ? 'bg-green-500 text-white' : 
+                                    row.status === 'approved' ? 'bg-blue-500 text-white' : 
+                                    row.status === 'rejected' ? 'bg-red-500 text-white' : 
+                                    'bg-orange-500 text-white'
+                                  }
+                                >
+                                  {row.status.toUpperCase()}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {row.status === 'pending' && (
+                                  <Button size="sm" variant="ghost" onClick={async () => {
+                                    if(confirm("Are you sure you want to delete this pending request?")) {
+                                      await supabase.from('site_requests').delete().eq('id', row.id);
+                                      loadRequests();
+                                    }
+                                  }}>
+                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
             <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
               <Card className="flex-1 flex flex-col overflow-hidden">
                 <CardHeader className="shrink-0">
-                  <CardTitle>Update Progress</CardTitle>
-                  <CardDescription>Track progress for scopes officially defined in the Bill of Materials</CardDescription>
-                  <div className="flex items-center gap-3 mt-4">
-                    <Label>Update Date:</Label>
-                    <Input
-                      type="date"
-                      value={scopeDate}
-                      onChange={(e) => setScopeDate(e.target.value)}
-                      className="w-auto h-9"
-                    />
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Update Progress</CardTitle>
+                      <CardDescription>Track progress for scopes officially defined in the Bill of Materials</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Update Date:</Label>
+                        <Input
+                          type="date"
+                          value={scopeDate}
+                          onChange={(e) => setScopeDate(e.target.value)}
+                          className="w-auto h-9"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="flex-1 overflow-hidden pb-4">
