@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingCart, Plus, Search, Building2, Warehouse as WarehouseIcon, FilterX } from "lucide-react";
+import { ShoppingCart, Plus, Search, Building2, Warehouse as WarehouseIcon, FilterX, List } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { projectService } from "@/services/projectService";
 
@@ -22,6 +23,7 @@ export default function Purchasing() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [supplierDialogOpen, setSupplierDialogOpen] = useState(false);
+  const [viewSuppliersDialogOpen, setViewSuppliersDialogOpen] = useState(false);
   
   // Filters
   const [filterSupplier, setFilterSupplier] = useState("all");
@@ -134,13 +136,26 @@ export default function Purchasing() {
             <p className="text-muted-foreground mt-1">Manage purchase orders and direct deliveries to warehouses</p>
           </div>
           <div className="flex items-center gap-2">
-            <Dialog open={supplierDialogOpen} onOpenChange={setSupplierDialogOpen}>
-              <DialogTrigger asChild>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
                 <Button variant="outline">
+                  <Building2 className="h-4 w-4 mr-2" />
+                  Suppliers
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => setSupplierDialogOpen(true)} className="cursor-pointer">
                   <Plus className="h-4 w-4 mr-2" />
                   Register Supplier
-                </Button>
-              </DialogTrigger>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setViewSuppliersDialogOpen(true)} className="cursor-pointer">
+                  <List className="h-4 w-4 mr-2" />
+                  View Suppliers
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <Dialog open={supplierDialogOpen} onOpenChange={setSupplierDialogOpen}>
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Register New Supplier</DialogTitle>
@@ -167,6 +182,47 @@ export default function Purchasing() {
                     <Button type="submit">Save Supplier</Button>
                   </div>
                 </form>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={viewSuppliersDialogOpen} onOpenChange={setViewSuppliersDialogOpen}>
+              <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+                <DialogHeader className="shrink-0">
+                  <DialogTitle className="flex items-center gap-2">
+                    <Building2 className="h-5 w-5 text-primary" />
+                    Registered Suppliers
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="overflow-y-auto border rounded-md flex-1">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-background z-10">
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Contact Person</TableHead>
+                        <TableHead>Phone</TableHead>
+                        <TableHead>Address</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {suppliers.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                            No suppliers registered yet.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        suppliers.map((s) => (
+                          <TableRow key={s.id}>
+                            <TableCell className="font-medium">{s.name}</TableCell>
+                            <TableCell>{s.contact_person || <span className="text-muted-foreground">-</span>}</TableCell>
+                            <TableCell>{s.phone || <span className="text-muted-foreground">-</span>}</TableCell>
+                            <TableCell>{s.address || <span className="text-muted-foreground">-</span>}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               </DialogContent>
             </Dialog>
 
