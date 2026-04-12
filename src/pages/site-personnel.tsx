@@ -269,6 +269,34 @@ export default function SitePersonnel() {
     loadScopes();
   };
 
+  const handleMoveScope = async (index: number, direction: 'up' | 'down') => {
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === scopes.length - 1) return;
+
+    const newScopes = [...scopes];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    
+    // Swap order numbers
+    const currentScope = newScopes[index];
+    const targetScope = newScopes[targetIndex];
+    
+    const tempOrder = currentScope.order_number;
+    currentScope.order_number = targetScope.order_number;
+    targetScope.order_number = tempOrder;
+    
+    // Swap positions in array for immediate UI update
+    newScopes[index] = targetScope;
+    newScopes[targetIndex] = currentScope;
+    
+    setScopes(newScopes);
+
+    // Save to database
+    await Promise.all([
+      siteService.updateScopeOfWork(currentScope.id, { order_number: currentScope.order_number }),
+      siteService.updateScopeOfWork(targetScope.id, { order_number: targetScope.order_number })
+    ]);
+  };
+
   const handleEnrollSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await siteService.enrollPersonnel({
@@ -2104,6 +2132,7 @@ export default function SitePersonnel() {
                       <Table>
                         <TableHeader>
                           <TableRow>
+                            <TableHead className="w-24">Order</TableHead>
                             <TableHead className="w-16">#</TableHead>
                             <TableHead>Scope Name</TableHead>
                             <TableHead className="w-48">Completion</TableHead>
@@ -2112,8 +2141,30 @@ export default function SitePersonnel() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {scopes.map((scope) => (
+                          {scopes.map((scope, index) => (
                             <TableRow key={scope.id}>
+                              <TableCell>
+                                <div className="flex flex-col gap-1">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-6 w-6 p-0" 
+                                    onClick={() => handleMoveScope(index, 'up')}
+                                    disabled={index === 0}
+                                  >
+                                    <ArrowUp className="h-3 w-3" />
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-6 w-6 p-0" 
+                                    onClick={() => handleMoveScope(index, 'down')}
+                                    disabled={index === scopes.length - 1}
+                                  >
+                                    <ArrowDown className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </TableCell>
                               <TableCell>{scope.order_number}</TableCell>
                               <TableCell>
                                 <div className="font-medium">{scope.name}</div>
