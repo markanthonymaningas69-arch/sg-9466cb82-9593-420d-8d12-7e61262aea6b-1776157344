@@ -43,7 +43,7 @@ export default function Purchasing() {
     unit_cost: "",
     destination_type: "main_warehouse",
     project_id: "none",
-    status: "ordered"
+    status: "pending"
   });
 
   const [supplierForm, setSupplierForm] = useState({
@@ -314,6 +314,18 @@ export default function Purchasing() {
                       </Select>
                     </div>
                     
+                    <div className="space-y-2 col-span-2">
+                      <Label>Status *</Label>
+                      <Select value={formData.status} onValueChange={(val) => setFormData({ ...formData, status: val })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="approved">Approved</SelectItem>
+                          <SelectItem value="received">Received</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
                     {formData.destination_type === "project_warehouse" && (
                       <div className="space-y-2 col-span-2">
                         <Label>Select Project *</Label>
@@ -357,16 +369,12 @@ export default function Purchasing() {
             
             <div className="space-y-1">
               <Label className="text-xs">Filter by Status:</Label>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-[160px] h-9 bg-white dark:bg-background">
-                  <SelectValue placeholder="All Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="ordered">Ordered</SelectItem>
-                  <SelectItem value="delivered">Delivered</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex bg-background border p-0.5 rounded-md w-fit h-9 items-center">
+                <Button variant={filterStatus === "all" ? "secondary" : "ghost"} size="sm" className="h-full text-xs" onClick={() => setFilterStatus("all")}>All</Button>
+                <Button variant={filterStatus === "pending" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-orange-600 dark:text-orange-400" onClick={() => setFilterStatus("pending")}>Pending</Button>
+                <Button variant={filterStatus === "approved" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-blue-600 dark:text-blue-400" onClick={() => setFilterStatus("approved")}>Approved</Button>
+                <Button variant={filterStatus === "received" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-green-600 dark:text-green-400" onClick={() => setFilterStatus("received")}>Received</Button>
+              </div>
             </div>
 
             <div className="space-y-1">
@@ -458,7 +466,14 @@ export default function Purchasing() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={p.status === 'ordered' ? 'default' : 'secondary'} className={p.status === 'ordered' ? 'bg-orange-500 hover:bg-orange-600' : ''}>
+                        <Badge 
+                          variant="outline" 
+                          className={
+                            p.status === 'received' ? 'bg-green-500 hover:bg-green-600 border-transparent text-white' : 
+                            p.status === 'approved' ? 'bg-blue-500 hover:bg-blue-600 border-transparent text-white' : 
+                            'bg-orange-500 hover:bg-orange-600 border-transparent text-white'
+                          }
+                        >
                           {p.status.toUpperCase()}
                         </Badge>
                       </TableCell>
