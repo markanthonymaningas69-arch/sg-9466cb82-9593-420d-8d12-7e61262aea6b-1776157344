@@ -592,11 +592,15 @@ export default function BillOfMaterials() {
     if (isManualMaterial && materialData.material_name) {
       const exists = masterItems.some(m => m.name.toLowerCase() === materialData.material_name.toLowerCase());
       if (!exists) {
+        const currentScope = scopes.find(s => s.id === selectedScopeId);
+        const associated_scopes = currentScope?.name ? [currentScope.name] : [];
+
         const { data: newMasterItem } = await projectService.createMasterItem({
           name: materialData.material_name,
-          category: "Other",
+          category: "Construction Materials",
           unit: materialData.unit || "Other",
-          default_cost: unitCost
+          default_cost: unitCost,
+          associated_scopes
         });
         
         if (newMasterItem) {
