@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingCart, Plus, Search, Building2, Warehouse as WarehouseIcon, FilterX, List } from "lucide-react";
+import { ShoppingCart, Plus, Search, Building2, Warehouse as WarehouseIcon, FilterX, List, Edit2, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { projectService } from "@/services/projectService";
 
@@ -24,6 +24,7 @@ export default function Purchasing() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [supplierDialogOpen, setSupplierDialogOpen] = useState(false);
   const [viewSuppliersDialogOpen, setViewSuppliersDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   
   // Filters
   const [filterSupplier, setFilterSupplier] = useState("all");
@@ -31,8 +32,19 @@ export default function Purchasing() {
   const [filterItem, setFilterItem] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   
+  const generateNextPONumber = (list: any[]) => {
+    let max = 0;
+    list.forEach(p => {
+      if (p.order_number && p.order_number.startsWith("PO-")) {
+        const num = parseInt(p.order_number.replace("PO-", ""), 10);
+        if (!isNaN(num) && num > max) max = num;
+      }
+    });
+    return `PO-${String(max + 1).padStart(4, '0')}`;
+  };
+
   const [formData, setFormData] = useState({
-    order_number: `PO-${Math.floor(Math.random() * 10000)}`,
+    order_number: "",
     voucher_number: "none",
     order_date: new Date().toISOString().split("T")[0],
     supplier: "",
@@ -66,10 +78,15 @@ export default function Purchasing() {
       supabase.from("vouchers").select("*").order("created_at", { ascending: false })
     ]);
     
-    setPurchases(pData || []);
+    const loadedPurchases = pData || [];
+    setPurchases(loadedPurchases);
     setProjects(projData || []);
     setSuppliers(supData || []);
     setVouchers(vouchData || []);
+    
+    if (!editingId && !formData.order_number) {
+      setFormData(prev => ({ ...prev, order_number: generateNextPONumber(loadedPurchases) }));
+    }
     setLoading(false);
   };
 
@@ -102,18 +119,67 @@ export default function Purchasing() {
       voucher_number: formData.voucher_number === "none" ? null : formData.voucher_number
     };
 
-    const { error } = await supabase.from("purchases").insert(payload);
+    const { error } = editingId 
+      ? await supabase.from("purchases").update(payload).eq("id", editingId)
+      : await supabase.from("purchases").insert(payload);
     
     if (!error) {
-      // Do not close dialog. Only clear item-specific fields for fast multi-item entry
-      setFormData({
-        ...formData,
+      if (editingId) {
+        setEditingId(null);
+        setDialogOpen(false);
+      } else {
+        // Do not close dialog. Only clear item-specific fields for fast multi-item entry
+        setFormData({
+          ...formData,
+          item_name: "",
+          quantity: "",
+          unit: "pcs",
+          unit_cost: ""
+        });
+      }
+      loadData();
+    }
+  };
+
+  const handleEdit = (p: any) => {
+    setEditingId(p.id);
+    setFormData({
+      order_number: p.order_number,
+      voucher_number: p.voucher_number || "none",
+      order_date: p.order_date,
+      supplier: p.supplier,
+      item_name: p.item_name,
+      category: p.category,
+      quantity: p.quantity.toString(),
+      unit: p.unit,
+      unit_cost: p.unit_cost.toString(),
+      destination_type: p.destination_type,
+      project_id: p.project_id || "none",
+      status: p.status
+    });
+    setDialogOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this purchase order item?")) return;
+    const { error } = await supabase.from("purchases").delete().eq("id", id);
+    if (!error) loadData();
+  };
+
+  const handleOpenChange = (open: boolean) => {
+    setDialogOpen(open);
+    if (!open) {
+      setEditingId(null);
+      setFormData(prev => ({
+        ...prev,
+        order_number: generateNextPONumber(purchases),
         item_name: "",
         quantity: "",
         unit: "pcs",
         unit_cost: ""
-      });
-      loadData();
+      }));
+    } else if (!editingId) {
+      setFormData(prev => ({ ...prev, order_number: prev.order_number || generateNextPONumber(purchases) }));
     }
   };
 
@@ -226,7 +292,7 @@ export default function Purchasing() {
               </DialogContent>
             </Dialog>
 
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <Dialog open={dialogOpen} onOpenChange={handleOpenChange}>
               <DialogTrigger asChild>
                 <Button>
                   <Plus className="h-4 w-4 mr-2" />
@@ -235,8 +301,10 @@ export default function Purchasing() {
               </DialogTrigger>
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                  <DialogTitle>Create Purchase Order</DialogTitle>
-                  <p className="text-sm text-muted-foreground">PO Header details remain saved to easily add multiple items.</p>
+                  <DialogTitle>{editingId ? "Edit Purchase Order Item" : "Create Purchase Order"}</DialogTitle>
+                  <p className="text-sm text-muted-foreground">
+                    {editingId ? "Update details for this specific item." : "PO Header details remain saved to easily add multiple items."}
+                  </p>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -340,10 +408,12 @@ export default function Purchasing() {
                     )}
                   </div>
                   <div className="flex justify-between items-center pt-4 border-t">
-                    <p className="text-xs text-muted-foreground">* Click Save Item to record and clear fields for the next item</p>
+                    <p className="text-xs text-muted-foreground">
+                      {editingId ? "* Changes will only apply to this item" : "* Click Save Item to record and clear fields for the next item"}
+                    </p>
                     <div className="flex gap-2">
-                      <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Close</Button>
-                      <Button type="submit">Save Item to PO</Button>
+                      <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+                      <Button type="submit">{editingId ? "Update Item" : "Save Item to PO"}</Button>
                     </div>
                   </div>
                 </form>
@@ -433,16 +503,17 @@ export default function Purchasing() {
                   <TableHead className="text-right">Total Cost</TableHead>
                   <TableHead>Destination</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">Loading purchases...</TableCell>
+                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Loading purchases...</TableCell>
                   </TableRow>
                 ) : filteredPurchases.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">No purchase orders found.</TableCell>
+                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">No purchase orders found.</TableCell>
                   </TableRow>
                 ) : (
                   filteredPurchases.map((p) => (
@@ -476,6 +547,16 @@ export default function Purchasing() {
                         >
                           {p.status.toUpperCase()}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" onClick={() => handleEdit(p)}>
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => handleDelete(p.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
