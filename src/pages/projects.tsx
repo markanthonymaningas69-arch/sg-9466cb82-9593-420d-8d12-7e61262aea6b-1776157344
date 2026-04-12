@@ -106,6 +106,11 @@ export default function Projects() {
   const handleMasterItemSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!masterForm.name || !masterForm.category || !masterForm.unit) {
+      alert("Please fill in all required fields: Name, Category, and Unit.");
+      return;
+    }
+
     const payload = {
       name: masterForm.name,
       category: masterForm.category,
@@ -292,7 +297,7 @@ export default function Projects() {
                         <form onSubmit={handleMasterItemSubmit} className="space-y-4 flex-1 overflow-y-auto pr-2 pb-4">
                           <div className="space-y-2">
                             <Label>Item Name *</Label>
-                            <Input value={masterForm.name} onChange={(e) => setMasterForm({...masterForm, name: e.target.value})} required />
+                            <Input value={masterForm.name} onChange={(e) => setMasterForm({...masterForm, name: e.target.value})} />
                           </div>
                           
                           <div className="space-y-2">
@@ -301,7 +306,7 @@ export default function Projects() {
                               <Select value={masterForm.category} onValueChange={(val) => {
                                 if (val === "others") { setIsManualMasterCategory(true); setMasterForm({...masterForm, category: ""}); }
                                 else setMasterForm({...masterForm, category: val});
-                              }} required>
+                              }}>
                                 <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                                 <SelectContent>
                                   {STANDARD_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
@@ -310,7 +315,7 @@ export default function Projects() {
                               </Select>
                             ) : (
                               <div className="flex gap-2">
-                                <Input value={masterForm.category} onChange={(e) => setMasterForm({...masterForm, category: e.target.value})} required />
+                                <Input value={masterForm.category} onChange={(e) => setMasterForm({...masterForm, category: e.target.value})} />
                                 <Button type="button" variant="outline" className="px-2" onClick={() => setIsManualMasterCategory(false)}>List</Button>
                               </div>
                             )}
@@ -322,7 +327,7 @@ export default function Projects() {
                               <Select value={masterForm.unit} onValueChange={(val) => {
                                 if (val === "others") { setIsManualMasterUnit(true); setMasterForm({...masterForm, unit: ""}); }
                                 else setMasterForm({...masterForm, unit: val});
-                              }} required>
+                              }}>
                                 <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                                 <SelectContent>
                                   {STANDARD_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
@@ -331,7 +336,7 @@ export default function Projects() {
                               </Select>
                             ) : (
                               <div className="flex gap-2">
-                                <Input value={masterForm.unit} onChange={(e) => setMasterForm({...masterForm, unit: e.target.value})} required />
+                                <Input value={masterForm.unit} onChange={(e) => setMasterForm({...masterForm, unit: e.target.value})} />
                                 <Button type="button" variant="outline" className="px-2" onClick={() => setIsManualMasterUnit(false)}>List</Button>
                               </div>
                             )}
@@ -462,7 +467,7 @@ export default function Projects() {
                         <form onSubmit={handleMasterScopeSubmit} className="space-y-4">
                           <div className="space-y-2">
                             <Label>Scope Name *</Label>
-                            <Input value={masterScopeForm.name} onChange={(e) => setMasterScopeForm({...masterScopeForm, name: e.target.value})} placeholder="e.g. Concrete Works" required />
+                            <Input value={masterScopeForm.name} onChange={(e) => setMasterScopeForm({...masterScopeForm, name: e.target.value})} placeholder="e.g. Concrete Works" />
                           </div>
                           <Button type="submit" className="w-full mt-4">{editingMasterScopeId ? "Update Scope" : "Save Scope"}</Button>
                         </form>
@@ -524,12 +529,11 @@ export default function Projects() {
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="name">Project Name *</Label>
+                      <Label htmlFor="name">Project Name</Label>
                       <Input
                         id="name"
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        required
                       />
                     </div>
                     <div className="space-y-2">
