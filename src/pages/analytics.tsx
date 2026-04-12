@@ -58,29 +58,39 @@ export default function Analytics() {
 
   const loadProjectData = async (projectId: string) => {
     setLoading(true);
-    const [bomData, consumptionData, attendanceData, deliveriesData] = await Promise.all([
-      bomService.getByProjectId(projectId),
-      siteService.getMaterialConsumption(projectId),
-      siteService.getSiteAttendance(projectId),
-      siteService.getDeliveries(projectId)
-    ]);
+    try {
+      const [bomData, consumptionData, attendanceData, deliveriesData] = await Promise.all([
+        bomService.getByProjectId(projectId),
+        siteService.getMaterialConsumption(projectId),
+        siteService.getSiteAttendance(projectId),
+        siteService.getDeliveries(projectId)
+      ]);
 
-    setBom(bomData.data || null);
-    setConsumption(consumptionData.data || []);
-    setAttendance(attendanceData.data || []);
-    setDeliveries(deliveriesData.data || []);
-    setLoading(false);
+      setBom(bomData.data || null);
+      setConsumption(consumptionData.data || []);
+      setAttendance(attendanceData.data || []);
+      setDeliveries(deliveriesData.data || []);
+    } catch (err) {
+      console.error("Error loading project data:", err);
+      setBom(null);
+      setConsumption([]);
+      setAttendance([]);
+      setDeliveries([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // 1. SWA Data
   const swaData = useMemo(() => {
-    if (!bom?.bom_scope_of_work) return [];
-    return bom.bom_scope_of_work.sort((a: any, b: any) => (a.order_number || 0) - (b.order_number || 0));
+    if (!bom?.bom_scope_of_work || !Array.isArray(bom.bom_scope_of_work)) return [];
+    // Spread into a new array to prevent "Cannot assign to read only property" in strict mode sorting
+    return [...bom.bom_scope_of_work].sort((a: any, b: any) => (a.order_number || 0) - (b.order_number || 0));
   }, [bom]);
 
   // 2. Material Usage vs Allocated
   const materialUsageData = useMemo(() => {
-    if (!bom?.bom_scope_of_work) return [];
+    if (!bom?.bom_scope_of_work || !Array.isArray(bom.bom_scope_of_work)) return [];
     
     const usageMap: Record<string, { allocated: number; actual: number; unit: string; scopeName: string }> = {};
 
@@ -88,33 +98,37 @@ export default function Analytics() {
     bom.bom_scope_of_work.forEach((scope: any) => {
       if (usageScopeFilter !== "all" && scope.id !== usageScopeFilter) return;
 
-      scope.bom_materials?.forEach((mat: any) => {
-        const key = `${scope.id}_${mat.material_name}`;
-        if (!usageMap[key]) {
-          usageMap[key] = { allocated: 0, actual: 0, unit: mat.unit, scopeName: scope.name };
-        }
-        usageMap[key].allocated += Number(mat.quantity || 0);
-      });
+      if (Array.isArray(scope.bom_materials)) {
+        scope.bom_materials.forEach((mat: any) => {
+          const name = mat.material_name || "Unknown";
+          const key = `${scope.id}_${name}`;
+          if (!usageMap[key]) {
+            usageMap[key] = { allocated: 0, actual: 0, unit: mat.unit || "", scopeName: scope.name || "" };
+          }
+          usageMap[key].allocated += Number(mat.quantity || 0);
+        });
+      }
     });
 
     // Map actual
-    consumption.forEach((cons: any) => {
+    (consumption || []).forEach((cons: any) => {
       if (usageScopeFilter !== "all" && cons.bom_scope_id !== usageScopeFilter) return;
 
-      const key = `${cons.bom_scope_id}_${cons.material_name}`;
+      const name = cons.material_name || "Unknown";
+      const key = `${cons.bom_scope_id}_${name}`;
       const scope = bom.bom_scope_of_work.find((s: any) => s.id === cons.bom_scope_id);
       
       if (!usageMap[key]) {
-        usageMap[key] = { allocated: 0, actual: 0, unit: cons.unit, scopeName: scope?.name || "Unknown Scope" };
+        usageMap[key] = { allocated: 0, actual: 0, unit: cons.unit || "", scopeName: scope?.name || "Unknown Scope" };
       }
       usageMap[key].actual += Number(cons.quantity_used || 0);
     });
 
     return Object.entries(usageMap).map(([key, data]) => {
-      const [scopeId, materialName] = key.split("_");
+      const [scopeId, ...nameParts] = key.split("_");
       return {
         scopeId,
-        materialName,
+        materialName: nameParts.join("_"),
         ...data,
         variance: data.allocated - data.actual
       };
@@ -123,32 +137,36 @@ export default function Analytics() {
 
   // 3. Amount Spent per Scope
   const scopeSpendingData = useMemo(() => {
-    if (!bom?.bom_scope_of_work) return [];
+    if (!bom?.bom_scope_of_work || !Array.isArray(bom.bom_scope_of_work)) return [];
 
     return bom.bom_scope_of_work.map((scope: any) => {
       // Allocated Materials
-      const allocatedMatCost = (scope.bom_materials || []).reduce((sum: number, m: any) => sum + (Number(m.quantity || 0) * Number(m.unit_cost || 0)), 0);
+      const allocatedMatCost = Array.isArray(scope.bom_materials) 
+        ? scope.bom_materials.reduce((sum: number, m: any) => sum + (Number(m.quantity || 0) * Number(m.unit_cost || 0)), 0)
+        : 0;
       
       // Allocated Labor
-      const allocatedLabCost = (scope.bom_labor || []).reduce((sum: number, l: any) => sum + (Number(l.no_of_workers || 0) * Number(l.daily_rate || 0) * Number(l.duration_days || 0)), 0);
+      const allocatedLabCost = Array.isArray(scope.bom_labor)
+        ? scope.bom_labor.reduce((sum: number, l: any) => sum + (Number(l.no_of_workers || 0) * Number(l.daily_rate || 0) * Number(l.duration_days || 0)), 0)
+        : 0;
 
-      // Actual Materials (Cost derived from BOM unit cost if available, else 0)
-      const actualMatCost = consumption
+      // Actual Materials
+      const actualMatCost = (consumption || [])
         .filter(c => c.bom_scope_id === scope.id)
         .reduce((sum: number, c: any) => {
-          const bomMat = scope.bom_materials?.find((m: any) => m.material_name === c.material_name);
+          const bomMat = Array.isArray(scope.bom_materials)
+            ? scope.bom_materials.find((m: any) => m.material_name === c.material_name)
+            : null;
           const unitCost = bomMat ? Number(bomMat.unit_cost || 0) : 0;
           return sum + (Number(c.quantity_used || 0) * unitCost);
         }, 0);
 
       return {
-        scopeName: scope.name,
+        scopeName: scope.name || "Unknown Scope",
         allocatedMatCost,
         allocatedLabCost,
         totalAllocated: allocatedMatCost + allocatedLabCost,
         actualMatCost,
-        // Note: Actual Labor cost per scope is difficult without scope-specific timesheets,
-        // so we focus on actual materials tracked to the scope.
         totalActual: actualMatCost
       };
     });
@@ -156,22 +174,26 @@ export default function Analytics() {
 
   // 4. OCM (Materials used but not in BOM)
   const ocmData = useMemo(() => {
-    if (!bom?.bom_scope_of_work) return [];
+    if (!bom?.bom_scope_of_work || !Array.isArray(bom.bom_scope_of_work)) return [];
     
     const ocmList: any[] = [];
 
-    consumption.forEach((cons: any) => {
+    (consumption || []).forEach((cons: any) => {
       const scope = bom.bom_scope_of_work.find((s: any) => s.id === cons.bom_scope_id);
       if (scope) {
-        const isInBom = scope.bom_materials?.some((m: any) => m.material_name.toLowerCase() === cons.material_name.toLowerCase());
+        const consName = cons.material_name?.toLowerCase() || "";
+        const isInBom = Array.isArray(scope.bom_materials) && scope.bom_materials.some((m: any) => 
+          (m.material_name?.toLowerCase() || "") === consName
+        );
+        
         if (!isInBom) {
           ocmList.push({
             date: cons.date_used,
-            scopeName: scope.name,
-            materialName: cons.material_name,
-            quantity: cons.quantity_used,
-            unit: cons.unit,
-            remarks: cons.remarks
+            scopeName: scope.name || "Unknown Scope",
+            materialName: cons.material_name || "Unknown Material",
+            quantity: cons.quantity_used || 0,
+            unit: cons.unit || "",
+            remarks: cons.remarks || "-"
           });
         }
       }
@@ -182,7 +204,7 @@ export default function Analytics() {
 
   // 5. Warehouse Deployment vs Site Received
   const deliveryData = useMemo(() => {
-    return deliveries.map(d => {
+    return (deliveries || []).map(d => {
       let items = [];
       try {
         if (typeof d.items === 'string') {
