@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 
 type CurrencyType = "USD" | "EUR" | "GBP" | "JPY" | "PHP" | "AUD" | "CAD" | "SGD" | "AED" | "INR";
 const SUPPORTED_CURRENCIES = ["USD", "EUR", "GBP", "JPY", "PHP", "AUD", "CAD", "SGD", "AED", "INR"];
+type PlanType = "starter" | "professional";
 
 export interface CompanySettings {
   name: string;
@@ -26,6 +27,8 @@ interface SettingsContextType {
   formatNumber: (value: number) => string;
   company: CompanySettings;
   setCompany: (company: CompanySettings) => void;
+  currentPlan: PlanType;
+  setCurrentPlan: (plan: PlanType) => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -33,6 +36,7 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [currency, setCurrencyState] = useState<CurrencyType>("USD");
   const [company, setCompanyState] = useState<CompanySettings>(defaultCompany);
+  const [currentPlan, setCurrentPlanState] = useState<PlanType>("starter");
 
   useEffect(() => {
     const savedCurrency = localStorage.getItem("app_currency") as CurrencyType;
@@ -48,6 +52,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         console.error("Failed to parse company settings", e);
       }
     }
+    
+    const savedPlan = localStorage.getItem("app_plan") as PlanType;
+    if (savedPlan && ["starter", "professional"].includes(savedPlan)) {
+      setCurrentPlanState(savedPlan);
+    }
   }, []);
 
   const setCurrency = (newCurrency: CurrencyType) => {
@@ -58,6 +67,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const setCompany = (newCompany: CompanySettings) => {
     setCompanyState(newCompany);
     localStorage.setItem("app_company", JSON.stringify(newCompany));
+  };
+
+  const setCurrentPlan = (plan: PlanType) => {
+    setCurrentPlanState(plan);
+    localStorage.setItem("app_plan", plan);
   };
 
   const formatCurrency = (value: number) => {
@@ -81,7 +95,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <SettingsContext.Provider value={{ currency, setCurrency, formatCurrency, formatNumber, company, setCompany }}>
+    <SettingsContext.Provider value={{ currency, setCurrency, formatCurrency, formatNumber, company, setCompany, currentPlan, setCurrentPlan }}>
       {children}
     </SettingsContext.Provider>
   );

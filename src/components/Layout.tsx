@@ -57,7 +57,7 @@ const navigation = [
 export function Layout({ children }: LayoutProps) {
   const router = useRouter();
   const { toast } = useToast();
-  const { company } = useSettings();
+  const { company, currentPlan } = useSettings();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [notificationOpen, setNotificationOpen] = useState(false);
@@ -171,7 +171,9 @@ export function Layout({ children }: LayoutProps) {
           {/* Navigation */}
           <nav className="flex-1 overflow-y-auto py-4">
             <ul className="space-y-1 px-3">
-              {navigation.map((item) => {
+              {navigation
+                .filter(item => !(currentPlan === "starter" && item.name === "Human Resources"))
+                .map((item) => {
                 const Icon = item.icon;
                 const isActive = router.pathname === item.href;
                 

@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Check, CreditCard, Calendar, Users, HardDrive, Shield } from "lucide-react";
+import { useSettings } from "@/contexts/SettingsProvider";
 
 export default function Subscription() {
-  const [currentPlan] = useState("professional");
+  const { currentPlan, setCurrentPlan } = useSettings();
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
 
   const plans = [
@@ -18,12 +19,11 @@ export default function Subscription() {
       monthlyPrice: 49,
       annualPrice: 470,
       features: [
-        "Up to 5 active projects",
-        "Basic accounting features",
-        "10 site personnel",
-        "100 warehouse items",
-        "Email support",
-        "Mobile app access"
+        "Full module access (except HR)",
+        "Accounting: Payroll tab only",
+        "1 Site personnel user account",
+        "Mobile app access",
+        "Email support"
       ]
     },
     {
@@ -34,31 +34,13 @@ export default function Subscription() {
       annualPrice: 950,
       popular: true,
       features: [
-        "Unlimited projects",
-        "Advanced accounting & analytics",
-        "Unlimited site personnel",
-        "Unlimited warehouse items",
-        "Priority support",
-        "Mobile app access",
-        "Custom reports",
-        "API access"
-      ]
-    },
-    {
-      id: "enterprise",
-      name: "Enterprise",
-      description: "For large construction companies",
-      monthlyPrice: 199,
-      annualPrice: 1910,
-      features: [
-        "Everything in Professional",
-        "Multi-company support",
-        "Advanced security features",
-        "Dedicated account manager",
-        "Custom integrations",
-        "SLA guarantee",
-        "Training & onboarding",
-        "White-label options"
+        "Full module access (All features)",
+        "3 Site personnel user accounts",
+        "1 Accounting user account",
+        "1 Purchasing user account",
+        "1 Human Resource user account",
+        "1 Warehouse user account",
+        "Priority support"
       ]
     }
   ];
@@ -90,19 +72,23 @@ export default function Subscription() {
         <Card>
           <CardHeader>
             <CardTitle>Current Plan</CardTitle>
-            <CardDescription>You are currently on the Professional plan</CardDescription>
+            <CardDescription>You are currently on the {currentPlan === "starter" ? "Starter" : "Professional"} plan</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-2xl font-bold">Professional</h3>
+                  <h3 className="text-2xl font-bold capitalize">{currentPlan}</h3>
                   <Badge variant="secondary">Active</Badge>
                 </div>
                 <p className="text-sm text-muted-foreground">Next billing date: May 1, 2026</p>
               </div>
               <div className="text-right">
-                <div className="text-3xl font-bold">${billingCycle === "monthly" ? "99" : "950"}</div>
+                <div className="text-3xl font-bold">
+                  ${billingCycle === "monthly" 
+                    ? (currentPlan === "starter" ? "49" : "99") 
+                    : (currentPlan === "starter" ? "470" : "950")}
+                </div>
                 <p className="text-sm text-muted-foreground">per {billingCycle === "monthly" ? "month" : "year"}</p>
               </div>
             </div>
@@ -196,6 +182,7 @@ export default function Subscription() {
                     className="w-full"
                     variant={plan.id === currentPlan ? "secondary" : "default"}
                     disabled={plan.id === currentPlan}
+                    onClick={() => setCurrentPlan(plan.id as "starter" | "professional")}
                   >
                     {plan.id === currentPlan ? "Current Plan" : "Upgrade"}
                   </Button>

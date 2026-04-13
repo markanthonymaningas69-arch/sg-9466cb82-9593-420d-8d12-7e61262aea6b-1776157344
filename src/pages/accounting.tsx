@@ -9,9 +9,18 @@ import { LiquidationsTab } from "@/components/accounting/LiquidationsTab";
 import { TaxReportTab } from "@/components/accounting/TaxReportTab";
 import { Card, CardContent } from "@/components/ui/card";
 import { Landmark, FileSpreadsheet, Users, Receipt, CircleDollarSign, FileText } from "lucide-react";
+import { useSettings } from "@/contexts/SettingsProvider";
+import { useEffect } from "react";
 
 export default function Accounting() {
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const { currentPlan } = useSettings();
+  const [activeTab, setActiveTab] = useState(currentPlan === "starter" ? "payroll" : "dashboard");
+
+  useEffect(() => {
+    if (currentPlan === "starter" && activeTab !== "payroll") {
+      setActiveTab("payroll");
+    }
+  }, [currentPlan, activeTab]);
 
   return (
     <Layout>
@@ -24,50 +33,66 @@ export default function Accounting() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
           <div className="overflow-x-auto pb-2">
             <TabsList className="w-full justify-start min-w-max h-12">
-              <TabsTrigger value="dashboard" className="flex items-center gap-2">
-                <Landmark className="h-4 w-4" /> Dashboard
-              </TabsTrigger>
-              <TabsTrigger value="journal" className="flex items-center gap-2">
-                <FileSpreadsheet className="h-4 w-4" /> Journal & OpEx
-              </TabsTrigger>
+              {currentPlan === "professional" && (
+                <>
+                  <TabsTrigger value="dashboard" className="flex items-center gap-2">
+                    <Landmark className="h-4 w-4" /> Dashboard
+                  </TabsTrigger>
+                  <TabsTrigger value="journal" className="flex items-center gap-2">
+                    <FileSpreadsheet className="h-4 w-4" /> Journal & OpEx
+                  </TabsTrigger>
+                </>
+              )}
               <TabsTrigger value="payroll" className="flex items-center gap-2">
                 <Users className="h-4 w-4" /> Payroll
               </TabsTrigger>
-              <TabsTrigger value="vouchers" className="flex items-center gap-2">
-                <Receipt className="h-4 w-4" /> Vouchers
-              </TabsTrigger>
-              <TabsTrigger value="liquidations" className="flex items-center gap-2">
-                <CircleDollarSign className="h-4 w-4" /> Liquidations
-              </TabsTrigger>
-              <TabsTrigger value="tax" className="flex items-center gap-2">
-                <FileText className="h-4 w-4" /> UAE Tax
-              </TabsTrigger>
+              {currentPlan === "professional" && (
+                <>
+                  <TabsTrigger value="vouchers" className="flex items-center gap-2">
+                    <Receipt className="h-4 w-4" /> Vouchers
+                  </TabsTrigger>
+                  <TabsTrigger value="liquidations" className="flex items-center gap-2">
+                    <CircleDollarSign className="h-4 w-4" /> Liquidations
+                  </TabsTrigger>
+                  <TabsTrigger value="tax" className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" /> UAE Tax
+                  </TabsTrigger>
+                </>
+              )}
             </TabsList>
           </div>
 
-          <TabsContent value="dashboard" className="flex-1 mt-0">
-            <AccountingDashboard />
-          </TabsContent>
-          
-          <TabsContent value="journal" className="flex-1 mt-0">
-            <JournalOpEx />
-          </TabsContent>
+          {currentPlan === "professional" && (
+            <>
+              <TabsContent value="dashboard" className="flex-1 mt-0">
+                <AccountingDashboard />
+              </TabsContent>
+              
+              <TabsContent value="journal" className="flex-1 mt-0">
+                <JournalOpEx />
+              </TabsContent>
+            </>
+          )}
           
           <TabsContent value="payroll" className="flex-1 mt-0">
             <PayrollTab />
           </TabsContent>
 
-          <TabsContent value="vouchers" className="flex-1 mt-0">
-            <VouchersTab />
-          </TabsContent>
+          {currentPlan === "professional" && (
+            <>
+              <TabsContent value="vouchers" className="flex-1 mt-0">
+                <VouchersTab />
+              </TabsContent>
 
-          <TabsContent value="liquidations" className="flex-1 mt-0">
-            <LiquidationsTab />
-          </TabsContent>
+              <TabsContent value="liquidations" className="flex-1 mt-0">
+                <LiquidationsTab />
+              </TabsContent>
 
-          <TabsContent value="tax" className="flex-1 mt-0">
-            <TaxReportTab />
-          </TabsContent>
+              <TabsContent value="tax" className="flex-1 mt-0">
+                <TaxReportTab />
+              </TabsContent>
+            </>
+          )}
         </Tabs>
       </div>
     </Layout>
