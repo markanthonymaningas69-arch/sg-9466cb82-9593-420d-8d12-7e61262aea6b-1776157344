@@ -15,7 +15,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { siteService } from "@/services/siteService";
 import { projectService } from "@/services/projectService";
 import { personnelService } from "@/services/personnelService";
-import { Plus, Pencil, Trash2, Users, Truck, ClipboardList, ArrowUp, ArrowDown, Check, ArrowUpDown, ShoppingCart, Banknote, Wrench } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Truck, ClipboardList, ArrowUp, ArrowDown, Check, ArrowUpDown, ShoppingCart, Banknote, Wrench, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 type Project = { id: string; name: string; location: string; status: string };
@@ -105,6 +105,8 @@ export default function SitePersonnel() {
   const [requests, setRequests] = useState<any[]>([]);
   const [requestDate, setRequestDate] = useState<string>(todayStr);
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
+  const [viewFormDialogOpen, setViewFormDialogOpen] = useState(false);
+  const [selectedFormGroup, setSelectedFormGroup] = useState<any>(null);
   const [isManualRequestItem, setIsManualRequestItem] = useState(false);
   const [isManualRequestUnit, setIsManualRequestUnit] = useState(false);
   const [requestItems, setRequestItems] = useState<any[]>([]);
@@ -2427,6 +2429,7 @@ export default function SitePersonnel() {
                                           placeholder="Type item name"
                                           value={requestForm.item_name}
                                           onChange={(e) => setRequestForm({ ...requestForm, item_name: e.target.value })}
+                                          required
                                         />
                                         <Button type="button" variant="outline" className="px-2" onClick={() => {
                                           setIsManualRequestItem(false);
@@ -2544,7 +2547,7 @@ export default function SitePersonnel() {
                                             {item.notes && <div className="text-[10px] text-muted-foreground truncate max-w-[150px]">{item.notes}</div>}
                                           </TableCell>
                                           <TableCell className="text-sm">{item.quantity} {item.unit}</TableCell>
-                                          <TableCell className="text-sm">{item.amount > 0 ? item.amount.toLocaleString() : "-"}</TableCell>
+                                          <TableCell className="text-sm">{item.amount || 0 > 0 ? item.amount.toLocaleString() : "-"}</TableCell>
                                           <TableCell className="text-right">
                                             <Button type="button" size="sm" variant="ghost" onClick={() => handleRemoveItem(idx)} className="h-6 w-6 p-0 text-red-500">
                                               <Trash2 className="h-4 w-4" />
@@ -2556,6 +2559,16 @@ export default function SitePersonnel() {
                                   </Table>
                                 </div>
                               )}
+                            </div>
+                          )}
+                          {requestForm.request_type === "Cash Advance" && (
+                            <div className="space-y-2">
+                              <Label>Notes / Reason *</Label>
+                              <Textarea
+                                value={requestForm.notes}
+                                onChange={(e) => setRequestForm({ ...requestForm, notes: e.target.value })}
+                                required
+                              />
                             </div>
                           )}
                           <div className="flex justify-between items-center pt-4 border-t">
@@ -2576,33 +2589,53 @@ export default function SitePersonnel() {
                 </CardHeader>
                 <CardContent className="flex-1 overflow-hidden pb-4">
                   {(() => {
-                    const combinedRequests = [
-                      ...requests.map(r => ({
-                        ...r,
-                        isCA: false,
-                        displayFormNumber: r.form_number || '-',
-                        displayType: r.request_type || 'Materials',
-                        displayItem: r.item_name,
-                        displayQty: r.quantity > 0 ? `${r.quantity} ${r.unit}` : '-',
-                        displayAmount: r.amount || 0,
-                        displayBy: r.requested_by,
-                        displayScope: r.bom_scope_id ? r.bom_scope_of_work?.name : "General"
-                      })),
-                      ...cashAdvances.map(c => ({
-                        ...c,
-                        isCA: true,
-                        displayFormNumber: c.form_number || '-',
-                        displayType: 'Cash Advance',
-                        displayItem: `${c.personnel?.name} (${c.personnel?.role})`,
-                        displayQty: '-',
-                        displayAmount: c.amount,
-                        displayBy: c.personnel?.name,
-                        displayScope: "General",
-                        notes: c.reason
-                      }))
-                    ].sort((a, b) => new Date(b.request_date).getTime() - new Date(a.request_date).getTime());
+                    const groupedRequests = requests.reduce((acc: any, r: any) => {
+                      const key = r.form_number || r.id;
+                      if (!acc[key]) {
+                        acc[key] = {
+                          id: r.id,
+                          isCA: false,
+                          form_number: r.form_number || '-',
+                          request_type: r.request_type || 'Materials',
+                          request_date: r.request_date,
+                          requested_by: r.requested_by,
+                          status: r.status,
+                          items: []
+                        };
+                      }
+                      acc[key].items.push({
+                        id: r.id,
+                        item_name: r.item_name,
+                        quantity: r.quantity,
+                        unit: r.unit,
+                        amount: r.amount,
+                        bom_scope_id: r.bom_scope_id,
+                        bom_scope_of_work: r.bom_scope_of_work,
+                        notes: r.notes
+                      });
+                      return acc;
+                    }, {});
 
-                    if (combinedRequests.length === 0) {
+                    const combinedGroups = [
+                      ...Object.values(groupedRequests),
+                      ...cashAdvances.map((c: any) => ({
+                        id: c.id,
+                        isCA: true,
+                        form_number: c.form_number || '-',
+                        request_type: 'Cash Advance',
+                        request_date: c.request_date,
+                        requested_by: c.personnel?.name || '-',
+                        status: c.status,
+                        items: [{
+                          id: c.id,
+                          item_name: `${c.personnel?.name} (${c.personnel?.role})`,
+                          amount: c.amount,
+                          notes: c.reason
+                        }]
+                      }))
+                    ].sort((a: any, b: any) => new Date(b.request_date).getTime() - new Date(a.request_date).getTime());
+
+                    if (combinedGroups.length === 0) {
                       return (
                         <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg bg-gray-50">
                           <p className="mb-4">No requests found for the selected date.</p>
@@ -2616,61 +2649,61 @@ export default function SitePersonnel() {
                           <TableHeader>
                             <TableRow>
                               <TableHead className="w-24">Date</TableHead>
-                              <TableHead className="w-24">Form No.</TableHead>
+                              <TableHead className="w-32">Form No.</TableHead>
                               <TableHead>Type</TableHead>
-                              <TableHead>Details</TableHead>
-                              <TableHead>Qty</TableHead>
-                              <TableHead>Amount</TableHead>
                               <TableHead>Requested By</TableHead>
+                              <TableHead>Items Count</TableHead>
                               <TableHead>Status</TableHead>
-                              <TableHead className="text-right w-16">Act</TableHead>
+                              <TableHead className="text-right w-24">Act</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {combinedRequests.map((row) => (
-                              <TableRow key={row.id}>
-                                <TableCell className="whitespace-nowrap text-sm">{row.request_date}</TableCell>
-                                <TableCell className="font-mono text-xs font-bold text-muted-foreground">{row.displayFormNumber}</TableCell>
+                            {combinedGroups.map((group: any) => (
+                              <TableRow key={group.id}>
+                                <TableCell className="whitespace-nowrap text-sm">{group.request_date}</TableCell>
+                                <TableCell className="font-mono text-xs font-bold text-primary">{group.form_number}</TableCell>
                                 <TableCell>
-                                  <Badge variant="secondary" className="font-normal text-xs">{row.displayType}</Badge>
+                                  <Badge variant="secondary" className="font-normal text-xs">{group.request_type}</Badge>
                                 </TableCell>
-                                <TableCell>
-                                  <div className="font-medium text-sm">{row.displayItem}</div>
-                                  <div className="text-[10px] text-muted-foreground truncate max-w-[200px]" title={row.notes}>{row.notes}</div>
-                                </TableCell>
-                                <TableCell className="text-sm">{row.displayQty}</TableCell>
-                                <TableCell className={row.displayAmount > 0 ? "font-bold text-primary text-sm" : "text-muted-foreground text-sm"}>
-                                  {row.displayAmount > 0 ? row.displayAmount.toLocaleString() : "-"}
-                                </TableCell>
-                                <TableCell className="text-sm">{row.displayBy}</TableCell>
+                                <TableCell className="text-sm font-medium">{group.requested_by}</TableCell>
+                                <TableCell className="text-sm">{group.items.length} item(s)</TableCell>
                                 <TableCell>
                                   <Badge 
                                     variant="outline" 
                                     className={`text-[10px] ${
-                                      row.status === 'fulfilled' || row.status === 'paid' ? 'bg-green-500 text-white' : 
-                                      row.status === 'approved' ? 'bg-blue-500 text-white' : 
-                                      row.status === 'rejected' ? 'bg-red-500 text-white' : 
+                                      group.status === 'fulfilled' || group.status === 'paid' ? 'bg-green-500 text-white' : 
+                                      group.status === 'approved' ? 'bg-blue-500 text-white' : 
+                                      group.status === 'rejected' ? 'bg-red-500 text-white' : 
                                       'bg-orange-500 text-white'
                                     }`}
                                   >
-                                    {row.status.toUpperCase()}
+                                    {group.status.toUpperCase()}
                                   </Badge>
                                 </TableCell>
                                 <TableCell className="text-right">
-                                  {row.status === 'pending' && (
-                                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={(e) => {
-                                      if(confirm("Delete this pending request?")) {
-                                        e.stopPropagation();
-                                        if (row.isCA) {
-                                          siteService.deleteCashAdvance(row.id).then(() => loadCashAdvances());
-                                        } else {
-                                          supabase.from('site_requests').delete().eq('id', row.id).then(() => loadRequests());
-                                        }
-                                      }
+                                  <div className="flex justify-end gap-1">
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-500 hover:bg-blue-50" onClick={() => {
+                                      setSelectedFormGroup(group);
+                                      setViewFormDialogOpen(true);
                                     }}>
-                                      <Trash2 className="h-4 w-4 text-red-500" />
+                                      <Eye className="h-4 w-4" />
                                     </Button>
-                                  )}
+                                    {group.status === 'pending' && (
+                                      <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 hover:bg-red-50" onClick={(e) => {
+                                        if(confirm("Delete this pending request?")) {
+                                          e.stopPropagation();
+                                          if (group.isCA) {
+                                            siteService.deleteCashAdvance(group.id).then(() => loadCashAdvances());
+                                          } else {
+                                            const ids = group.items.map((i: any) => i.id);
+                                            supabase.from('site_requests').delete().in('id', ids).then(() => loadRequests());
+                                          }
+                                        }
+                                      }}>
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </div>
                                 </TableCell>
                               </TableRow>
                             ))}
@@ -2680,6 +2713,92 @@ export default function SitePersonnel() {
                     );
                   })()}
                 </CardContent>
+
+                {/* View Details Modal */}
+                <Dialog open={viewFormDialogOpen} onOpenChange={setViewFormDialogOpen}>
+                  <DialogContent className="max-w-3xl">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        Request Details: <span className="font-mono text-primary">{selectedFormGroup?.form_number}</span>
+                      </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-muted/30 p-4 rounded-lg border border-border/50">
+                        <div>
+                          <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Request Type</div>
+                          <div className="font-medium text-sm">
+                            <Badge variant="secondary">{selectedFormGroup?.request_type}</Badge>
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Requested By</div>
+                          <div className="font-medium text-sm">{selectedFormGroup?.requested_by}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Date Required</div>
+                          <div className="font-medium text-sm">{selectedFormGroup?.request_date}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Status</div>
+                          <div className="font-medium text-sm">
+                            <Badge 
+                              variant="outline" 
+                              className={`text-[10px] ${
+                                selectedFormGroup?.status === 'fulfilled' || selectedFormGroup?.status === 'paid' ? 'bg-green-500 text-white' : 
+                                selectedFormGroup?.status === 'approved' ? 'bg-blue-500 text-white' : 
+                                selectedFormGroup?.status === 'rejected' ? 'bg-red-500 text-white' : 
+                                'bg-orange-500 text-white'
+                              }`}
+                            >
+                              {selectedFormGroup?.status?.toUpperCase()}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="border rounded-md overflow-hidden">
+                        <Table>
+                          <TableHeader className="bg-muted/50">
+                            <TableRow>
+                              {!selectedFormGroup?.isCA && <TableHead>Scope of Work</TableHead>}
+                              <TableHead>Item / Description</TableHead>
+                              {!selectedFormGroup?.isCA && <TableHead>Quantity</TableHead>}
+                              <TableHead className="text-right">Est. Amount</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {selectedFormGroup?.items.map((item: any, idx: number) => (
+                              <TableRow key={idx}>
+                                {!selectedFormGroup?.isCA && (
+                                  <TableCell>
+                                    {item.bom_scope_id ? (
+                                      <Badge variant="outline" className="text-xs">
+                                        {item.bom_scope_of_work?.name || "Unknown"}
+                                      </Badge>
+                                    ) : (
+                                      <span className="text-muted-foreground italic text-xs">General / Unassigned</span>
+                                    )}
+                                  </TableCell>
+                                )}
+                                <TableCell>
+                                  <div className="font-medium">{item.item_name}</div>
+                                  {item.notes && <div className="text-xs text-muted-foreground mt-1 max-w-[250px] truncate" title={item.notes}>{item.notes}</div>}
+                                </TableCell>
+                                {!selectedFormGroup?.isCA && (
+                                  <TableCell>{item.quantity > 0 ? `${item.quantity} ${item.unit}` : '-'}</TableCell>
+                                )}
+                                <TableCell className="text-right font-medium text-primary">
+                                  {item.amount > 0 ? item.amount.toLocaleString(undefined, {minimumFractionDigits: 2}) : '-'}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
               </Card>
             </TabsContent>
 
