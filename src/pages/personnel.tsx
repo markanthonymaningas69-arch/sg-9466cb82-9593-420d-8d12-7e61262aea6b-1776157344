@@ -48,7 +48,7 @@ export default function Personnel() {
     daily_rate: "",
     overtime_rate: "",
     status: "active" as const,
-    worker_type: "construction" as const,
+    worker_type: "construction" as "construction" | "office",
     hire_date: new Date().toISOString().split("T")[0]
   });
 
