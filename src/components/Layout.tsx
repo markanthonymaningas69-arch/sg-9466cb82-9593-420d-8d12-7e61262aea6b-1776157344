@@ -61,6 +61,7 @@ export function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [pendingLeaves, setPendingLeaves] = useState<any[]>([]);
+  const [pendingCashAdvances, setPendingCashAdvances] = useState<any[]>([]);
   const [notificationOpen, setNotificationOpen] = useState(false);
 
   useEffect(() => {
@@ -86,6 +87,14 @@ export function Layout({ children }: LayoutProps) {
       .order('created_at', { ascending: false })
       .limit(10);
     setPendingLeaves(leaves || []);
+
+    const { data: advances } = await supabase
+      .from('cash_advance_requests')
+      .select('*, personnel(name), projects(name)')
+      .eq('status', 'pending')
+      .order('request_date', { ascending: false })
+      .limit(10);
+    setPendingCashAdvances(advances || []);
   };
 
   const handleApproveRequest = async (requestId: string, itemName: string, e: React.MouseEvent) => {
@@ -152,6 +161,28 @@ export function Layout({ children }: LayoutProps) {
       loadPendingRequests();
     } else {
       toast({ title: "Error", description: "Failed to reject leave request", variant: "destructive" });
+    }
+  };
+
+  const handleApproveCashAdvance = async (id: string, name: string, amount: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const { error } = await supabase.from('cash_advance_requests').update({ status: 'approved' }).eq('id', id);
+    if (!error) {
+      toast({ title: "Cash Advance Approved", description: `${name}'s request for ${company?.currency || '$'}${amount} approved.` });
+      loadPendingRequests();
+    } else {
+      toast({ title: "Error", description: "Failed to approve request", variant: "destructive" });
+    }
+  };
+
+  const handleRejectCashAdvance = async (id: string, name: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const { error } = await supabase.from('cash_advance_requests').update({ status: 'rejected' }).eq('id', id);
+    if (!error) {
+      toast({ title: "Cash Advance Rejected", description: `${name}'s request rejected.`, variant: "destructive" });
+      loadPendingRequests();
+    } else {
+      toast({ title: "Error", description: "Failed to reject request", variant: "destructive" });
     }
   };
 
@@ -222,6 +253,11 @@ export function Layout({ children }: LayoutProps) {
                     >
                       <Icon className="h-5 w-5 shrink-0" />
                       {item.name}
+                      {item.name === "Accounting" && pendingCashAdvances.length > 0 && (
+                        <Badge variant="destructive" className="ml-auto h-5 px-1.5 flex items-center justify-center text-[10px]">
+                          {pendingCashAdvances.length}
+                        </Badge>
+                      )}
                     </Link>
                   </li>
                 );
@@ -295,29 +331,78 @@ export function Layout({ children }: LayoutProps) {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative">
                   <Bell className="h-5 w-5" />
-                  {(pendingRequests.length + pendingLeaves.length) > 0 && (
+                  {(pendingRequests.length + pendingLeaves.length + pendingCashAdvances.length) > 0 && (
                     <Badge 
                       variant="destructive" 
                       className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
                     >
-                      {pendingRequests.length + pendingLeaves.length}
+                      {pendingRequests.length + pendingLeaves.length + pendingCashAdvances.length}
                     </Badge>
                   )}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-80">
                 <DropdownMenuLabel className="font-semibold">
-                  Notifications ({pendingRequests.length + pendingLeaves.length} pending)
+                  Notifications ({pendingRequests.length + pendingLeaves.length + pendingCashAdvances.length} pending)
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {pendingRequests.length === 0 && pendingLeaves.length === 0 ? (
+                {pendingRequests.length === 0 && pendingLeaves.length === 0 && pendingCashAdvances.length === 0 ? (
                   <div className="p-4 text-center text-sm text-muted-foreground">
                     No pending notifications
                   </div>
                 ) : (
                   <ScrollArea className="max-h-[400px]">
-                    {pendingRequests.length > 0 && (
+                    {pendingCashAdvances.length > 0 && (
                       <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase bg-muted/50">
+                        Cash Advances
+                      </div>
+                    )}
+                    {pendingCashAdvances.map((adv) => (
+                      <DropdownMenuItem 
+                        key={adv.id} 
+                        className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-muted"
+                        onClick={() => {
+                          router.push('/accounting');
+                          setNotificationOpen(false);
+                        }}
+                      >
+                        <div className="flex items-start justify-between w-full">
+                          <span className="font-medium text-sm">{adv.personnel?.name}</span>
+                          <Badge variant="outline" className="text-xs text-orange-600 border-orange-200 bg-orange-50">
+                            {company?.currency || '$'} {adv.amount}
+                          </Badge>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {adv.projects?.name || "Unknown Project"}
+                        </span>
+                        <span className="text-xs text-muted-foreground italic truncate max-w-full">
+                          "{adv.reason}"
+                        </span>
+                        <div className="flex gap-2 w-full mt-1" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="flex-1 h-8 bg-green-600 hover:bg-green-700 text-white"
+                            onClick={(e) => handleApproveCashAdvance(adv.id, adv.personnel?.name, adv.amount, e)}
+                          >
+                            <Check className="h-3 w-3 mr-1" />
+                            Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="flex-1 h-8"
+                            onClick={(e) => handleRejectCashAdvance(adv.id, adv.personnel?.name, e)}
+                          >
+                            <XCircle className="h-3 w-3 mr-1" />
+                            Reject
+                          </Button>
+                        </div>
+                      </DropdownMenuItem>
+                    ))}
+
+                    {pendingRequests.length > 0 && (
+                      <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase bg-muted/50 mt-2">
                         Material Requests
                       </div>
                     )}

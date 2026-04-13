@@ -319,5 +319,42 @@ export const siteService = {
       .eq("id", id);
     
     return { error };
+  },
+
+  // Cash Advances
+  async getCashAdvances(projectId: string) {
+    const { data, error } = await supabase
+      .from("cash_advance_requests")
+      .select("*, personnel(name, role)")
+      .eq("project_id", projectId)
+      .order("request_date", { ascending: false });
+    return { data: data || [], error };
+  },
+
+  async createCashAdvance(record: any) {
+    const { data, error } = await supabase
+      .from("cash_advance_requests")
+      .insert(record)
+      .select()
+      .single();
+    return { data, error };
+  },
+
+  async updateCashAdvance(id: string, updates: any) {
+    const { data, error } = await supabase
+      .from("cash_advance_requests")
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single();
+    return { data, error };
+  },
+
+  async deleteCashAdvance(id: string) {
+    const { error } = await supabase
+      .from("cash_advance_requests")
+      .delete()
+      .eq("id", id);
+    return { error };
   }
 };

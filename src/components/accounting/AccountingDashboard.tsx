@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { accountingService } from "@/services/accountingService";
 import { useSettings } from "@/contexts/SettingsProvider";
-import { TrendingUp, TrendingDown, Landmark, Receipt } from "lucide-react";
+import { TrendingUp, TrendingDown, Landmark, Receipt, AlertCircle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export function AccountingDashboard() {
   const { formatCurrency } = useSettings();
@@ -13,10 +15,31 @@ export function AccountingDashboard() {
     balance: 0
   });
   const [loading, setLoading] = useState(true);
+  const [pendingCashAdvances, setPendingCashAdvances] = useState<any[]>([]);
 
   useEffect(() => {
     loadSummary();
+    loadPendingCashAdvances();
+    
+    const channel = supabase
+      .channel('cash_advance_accounting_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_advance_requests' }, () => {
+        loadPendingCashAdvances();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
+
+  const loadPendingCashAdvances = async () => {
+    const { data } = await supabase
+      .from('cash_advance_requests')
+      .select('*, personnel(name), projects(name)')
+      .eq('status', 'pending');
+    setPendingCashAdvances(data || []);
+  };
 
   const loadSummary = async () => {
     setLoading(true);
@@ -31,6 +54,16 @@ export function AccountingDashboard() {
 
   return (
     <div className="space-y-6 mt-4">
+      {pendingCashAdvances.length > 0 && (
+        <Alert variant="destructive" className="bg-orange-50 text-orange-900 border-orange-200">
+          <AlertCircle className="h-4 w-4 text-orange-600" />
+          <AlertTitle className="text-orange-800 font-bold">Pending Cash Advances</AlertTitle>
+          <AlertDescription className="text-orange-700">
+            There are {pendingCashAdvances.length} cash advance requests pending approval in the notification center. Please review them.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

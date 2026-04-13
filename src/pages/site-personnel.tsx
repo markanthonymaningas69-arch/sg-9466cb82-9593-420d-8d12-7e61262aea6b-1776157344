@@ -15,7 +15,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { siteService } from "@/services/siteService";
 import { projectService } from "@/services/projectService";
 import { personnelService } from "@/services/personnelService";
-import { Plus, Pencil, Trash2, Users, Truck, ClipboardList, ArrowUp, ArrowDown, Check, ArrowUpDown, ShoppingCart } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Truck, ClipboardList, ArrowUp, ArrowDown, Check, ArrowUpDown, ShoppingCart, Banknote } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 type Project = { id: string; name: string; location: string; status: string };
@@ -25,6 +25,7 @@ type AttendanceRow = { personnel_id: string; name: string; role: string; daily_r
 type Delivery = { id: string; project_id: string; delivery_date: string; item_name: string; quantity: number; unit: string; supplier: string; received_by: string; status: string; notes: string; receipt_number?: string };
 type ScopeOfWork = { id: string; name: string; description?: string; order_number: number; completion_percentage?: number; status?: string; bom_id: string };
 type MaterialConsumption = { id: string; project_id: string; bom_scope_id: string | null; date_used: string; item_name: string; quantity: number; unit: string; recorded_by: string; notes: string; bom_scope_of_work?: { name: string } };
+type CashAdvance = { id: string; personnel_id: string; project_id: string; amount: number; reason: string; status: string; request_date: string; personnel?: { name: string; role: string } };
 
 const STANDARD_ROLES = ["Admin", "Carpenter", "Electrician", "Helper", "Mason", "Plumber", "Skilled", "Steelman", "Tile Mason", "Welder"];
 
@@ -116,6 +117,16 @@ export default function SitePersonnel() {
     notes: ""
   });
 
+  // Cash Advances
+  const [cashAdvances, setCashAdvances] = useState<CashAdvance[]>([]);
+  const [advanceDialogOpen, setAdvanceDialogOpen] = useState(false);
+  const [advanceForm, setAdvanceForm] = useState({
+    personnel_id: "",
+    amount: "",
+    reason: "",
+    request_date: todayStr
+  });
+
   // Scope of Works
   const [scopes, setScopes] = useState<ScopeOfWork[]>([]);
 
@@ -143,6 +154,7 @@ export default function SitePersonnel() {
       loadDeliveries();
       loadConsumptions();
       loadRequests();
+      loadCashAdvances();
     }
   }, [selectedProject, deliveriesDate, consumptionDate, requestDate]);
 
@@ -163,6 +175,18 @@ export default function SitePersonnel() {
         (payload) => {
           // Reload requests when any change occurs
           loadRequests();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'cash_advance_requests',
+          filter: `project_id=eq.${selectedProject}`
+        },
+        () => {
+          loadCashAdvances();
         }
       )
       .subscribe();
@@ -294,6 +318,12 @@ export default function SitePersonnel() {
     }
     const { data } = await query;
     setRequests(data || []);
+  };
+
+  const loadCashAdvances = async () => {
+    if (!selectedProject) return;
+    const { data } = await siteService.getCashAdvances(selectedProject);
+    setCashAdvances(data || []);
   };
 
   const loadScopes = async () => {
@@ -500,6 +530,21 @@ export default function SitePersonnel() {
     loadRequests();
   };
   
+  const handleAdvanceSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await siteService.createCashAdvance({
+      project_id: selectedProject,
+      personnel_id: advanceForm.personnel_id,
+      amount: parseFloat(advanceForm.amount),
+      reason: advanceForm.reason,
+      request_date: advanceForm.request_date,
+      status: 'pending'
+    });
+    setAdvanceDialogOpen(false);
+    setAdvanceForm({ personnel_id: "", amount: "", reason: "", request_date: todayStr });
+    loadCashAdvances();
+  };
+
   const resetRequestForm = () => {
     setRequestForm({
       bom_scope_id: "unassigned",
@@ -582,6 +627,10 @@ export default function SitePersonnel() {
               <TabsTrigger value="request">
                 <ShoppingCart className="h-4 w-4 mr-2" />
                 Requests
+              </TabsTrigger>
+              <TabsTrigger value="advance">
+                <Banknote className="h-4 w-4 mr-2" />
+                Cash Advance
               </TabsTrigger>
               <TabsTrigger value="scope">
                 <Plus className="h-4 w-4 mr-2" />
@@ -1047,8 +1096,8 @@ export default function SitePersonnel() {
                         const totalCost = presentWorkers.reduce((sum, r) => {
                           const daily = r.daily_rate || 0;
                           const ot = r.overtime_rate || 0;
-                          const hrs = r.hours_worked || 0;
-                          const oth = r.overtime_hours || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
                           return sum + ((daily / 8) * hrs) + (ot * oth);
                         }, 0);
                         const roleCounts = presentWorkers.reduce((acc, r) => {
@@ -2497,6 +2546,144 @@ export default function SitePersonnel() {
                                     if(confirm("Are you sure you want to delete this pending request?")) {
                                       e.stopPropagation();
                                       supabase.from('site_requests').delete().eq('id', row.id).then(() => loadRequests());
+                                    }
+                                  }}>
+                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="advance" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Cash Advance Requests</CardTitle>
+                      <CardDescription>Request cash advances for site personnel</CardDescription>
+                    </div>
+                    <Dialog open={advanceDialogOpen} onOpenChange={setAdvanceDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button>
+                          <Plus className="h-4 w-4 mr-2" />
+                          New Cash Advance
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Submit Cash Advance Request</DialogTitle>
+                        </DialogHeader>
+                        <form onSubmit={handleAdvanceSubmit} className="space-y-4">
+                          <div className="space-y-2">
+                            <Label>Personnel *</Label>
+                            <Select
+                              value={advanceForm.personnel_id}
+                              onValueChange={(val) => setAdvanceForm({ ...advanceForm, personnel_id: val })}
+                              required
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select worker" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {projectPersonnelList.map((p) => (
+                                  <SelectItem key={p.id} value={p.id}>{p.name} ({p.role})</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>Amount *</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0.01"
+                                value={advanceForm.amount}
+                                onChange={(e) => setAdvanceForm({ ...advanceForm, amount: e.target.value })}
+                                required
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Date Required *</Label>
+                              <Input
+                                type="date"
+                                value={advanceForm.request_date}
+                                onChange={(e) => setAdvanceForm({ ...advanceForm, request_date: e.target.value })}
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Reason / Justification *</Label>
+                            <Textarea
+                              value={advanceForm.reason}
+                              onChange={(e) => setAdvanceForm({ ...advanceForm, reason: e.target.value })}
+                              required
+                            />
+                          </div>
+                          <div className="flex justify-end gap-2 pt-4">
+                            <Button type="button" variant="outline" onClick={() => setAdvanceDialogOpen(false)}>
+                              Cancel
+                            </Button>
+                            <Button type="submit">Submit Request</Button>
+                          </div>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4">
+                  {cashAdvances.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg bg-gray-50">
+                      <p className="mb-4">No cash advance requests found.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-y-auto h-full border rounded-md relative">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-12 text-center">Date</TableHead>
+                            <TableHead>Personnel</TableHead>
+                            <TableHead>Amount</TableHead>
+                            <TableHead>Reason</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right w-24">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {cashAdvances.map((row) => (
+                            <TableRow key={row.id}>
+                              <TableCell className="whitespace-nowrap">{row.request_date}</TableCell>
+                              <TableCell className="font-medium">{row.personnel?.name} <span className="text-muted-foreground text-xs ml-1">({row.personnel?.role})</span></TableCell>
+                              <TableCell className="font-bold text-primary">{row.amount}</TableCell>
+                              <TableCell>{row.reason}</TableCell>
+                              <TableCell>
+                                <Badge 
+                                  variant="outline" 
+                                  className={
+                                    row.status === 'paid' ? 'bg-green-500 text-white' : 
+                                    row.status === 'approved' ? 'bg-blue-500 text-white' : 
+                                    row.status === 'rejected' ? 'bg-red-500 text-white' : 
+                                    'bg-orange-500 text-white'
+                                  }
+                                >
+                                  {row.status.toUpperCase()}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {row.status === 'pending' && (
+                                  <Button size="sm" variant="ghost" className="h-4 w-4 p-0" onClick={(e) => {
+                                    if(confirm("Are you sure you want to delete this pending request?")) {
+                                      e.stopPropagation();
+                                      siteService.deleteCashAdvance(row.id).then(() => loadCashAdvances());
                                     }
                                   }}>
                                     <Trash2 className="h-4 w-4 text-red-500" />
