@@ -146,6 +146,32 @@ export default function SitePersonnel() {
     }
   }, [selectedProject, deliveriesDate, consumptionDate, requestDate]);
 
+  useEffect(() => {
+    if (!selectedProject) return;
+
+    // Set up real-time subscription for site_requests
+    const channel = supabase
+      .channel('site_requests_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'site_requests',
+          filter: `project_id=eq.${selectedProject}`
+        },
+        (payload) => {
+          // Reload requests when any change occurs
+          loadRequests();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedProject, requestDate]);
+
   const loadProjects = async () => {
     const { data } = await projectService.getAll();
     setProjects(data || []);
@@ -2461,10 +2487,10 @@ export default function SitePersonnel() {
                               </TableCell>
                               <TableCell className="text-right">
                                 {row.status === 'pending' && (
-                                  <Button size="sm" variant="ghost" onClick={async () => {
+                                  <Button size="sm" variant="ghost" onClick={(e) => {
                                     if(confirm("Are you sure you want to delete this pending request?")) {
-                                      await supabase.from('site_requests').delete().eq('id', row.id);
-                                      loadRequests();
+                                      e.stopPropagation();
+                                      siteService.deleteSiteRequest(row.id).then(loadRequests);
                                     }
                                   }}>
                                     <Trash2 className="h-4 w-4 text-red-500" />
