@@ -239,6 +239,9 @@ export function Layout({ children }: LayoutProps) {
                 const Icon = item.icon;
                 const isActive = router.pathname === item.href;
                 
+                const acctCount = pendingCashAdvances.length + pendingRequests.filter(r => ['Equipment (Rentals)', 'PPE', 'Petty Cash'].includes(r.request_type)).length;
+                const whseCount = pendingRequests.filter(r => ['Tools', 'Equipment (Warehouse)', 'PPE', 'Materials'].includes(r.request_type) || !r.request_type).length;
+
                 return (
                   <li key={item.name}>
                     <Link
@@ -253,9 +256,14 @@ export function Layout({ children }: LayoutProps) {
                     >
                       <Icon className="h-5 w-5 shrink-0" />
                       {item.name}
-                      {item.name === "Accounting" && pendingCashAdvances.length > 0 && (
+                      {item.name === "Accounting" && acctCount > 0 && (
                         <Badge variant="destructive" className="ml-auto h-5 px-1.5 flex items-center justify-center text-[10px]">
-                          {pendingCashAdvances.length}
+                          {acctCount}
+                        </Badge>
+                      )}
+                      {item.name === "Warehouse" && whseCount > 0 && (
+                        <Badge variant="destructive" className="ml-auto h-5 px-1.5 flex items-center justify-center text-[10px]">
+                          {whseCount}
                         </Badge>
                       )}
                     </Link>
@@ -403,7 +411,7 @@ export function Layout({ children }: LayoutProps) {
 
                     {pendingRequests.length > 0 && (
                       <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase bg-muted/50 mt-2">
-                        Material Requests
+                        Site Requests
                       </div>
                     )}
                     {pendingRequests.map((req) => (
@@ -416,9 +424,13 @@ export function Layout({ children }: LayoutProps) {
                         }}
                       >
                         <div className="flex items-start justify-between w-full">
-                          <span className="font-medium text-sm">{req.item_name}</span>
+                          <div className="flex flex-col">
+                            <span className="font-medium text-sm">{req.item_name}</span>
+                            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{req.request_type || 'Materials'}</span>
+                          </div>
                           <Badge variant="outline" className="text-xs">
-                            {req.quantity} {req.unit}
+                            {req.quantity > 0 ? `${req.quantity} ${req.unit}` : ''}
+                            {req.amount > 0 ? ` ${company?.currency || '$'}${req.amount}` : ''}
                           </Badge>
                         </div>
                         <span className="text-xs text-muted-foreground">
