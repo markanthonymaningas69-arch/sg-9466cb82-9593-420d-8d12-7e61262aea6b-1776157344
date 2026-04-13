@@ -10,7 +10,8 @@ import { useSettings } from "@/contexts/SettingsProvider";
 import { projectService } from "@/services/projectService";
 import { bomService } from "@/services/bomService";
 import { siteService } from "@/services/siteService";
-import { ClipboardList, Package, DollarSign, AlertCircle, Truck } from "lucide-react";
+import { ClipboardList, Package, DollarSign, AlertCircle, TrendingUp, BarChart3 } from "lucide-react";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type { Database } from "@/integrations/supabase/types";
 
 type Project = Database["public"]["Tables"]["projects"]["Row"];
@@ -275,30 +276,63 @@ export default function Analytics() {
     return ocmList;
   }, [bom, consumption]);
 
-  // 5. Warehouse Deployment vs Site Received
-  const deliveryData = useMemo(() => {
-    const itemMap: Record<string, { itemName: string; unit: string; totalDelivered: number; totalReceived: number }> = {};
-
-    (deliveries || []).forEach(d => {
-      const name = d.item_name || "Unknown Item";
-      if (!itemMap[name]) {
-        itemMap[name] = { itemName: name, unit: d.unit || "", totalDelivered: 0, totalReceived: 0 };
-      }
+  // 5. Visual Analytics Data
+  const visualAnalyticsData = useMemo(() => {
+    // Group consumption by date
+    const consumptionByDate: Record<string, number> = {};
+    (consumption || []).forEach(c => {
+      const date = c.date_used;
+      if (!consumptionByDate[date]) consumptionByDate[date] = 0;
       
-      const qty = Number(d.quantity || 0);
-      itemMap[name].totalDelivered += qty;
-      
-      if (d.status === "received") {
-        itemMap[name].totalReceived += qty;
+      const scope = bom?.bom_scope_of_work?.find((s: any) => s.id === c.bom_scope_id);
+      if (scope) {
+        const consName = (c.item_name || c.material_name || "").toLowerCase();
+        const bomMat = Array.isArray(scope.bom_materials) 
+          ? scope.bom_materials.find((m: any) => (m.material_name?.toLowerCase() || "") === consName)
+          : null;
+        const unitCost = bomMat ? Number(bomMat.unit_cost || 0) : 0;
+        consumptionByDate[date] += Number(c.quantity || c.quantity_used || 0) * unitCost;
       }
     });
 
-    return Object.values(itemMap).map((data, index) => ({
-      id: `delivery-summary-${index}`,
-      ...data,
-      variance: data.totalDelivered - data.totalReceived
-    }));
-  }, [deliveries]);
+    // Group labor by date
+    const laborByDate: Record<string, { hours: number; cost: number }> = {};
+    (attendance || []).forEach(a => {
+      const date = a.date;
+      if (!laborByDate[date]) laborByDate[date] = { hours: 0, cost: 0 };
+      
+      const hrRate = Number(a.personnel?.hourly_rate || (a.personnel?.daily_rate ? a.personnel.daily_rate / 8 : 0));
+      const hours = Number(a.hours_worked || 0);
+      
+      laborByDate[date].hours += hours;
+      laborByDate[date].cost += hours * hrRate;
+    });
+
+    // Combine all dates
+    const allDates = Array.from(new Set([
+      ...Object.keys(consumptionByDate),
+      ...Object.keys(laborByDate)
+    ])).sort();
+
+    let cumulativeCost = 0;
+    const chartData = allDates.map(date => {
+      const matCost = consumptionByDate[date] || 0;
+      const labData = laborByDate[date] || { hours: 0, cost: 0 };
+      const dailyTotal = matCost + labData.cost;
+      cumulativeCost += dailyTotal;
+
+      return {
+        date,
+        materialCost: matCost,
+        laborHours: labData.hours,
+        laborCost: labData.cost,
+        dailyTotal,
+        cumulativeCost
+      };
+    });
+
+    return chartData;
+  }, [bom, consumption, attendance]);
 
   if (loading && projects.length === 0) {
     return (
@@ -365,9 +399,9 @@ export default function Analytics() {
                 <AlertCircle className="h-4 w-4 shrink-0" />
                 <span className="text-xs md:text-sm font-medium">OCM Materials</span>
               </TabsTrigger>
-              <TabsTrigger value="warehouse" className="flex-1 min-w-[160px] max-w-[220px] flex-col items-center justify-center gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-card py-2 h-auto text-center whitespace-normal leading-tight">
-                <Truck className="h-4 w-4 shrink-0" />
-                <span className="text-xs md:text-sm font-medium">Warehouse Deployment</span>
+              <TabsTrigger value="visual" className="flex-1 min-w-[160px] max-w-[220px] flex-col items-center justify-center gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-card py-2 h-auto text-center whitespace-normal leading-tight">
+                <BarChart3 className="h-4 w-4 shrink-0" />
+                <span className="text-xs md:text-sm font-medium">Visual Analytics</span>
               </TabsTrigger>
             </TabsList>
 
@@ -582,55 +616,120 @@ export default function Analytics() {
               </Card>
             </TabsContent>
 
-            {/* 5. Warehouse vs Site Received */}
-            <TabsContent value="warehouse">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Truck className="h-5 w-5 text-primary" />
-                    Warehouse Deployment vs Site Received
-                  </CardTitle>
-                  <CardDescription>Compare total materials deployed to the site against what has been officially received.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Item Name</TableHead>
-                        <TableHead className="text-right">Total Deployed Qty</TableHead>
-                        <TableHead className="text-right">Total Received Qty</TableHead>
-                        <TableHead className="text-right">Pending / In Transit</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {deliveryData.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                            No deployment or delivery records found.
-                          </TableCell>
-                        </TableRow>
+            {/* 5. Visual Analytics */}
+            <TabsContent value="visual">
+              <div className="space-y-6">
+                {/* Cost Burn Rate */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5 text-primary" />
+                      Cumulative Cost Burn Rate
+                    </CardTitle>
+                    <CardDescription>Track how project costs accumulate over time</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {visualAnalyticsData.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        No cost data available yet. Start logging site activities to see trends.
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={300}>
+                        <LineChart data={visualAnalyticsData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="date" />
+                          <YAxis />
+                          <Tooltip formatter={(value: any) => formatCurrency(Number(value))} />
+                          <Legend />
+                          <Line type="monotone" dataKey="cumulativeCost" stroke="#8884d8" strokeWidth={2} name="Cumulative Cost" />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Daily Material Consumption */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Package className="h-5 w-5 text-primary" />
+                      Daily Material Consumption Cost
+                    </CardTitle>
+                    <CardDescription>Material costs consumed each day</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {visualAnalyticsData.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        No material consumption data available.
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={visualAnalyticsData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="date" />
+                          <YAxis />
+                          <Tooltip formatter={(value: any) => formatCurrency(Number(value))} />
+                          <Legend />
+                          <Bar dataKey="materialCost" fill="#82ca9d" name="Material Cost" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Daily Labor */}
+                <div className="grid md:grid-cols-2 gap-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Daily Labor Hours</CardTitle>
+                      <CardDescription>Manpower hours logged per day</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {visualAnalyticsData.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground text-sm">
+                          No attendance data available.
+                        </div>
                       ) : (
-                        deliveryData.map((row: any) => (
-                          <TableRow key={row.id}>
-                            <TableCell className="font-medium">{row.itemName}</TableCell>
-                            <TableCell className="text-right text-muted-foreground">{row.totalDelivered} {row.unit}</TableCell>
-                            <TableCell className="text-right font-bold text-success">{row.totalReceived} {row.unit}</TableCell>
-                            <TableCell className="text-right">
-                              {row.variance > 0 ? (
-                                <Badge variant="secondary" className="bg-warning/20 text-warning-foreground hover:bg-warning/30">
-                                  {row.variance} {row.unit} Pending
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline" className="text-success border-success">All Received</Badge>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))
+                        <ResponsiveContainer width="100%" height={250}>
+                          <BarChart data={visualAnalyticsData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="date" />
+                            <YAxis />
+                            <Tooltip />
+                            <Legend />
+                            <Bar dataKey="laborHours" fill="#ffc658" name="Labor Hours" />
+                          </BarChart>
+                        </ResponsiveContainer>
                       )}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Daily Labor Cost</CardTitle>
+                      <CardDescription>Manpower costs per day</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {visualAnalyticsData.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground text-sm">
+                          No attendance data available.
+                        </div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height={250}>
+                          <BarChart data={visualAnalyticsData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="date" />
+                            <YAxis />
+                            <Tooltip formatter={(value: any) => formatCurrency(Number(value))} />
+                            <Legend />
+                            <Bar dataKey="laborCost" fill="#ff7c7c" name="Labor Cost" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
             </TabsContent>
 
           </Tabs>
