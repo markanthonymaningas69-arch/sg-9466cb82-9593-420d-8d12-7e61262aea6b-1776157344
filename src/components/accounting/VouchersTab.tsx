@@ -11,10 +11,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { useSettings } from "@/contexts/SettingsProvider";
 import { accountingService } from "@/services/accountingService";
 import { projectService } from "@/services/projectService";
-import { Plus, ReceiptText } from "lucide-react";
+import { Plus, ReceiptText, Printer, CheckCircle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 export function VouchersTab() {
-  const { formatCurrency } = useSettings();
+  const { formatCurrency, company, currency } = useSettings();
+  const { toast } = useToast();
   const [vouchers, setVouchers] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -40,9 +43,95 @@ export function VouchersTab() {
       accountingService.getVouchers(),
       projectService.getAll()
     ]);
-    setVouchers(vData.data || []);
+    // Sort vouchers: drafts first, then by date descending
+    const sortedVouchers = (vData.data || []).sort((a, b) => {
+      if (a.status === 'draft' && b.status !== 'draft') return -1;
+      if (a.status !== 'draft' && b.status === 'draft') return 1;
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
+    setVouchers(sortedVouchers);
     setProjects(pData.data || []);
     setLoading(false);
+  };
+
+  const handleApproveDraft = async (id: string) => {
+    const { error } = await supabase.from('vouchers').update({ status: 'issued' }).eq('id', id);
+    if (!error) {
+      toast({ title: "Voucher Issued", description: "The draft voucher has been officially issued." });
+      loadData();
+    } else {
+      toast({ title: "Error", description: "Failed to issue voucher", variant: "destructive" });
+    }
+  };
+
+  const handlePrint = (v: any) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${v.voucher_number}</title>
+          <style>
+            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 40px; color: #333; max-width: 800px; margin: 0 auto; }
+            .header { text-align: center; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 2px solid #222; }
+            h1 { margin: 0 0 10px 0; font-size: 24px; color: #111; letter-spacing: 1px; }
+            h3 { margin: 0; color: #555; font-weight: normal; }
+            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+            .info-row { display: flex; margin-bottom: 10px; }
+            .label { font-weight: bold; width: 120px; color: #555; }
+            .value { flex: 1; border-bottom: 1px solid #ccc; padding-bottom: 2px; }
+            .particulars-box { border: 1px solid #ddd; padding: 20px; min-height: 100px; margin-bottom: 30px; border-radius: 4px; }
+            .particulars-title { font-weight: bold; margin-bottom: 10px; color: #555; }
+            .amount-box { text-align: right; font-size: 20px; font-weight: bold; margin-bottom: 60px; padding: 10px; background: #f9f9f9; border: 1px solid #eee; border-radius: 4px; }
+            .signatures { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 40px; margin-top: 80px; }
+            .sig-line { border-top: 1px solid #000; text-align: center; padding-top: 10px; font-size: 14px; font-weight: bold; color: #444; }
+            .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; background: #eee; text-transform: uppercase; float: right; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <span class="badge">${v.type} VOUCHER</span>
+            <h1>${v.type === 'payment' ? 'PAYMENT' : v.type === 'receipt' ? 'RECEIPT' : 'JOURNAL'} VOUCHER</h1>
+            <h3>${company?.name || 'Company Name'}</h3>
+            <p style="margin: 5px 0 0 0; font-size: 12px; color: #777;">${company?.address || ''}</p>
+          </div>
+          
+          <div class="info-grid">
+            <div>
+              <div class="info-row"><div class="label">Voucher No:</div><div class="value">${v.voucher_number}</div></div>
+              <div class="info-row"><div class="label">Date:</div><div class="value">${new Date(v.date).toLocaleDateString()}</div></div>
+            </div>
+            <div>
+              <div class="info-row"><div class="label">Payee / To:</div><div class="value">${v.payee || '-'}</div></div>
+              <div class="info-row"><div class="label">Project:</div><div class="value">${v.project_id ? 'Assigned to Project' : 'Head Office'}</div></div>
+            </div>
+          </div>
+
+          <div class="particulars-box">
+            <div class="particulars-title">Particulars:</div>
+            <div>${v.description || v.particulars || 'No details provided.'}</div>
+          </div>
+
+          <div class="amount-box">
+            Total Amount: ${currency || '$'} ${v.amount.toLocaleString(undefined, {minimumFractionDigits: 2})}
+          </div>
+
+          <div class="signatures">
+            <div class="sig-line">Prepared By</div>
+            <div class="sig-line">Approved By</div>
+            <div class="sig-line">Received By</div>
+          </div>
+          
+          <script>
+            window.onload = function() { window.print(); }
+          </script>
+        </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -164,6 +253,7 @@ export function VouchersTab() {
                 <TableHead>Allocation</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
+                <TableHead className="text-right w-24">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -189,16 +279,33 @@ export function VouchersTab() {
                     </TableCell>
                     <TableCell>
                       <div className="font-medium">{v.payee}</div>
-                      <div className="text-xs text-muted-foreground max-w-[200px] truncate">{v.particulars}</div>
+                      <div className="text-xs text-muted-foreground max-w-[200px] truncate">{v.description || v.particulars}</div>
                     </TableCell>
                     <TableCell>
                       {v.project_id ? "Project Assigned" : "Office"}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className="capitalize">{v.status}</Badge>
+                      <Badge 
+                        variant={v.status === 'draft' ? 'outline' : 'secondary'} 
+                        className={v.status === 'draft' ? 'bg-orange-50 text-orange-700 border-orange-200 capitalize' : 'capitalize'}
+                      >
+                        {v.status}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-right font-bold">
                       {formatCurrency(v.amount)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        {v.status === 'draft' && (
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50" onClick={() => handleApproveDraft(v.id)} title="Issue Voucher">
+                            <CheckCircle className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" onClick={() => handlePrint(v)} title="Print to PDF">
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

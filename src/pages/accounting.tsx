@@ -9,19 +9,44 @@ import { LiquidationsTab } from "@/components/accounting/LiquidationsTab";
 import { TaxReportTab } from "@/components/accounting/TaxReportTab";
 import { RequestsViewTab } from "@/components/accounting/RequestsViewTab";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Landmark, FileSpreadsheet, Users, Receipt, CircleDollarSign, FileText, FileSearch } from "lucide-react";
 import { useSettings } from "@/contexts/SettingsProvider";
 import { useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Accounting() {
   const { currentPlan } = useSettings();
   const [activeTab, setActiveTab] = useState(currentPlan === "starter" ? "payroll" : "dashboard");
+  const [draftVouchersCount, setDraftVouchersCount] = useState(0);
 
   useEffect(() => {
     if (currentPlan === "starter" && activeTab !== "payroll") {
       setActiveTab("payroll");
     }
   }, [currentPlan, activeTab]);
+
+  useEffect(() => {
+    loadDraftVouchers();
+    const channel = supabase
+      .channel('vouchers_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vouchers' }, () => {
+        loadDraftVouchers();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const loadDraftVouchers = async () => {
+    const { count } = await supabase
+      .from('vouchers')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'draft');
+    setDraftVouchersCount(count || 0);
+  };
 
   return (
     <Layout>
@@ -50,7 +75,13 @@ export default function Accounting() {
               {currentPlan === "professional" && (
                 <>
                   <TabsTrigger value="vouchers" className="flex items-center gap-2">
-                    <Receipt className="h-4 w-4" /> Vouchers
+                    <Receipt className="h-4 w-4" /> 
+                    Vouchers
+                    {draftVouchersCount > 0 && (
+                      <Badge variant="destructive" className="ml-1 h-5 px-1.5 flex items-center justify-center text-[10px]">
+                        {draftVouchersCount}
+                      </Badge>
+                    )}
                   </TabsTrigger>
                   <TabsTrigger value="liquidations" className="flex items-center gap-2">
                     <CircleDollarSign className="h-4 w-4" /> Liquidations

@@ -97,12 +97,12 @@ export function Layout({ children }: LayoutProps) {
     setPendingCashAdvances(advances || []);
   };
 
-  const handleApproveRequest = async (requestId: string, itemName: string, e: React.MouseEvent) => {
+  const handleApproveRequest = async (req: any, e: React.MouseEvent) => {
     e.stopPropagation();
     const { error } = await supabase
       .from('site_requests')
       .update({ status: 'approved' })
-      .eq('id', requestId);
+      .eq('id', req.id);
     
     if (error) {
       toast({
@@ -111,9 +111,23 @@ export function Layout({ children }: LayoutProps) {
         variant: "destructive"
       });
     } else {
+      // Auto-generate voucher if it has an amount and is a payable type
+      if (req.amount > 0 && ['Petty Cash', 'Equipment (Rentals)', 'PPE'].includes(req.request_type)) {
+        await supabase.from('vouchers').insert({
+          type: 'payment',
+          voucher_number: `PV-${Math.floor(Math.random() * 10000)}`,
+          date: new Date().toISOString().split("T")[0],
+          amount: req.amount,
+          payee: req.requested_by || 'Site Personnel',
+          description: `Approved ${req.request_type}: ${req.item_name}`,
+          project_id: req.project_id,
+          status: 'draft'
+        });
+      }
+
       toast({
         title: "Request Approved",
-        description: `${itemName} has been approved`,
+        description: `${req.item_name} has been approved`,
       });
       loadPendingRequests();
     }
@@ -164,11 +178,23 @@ export function Layout({ children }: LayoutProps) {
     }
   };
 
-  const handleApproveCashAdvance = async (id: string, name: string, amount: number, e: React.MouseEvent) => {
+  const handleApproveCashAdvance = async (adv: any, e: React.MouseEvent) => {
     e.stopPropagation();
-    const { error } = await supabase.from('cash_advance_requests').update({ status: 'approved' }).eq('id', id);
+    const { error } = await supabase.from('cash_advance_requests').update({ status: 'approved' }).eq('id', adv.id);
     if (!error) {
-      toast({ title: "Cash Advance Approved", description: `${name}'s request for ${currency || '$'}${amount} approved.` });
+      // Auto-generate voucher for cash advance
+      await supabase.from('vouchers').insert({
+        type: 'payment',
+        voucher_number: `PV-${Math.floor(Math.random() * 10000)}`,
+        date: new Date().toISOString().split("T")[0],
+        amount: adv.amount,
+        payee: adv.personnel?.name || 'Site Worker',
+        description: `Cash Advance: ${adv.reason}`,
+        project_id: adv.project_id,
+        status: 'draft'
+      });
+
+      toast({ title: "Cash Advance Approved", description: `${adv.personnel?.name}'s request for ${currency || '$'}${adv.amount} approved.` });
       loadPendingRequests();
     } else {
       toast({ title: "Error", description: "Failed to approve request", variant: "destructive" });
@@ -391,7 +417,7 @@ export function Layout({ children }: LayoutProps) {
                             size="sm"
                             variant="default"
                             className="flex-1 h-8 bg-green-600 hover:bg-green-700 text-white"
-                            onClick={(e) => handleApproveCashAdvance(adv.id, adv.personnel?.name, adv.amount, e)}
+                            onClick={(e) => handleApproveCashAdvance(adv, e)}
                           >
                             <Check className="h-3 w-3 mr-1" />
                             Approve
@@ -444,7 +470,7 @@ export function Layout({ children }: LayoutProps) {
                             size="sm"
                             variant="default"
                             className="flex-1 h-8 bg-green-600 hover:bg-green-700 text-white"
-                            onClick={(e) => handleApproveRequest(req.id, req.item_name, e)}
+                            onClick={(e) => handleApproveRequest(req, e)}
                           >
                             <Check className="h-3 w-3 mr-1" />
                             Approve
