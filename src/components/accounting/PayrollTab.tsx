@@ -86,24 +86,6 @@ export function PayrollTab() {
     setLoading(false);
   };
 
-  const setPreset = (preset: 'today' | 'week' | 'month') => {
-    const now = new Date();
-    let start = "";
-    const end = now.toISOString().split("T")[0];
-    
-    if (preset === 'today') {
-      start = end;
-    } else if (preset === 'week') {
-      const firstDay = new Date(now.setDate(now.getDate() - now.getDay()));
-      start = firstDay.toISOString().split("T")[0];
-    } else if (preset === 'month') {
-      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-      start = firstDay.toISOString().split("T")[0];
-    }
-    
-    setFilters({ ...filters, startDate: start, endDate: end });
-  };
-
   const totalPayrollCost = payrollData.reduce((sum, emp) => sum + emp.totalPay, 0);
 
   return (
@@ -130,9 +112,6 @@ export function PayrollTab() {
               </Select>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setPreset('today')}>Today</Button>
-              <Button variant="outline" onClick={() => setPreset('week')}>This Week</Button>
-              <Button variant="outline" onClick={() => setPreset('month')}>This Month</Button>
               <Button onClick={loadPayroll} disabled={loading}>
                 {loading ? "Calculating..." : "Apply Filter"}
               </Button>

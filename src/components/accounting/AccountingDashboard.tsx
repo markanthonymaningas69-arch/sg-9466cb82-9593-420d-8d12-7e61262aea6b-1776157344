@@ -5,6 +5,26 @@ import { useSettings } from "@/contexts/SettingsProvider";
 import { TrendingUp, TrendingDown, Landmark, Receipt, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+
+// Mock data for visualizations
+const cashFlowData = [
+  { name: 'Jan', income: 4000, expense: 2400 },
+  { name: 'Feb', income: 3000, expense: 1398 },
+  { name: 'Mar', income: 2000, expense: 9800 },
+  { name: 'Apr', income: 2780, expense: 3908 },
+  { name: 'May', income: 1890, expense: 4800 },
+  { name: 'Jun', income: 2390, expense: 3800 },
+];
+
+const opExData = [
+  { name: 'Payroll', value: 45000 },
+  { name: 'Materials', value: 30000 },
+  { name: 'Equipment', value: 15000 },
+  { name: 'Logistics', value: 10000 },
+];
+
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
 
 export function AccountingDashboard() {
   const { formatCurrency } = useSettings();
@@ -112,16 +132,45 @@ export function AccountingDashboard() {
           <CardHeader>
             <CardTitle>Cash Flow Trend</CardTitle>
           </CardHeader>
-          <CardContent className="flex items-center justify-center text-muted-foreground">
-            Chart visualization will be activated here
+          <CardContent className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={cashFlowData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                <YAxis axisLine={false} tickLine={false} tickFormatter={(value) => `$${value}`} />
+                <RechartsTooltip cursor={{ fill: 'transparent' }} formatter={(value: number) => formatCurrency(value)} />
+                <Legend />
+                <Bar dataKey="income" name="Income (Credits)" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="expense" name="Expenses (Debits)" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
         <Card className="min-h-[300px]">
           <CardHeader>
             <CardTitle>OpEx Breakdown</CardTitle>
           </CardHeader>
-          <CardContent className="flex items-center justify-center text-muted-foreground">
-            Pie chart visualization will be activated here
+          <CardContent className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={opExData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  fill="#8884d8"
+                  paddingAngle={5}
+                  dataKey="value"
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                >
+                  {opExData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <RechartsTooltip formatter={(value: number) => formatCurrency(value)} />
+              </PieChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>

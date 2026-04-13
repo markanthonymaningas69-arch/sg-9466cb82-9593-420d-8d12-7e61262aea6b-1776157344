@@ -21,7 +21,6 @@ export function JournalOpEx() {
   const [entries, setEntries] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [isVatApplicable, setIsVatApplicable] = useState(false);
   
   const [form, setForm] = useState({
     date: new Date().toISOString().split("T")[0],
@@ -49,7 +48,6 @@ export function JournalOpEx() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const baseAmount = parseFloat(form.amount) || 0;
-    const taxAmount = isVatApplicable ? baseAmount * 0.05 : 0;
     
     await accountingService.createJournalEntry({
       date: form.date,
@@ -58,13 +56,12 @@ export function JournalOpEx() {
       type: form.type,
       category: form.category,
       amount: baseAmount,
-      tax_amount: taxAmount,
+      tax_amount: 0,
       project_id: form.project_id === "office" ? null : form.project_id
     });
     
     setDialogOpen(false);
     setForm({ ...form, description: "", amount: "", account_name: "" });
-    setIsVatApplicable(false);
     loadData();
   };
 
@@ -129,12 +126,6 @@ export function JournalOpEx() {
                 <div className="space-y-2">
                   <Label>Amount (Base) *</Label>
                   <Input type="number" step="0.01" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} required />
-                  <div className="flex items-center space-x-2 pt-2">
-                    <Checkbox id="vat" checked={isVatApplicable} onCheckedChange={(val) => setIsVatApplicable(!!val)} />
-                    <label htmlFor="vat" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                      Add 5% Dubai VAT
-                    </label>
-                  </div>
                 </div>
                 <div className="space-y-2 col-span-2">
                   <Label>Description / Memo</Label>
@@ -159,13 +150,12 @@ export function JournalOpEx() {
                 <TableHead>Allocation</TableHead>
                 <TableHead className="text-right">Debit</TableHead>
                 <TableHead className="text-right">Credit</TableHead>
-                <TableHead className="text-right">VAT (5%)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {entries.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     No journal entries found.
                   </TableCell>
                 </TableRow>
@@ -190,9 +180,6 @@ export function JournalOpEx() {
                     </TableCell>
                     <TableCell className="text-right font-semibold text-emerald-600">
                       {entry.type === "credit" ? formatCurrency(entry.amount) : "-"}
-                    </TableCell>
-                    <TableCell className="text-right text-orange-500">
-                      {entry.tax_amount > 0 ? formatCurrency(entry.tax_amount) : "-"}
                     </TableCell>
                   </TableRow>
                 ))

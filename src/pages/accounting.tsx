@@ -7,8 +7,9 @@ import { PayrollTab } from "@/components/accounting/PayrollTab";
 import { VouchersTab } from "@/components/accounting/VouchersTab";
 import { LiquidationsTab } from "@/components/accounting/LiquidationsTab";
 import { TaxReportTab } from "@/components/accounting/TaxReportTab";
+import { RequestsViewTab } from "@/components/accounting/RequestsViewTab";
 import { Card, CardContent } from "@/components/ui/card";
-import { Landmark, FileSpreadsheet, Users, Receipt, CircleDollarSign, FileText } from "lucide-react";
+import { Landmark, FileSpreadsheet, Users, Receipt, CircleDollarSign, FileText, FileSearch } from "lucide-react";
 import { useSettings } from "@/contexts/SettingsProvider";
 import { useEffect } from "react";
 
@@ -54,8 +55,11 @@ export default function Accounting() {
                   <TabsTrigger value="liquidations" className="flex items-center gap-2">
                     <CircleDollarSign className="h-4 w-4" /> Liquidations
                   </TabsTrigger>
+                  <TabsTrigger value="requests" className="flex items-center gap-2">
+                    <FileSearch className="h-4 w-4" /> Requests
+                  </TabsTrigger>
                   <TabsTrigger value="tax" className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" /> UAE Tax
+                    <FileText className="h-4 w-4" /> Taxation
                   </TabsTrigger>
                 </>
               )}
@@ -86,6 +90,10 @@ export default function Accounting() {
 
               <TabsContent value="liquidations" className="flex-1 mt-0">
                 <LiquidationsTab />
+              </TabsContent>
+
+              <TabsContent value="requests" className="flex-1 mt-0">
+                <RequestsViewTab />
               </TabsContent>
 
               <TabsContent value="tax" className="flex-1 mt-0">

@@ -5,11 +5,22 @@ import { useSettings } from "@/contexts/SettingsProvider";
 import { accountingService } from "@/services/accountingService";
 import { FileText, Download, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const TAX_RULES = [
+  { id: 'uae', name: 'UAE VAT', rate: 0.05, code: 'VAT' },
+  { id: 'us', name: 'US Sales Tax', rate: 0.07, code: 'Sales Tax' },
+  { id: 'uk', name: 'UK VAT', rate: 0.20, code: 'VAT' },
+  { id: 'aus', name: 'Australia GST', rate: 0.10, code: 'GST' },
+  { id: 'sg', name: 'Singapore GST', rate: 0.09, code: 'GST' },
+  { id: 'ph', name: 'Philippines VAT', rate: 0.12, code: 'VAT' },
+];
 
 export function TaxReportTab() {
   const { formatCurrency } = useSettings();
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedTax, setSelectedTax] = useState(TAX_RULES[0]);
 
   // Tax Summary
   const [summary, setSummary] = useState({
@@ -20,7 +31,7 @@ export function TaxReportTab() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [selectedTax]);
 
   const loadData = async () => {
     setLoading(true);
@@ -28,25 +39,27 @@ export function TaxReportTab() {
     const { data } = await accountingService.getJournalEntries();
     
     if (data) {
-      // Only keep transactions that have VAT applied
-      const taxTransactions = data.filter((t: any) => t.tax_amount && t.tax_amount > 0);
+      // Treat operational and revenue categories as taxable for demonstration
+      const taxTransactions = data.filter((t: any) => t.category === "operational" || t.category === "revenue");
       
-      let inputVat = 0;
-      let outputVat = 0;
+      let inputTax = 0;
+      let outputTax = 0;
       
-      taxTransactions.forEach((t: any) => {
+      const enrichedTransactions = taxTransactions.map((t: any) => {
+        const calcTax = Number(t.amount) * selectedTax.rate;
         if (t.type === "debit") {
-          inputVat += Number(t.tax_amount); // Paid to suppliers
+          inputTax += calcTax;
         } else if (t.type === "credit") {
-          outputVat += Number(t.tax_amount); // Collected from clients
+          outputTax += calcTax;
         }
+        return { ...t, calculated_tax: calcTax };
       });
       
-      setTransactions(taxTransactions);
+      setTransactions(enrichedTransactions);
       setSummary({
-        totalInputVat: inputVat,
-        totalOutputVat: outputVat,
-        netVatPayable: outputVat - inputVat
+        totalInputVat: inputTax,
+        totalOutputVat: outputTax,
+        netVatPayable: outputTax - inputTax
       });
     }
     
@@ -55,11 +68,36 @@ export function TaxReportTab() {
 
   return (
     <div className="space-y-4 mt-4">
+      <div className="flex justify-between items-center bg-card p-4 rounded-lg border">
+        <div>
+          <h3 className="font-semibold">Taxation Rule</h3>
+          <p className="text-sm text-muted-foreground">Select the applicable tax jurisdiction for your reports</p>
+        </div>
+        <Select 
+          value={selectedTax.id} 
+          onValueChange={(val) => {
+            const rule = TAX_RULES.find(r => r.id === val);
+            if (rule) setSelectedTax(rule);
+          }}
+        >
+          <SelectTrigger className="w-[250px]">
+            <SelectValue placeholder="Select Tax Rule" />
+          </SelectTrigger>
+          <SelectContent>
+            {TAX_RULES.map(rule => (
+              <SelectItem key={rule.id} value={rule.id}>
+                {rule.name} ({(rule.rate * 100).toFixed(1)}%)
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="border-emerald-200 bg-emerald-50/30">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-emerald-800">Total Input VAT (5%)</CardTitle>
-            <CardDescription>VAT Paid on Purchases (Claimable)</CardDescription>
+            <CardTitle className="text-sm font-medium text-emerald-800">Total Input {selectedTax.code}</CardTitle>
+            <CardDescription>Tax Paid on Purchases (Claimable)</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-emerald-600">{formatCurrency(summary.totalInputVat)}</div>
@@ -68,8 +106,8 @@ export function TaxReportTab() {
         
         <Card className="border-orange-200 bg-orange-50/30">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-orange-800">Total Output VAT (5%)</CardTitle>
-            <CardDescription>VAT Collected on Sales (Payable)</CardDescription>
+            <CardTitle className="text-sm font-medium text-orange-800">Total Output {selectedTax.code}</CardTitle>
+            <CardDescription>Tax Collected on Sales (Payable)</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-orange-600">{formatCurrency(summary.totalOutputVat)}</div>
@@ -79,7 +117,7 @@ export function TaxReportTab() {
         <Card className={`border-2 ${summary.netVatPayable > 0 ? 'border-destructive/50 bg-destructive/5' : 'border-primary/50 bg-primary/5'}`}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center justify-between">
-              Net VAT to FTA
+              Net {selectedTax.code} Payable
               <Building2 className="h-4 w-4 text-muted-foreground" />
             </CardTitle>
             <CardDescription>
@@ -97,12 +135,12 @@ export function TaxReportTab() {
       <Card className="shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <div>
-            <CardTitle>UAE VAT Report (FTA Format)</CardTitle>
-            <CardDescription>Detailed ledger of all 5% taxable transactions</CardDescription>
+            <CardTitle>{selectedTax.name} Report</CardTitle>
+            <CardDescription>Detailed ledger of all taxable transactions</CardDescription>
           </div>
           <Button variant="outline">
             <Download className="h-4 w-4 mr-2" />
-            Export CSV for FTA
+            Export CSV for Authority
           </Button>
         </CardHeader>
         <CardContent>
@@ -113,9 +151,9 @@ export function TaxReportTab() {
                   <TableHead>Date</TableHead>
                   <TableHead>Reference / Account</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead>VAT Type</TableHead>
+                  <TableHead>Tax Type</TableHead>
                   <TableHead className="text-right">Base Amount</TableHead>
-                  <TableHead className="text-right font-bold">5% VAT Amount</TableHead>
+                  <TableHead className="text-right font-bold">{(selectedTax.rate * 100).toFixed(1)}% {selectedTax.code} Amount</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -141,7 +179,7 @@ export function TaxReportTab() {
                             ? 'bg-emerald-100 text-emerald-800' 
                             : 'bg-orange-100 text-orange-800'
                         }`}>
-                          {t.type === 'debit' ? 'Input VAT (Purchase)' : 'Output VAT (Sale)'}
+                          {t.type === 'debit' ? `Input ${selectedTax.code}` : `Output ${selectedTax.code}`}
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
@@ -150,7 +188,7 @@ export function TaxReportTab() {
                       <TableCell className={`text-right font-bold ${
                         t.type === 'debit' ? 'text-emerald-600' : 'text-orange-600'
                       }`}>
-                        {formatCurrency(t.tax_amount)}
+                        {formatCurrency(t.calculated_tax)}
                       </TableCell>
                     </TableRow>
                   ))
