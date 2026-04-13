@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { 
@@ -13,10 +13,25 @@ import {
   Menu,
   X,
   ClipboardList,
-  ShoppingCart
+  ShoppingCart,
+  Bell,
+  User,
+  LogOut
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { supabase } from "@/integrations/supabase/client";
+import { authService } from "@/services/authService";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -38,6 +53,30 @@ const navigation = [
 export function Layout({ children }: LayoutProps) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+
+  useEffect(() => {
+    loadPendingRequests();
+    // Poll for new requests every 30 seconds
+    const interval = setInterval(loadPendingRequests, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const loadPendingRequests = async () => {
+    const { data } = await supabase
+      .from('site_requests')
+      .select('*, projects(name)')
+      .eq('status', 'pending')
+      .order('request_date', { ascending: false })
+      .limit(10);
+    setPendingRequests(data || []);
+  };
+
+  const handleLogout = async () => {
+    await authService.signOut();
+    router.push('/auth/login');
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -137,7 +176,7 @@ export function Layout({ children }: LayoutProps) {
           <div className="flex-1" />
           
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
+            <span className="text-sm text-muted-foreground hidden sm:block">
               {new Date().toLocaleDateString("en-US", { 
                 weekday: "short", 
                 year: "numeric", 
@@ -145,6 +184,93 @@ export function Layout({ children }: LayoutProps) {
                 day: "numeric" 
               })}
             </span>
+
+            {/* Notifications */}
+            <DropdownMenu open={notificationOpen} onOpenChange={setNotificationOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative">
+                  <Bell className="h-5 w-5" />
+                  {pendingRequests.length > 0 && (
+                    <Badge 
+                      variant="destructive" 
+                      className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+                    >
+                      {pendingRequests.length}
+                    </Badge>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-80">
+                <DropdownMenuLabel className="font-semibold">
+                  Material Requests ({pendingRequests.length} pending)
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {pendingRequests.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-muted-foreground">
+                    No pending requests
+                  </div>
+                ) : (
+                  <ScrollArea className="max-h-[400px]">
+                    {pendingRequests.map((req) => (
+                      <DropdownMenuItem 
+                        key={req.id} 
+                        className="flex flex-col items-start gap-1 p-3 cursor-pointer"
+                        onClick={() => {
+                          router.push('/site-personnel?tab=request');
+                          setNotificationOpen(false);
+                        }}
+                      >
+                        <div className="flex items-start justify-between w-full">
+                          <span className="font-medium text-sm">{req.item_name}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {req.quantity} {req.unit}
+                          </Badge>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {req.projects?.name || "Unknown Project"}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          By: {req.requested_by} • {new Date(req.request_date).toLocaleDateString()}
+                        </span>
+                      </DropdownMenuItem>
+                    ))}
+                  </ScrollArea>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Profile */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="rounded-full">
+                  <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold text-sm">
+                    A
+                  </div>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium">Admin User</p>
+                    <p className="text-xs text-muted-foreground">admin@constructpro.com</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => router.push('/settings')}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled>
+                  <User className="mr-2 h-4 w-4" />
+                  Account
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Log out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 
