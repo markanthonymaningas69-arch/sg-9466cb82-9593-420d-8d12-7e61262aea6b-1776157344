@@ -39,6 +39,8 @@ export default function Personnel() {
   // Attendance Date Filters
   const [attStartDate, setAttStartDate] = useState(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]);
   const [attEndDate, setAttEndDate] = useState(new Date().toISOString().split("T")[0]);
+  const [minDaysWorked, setMinDaysWorked] = useState<string>("");
+  const [minDaysAbsent, setMinDaysAbsent] = useState<string>("");
   
   const [formData, setFormData] = useState({
     name: "",
@@ -628,114 +630,47 @@ export default function Personnel() {
 
           <TabsContent value="attendance" className="space-y-4">
             <div className="flex flex-col sm:flex-row justify-between gap-4">
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-md">
+              <div className="flex flex-wrap items-center gap-2 bg-muted/50 p-1 rounded-md">
+                <div className="flex items-center gap-2">
                   <Input
                     type="date"
                     value={attStartDate}
                     onChange={(e) => setAttStartDate(e.target.value)}
-                    className="h-9"
+                    className="h-9 w-36"
                   />
                   <span className="text-muted-foreground text-sm px-1">to</span>
                   <Input
                     type="date"
                     value={attEndDate}
                     onChange={(e) => setAttEndDate(e.target.value)}
-                    className="h-9"
+                    className="h-9 w-36"
                   />
-                  <Button variant="secondary" onClick={loadData} className="h-9">Filter</Button>
                 </div>
+                <div className="h-6 w-px bg-border mx-2 hidden sm:block"></div>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-muted-foreground">Min. Worked:</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    placeholder="Days"
+                    value={minDaysWorked}
+                    onChange={(e) => setMinDaysWorked(e.target.value)}
+                    className="h-9 w-20"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-muted-foreground">Min. Absent:</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    placeholder="Days"
+                    value={minDaysAbsent}
+                    onChange={(e) => setMinDaysAbsent(e.target.value)}
+                    className="h-9 w-20"
+                  />
+                </div>
+                <Button variant="secondary" onClick={loadData} className="h-9 ml-auto">Refresh</Button>
               </div>
-              <Dialog open={attendanceDialogOpen} onOpenChange={setAttendanceDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button onClick={resetAttendanceForm}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Mark Attendance
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Mark Attendance</DialogTitle>
-                  </DialogHeader>
-                  <form onSubmit={handleAttendanceSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="att_personnel">Personnel *</Label>
-                      <Select value={attendanceForm.personnel_id} onValueChange={(value) => setAttendanceForm({ ...attendanceForm, personnel_id: value })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select personnel" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {filteredPersonnel.map((person) => (
-                            <SelectItem key={person.id} value={person.id}>
-                              {person.name} - {person.role}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="att_date">Date *</Label>
-                      <Input
-                        id="att_date"
-                        type="date"
-                        value={attendanceForm.date}
-                        onChange={(e) => setAttendanceForm({ ...attendanceForm, date: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="att_status">Status *</Label>
-                      <Select value={attendanceForm.status} onValueChange={(value: any) => setAttendanceForm({ ...attendanceForm, status: value })}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="present">Present</SelectItem>
-                          <SelectItem value="absent">Absent</SelectItem>
-                          <SelectItem value="late">Late</SelectItem>
-                          <SelectItem value="half_day">Half Day</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="hours_worked">Regular Hours</Label>
-                        <Input
-                          id="hours_worked"
-                          type="number"
-                          step="0.5"
-                          value={attendanceForm.hours_worked}
-                          onChange={(e) => setAttendanceForm({ ...attendanceForm, hours_worked: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="overtime_hours">Overtime Hours</Label>
-                        <Input
-                          id="overtime_hours"
-                          type="number"
-                          step="0.5"
-                          value={attendanceForm.overtime_hours}
-                          onChange={(e) => setAttendanceForm({ ...attendanceForm, overtime_hours: e.target.value })}
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="att_notes">Notes</Label>
-                      <Textarea
-                        id="att_notes"
-                        value={attendanceForm.notes}
-                        onChange={(e) => setAttendanceForm({ ...attendanceForm, notes: e.target.value })}
-                      />
-                    </div>
-                    <div className="flex justify-end gap-2 pt-4">
-                      <Button type="button" variant="outline" onClick={() => setAttendanceDialogOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button type="submit">Mark</Button>
-                    </div>
-                  </form>
-                </DialogContent>
-              </Dialog>
             </div>
 
             <Card>
@@ -763,6 +698,9 @@ export default function Personnel() {
                       const totalOvertime = records.reduce((sum, a) => sum + (Number(a.overtime_hours) || 0), 0);
 
                       if (daysWorked === 0 && daysAbsent === 0) return null;
+                      
+                      if (minDaysWorked && daysWorked < parseInt(minDaysWorked)) return null;
+                      if (minDaysAbsent && daysAbsent < parseInt(minDaysAbsent)) return null;
 
                       return (
                         <TableRow key={person.id}>

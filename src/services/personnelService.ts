@@ -70,7 +70,7 @@ export const personnelService = {
   // Attendance Management
   async getAttendance(startDate: string, endDate: string) {
     const { data, error } = await supabase
-      .from("attendance")
+      .from("site_attendance")
       .select("*, personnel(name, role, worker_type)")
       .gte("date", startDate)
       .lte("date", endDate)
@@ -79,19 +79,19 @@ export const personnelService = {
     return { data: data || [], error };
   },
 
-  async markAttendance(attendance: AttendanceInsert) {
+  async markAttendance(attendance: any) {
     const { data, error } = await supabase
-      .from("attendance")
-      .insert(attendance)
+      .from("site_attendance")
+      .upsert(attendance)
       .select()
       .single();
     
     return { data, error };
   },
 
-  async updateAttendance(id: string, updates: Partial<AttendanceInsert>) {
+  async updateAttendance(id: string, updates: any) {
     const { data, error } = await supabase
-      .from("attendance")
+      .from("site_attendance")
       .update(updates)
       .eq("id", id)
       .select()
