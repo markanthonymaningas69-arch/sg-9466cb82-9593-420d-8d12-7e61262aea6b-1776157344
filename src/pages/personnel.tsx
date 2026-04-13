@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { personnelService } from "@/services/personnelService";
 import { projectService } from "@/services/projectService";
-import { Plus, Pencil, Trash2, UserCheck, Calendar, DollarSign, Clock, Passport } from "lucide-react";
+import { Plus, Pencil, Trash2, UserCheck, Calendar, DollarSign, Clock, FileText as PassportIcon } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 import { useSettings } from "@/contexts/SettingsProvider";
 
@@ -361,7 +361,7 @@ export default function Personnel() {
             </TabsTrigger>
             {currency !== "PHP" && (
               <TabsTrigger value="visa" className="py-2.5">
-                <Passport className="h-4 w-4 mr-2" />
+                <PassportIcon className="h-4 w-4 mr-2" />
                 Visa
               </TabsTrigger>
             )}
