@@ -169,7 +169,11 @@ export default function Personnel() {
 
   const handleVisaSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await personnelService.addVisa(visaForm);
+    await personnelService.addVisa({
+      ...visaForm,
+      issue_date: visaForm.visa_issue_date || visaForm.passport_issue_date || new Date().toISOString(),
+      expiry_date: visaForm.visa_expiry_date || visaForm.passport_expiry_date || new Date().toISOString()
+    });
     setVisaDialogOpen(false);
     resetVisaForm();
     loadData();
