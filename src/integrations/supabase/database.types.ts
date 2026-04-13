@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -864,8 +864,12 @@ export type Database = {
           expiry_date: string
           id: string
           issue_date: string
+          passport_expiry_date: string | null
+          passport_issue_date: string | null
           personnel_id: string | null
           status: string | null
+          visa_expiry_date: string | null
+          visa_issue_date: string | null
           visa_number: string
         }
         Insert: {
@@ -874,8 +878,12 @@ export type Database = {
           expiry_date: string
           id?: string
           issue_date: string
+          passport_expiry_date?: string | null
+          passport_issue_date?: string | null
           personnel_id?: string | null
           status?: string | null
+          visa_expiry_date?: string | null
+          visa_issue_date?: string | null
           visa_number: string
         }
         Update: {
@@ -884,8 +892,12 @@ export type Database = {
           expiry_date?: string
           id?: string
           issue_date?: string
+          passport_expiry_date?: string | null
+          passport_issue_date?: string | null
           personnel_id?: string | null
           status?: string | null
+          visa_expiry_date?: string | null
+          visa_issue_date?: string | null
           visa_number?: string
         }
         Relationships: [
