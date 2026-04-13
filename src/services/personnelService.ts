@@ -9,8 +9,8 @@ type LeaveRequest = Database["public"]["Tables"]["leave_requests"]["Row"];
 type LeaveRequestInsert = Database["public"]["Tables"]["leave_requests"]["Insert"];
 type Payroll = Database["public"]["Tables"]["payroll"]["Row"];
 type PayrollInsert = Database["public"]["Tables"]["payroll"]["Insert"];
-type TrainingRecord = Database["public"]["Tables"]["training_records"]["Row"];
-type TrainingRecordInsert = Database["public"]["Tables"]["training_records"]["Insert"];
+type Visa = Database["public"]["Tables"]["personnel_visas"]["Row"];
+type VisaInsert = Database["public"]["Tables"]["personnel_visas"]["Insert"];
 
 export const personnelService = {
   // Personnel CRUD
@@ -71,7 +71,7 @@ export const personnelService = {
   async getAttendance(startDate: string, endDate: string) {
     const { data, error } = await supabase
       .from("attendance")
-      .select("*, personnel(name, role)")
+      .select("*, personnel(name, role, worker_type)")
       .gte("date", startDate)
       .lte("date", endDate)
       .order("date", { ascending: false });
@@ -104,7 +104,7 @@ export const personnelService = {
   async getLeaveRequests() {
     const { data, error } = await supabase
       .from("leave_requests")
-      .select("*, personnel(name, role)")
+      .select("*, personnel(name, role, worker_type)")
       .order("created_at", { ascending: false });
     
     return { data: data || [], error };
@@ -135,7 +135,7 @@ export const personnelService = {
   async getPayroll(periodStart: string) {
     const { data, error } = await supabase
       .from("payroll")
-      .select("*, personnel(name, role, hourly_rate)")
+      .select("*, personnel(name, role, hourly_rate, worker_type)")
       .eq("pay_period_start", periodStart)
       .order("created_at", { ascending: false });
     
@@ -163,12 +163,12 @@ export const personnelService = {
     return { data, error };
   },
 
-  // Training Records
-  async getTrainingRecords(personnelId?: string) {
+  // Visa Records
+  async getVisas(personnelId?: string) {
     let query = supabase
-      .from("training_records")
-      .select("*, personnel(name, role)")
-      .order("completed_date", { ascending: false });
+      .from("personnel_visas")
+      .select("*, personnel(name, role, worker_type)")
+      .order("expiry_date", { ascending: true });
     
     if (personnelId) {
       query = query.eq("personnel_id", personnelId);
@@ -178,10 +178,10 @@ export const personnelService = {
     return { data: data || [], error };
   },
 
-  async addTrainingRecord(training: TrainingRecordInsert) {
+  async addVisa(visa: VisaInsert) {
     const { data, error } = await supabase
-      .from("training_records")
-      .insert(training)
+      .from("personnel_visas")
+      .insert(visa)
       .select()
       .single();
     

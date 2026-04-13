@@ -1,0 +1,1 @@
+ALTER TABLE personnel ADD COLUMN IF NOT EXISTS worker_type text DEFAULT 'construction';

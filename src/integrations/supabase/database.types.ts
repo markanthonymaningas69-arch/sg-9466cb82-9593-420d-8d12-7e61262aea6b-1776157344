@@ -809,6 +809,7 @@ export type Database = {
           project_id: string | null
           role: string
           status: string
+          worker_type: string | null
         }
         Insert: {
           created_at?: string | null
@@ -823,6 +824,7 @@ export type Database = {
           project_id?: string | null
           role: string
           status: string
+          worker_type?: string | null
         }
         Update: {
           created_at?: string | null
@@ -837,6 +839,7 @@ export type Database = {
           project_id?: string | null
           role?: string
           status?: string
+          worker_type?: string | null
         }
         Relationships: [
           {
@@ -844,6 +847,47 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      personnel_visas: {
+        Row: {
+          country: string
+          created_at: string | null
+          expiry_date: string
+          id: string
+          issue_date: string
+          personnel_id: string | null
+          status: string | null
+          visa_number: string
+        }
+        Insert: {
+          country: string
+          created_at?: string | null
+          expiry_date: string
+          id?: string
+          issue_date: string
+          personnel_id?: string | null
+          status?: string | null
+          visa_number: string
+        }
+        Update: {
+          country?: string
+          created_at?: string | null
+          expiry_date?: string
+          id?: string
+          issue_date?: string
+          personnel_id?: string | null
+          status?: string | null
+          visa_number?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personnel_visas_personnel_id_fkey"
+            columns: ["personnel_id"]
+            isOneToOne: false
+            referencedRelation: "personnel"
             referencedColumns: ["id"]
           },
         ]
