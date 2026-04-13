@@ -212,8 +212,8 @@ export default function SitePersonnel() {
       });
       setAttendanceList(merged);
     } else {
-      const { data } = await siteService.getSiteAttendance(selectedProject);
-      const grouped = (attendance || []).reduce((acc: any, curr: any) => {
+      const { data: attendanceData } = await siteService.getSiteAttendance(selectedProject);
+      const grouped = (attendanceData || []).reduce((acc: any, curr: any) => {
         const d = curr.date;
         if (!acc[d]) acc[d] = [];
         acc[d].push(curr);
@@ -2487,11 +2487,10 @@ export default function SitePersonnel() {
                               </TableCell>
                               <TableCell className="text-right">
                                 {row.status === 'pending' && (
-                                  <Button size="sm" variant="ghost" onClick={async (e) => {
+                                  <Button size="sm" variant="ghost" className="h-4 w-4 p-0" onClick={(e) => {
                                     if(confirm("Are you sure you want to delete this pending request?")) {
                                       e.stopPropagation();
-                                      await supabase.from('site_requests').delete().eq('id', row.id);
-                                      loadRequests();
+                                      siteService.deleteSiteRequest(row.id).then(loadRequests);
                                     }
                                   }}>
                                     <Trash2 className="h-4 w-4 text-red-500" />
