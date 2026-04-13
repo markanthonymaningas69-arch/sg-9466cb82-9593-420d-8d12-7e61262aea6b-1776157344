@@ -107,6 +107,7 @@ export default function SitePersonnel() {
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
   const [isManualRequestItem, setIsManualRequestItem] = useState(false);
   const [isManualRequestUnit, setIsManualRequestUnit] = useState(false);
+  const [requestItems, setRequestItems] = useState<any[]>([]);
   const [requestForm, setRequestForm] = useState({
     request_type: "Materials",
     form_number: "",
@@ -529,20 +530,25 @@ export default function SitePersonnel() {
         status: 'pending'
       });
     } else {
-      await supabase.from('site_requests').insert({
+      if (requestItems.length === 0) {
+        alert("Please add at least one item to the list before submitting.");
+        return;
+      }
+      const inserts = requestItems.map(item => ({
         project_id: selectedProject,
-        bom_scope_id: requestForm.bom_scope_id === "unassigned" ? null : requestForm.bom_scope_id,
+        bom_scope_id: item.bom_scope_id === "unassigned" ? null : item.bom_scope_id,
         request_date: requestForm.request_date,
-        item_name: requestForm.item_name,
-        quantity: parseFloat(requestForm.quantity.toString()) || 0,
-        unit: requestForm.unit,
-        amount: parseFloat(requestForm.amount.toString()) || 0,
+        item_name: item.item_name,
+        quantity: parseFloat(item.quantity.toString()) || 0,
+        unit: item.unit,
+        amount: parseFloat(item.amount.toString()) || 0,
         request_type: requestForm.request_type,
         form_number: requestForm.form_number,
         requested_by: requestForm.requested_by,
-        notes: requestForm.notes,
+        notes: item.notes,
         status: 'pending'
-      });
+      }));
+      await supabase.from('site_requests').insert(inserts);
     }
     setRequestDialogOpen(false);
     resetRequestForm();
@@ -565,6 +571,29 @@ export default function SitePersonnel() {
     loadCashAdvances();
   };
 
+  const handleAddItem = () => {
+    if (!requestForm.item_name) {
+      alert("Please enter an item name or select one from the BOM.");
+      return;
+    }
+    setRequestItems([...requestItems, { ...requestForm }]);
+    setRequestForm(prev => ({
+      ...prev,
+      item_name: "",
+      quantity: 0,
+      amount: 0,
+      notes: "",
+      bom_scope_id: "unassigned"
+    }));
+    setIsManualRequestItem(false);
+  };
+
+  const handleRemoveItem = (index: number) => {
+    const newItems = [...requestItems];
+    newItems.splice(index, 1);
+    setRequestItems(newItems);
+  };
+
   const resetRequestForm = () => {
     setRequestForm({
       request_type: "Materials",
@@ -579,6 +608,7 @@ export default function SitePersonnel() {
       requested_by: "",
       notes: ""
     });
+    setRequestItems([]);
     setIsManualRequestItem(false);
     setIsManualRequestUnit(false);
   };
@@ -594,6 +624,7 @@ export default function SitePersonnel() {
       amount: 0,
       notes: ""
     });
+    setRequestItems([]);
     setIsManualRequestItem(false);
     setIsManualRequestUnit(false);
     setRequestDialogOpen(true);
@@ -2166,7 +2197,7 @@ export default function SitePersonnel() {
                                 <TableHeader>
                                   <TableRow>
                                     <TableHead className="w-12 text-center">#</TableHead>
-                                    <TableHead className="font-medium">Item</TableHead>
+                                    <TableHead>Item</TableHead>
                                     <TableHead>Quantity</TableHead>
                                     <TableHead>Scope Assignment</TableHead>
                                     <TableHead>Recorded By</TableHead>
@@ -2232,18 +2263,34 @@ export default function SitePersonnel() {
                         )}
                       </div>
                     </div>
-                    <div className="flex flex-col gap-2 md:flex-row">
+                    <div className="flex flex-wrap gap-2">
                       <Button onClick={() => openRequestDialog('Materials', 'MR')} variant="default" className="bg-blue-600 hover:bg-blue-700 text-white">
                         <ShoppingCart className="h-4 w-4 mr-2" />
-                        Material Request
+                        Materials
                       </Button>
-                      <Button onClick={() => openRequestDialog('Tools & Equipments', 'TE')} variant="outline" className="border-orange-500 text-orange-600 hover:bg-orange-50">
+                      <Button onClick={() => openRequestDialog('Tools', 'TR')} variant="outline" className="border-orange-500 text-orange-600 hover:bg-orange-50">
                         <Wrench className="h-4 w-4 mr-2" />
-                        Tools & Equipments
+                        Tools
+                      </Button>
+                      <Button onClick={() => openRequestDialog('Equipment (Warehouse)', 'EQW')} variant="outline" className="border-purple-500 text-purple-600 hover:bg-purple-50">
+                        <Truck className="h-4 w-4 mr-2" />
+                        Equipment (Main Warehouse)
+                      </Button>
+                      <Button onClick={() => openRequestDialog('Equipment (Rentals)', 'EQR')} variant="outline" className="border-indigo-500 text-indigo-600 hover:bg-indigo-50">
+                        <Truck className="h-4 w-4 mr-2" />
+                        Equipment (Rentals)
+                      </Button>
+                      <Button onClick={() => openRequestDialog('PPE', 'PPE')} variant="outline" className="border-yellow-500 text-yellow-600 hover:bg-yellow-50">
+                        <Users className="h-4 w-4 mr-2" />
+                        PPE
+                      </Button>
+                      <Button onClick={() => openRequestDialog('Petty Cash', 'PC')} variant="outline" className="border-teal-600 text-teal-700 hover:bg-teal-50">
+                        <Banknote className="h-4 w-4 mr-2" />
+                        Petty Cash
                       </Button>
                       <Button onClick={() => openRequestDialog('Cash Advance', 'CA')} variant="outline" className="border-green-600 text-green-700 hover:bg-green-50">
                         <Banknote className="h-4 w-4 mr-2" />
-                        Cash Advance
+                        Cash Advance for Workers
                       </Button>
                     </div>
                     
@@ -2264,26 +2311,6 @@ export default function SitePersonnel() {
                         <form onSubmit={handleRequestSubmit} className="space-y-4">
                           <div className="grid grid-cols-2 gap-4 border-b pb-4">
                             <div className="space-y-2">
-                              <Label>Request Sub-Type</Label>
-                              <Select
-                                value={requestForm.request_type}
-                                onValueChange={(val) => setRequestForm({ ...requestForm, request_type: val })}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="Materials">Materials</SelectItem>
-                                  <SelectItem value="Tools & Equipments">Tools & Equipments</SelectItem>
-                                  <SelectItem value="Equipment (Warehouse)">Equipment (Main Warehouse)</SelectItem>
-                                  <SelectItem value="Equipment (Rentals)">Equipment (Rentals)</SelectItem>
-                                  <SelectItem value="PPE">PPE</SelectItem>
-                                  <SelectItem value="Petty Cash">Petty Cash</SelectItem>
-                                  <SelectItem value="Cash Advance">Cash Advance</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2">
                               <Label>Date Required *</Label>
                               <Input
                                 type="date"
@@ -2292,6 +2319,16 @@ export default function SitePersonnel() {
                                 required
                               />
                             </div>
+                            {requestForm.request_type !== "Cash Advance" && (
+                              <div className="space-y-2">
+                                <Label>Requested By *</Label>
+                                <Input
+                                  value={requestForm.requested_by}
+                                  onChange={(e) => setRequestForm({ ...requestForm, requested_by: e.target.value })}
+                                  required
+                                />
+                              </div>
+                            )}
                           </div>
 
                           {requestForm.request_type === "Cash Advance" ? (
@@ -2324,156 +2361,203 @@ export default function SitePersonnel() {
                                   required
                                 />
                               </div>
+                              <div className="space-y-2 col-span-2">
+                                <Label>Reason / Justification *</Label>
+                                <Textarea
+                                  value={requestForm.notes}
+                                  onChange={(e) => setRequestForm({ ...requestForm, notes: e.target.value })}
+                                  required
+                                />
+                              </div>
                             </div>
                           ) : (
-                            <>
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2 col-span-2 md:col-span-1">
-                                  <Label>Scope of Work (Optional)</Label>
-                                  <Select
-                                    value={requestForm.bom_scope_id}
-                                    onValueChange={(val) => setRequestForm({ ...requestForm, bom_scope_id: val })}
-                                  >
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Assign to scope..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="unassigned" className="text-muted-foreground italic">General / Unassigned</SelectItem>
-                                      {scopes.map((s) => (
-                                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                <div className="space-y-2 col-span-2 md:col-span-1">
-                                  <Label>Requested Item *</Label>
-                                  {!isManualRequestItem ? (
+                            <div className="space-y-4">
+                              <div className="bg-muted/30 p-4 rounded-md border space-y-4">
+                                <h4 className="font-semibold text-sm">Add Item to Request</h4>
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div className="space-y-2 col-span-2 md:col-span-1">
+                                    <Label>Scope of Work (Optional)</Label>
                                     <Select
-                                      value={requestForm.item_name}
-                                      onValueChange={(val) => {
-                                        if (val === "others") {
-                                          setIsManualRequestItem(true);
-                                          setRequestForm({ ...requestForm, item_name: "", unit: "" });
-                                          setIsManualRequestUnit(false);
-                                        } else {
-                                          const mat = bomMaterials.find(m => m.name === val);
-                                          setRequestForm({ ...requestForm, item_name: val, unit: mat?.unit || requestForm.unit });
-                                          setIsManualRequestUnit(false);
-                                        }
-                                      }}
+                                      value={requestForm.bom_scope_id}
+                                      onValueChange={(val) => setRequestForm({ ...requestForm, bom_scope_id: val })}
                                     >
                                       <SelectTrigger>
-                                        <SelectValue placeholder="Select from BOM" />
+                                        <SelectValue placeholder="Assign to scope..." />
                                       </SelectTrigger>
                                       <SelectContent>
-                                        {bomMaterials
-                                          .filter(mat => !requestForm.bom_scope_id || requestForm.bom_scope_id === "unassigned" || mat.scope_id === requestForm.bom_scope_id)
-                                          .map((mat) => (
-                                          <SelectItem key={mat.id} value={mat.name}>{mat.name}</SelectItem>
+                                        <SelectItem value="unassigned" className="text-muted-foreground italic">General / Unassigned</SelectItem>
+                                        {scopes.map((s) => (
+                                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                                         ))}
-                                        <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
                                       </SelectContent>
                                     </Select>
-                                  ) : (
-                                    <div className="flex gap-2">
-                                      <Input
-                                        placeholder="Type item name"
+                                  </div>
+                                  <div className="space-y-2 col-span-2 md:col-span-1">
+                                    <Label>Requested Item *</Label>
+                                    {!isManualRequestItem ? (
+                                      <Select
                                         value={requestForm.item_name}
-                                        onChange={(e) => setRequestForm({ ...requestForm, item_name: e.target.value })}
-                                        required
-                                      />
-                                      <Button type="button" variant="outline" className="px-2" onClick={() => {
-                                        setIsManualRequestItem(false);
-                                        setRequestForm({ ...requestForm, item_name: "", unit: "" });
-                                      }}>
-                                        BOM
-                                      </Button>
-                                    </div>
-                                  )}
+                                        onValueChange={(val) => {
+                                          if (val === "others") {
+                                            setIsManualRequestItem(true);
+                                            setRequestForm({ ...requestForm, item_name: "", unit: "" });
+                                            setIsManualRequestUnit(false);
+                                          } else {
+                                            const mat = bomMaterials.find(m => m.name === val);
+                                            setRequestForm({ ...requestForm, item_name: val, unit: mat?.unit || requestForm.unit });
+                                            setIsManualRequestUnit(false);
+                                          }
+                                        }}
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Select from BOM" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {bomMaterials
+                                            .filter(mat => !requestForm.bom_scope_id || requestForm.bom_scope_id === "unassigned" || mat.scope_id === requestForm.bom_scope_id)
+                                            .map((mat) => (
+                                            <SelectItem key={mat.id} value={mat.name}>{mat.name}</SelectItem>
+                                          ))}
+                                          <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    ) : (
+                                      <div className="flex gap-2">
+                                        <Input
+                                          placeholder="Type item name"
+                                          value={requestForm.item_name}
+                                          onChange={(e) => setRequestForm({ ...requestForm, item_name: e.target.value })}
+                                        />
+                                        <Button type="button" variant="outline" className="px-2" onClick={() => {
+                                          setIsManualRequestItem(false);
+                                          setRequestForm({ ...requestForm, item_name: "", unit: "" });
+                                        }}>
+                                          BOM
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                                {['Petty Cash', 'Equipment (Rentals)', 'PPE'].includes(requestForm.request_type) && (
+                                <div className="grid grid-cols-3 gap-4">
                                   <div className="space-y-2">
-                                    <Label>Est. Amount (Optional)</Label>
+                                    <Label>Quantity</Label>
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      value={requestForm.quantity}
+                                      onChange={(e) => setRequestForm({ ...requestForm, quantity: parseFloat(e.target.value) || 0 })}
+                                    />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label>Unit</Label>
+                                    {!isManualRequestUnit ? (
+                                      <Select
+                                        value={requestForm.unit}
+                                        onValueChange={(val) => {
+                                          if (val === "others") {
+                                            setIsManualRequestUnit(true);
+                                            setRequestForm({ ...requestForm, unit: "" });
+                                          } else {
+                                            setRequestForm({ ...requestForm, unit: val });
+                                          }
+                                        }}
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Select unit" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {availableUnits.map((u) => (
+                                            <SelectItem key={u} value={u}>{u}</SelectItem>
+                                          ))}
+                                          <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    ) : (
+                                      <div className="flex gap-2">
+                                        <Input
+                                          value={requestForm.unit}
+                                          onChange={(e) => setRequestForm({ ...requestForm, unit: e.target.value })}
+                                          placeholder="Custom unit"
+                                        />
+                                        <Button type="button" variant="outline" className="px-2" onClick={() => {
+                                          setIsManualRequestUnit(false);
+                                          setRequestForm({ ...requestForm, unit: "" });
+                                        }}>
+                                          List
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label>Est. Amount</Label>
                                     <Input
                                       type="number"
                                       step="0.01"
                                       min="0"
                                       value={requestForm.amount}
                                       onChange={(e) => setRequestForm({ ...requestForm, amount: parseFloat(e.target.value) || 0 })}
+                                      placeholder="Optional"
                                     />
                                   </div>
-                                )}
-                              </div>
-                              <div className="grid grid-cols-2 gap-4">
+                                </div>
                                 <div className="space-y-2">
-                                  <Label>Quantity</Label>
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={requestForm.quantity}
-                                    onChange={(e) => setRequestForm({ ...requestForm, quantity: parseFloat(e.target.value) || 0 })}
+                                  <Label>Item Notes</Label>
+                                  <Textarea
+                                    value={requestForm.notes}
+                                    onChange={(e) => setRequestForm({ ...requestForm, notes: e.target.value })}
+                                    placeholder="Any specific details for this item..."
+                                    rows={2}
                                   />
                                 </div>
-                                <div className="space-y-2">
-                                  <Label>Unit</Label>
-                                  {!isManualRequestUnit ? (
-                                    <Select
-                                      value={requestForm.unit}
-                                      onValueChange={(val) => {
-                                        if (val === "others") {
-                                          setIsManualRequestUnit(true);
-                                          setRequestForm({ ...requestForm, unit: "" });
-                                        } else {
-                                          setRequestForm({ ...requestForm, unit: val });
-                                        }
-                                      }}
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Select unit" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {availableUnits.map((u) => (
-                                          <SelectItem key={u} value={u}>{u}</SelectItem>
-                                        ))}
-                                        <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  ) : (
-                                    <div className="flex gap-2">
-                                      <Input
-                                        value={requestForm.unit}
-                                        onChange={(e) => setRequestForm({ ...requestForm, unit: e.target.value })}
-                                        placeholder="Custom unit"
-                                      />
-                                      <Button type="button" variant="outline" className="px-2" onClick={() => {
-                                        setIsManualRequestUnit(false);
-                                        setRequestForm({ ...requestForm, unit: "" });
-                                      }}>
-                                        List
-                                      </Button>
-                                    </div>
-                                  )}
+                                <Button type="button" onClick={handleAddItem} variant="secondary" className="w-full">
+                                  <Plus className="w-4 h-4 mr-2" /> Add Item to Request List
+                                </Button>
+                              </div>
+
+                              {requestItems.length > 0 && (
+                                <div className="border rounded-md mt-4">
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow className="bg-muted/50">
+                                        <TableHead>Scope</TableHead>
+                                        <TableHead>Item Details</TableHead>
+                                        <TableHead>Qty</TableHead>
+                                        <TableHead>Amount</TableHead>
+                                        <TableHead className="text-right">Action</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {requestItems.map((item, idx) => (
+                                        <TableRow key={idx}>
+                                          <TableCell>
+                                            {item.bom_scope_id === "unassigned" ? (
+                                              <span className="text-muted-foreground italic text-xs">General</span>
+                                            ) : (
+                                              <Badge variant="secondary" className="text-xs">
+                                                {scopes.find(s => s.id === item.bom_scope_id)?.name || "Unknown"}
+                                              </Badge>
+                                            )}
+                                          </TableCell>
+                                          <TableCell>
+                                            <div className="font-medium text-sm">{item.item_name}</div>
+                                            {item.notes && <div className="text-[10px] text-muted-foreground truncate max-w-[150px]">{item.notes}</div>}
+                                          </TableCell>
+                                          <TableCell className="text-sm">{item.quantity} {item.unit}</TableCell>
+                                          <TableCell className="text-sm">{item.amount > 0 ? item.amount.toLocaleString() : "-"}</TableCell>
+                                          <TableCell className="text-right">
+                                            <Button type="button" size="sm" variant="ghost" onClick={() => handleRemoveItem(idx)} className="h-6 w-6 p-0 text-red-500">
+                                              <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
                                 </div>
-                              </div>
-                              <div className="space-y-2">
-                                <Label>Requested By *</Label>
-                                <Input
-                                  value={requestForm.requested_by}
-                                  onChange={(e) => setRequestForm({ ...requestForm, requested_by: e.target.value })}
-                                  required
-                                />
-                              </div>
-                            </>
+                              )}
+                            </div>
                           )}
-                          <div className="space-y-2">
-                            <Label>Notes / Reason *</Label>
-                            <Textarea
-                              value={requestForm.notes}
-                              onChange={(e) => setRequestForm({ ...requestForm, notes: e.target.value })}
-                              required
-                            />
-                          </div>
                           <div className="flex justify-between items-center pt-4 border-t">
                             <Button type="button" variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={resetRequestForm}>
                               Clear Form
