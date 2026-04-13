@@ -146,22 +146,16 @@ export function Layout({ children }: LayoutProps) {
       )}>
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center justify-between h-16 px-4 border-b">
-            <div className="flex items-center gap-3 overflow-hidden">
-              {company.logo ? (
-                <img src={company.logo} alt="Logo" className="h-10 w-10 shrink-0 rounded-lg object-contain bg-white border" />
-              ) : (
-                <div className="h-10 w-10 shrink-0 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
-                  {company.name ? company.name.substring(0, 2).toUpperCase() : "TX"}
-                </div>
-              )}
-              <div className="flex flex-col min-w-0">
-                <h1 className="text-sm font-heading font-bold text-primary leading-tight truncate">
-                  {company.name || "Thea-X"}
+          <div className="flex items-center justify-between h-16 px-6 border-b">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
+                TX
+              </div>
+              <div>
+                <h1 className="text-lg font-heading font-bold text-primary leading-tight">
+                  Thea-X
                 </h1>
-                <p className="text-[10px] text-muted-foreground truncate" title={company.address}>
-                  {company.address || "Construction Accounting System"}
-                </p>
+                <p className="text-xs text-muted-foreground">Construction Accounting</p>
               </div>
             </div>
             <Button
@@ -224,16 +218,37 @@ export function Layout({ children }: LayoutProps) {
           <Button
             variant="ghost"
             size="icon"
-            className="lg:hidden"
+            className="lg:hidden shrink-0"
             onClick={() => setSidebarOpen(true)}
           >
             <Menu className="h-5 w-5" />
           </Button>
           
+          {/* Company Information */}
+          <div className="flex items-center gap-3 lg:border-l lg:pl-6 lg:-ml-2 lg:h-10">
+            {company.logo ? (
+              <img src={company.logo} alt="Company Logo" className="h-8 w-8 shrink-0 rounded object-contain bg-white border" />
+            ) : (
+              <div className="h-8 w-8 shrink-0 rounded bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                {company.name ? company.name.substring(0, 2).toUpperCase() : "CO"}
+              </div>
+            )}
+            <div className="flex flex-col min-w-0 hidden sm:flex">
+              <h2 className="text-sm font-semibold leading-tight text-foreground truncate max-w-[200px] lg:max-w-[300px]">
+                {company.name || "Company Name"}
+              </h2>
+              {company.address && (
+                <p className="text-[10px] text-muted-foreground truncate max-w-[200px] lg:max-w-[300px]">
+                  {company.address}
+                </p>
+              )}
+            </div>
+          </div>
+
           <div className="flex-1" />
           
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground hidden sm:block">
+            <span className="text-sm text-muted-foreground hidden md:block">
               {new Date().toLocaleDateString("en-US", { 
                 weekday: "short", 
                 year: "numeric", 
