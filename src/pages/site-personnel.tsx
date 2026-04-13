@@ -2490,7 +2490,7 @@ export default function SitePersonnel() {
                                   <Button size="sm" variant="ghost" className="h-4 w-4 p-0" onClick={(e) => {
                                     if(confirm("Are you sure you want to delete this pending request?")) {
                                       e.stopPropagation();
-                                      siteService.deleteSiteRequest(row.id).then(loadRequests);
+                                      supabase.from('site_requests').delete().eq('id', row.id).then(() => loadRequests());
                                     }
                                   }}>
                                     <Trash2 className="h-4 w-4 text-red-500" />
