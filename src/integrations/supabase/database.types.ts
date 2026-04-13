@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -372,6 +372,7 @@ export type Database = {
         Row: {
           amount: number
           created_at: string | null
+          form_number: string | null
           id: string
           personnel_id: string | null
           project_id: string | null
@@ -382,6 +383,7 @@ export type Database = {
         Insert: {
           amount: number
           created_at?: string | null
+          form_number?: string | null
           id?: string
           personnel_id?: string | null
           project_id?: string | null
@@ -392,6 +394,7 @@ export type Database = {
         Update: {
           amount?: number
           created_at?: string | null
+          form_number?: string | null
           id?: string
           personnel_id?: string | null
           project_id?: string | null
@@ -1259,6 +1262,7 @@ export type Database = {
           amount: number | null
           bom_scope_id: string | null
           created_at: string | null
+          form_number: string | null
           id: string
           item_name: string
           notes: string | null
@@ -1274,6 +1278,7 @@ export type Database = {
           amount?: number | null
           bom_scope_id?: string | null
           created_at?: string | null
+          form_number?: string | null
           id?: string
           item_name: string
           notes?: string | null
@@ -1289,6 +1294,7 @@ export type Database = {
           amount?: number | null
           bom_scope_id?: string | null
           created_at?: string | null
+          form_number?: string | null
           id?: string
           item_name?: string
           notes?: string | null
