@@ -15,7 +15,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { siteService } from "@/services/siteService";
 import { projectService } from "@/services/projectService";
 import { personnelService } from "@/services/personnelService";
-import { Plus, Pencil, Trash2, Users, Truck, ClipboardList, ArrowUp, ArrowDown, Check, ArrowUpDown, ShoppingCart, Banknote } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Truck, ClipboardList, ArrowUp, ArrowDown, Check, ArrowUpDown, ShoppingCart, Banknote, Wrench } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 type Project = { id: string; name: string; location: string; status: string };
@@ -25,7 +25,7 @@ type AttendanceRow = { personnel_id: string; name: string; role: string; daily_r
 type Delivery = { id: string; project_id: string; delivery_date: string; item_name: string; quantity: number; unit: string; supplier: string; received_by: string; status: string; notes: string; receipt_number?: string };
 type ScopeOfWork = { id: string; name: string; description?: string; order_number: number; completion_percentage?: number; status?: string; bom_id: string };
 type MaterialConsumption = { id: string; project_id: string; bom_scope_id: string | null; date_used: string; item_name: string; quantity: number; unit: string; recorded_by: string; notes: string; bom_scope_of_work?: { name: string } };
-type CashAdvance = { id: string; personnel_id: string; project_id: string; amount: number; reason: string; status: string; request_date: string; personnel?: { name: string; role: string } };
+type CashAdvance = { id: string; personnel_id: string; project_id: string; amount: number; reason: string; status: string; request_date: string; form_number?: string; personnel?: { name: string; role: string } };
 
 const STANDARD_ROLES = ["Admin", "Carpenter", "Electrician", "Helper", "Mason", "Plumber", "Skilled", "Steelman", "Tile Mason", "Welder"];
 
@@ -109,6 +109,7 @@ export default function SitePersonnel() {
   const [isManualRequestUnit, setIsManualRequestUnit] = useState(false);
   const [requestForm, setRequestForm] = useState({
     request_type: "Materials",
+    form_number: "",
     bom_scope_id: "unassigned",
     request_date: todayStr,
     item_name: "",
@@ -524,6 +525,7 @@ export default function SitePersonnel() {
         amount: parseFloat(requestForm.amount.toString()) || 0,
         reason: requestForm.notes,
         request_date: requestForm.request_date,
+        form_number: requestForm.form_number,
         status: 'pending'
       });
     } else {
@@ -536,6 +538,7 @@ export default function SitePersonnel() {
         unit: requestForm.unit,
         amount: parseFloat(requestForm.amount.toString()) || 0,
         request_type: requestForm.request_type,
+        form_number: requestForm.form_number,
         requested_by: requestForm.requested_by,
         notes: requestForm.notes,
         status: 'pending'
@@ -565,6 +568,7 @@ export default function SitePersonnel() {
   const resetRequestForm = () => {
     setRequestForm({
       request_type: "Materials",
+      form_number: "",
       bom_scope_id: "unassigned",
       request_date: todayStr,
       item_name: "",
@@ -577,6 +581,22 @@ export default function SitePersonnel() {
     });
     setIsManualRequestItem(false);
     setIsManualRequestUnit(false);
+  };
+
+  const openRequestDialog = (type: string, prefix: string) => {
+    const randomNum = Math.floor(100000 + Math.random() * 900000);
+    setRequestForm({
+      ...requestForm,
+      request_type: type,
+      form_number: `${prefix}-${randomNum}`,
+      item_name: "",
+      quantity: 0,
+      amount: 0,
+      notes: ""
+    });
+    setIsManualRequestItem(false);
+    setIsManualRequestUnit(false);
+    setRequestDialogOpen(true);
   };
 
   const getStatusBadge = (status: string) => {
@@ -2143,168 +2163,52 @@ export default function SitePersonnel() {
                               <Table>
                                 <TableHeader>
                                   <TableRow>
-                                    <TableHead>Item</TableHead>
-                                    <TableHead>Quantity</TableHead>
-                                    <TableHead>Scope Assignment</TableHead>
-                                    <TableHead>Recorded By</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
+                                    <TableHead className="w-12 text-center">#</TableHead>
+                                    <TableHead>Worker</TableHead>
+                                    <TableHead>Position</TableHead>
+                                    <TableHead className="w-[200px]">Scope Assignment</TableHead>
+                                    <TableHead className="text-right">Daily Rate</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead className="text-center">Overtime (Hrs)</TableHead>
+                                    <TableHead className="text-right">Total Cost</TableHead>
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                  {groupConsumptions.map((row) => {
-                                    const isEditing = editingConsumptionId === row.id;
-                                    return (
-                                    <TableRow key={row.id}>
-                                      <TableCell className="font-medium">
-                                        {isEditing ? (
-                                          manualEditItems[row.id] || (row.item_name && !bomMaterials.find(m => m.name === row.item_name)) ? (
-                                            <div className="flex gap-2">
-                                              <Input
-                                                value={row.item_name}
-                                                className="h-8 w-full min-w-[120px]"
-                                                placeholder="Custom material"
-                                                onChange={(e) => {
-                                                  const list = [...consumptions];
-                                                  const idx = list.findIndex(l => l.id === row.id);
-                                                  list[idx].item_name = e.target.value;
-                                                  setConsumptions(list);
-                                                }}
-                                                onBlur={(e) => siteService.updateMaterialConsumption(row.id, { item_name: e.target.value })}
-                                              />
-                                              <Button type="button" variant="outline" size="sm" className="h-8 px-2" onClick={() => {
-                                                setManualEditItems(prev => ({ ...prev, [row.id]: false }));
-                                                const list = [...consumptions];
-                                                const idx = list.findIndex(l => l.id === row.id);
-                                                list[idx].item_name = "";
-                                                setConsumptions(list);
-                                              }}>
-                                                List
-                                              </Button>
-                                            </div>
-                                          ) : (
-                                            <Select
-                                              value={row.item_name || ""}
-                                              onValueChange={(val) => {
-                                                if (val === "others") {
-                                                  setManualEditItems(prev => ({ ...prev, [row.id]: true }));
-                                                  const list = [...consumptions];
-                                                  const idx = list.findIndex(l => l.id === row.id);
-                                                  list[idx].item_name = "";
-                                                  setConsumptions(list);
-                                                } else {
-                                                  const mat = bomMaterials.find(m => m.name === val);
-                                                  const list = [...consumptions];
-                                                  const idx = list.findIndex(l => l.id === row.id);
-                                                  list[idx].item_name = val;
-                                                  if (mat?.unit) list[idx].unit = mat.unit;
-                                                  setConsumptions(list);
-                                                  siteService.updateMaterialConsumption(row.id, { 
-                                                    item_name: val,
-                                                    unit: mat?.unit || list[idx].unit
-                                                  });
-                                                }
-                                              }}
-                                            >
-                                              <SelectTrigger className="h-8 w-full min-w-[160px]">
-                                                <SelectValue placeholder="Select material" />
-                                              </SelectTrigger>
-                                              <SelectContent>
-                                                {bomMaterials
-                                                  .filter(mat => !row.bom_scope_id || row.bom_scope_id === "unassigned" || mat.scope_id === row.bom_scope_id)
-                                                  .map((mat) => (
-                                                  <SelectItem key={mat.id} value={mat.name}>{mat.name}</SelectItem>
-                                                ))}
-                                                <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
-                                              </SelectContent>
-                                            </Select>
-                                          )
-                                        ) : (
-                                          row.item_name
-                                        )}
-                                      </TableCell>
-                                      <TableCell>
-                                        {isEditing ? (
-                                          <div className="flex items-center gap-2">
-                                            <Input
-                                              type="number"
-                                              step="0.01"
-                                              className="w-20 h-8"
-                                              value={row.quantity}
-                                              onChange={(e) => {
-                                                const list = [...consumptions];
-                                                const idx = list.findIndex(l => l.id === row.id);
-                                                list[idx].quantity = parseFloat(e.target.value) || 0;
-                                                setConsumptions(list);
-                                              }}
-                                              onBlur={(e) => siteService.updateMaterialConsumption(row.id, { quantity: parseFloat(e.target.value) || 0 })}
-                                            />
-                                            <span>{row.unit}</span>
-                                          </div>
-                                        ) : (
-                                          `${row.quantity} ${row.unit}`
-                                        )}
-                                      </TableCell>
-                                      <TableCell>
-                                        {isEditing ? (
-                                          <Select
-                                            value={row.bom_scope_id || "unassigned"}
-                                            onValueChange={(val) => {
-                                              const list = [...consumptions];
-                                              const idx = list.findIndex(l => l.id === row.id);
-                                              list[idx].bom_scope_id = val === "unassigned" ? null : val;
-                                              
-                                              const scopeName = val === "unassigned" ? undefined : scopes.find(s => s.id === val)?.name;
-                                              if (scopeName) {
-                                                list[idx].bom_scope_of_work = { name: scopeName };
-                                              } else {
-                                                delete list[idx].bom_scope_of_work;
-                                              }
-                                              
-                                              setConsumptions(list);
-                                              siteService.updateMaterialConsumption(row.id, { bom_scope_id: val === "unassigned" ? null : val });
-                                            }}
-                                          >
-                                            <SelectTrigger className="h-8">
-                                              <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                              <SelectItem value="unassigned" className="text-muted-foreground italic">Admin / Unassigned</SelectItem>
-                                              {scopes.map((s) => (
-                                                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                              ))}
-                                            </SelectContent>
-                                          </Select>
-                                        ) : (
-                                          row.bom_scope_id ? (
-                                            <Badge variant="secondary">{row.bom_scope_of_work?.name || "Unknown Scope"}</Badge>
-                                          ) : (
-                                            <span className="text-muted-foreground italic">Admin / Unassigned</span>
-                                          )
-                                        )}
-                                      </TableCell>
-                                      <TableCell>{row.recorded_by || "-"}</TableCell>
-                                      <TableCell className="text-right">
-                                        {isEditing ? (
-                                          <Button variant="ghost" size="sm" onClick={() => setEditingConsumptionId(null)}>
-                                            <Check className="h-4 w-4 text-green-500" />
-                                          </Button>
-                                        ) : (
-                                          <div className="flex justify-end gap-2">
-                                            <Button size="sm" variant="ghost" onClick={() => setEditingConsumptionId(row.id)}>
-                                              <Pencil className="h-4 w-4 text-blue-500" />
-                                            </Button>
-                                            <Button size="sm" variant="ghost" onClick={async () => {
-                                              await siteService.deleteMaterialConsumption(row.id);
-                                              loadConsumptions();
-                                            }}>
-                                              <Trash2 className="h-4 w-4 text-red-500" />
-                                            </Button>
-                                          </div>
-                                        )}
-                                      </TableCell>
-                                    </TableRow>
-                                  );
-                                  })}
+                                  {(() => {
+                                    const sortedRecords = [...records].sort((a, b) => {
+                                      const scopeA = scopes.find(s => s.id === a.bom_scope_id)?.name || "Z_Admin / Unassigned";
+                                      const scopeB = scopes.find(s => s.id === b.bom_scope_id)?.name || "Z_Admin / Unassigned";
+                                      return scopeA.localeCompare(scopeB);
+                                    });
+
+                                    return sortedRecords.map((record, index) => {
+                                      const daily = record.personnel?.daily_rate || 0;
+                                      const ot = record.personnel?.overtime_rate || 0;
+                                      const hrs = record.hours_worked || 0;
+                                      const oth = record.overtime_hours || 0;
+                                      const rowCost = record.status === "absent" ? 0 : ((daily / 8) * hrs) + (ot * oth);
+
+                                      return (
+                                        <TableRow key={record.id} className={record.status === "absent" ? "bg-muted/50 opacity-75" : ""}>
+                                          <TableCell className="text-center text-muted-foreground">{index + 1}</TableCell>
+                                          <TableCell className="font-medium">{record.personnel?.name || "Unknown"}</TableCell>
+                                          <TableCell>{record.personnel?.role}</TableCell>
+                                          <TableCell>{scopes.find(s => s.id === record.bom_scope_id)?.name || "Admin / Unassigned"}</TableCell>
+                                          <TableCell className="text-right">₱{daily.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                                          <TableCell>
+                                            <span className={`text-sm font-semibold ${record.status === "present" ? "text-green-600" : "text-red-500"}`}>
+                                              {record.status === "present" ? "Present" : "Absent"}
+                                            </span>
+                                          </TableCell>
+                                          <TableCell className="text-center">{record.hours_worked || 0}</TableCell>
+                                          <TableCell className="text-center">{record.overtime_hours || 0}</TableCell>
+                                          <TableCell className="text-right font-semibold text-primary">
+                                            ₱{rowCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                          </TableCell>
+                                        </TableRow>
+                                      );
+                                    });
+                                  })()}
                                 </TableBody>
                               </Table>
                             )}
@@ -2339,21 +2243,39 @@ export default function SitePersonnel() {
                         )}
                       </div>
                     </div>
+                    <div className="flex flex-col gap-2 md:flex-row">
+                      <Button onClick={() => openRequestDialog('Materials', 'MR')} variant="default" className="bg-blue-600 hover:bg-blue-700 text-white">
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        Material Request
+                      </Button>
+                      <Button onClick={() => openRequestDialog('Tools & Equipments', 'TE')} variant="outline" className="border-orange-500 text-orange-600 hover:bg-orange-50">
+                        <Wrench className="h-4 w-4 mr-2" />
+                        Tools & Equipments
+                      </Button>
+                      <Button onClick={() => openRequestDialog('Cash Advance', 'CA')} variant="outline" className="border-green-600 text-green-700 hover:bg-green-50">
+                        <Banknote className="h-4 w-4 mr-2" />
+                        Cash Advance
+                      </Button>
+                    </div>
+                    
                     <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button>
-                          <Plus className="h-4 w-4 mr-2" />
-                          New Request
-                        </Button>
-                      </DialogTrigger>
                       <DialogContent className="max-w-2xl">
                         <DialogHeader>
                           <DialogTitle>Submit Site Request</DialogTitle>
                         </DialogHeader>
+                        
+                        <div className="flex justify-between items-center bg-muted/50 p-3 rounded-md border border-muted">
+                          <div className="flex items-center">
+                            <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Form No:</span>
+                            <span className="font-bold ml-3 text-lg text-primary">{requestForm.form_number}</span>
+                          </div>
+                          <Badge variant="outline" className="text-sm px-3 py-1 bg-background">{requestForm.request_type}</Badge>
+                        </div>
+
                         <form onSubmit={handleRequestSubmit} className="space-y-4">
                           <div className="grid grid-cols-2 gap-4 border-b pb-4">
                             <div className="space-y-2">
-                              <Label>Request Type *</Label>
+                              <Label>Request Sub-Type</Label>
                               <Select
                                 value={requestForm.request_type}
                                 onValueChange={(val) => setRequestForm({ ...requestForm, request_type: val })}
@@ -2363,12 +2285,12 @@ export default function SitePersonnel() {
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="Materials">Materials</SelectItem>
-                                  <SelectItem value="Tools">Tools</SelectItem>
+                                  <SelectItem value="Tools & Equipments">Tools & Equipments</SelectItem>
                                   <SelectItem value="Equipment (Warehouse)">Equipment (Main Warehouse)</SelectItem>
                                   <SelectItem value="Equipment (Rentals)">Equipment (Rentals)</SelectItem>
                                   <SelectItem value="PPE">PPE</SelectItem>
                                   <SelectItem value="Petty Cash">Petty Cash</SelectItem>
-                                  <SelectItem value="Cash Advance">Cash Advance for Workers</SelectItem>
+                                  <SelectItem value="Cash Advance">Cash Advance</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
@@ -2417,7 +2339,7 @@ export default function SitePersonnel() {
                           ) : (
                             <>
                               <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2 col-span-2">
+                                <div className="space-y-2 col-span-2 md:col-span-1">
                                   <Label>Scope of Work (Optional)</Label>
                                   <Select
                                     value={requestForm.bom_scope_id}
@@ -2585,6 +2507,7 @@ export default function SitePersonnel() {
                       ...requests.map(r => ({
                         ...r,
                         isCA: false,
+                        displayFormNumber: r.form_number || '-',
                         displayType: r.request_type || 'Materials',
                         displayItem: r.item_name,
                         displayQty: r.quantity > 0 ? `${r.quantity} ${r.unit}` : '-',
@@ -2595,6 +2518,7 @@ export default function SitePersonnel() {
                       ...cashAdvances.map(c => ({
                         ...c,
                         isCA: true,
+                        displayFormNumber: c.form_number || '-',
                         displayType: 'Cash Advance',
                         displayItem: `${c.personnel?.name} (${c.personnel?.role})`,
                         displayQty: '-',
@@ -2619,6 +2543,7 @@ export default function SitePersonnel() {
                           <TableHeader>
                             <TableRow>
                               <TableHead className="w-24">Date</TableHead>
+                              <TableHead className="w-24">Form No.</TableHead>
                               <TableHead>Type</TableHead>
                               <TableHead>Details</TableHead>
                               <TableHead>Qty</TableHead>
@@ -2632,6 +2557,7 @@ export default function SitePersonnel() {
                             {combinedRequests.map((row) => (
                               <TableRow key={row.id}>
                                 <TableCell className="whitespace-nowrap text-sm">{row.request_date}</TableCell>
+                                <TableCell className="font-mono text-xs font-bold text-muted-foreground">{row.displayFormNumber}</TableCell>
                                 <TableCell>
                                   <Badge variant="secondary" className="font-normal text-xs">{row.displayType}</Badge>
                                 </TableCell>
