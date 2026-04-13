@@ -45,10 +45,16 @@ export default function Personnel() {
     phone: "",
     email: "",
     hourly_rate: "",
+    daily_rate: "",
+    overtime_rate: "",
     status: "active" as const,
     worker_type: "construction" as const,
     hire_date: new Date().toISOString().split("T")[0]
   });
+
+  const [otFactor, setOtFactor] = useState<number>(1.25);
+  const [isManualRole, setIsManualRole] = useState(false);
+  const STANDARD_ROLES = ["Admin", "Carpenter", "Electrician", "Helper", "Mason", "Plumber", "Skilled", "Steelman", "Tile Mason", "Welder"];
 
   const [attendanceForm, setAttendanceForm] = useState({
     personnel_id: "",
@@ -115,9 +121,25 @@ export default function Personnel() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const personnelData = {
-      ...formData,
-      hourly_rate: parseFloat(formData.hourly_rate) || 0
+      name: formData.name,
+      role: formData.role,
+      project_id: formData.project_id || null,
+      phone: formData.phone,
+      email: formData.email,
+      status: formData.status,
+      worker_type: formData.worker_type,
+      hire_date: formData.hire_date,
+      hourly_rate: parseFloat(formData.hourly_rate) || 0,
+      daily_rate: parseFloat(formData.daily_rate) || 0,
+      overtime_rate: parseFloat(formData.overtime_rate) || 0,
     };
+
+    if (formData.worker_type === "construction") {
+      personnelData.hourly_rate = (parseFloat(formData.daily_rate) || 0) / 8;
+    } else {
+      personnelData.daily_rate = (parseFloat(formData.hourly_rate) || 0) * 8;
+    }
+
     if (editingPersonnel) {
       await personnelService.update(editingPersonnel.id, personnelData);
     } else {
@@ -199,6 +221,8 @@ export default function Personnel() {
       phone: person.phone || "",
       email: person.email || "",
       hourly_rate: person.hourly_rate?.toString() || "",
+      daily_rate: person.daily_rate?.toString() || "",
+      overtime_rate: person.overtime_rate?.toString() || "",
       status: person.status as any,
       worker_type: (person.worker_type as any) || "construction",
       hire_date: person.hire_date || new Date().toISOString().split("T")[0]
@@ -231,10 +255,13 @@ export default function Personnel() {
       phone: "",
       email: "",
       hourly_rate: "",
+      daily_rate: "",
+      overtime_rate: "",
       status: "active",
       worker_type: "construction",
       hire_date: new Date().toISOString().split("T")[0]
     });
+    setIsManualRole(false);
     setEditingPersonnel(null);
   };
 
@@ -404,14 +431,46 @@ export default function Personnel() {
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="role">Role *</Label>
-                        <Input
-                          id="role"
-                          value={formData.role}
-                          onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                          placeholder="e.g., Site Engineer, Foreman"
-                          required
-                        />
+                        <Label htmlFor="role">Position / Role *</Label>
+                        {formData.worker_type === "construction" && !isManualRole ? (
+                          <Select
+                            value={formData.role}
+                            onValueChange={(val) => {
+                              if (val === "others") {
+                                setIsManualRole(true);
+                                setFormData({ ...formData, role: "" });
+                              } else {
+                                setFormData({ ...formData, role: val });
+                              }
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select position" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {STANDARD_ROLES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                              <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <div className="flex gap-2">
+                            <Input
+                              id="role"
+                              value={formData.role}
+                              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                              placeholder={formData.worker_type === "office" ? "e.g., Site Engineer" : "Custom position"}
+                              required
+                            />
+                            {formData.worker_type === "construction" && isManualRole && (
+                              <Button type="button" variant="outline" className="px-2" onClick={() => {
+                                setIsManualRole(false);
+                                setFormData({ ...formData, role: "" });
+                              }}>
+                                List
+                              </Button>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="project_id">Assigned Project</Label>
@@ -469,7 +528,10 @@ export default function Personnel() {
                           onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         />
                       </div>
-                      <div className="space-y-2">
+                    </div>
+                    
+                    {formData.worker_type === "office" ? (
+                      <div className="space-y-2 w-1/2 pr-2">
                         <Label htmlFor="hourly_rate">Hourly Rate ({currency})</Label>
                         <Input
                           id="hourly_rate"
@@ -479,7 +541,62 @@ export default function Personnel() {
                           onChange={(e) => setFormData({ ...formData, hourly_rate: e.target.value })}
                         />
                       </div>
-                    </div>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-4 border-t pt-4">
+                        <div className="space-y-2">
+                          <Label>Daily Rate ({currency})</Label>
+                          <Input
+                            required
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={formData.daily_rate}
+                            onChange={(e) => {
+                              const rate = parseFloat(e.target.value) || 0;
+                              setFormData({ 
+                                ...formData, 
+                                daily_rate: e.target.value,
+                                overtime_rate: ((rate / 8) * otFactor).toFixed(2)
+                              });
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>OT Factor</Label>
+                          <Select value={otFactor.toString()} onValueChange={(val) => {
+                            const factor = parseFloat(val);
+                            setOtFactor(factor);
+                            const rate = parseFloat(formData.daily_rate) || 0;
+                            setFormData(prev => ({
+                              ...prev,
+                              overtime_rate: ((rate / 8) * factor).toFixed(2)
+                            }));
+                          }}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="1">1.0x (Regular)</SelectItem>
+                              <SelectItem value="1.25">1.25x (Standard OT)</SelectItem>
+                              <SelectItem value="1.3">1.3x (Special/Rest)</SelectItem>
+                              <SelectItem value="1.5">1.5x (Night Shift)</SelectItem>
+                              <SelectItem value="2">2.0x (Double Pay)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Overtime Rate ({currency}/hr)</Label>
+                          <Input
+                            required
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={formData.overtime_rate}
+                            onChange={(e) => setFormData({ ...formData, overtime_rate: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                    )}
                     <div className="flex justify-end gap-2 pt-4">
                       <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                         Cancel
@@ -507,6 +624,7 @@ export default function Personnel() {
                       <TableHead>Contact</TableHead>
                       <TableHead>Rate</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Source</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -517,10 +635,20 @@ export default function Personnel() {
                         <TableCell>{person.role}</TableCell>
                         <TableCell>{person.projects?.name || "Unassigned"}</TableCell>
                         <TableCell>{person.phone || "-"}</TableCell>
-                        <TableCell>{currency} {person.hourly_rate?.toLocaleString() || 0}/hr</TableCell>
+                        <TableCell>
+                          {workerFilter === 'office' 
+                            ? `${currency} ${person.hourly_rate?.toLocaleString() || 0}/hr`
+                            : `${currency} ${person.daily_rate?.toLocaleString() || 0}/day`
+                          }
+                        </TableCell>
                         <TableCell>
                           <Badge className={statusColors[person.status] || "bg-gray-100 text-gray-800"}>
                             {person.status.replace("_", " ")}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-[10px] bg-muted/50">
+                            {person.updated_source || person.created_source || 'Human Resources'}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">

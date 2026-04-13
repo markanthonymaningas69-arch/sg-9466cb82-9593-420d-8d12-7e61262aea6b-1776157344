@@ -19,7 +19,7 @@ import { Plus, Pencil, Trash2, Users, Truck, ClipboardList, ArrowUp, ArrowDown, 
 import { supabase } from "@/integrations/supabase/client";
 
 type Project = { id: string; name: string; location: string; status: string };
-type Personnel = { id: string; name: string; role: string; daily_rate: number; overtime_rate: number };
+type Personnel = { id: string; name: string; role: string; daily_rate: number; overtime_rate: number; created_source?: string; updated_source?: string };
 type SiteAttendance = { id: string; personnel_id: string; project_id: string; date: string; status: string; hours_worked: number; overtime_hours?: number; bom_scope_id?: string; notes: string; personnel?: { name: string; role: string; daily_rate: number; overtime_rate: number } };
 type AttendanceRow = { personnel_id: string; name: string; role: string; daily_rate: number; overtime_rate: number; status: string; hours_worked: number; overtime_hours: number; bom_scope_id: string | null };
 type Delivery = { id: string; project_id: string; delivery_date: string; item_name: string; quantity: number; unit: string; supplier: string; received_by: string; status: string; notes: string; receipt_number?: string };
@@ -730,6 +730,7 @@ export default function SitePersonnel() {
                           <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleManpowerSort("role")}>Position {getSortIcon(manpowerSort, "role")}</TableHead>
                           <TableHead className="w-32 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleManpowerSort("daily_rate")}>Daily Rate {getSortIcon(manpowerSort, "daily_rate")}</TableHead>
                           <TableHead className="w-32">OT Rate</TableHead>
+                          <TableHead className="w-32">Source</TableHead>
                           <TableHead className="w-16"></TableHead>
                         </TableRow>
                       </TableHeader>
@@ -906,6 +907,11 @@ export default function SitePersonnel() {
                             ) : (
                               <span>{p.overtime_rate}</span>
                             )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-[10px] bg-muted/50">
+                              {p.updated_source || p.created_source || 'Unknown'}
+                            </Badge>
                           </TableCell>
                           <TableCell>
                             {isEditing ? (

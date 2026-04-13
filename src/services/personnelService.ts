@@ -37,7 +37,7 @@ export const personnelService = {
   async create(personnel: PersonnelInsert) {
     const { data, error } = await supabase
       .from("personnel")
-      .insert(personnel)
+      .insert({ ...personnel, created_source: 'Human Resources', updated_source: 'Human Resources' })
       .select()
       .single();
     
@@ -48,7 +48,7 @@ export const personnelService = {
   async update(id: string, updates: Partial<PersonnelInsert>) {
     const { data, error } = await supabase
       .from("personnel")
-      .update(updates)
+      .update({ ...updates, updated_source: 'Human Resources' })
       .eq("id", id)
       .select()
       .single();

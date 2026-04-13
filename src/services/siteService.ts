@@ -24,7 +24,7 @@ export const siteService = {
   async enrollPersonnel(personnel: any) {
     const { data, error } = await supabase
       .from("personnel")
-      .insert(personnel)
+      .insert({ ...personnel, created_source: 'Site Personnel', updated_source: 'Site Personnel' })
       .select()
       .single();
     return { data, error };
@@ -33,7 +33,7 @@ export const siteService = {
   async updatePersonnel(id: string, updates: any) {
     const { data, error } = await supabase
       .from("personnel")
-      .update(updates)
+      .update({ ...updates, updated_source: 'Site Personnel' })
       .eq("id", id)
       .select()
       .single();

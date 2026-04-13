@@ -798,6 +798,7 @@ export type Database = {
       personnel: {
         Row: {
           created_at: string | null
+          created_source: string | null
           daily_rate: number | null
           email: string
           hire_date: string
@@ -809,10 +810,12 @@ export type Database = {
           project_id: string | null
           role: string
           status: string
+          updated_source: string | null
           worker_type: string | null
         }
         Insert: {
           created_at?: string | null
+          created_source?: string | null
           daily_rate?: number | null
           email: string
           hire_date: string
@@ -824,10 +827,12 @@ export type Database = {
           project_id?: string | null
           role: string
           status: string
+          updated_source?: string | null
           worker_type?: string | null
         }
         Update: {
           created_at?: string | null
+          created_source?: string | null
           daily_rate?: number | null
           email?: string
           hire_date?: string
@@ -839,6 +844,7 @@ export type Database = {
           project_id?: string | null
           role?: string
           status?: string
+          updated_source?: string | null
           worker_type?: string | null
         }
         Relationships: [
