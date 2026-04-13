@@ -1695,24 +1695,33 @@ export default function SitePersonnel() {
                             <Table>
                               <TableHeader>
                                 <TableRow>
-                                  <TableHead>Item</TableHead>
+                                  <TableHead className="w-12 text-center">#</TableHead>
+                                  <TableHead className="font-medium">Item</TableHead>
                                   <TableHead>Quantity</TableHead>
-                                  <TableHead>Received By</TableHead>
-                                  <TableHead>Status</TableHead>
-                                  <TableHead className="text-right">Actions</TableHead>
+                                  <TableHead>Scope Assignment</TableHead>
+                                  <TableHead>Recorded By</TableHead>
+                                  <TableHead className="text-right w-24">Actions</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
                                 {groupDeliveries.map((delivery) => (
                                   <TableRow key={delivery.id}>
+                                    <TableCell className="text-center text-muted-foreground">{deliveryList.findIndex(r => r.id === delivery.id) + 1}</TableCell>
                                     <TableCell className="font-medium">{delivery.item_name}</TableCell>
                                     <TableCell>{delivery.quantity} {delivery.unit}</TableCell>
-                                    <TableCell>{delivery.received_by}</TableCell>
-                                    <TableCell>{getStatusBadge(delivery.status)}</TableCell>
+                                    <TableCell>
+                                      {delivery.bom_scope_id ? (
+                                        <Badge variant="secondary">{delivery.bom_scope_of_work?.name || "Unknown Scope"}</Badge>
+                                      ) : (
+                                        <span className="text-muted-foreground italic">Admin / Unassigned</span>
+                                      )}
+                                    </TableCell>
+                                    <TableCell>{delivery.recorded_by || "-"}</TableCell>
                                     <TableCell className="text-right">
-                                      <Button size="sm" variant="ghost" onClick={(e) => {
+                                      <Button size="sm" variant="ghost" onClick={async (e) => {
                                         e.stopPropagation();
-                                        siteService.deleteDelivery(delivery.id).then(loadDeliveries);
+                                        await siteService.deleteDelivery(delivery.id);
+                                        loadDeliveries();
                                       }}>
                                         <Trash2 className="h-4 w-4 text-red-500" />
                                       </Button>
@@ -1721,7 +1730,7 @@ export default function SitePersonnel() {
                                 ))}
                                 {groupDeliveries.length === 0 && (
                                   <TableRow>
-                                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground border-2 border-dashed">
                                       No deliveries recorded for this date.
                                     </TableCell>
                                   </TableRow>
@@ -2164,51 +2173,38 @@ export default function SitePersonnel() {
                                 <TableHeader>
                                   <TableRow>
                                     <TableHead className="w-12 text-center">#</TableHead>
-                                    <TableHead>Worker</TableHead>
-                                    <TableHead>Position</TableHead>
-                                    <TableHead className="w-[200px]">Scope Assignment</TableHead>
-                                    <TableHead className="text-right">Daily Rate</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead className="text-center">Overtime (Hrs)</TableHead>
-                                    <TableHead className="text-right">Total Cost</TableHead>
+                                    <TableHead className="font-medium">Item</TableHead>
+                                    <TableHead>Quantity</TableHead>
+                                    <TableHead>Scope Assignment</TableHead>
+                                    <TableHead>Recorded By</TableHead>
+                                    <TableHead className="text-right w-24">Actions</TableHead>
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                  {(() => {
-                                    const sortedRecords = [...records].sort((a, b) => {
-                                      const scopeA = scopes.find(s => s.id === a.bom_scope_id)?.name || "Z_Admin / Unassigned";
-                                      const scopeB = scopes.find(s => s.id === b.bom_scope_id)?.name || "Z_Admin / Unassigned";
-                                      return scopeA.localeCompare(scopeB);
-                                    });
-
-                                    return sortedRecords.map((record, index) => {
-                                      const daily = record.personnel?.daily_rate || 0;
-                                      const ot = record.personnel?.overtime_rate || 0;
-                                      const hrs = record.hours_worked || 0;
-                                      const oth = record.overtime_hours || 0;
-                                      const rowCost = record.status === "absent" ? 0 : ((daily / 8) * hrs) + (ot * oth);
-
-                                      return (
-                                        <TableRow key={record.id} className={record.status === "absent" ? "bg-muted/50 opacity-75" : ""}>
-                                          <TableCell className="text-center text-muted-foreground">{index + 1}</TableCell>
-                                          <TableCell className="font-medium">{record.personnel?.name || "Unknown"}</TableCell>
-                                          <TableCell>{record.personnel?.role}</TableCell>
-                                          <TableCell>{scopes.find(s => s.id === record.bom_scope_id)?.name || "Admin / Unassigned"}</TableCell>
-                                          <TableCell className="text-right">₱{daily.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                                          <TableCell>
-                                            <span className={`text-sm font-semibold ${record.status === "present" ? "text-green-600" : "text-red-500"}`}>
-                                              {record.status === "present" ? "Present" : "Absent"}
-                                            </span>
-                                          </TableCell>
-                                          <TableCell className="text-center">{record.hours_worked || 0}</TableCell>
-                                          <TableCell className="text-center">{record.overtime_hours || 0}</TableCell>
-                                          <TableCell className="text-right font-semibold text-primary">
-                                            ₱{rowCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                          </TableCell>
-                                        </TableRow>
-                                      );
-                                    });
-                                  })()}
+                                  {groupConsumptions.map((record, index) => (
+                                    <TableRow key={record.id}>
+                                      <TableCell className="text-center text-muted-foreground">{index + 1}</TableCell>
+                                      <TableCell className="font-medium">{record.item_name}</TableCell>
+                                      <TableCell>{record.quantity} {record.unit}</TableCell>
+                                      <TableCell>
+                                        {record.bom_scope_id ? (
+                                          <Badge variant="secondary">{record.bom_scope_of_work?.name || "Unknown Scope"}</Badge>
+                                        ) : (
+                                          <span className="text-muted-foreground italic">Admin / Unassigned</span>
+                                        )}
+                                      </TableCell>
+                                      <TableCell>{record.recorded_by || "-"}</TableCell>
+                                      <TableCell className="text-right">
+                                        <Button size="sm" variant="ghost" onClick={async (e) => {
+                                          e.stopPropagation();
+                                          await siteService.deleteMaterialConsumption(record.id);
+                                          loadConsumptions();
+                                        }}>
+                                          <Trash2 className="h-4 w-4 text-red-500" />
+                                        </Button>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
                                 </TableBody>
                               </Table>
                             )}
