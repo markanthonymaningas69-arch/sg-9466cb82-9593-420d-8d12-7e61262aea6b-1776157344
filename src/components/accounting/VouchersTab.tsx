@@ -43,10 +43,10 @@ export function VouchersTab() {
       accountingService.getVouchers(),
       projectService.getAll()
     ]);
-    // Sort vouchers: drafts first, then by date descending
+    // Sort vouchers: approved first, then by date descending
     const sortedVouchers = (vData.data || []).sort((a, b) => {
-      if (a.status === 'draft' && b.status !== 'draft') return -1;
-      if (a.status !== 'draft' && b.status === 'draft') return 1;
+      if (a.status === 'approved' && b.status !== 'approved') return -1;
+      if (a.status !== 'approved' && b.status === 'approved') return 1;
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
     setVouchers(sortedVouchers);
@@ -54,10 +54,10 @@ export function VouchersTab() {
     setLoading(false);
   };
 
-  const handleApproveDraft = async (id: string) => {
+  const handleIssueVoucher = async (id: string) => {
     const { error } = await supabase.from('vouchers').update({ status: 'issued' }).eq('id', id);
     if (!error) {
-      toast({ title: "Voucher Issued", description: "The draft voucher has been officially issued." });
+      toast({ title: "Voucher Issued", description: "The voucher has been officially marked as issued." });
       loadData();
     } else {
       toast({ title: "Error", description: "Failed to issue voucher", variant: "destructive" });
@@ -286,8 +286,8 @@ export function VouchersTab() {
                     </TableCell>
                     <TableCell>
                       <Badge 
-                        variant={v.status === 'draft' ? 'outline' : 'secondary'} 
-                        className={v.status === 'draft' ? 'bg-orange-50 text-orange-700 border-orange-200 capitalize' : 'capitalize'}
+                        variant={v.status === 'approved' ? 'outline' : 'secondary'} 
+                        className={v.status === 'approved' ? 'bg-orange-50 text-orange-700 border-orange-200 capitalize' : 'capitalize'}
                       >
                         {v.status}
                       </Badge>
@@ -297,8 +297,8 @@ export function VouchersTab() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        {v.status === 'draft' && (
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50" onClick={() => handleApproveDraft(v.id)} title="Issue Voucher">
+                        {v.status === 'approved' && (
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50" onClick={() => handleIssueVoucher(v.id)} title="Mark as Issued">
                             <CheckCircle className="h-4 w-4" />
                           </Button>
                         )}

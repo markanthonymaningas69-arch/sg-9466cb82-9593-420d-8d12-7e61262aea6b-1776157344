@@ -18,7 +18,8 @@ import { supabase } from "@/integrations/supabase/client";
 export default function Accounting() {
   const { currentPlan } = useSettings();
   const [activeTab, setActiveTab] = useState(currentPlan === "starter" ? "payroll" : "dashboard");
-  const [draftVouchersCount, setDraftVouchersCount] = useState(0);
+  const [approvedVouchersCount, setApprovedVouchersCount] = useState(0);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
 
   useEffect(() => {
     if (currentPlan === "starter" && activeTab !== "payroll") {
@@ -27,12 +28,12 @@ export default function Accounting() {
   }, [currentPlan, activeTab]);
 
   useEffect(() => {
-    loadDraftVouchers();
+    loadCounts();
     const channel = supabase
-      .channel('vouchers_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vouchers' }, () => {
-        loadDraftVouchers();
-      })
+      .channel('accounting_badges')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vouchers' }, () => loadCounts())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'site_requests' }, () => loadCounts())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_advance_requests' }, () => loadCounts())
       .subscribe();
 
     return () => {
@@ -40,12 +41,24 @@ export default function Accounting() {
     };
   }, []);
 
-  const loadDraftVouchers = async () => {
-    const { count } = await supabase
+  const loadCounts = async () => {
+    const { count: vCount } = await supabase
       .from('vouchers')
       .select('*', { count: 'exact', head: true })
-      .eq('status', 'draft');
-    setDraftVouchersCount(count || 0);
+      .eq('status', 'approved');
+    setApprovedVouchersCount(vCount || 0);
+
+    const { count: rCount1 } = await supabase
+      .from('site_requests')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending');
+      
+    const { count: rCount2 } = await supabase
+      .from('cash_advance_requests')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending');
+
+    setPendingRequestsCount((rCount1 || 0) + (rCount2 || 0));
   };
 
   return (
@@ -77,9 +90,9 @@ export default function Accounting() {
                   <TabsTrigger value="vouchers" className="flex items-center gap-2">
                     <Receipt className="h-4 w-4" /> 
                     Vouchers
-                    {draftVouchersCount > 0 && (
+                    {approvedVouchersCount > 0 && (
                       <Badge variant="destructive" className="ml-1 h-5 px-1.5 flex items-center justify-center text-[10px]">
-                        {draftVouchersCount}
+                        {approvedVouchersCount}
                       </Badge>
                     )}
                   </TabsTrigger>
@@ -88,6 +101,11 @@ export default function Accounting() {
                   </TabsTrigger>
                   <TabsTrigger value="requests" className="flex items-center gap-2">
                     <FileSearch className="h-4 w-4" /> Requests
+                    {pendingRequestsCount > 0 && (
+                      <Badge variant="destructive" className="ml-1 h-5 px-1.5 flex items-center justify-center text-[10px]">
+                        {pendingRequestsCount}
+                      </Badge>
+                    )}
                   </TabsTrigger>
                   <TabsTrigger value="tax" className="flex items-center gap-2">
                     <FileText className="h-4 w-4" /> Taxation
