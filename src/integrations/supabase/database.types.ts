@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -1256,6 +1256,7 @@ export type Database = {
       }
       site_requests: {
         Row: {
+          amount: number | null
           bom_scope_id: string | null
           created_at: string | null
           id: string
@@ -1264,11 +1265,13 @@ export type Database = {
           project_id: string
           quantity: number
           request_date: string
+          request_type: string | null
           requested_by: string
           status: string | null
           unit: string
         }
         Insert: {
+          amount?: number | null
           bom_scope_id?: string | null
           created_at?: string | null
           id?: string
@@ -1277,11 +1280,13 @@ export type Database = {
           project_id: string
           quantity: number
           request_date?: string
+          request_type?: string | null
           requested_by: string
           status?: string | null
           unit: string
         }
         Update: {
+          amount?: number | null
           bom_scope_id?: string | null
           created_at?: string | null
           id?: string
@@ -1290,6 +1295,7 @@ export type Database = {
           project_id?: string
           quantity?: number
           request_date?: string
+          request_type?: string | null
           requested_by?: string
           status?: string | null
           unit?: string
