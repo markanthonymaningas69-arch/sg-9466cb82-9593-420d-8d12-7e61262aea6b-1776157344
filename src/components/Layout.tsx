@@ -16,7 +16,9 @@ import {
   ShoppingCart,
   Bell,
   User,
-  LogOut
+  LogOut,
+  Check,
+  XCircle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -32,6 +34,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { authService } from "@/services/authService";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -52,6 +55,7 @@ const navigation = [
 
 export function Layout({ children }: LayoutProps) {
   const router = useRouter();
+  const { toast } = useToast();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [notificationOpen, setNotificationOpen] = useState(false);
@@ -71,6 +75,51 @@ export function Layout({ children }: LayoutProps) {
       .order('request_date', { ascending: false })
       .limit(10);
     setPendingRequests(data || []);
+  };
+
+  const handleApproveRequest = async (requestId: string, itemName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const { error } = await supabase
+      .from('site_requests')
+      .update({ status: 'approved' })
+      .eq('id', requestId);
+    
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to approve request",
+        variant: "destructive"
+      });
+    } else {
+      toast({
+        title: "Request Approved",
+        description: `${itemName} has been approved`,
+      });
+      loadPendingRequests();
+    }
+  };
+
+  const handleRejectRequest = async (requestId: string, itemName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const { error } = await supabase
+      .from('site_requests')
+      .update({ status: 'rejected' })
+      .eq('id', requestId);
+    
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to reject request",
+        variant: "destructive"
+      });
+    } else {
+      toast({
+        title: "Request Rejected",
+        description: `${itemName} has been rejected`,
+        variant: "destructive"
+      });
+      loadPendingRequests();
+    }
   };
 
   const handleLogout = async () => {
@@ -214,7 +263,7 @@ export function Layout({ children }: LayoutProps) {
                     {pendingRequests.map((req) => (
                       <DropdownMenuItem 
                         key={req.id} 
-                        className="flex flex-col items-start gap-1 p-3 cursor-pointer"
+                        className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-muted"
                         onClick={() => {
                           router.push('/site-personnel?tab=request');
                           setNotificationOpen(false);
@@ -232,6 +281,26 @@ export function Layout({ children }: LayoutProps) {
                         <span className="text-xs text-muted-foreground">
                           By: {req.requested_by} • {new Date(req.request_date).toLocaleDateString()}
                         </span>
+                        <div className="flex gap-2 w-full mt-1" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="flex-1 h-8 bg-green-600 hover:bg-green-700 text-white"
+                            onClick={(e) => handleApproveRequest(req.id, req.item_name, e)}
+                          >
+                            <Check className="h-3 w-3 mr-1" />
+                            Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="flex-1 h-8"
+                            onClick={(e) => handleRejectRequest(req.id, req.item_name, e)}
+                          >
+                            <XCircle className="h-3 w-3 mr-1" />
+                            Reject
+                          </Button>
+                        </div>
                       </DropdownMenuItem>
                     ))}
                   </ScrollArea>
