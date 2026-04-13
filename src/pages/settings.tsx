@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { 
   Card, 
@@ -30,15 +30,9 @@ import {
 export default function Settings() {
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
-  const { currency, setCurrency } = useSettings();
+  const { currency, setCurrency, company, setCompany } = useSettings();
 
-  const [company, setCompany] = useState({
-    name: "ABC Construction Co.",
-    address: "123 Builder Street, Construction City",
-    taxId: "12-3456789",
-    website: "www.abcconstruction.com"
-  });
-
+  const [localCompany, setLocalCompany] = useState(company);
   const [notifications, setNotifications] = useState({
     emailNotifications: true,
     projectUpdates: true,
@@ -47,11 +41,27 @@ export default function Settings() {
     weeklyDigest: true
   });
 
+  useEffect(() => {
+    setLocalCompany(company);
+  }, [company]);
+
   const handleSaveCompany = () => {
+    setCompany(localCompany);
     toast({
       title: "Company Settings Updated",
       description: "Company information has been saved successfully.",
     });
+  };
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLocalCompany({ ...localCompany, logo: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSaveNotifications = () => {
@@ -104,38 +114,62 @@ export default function Settings() {
                 <CardDescription>Manage your company information</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="companyName">Company Name</Label>
-                    <Input
-                      id="companyName"
-                      value={company.name}
-                      onChange={(e) => setCompany({ ...company, name: e.target.value })}
-                    />
+                <div className="flex flex-col sm:flex-row gap-6 mb-4">
+                  {/* Logo Upload Section */}
+                  <div className="shrink-0 flex flex-col items-center gap-3">
+                    <Label>Company Logo</Label>
+                    {localCompany.logo ? (
+                      <img src={localCompany.logo} alt="Logo" className="h-24 w-24 object-contain rounded-md border bg-white" />
+                    ) : (
+                      <div className="h-24 w-24 rounded-md border bg-muted flex items-center justify-center text-xs text-muted-foreground">
+                        No Logo
+                      </div>
+                    )}
+                    <div className="relative">
+                      <Input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleLogoUpload} 
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                      />
+                      <Button type="button" variant="outline" size="sm">Upload Logo</Button>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="taxId">Tax ID</Label>
-                    <Input
-                      id="taxId"
-                      value={company.taxId}
-                      onChange={(e) => setCompany({ ...company, taxId: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2 col-span-2">
-                    <Label htmlFor="address">Address</Label>
-                    <Input
-                      id="address"
-                      value={company.address}
-                      onChange={(e) => setCompany({ ...company, address: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2 col-span-2">
-                    <Label htmlFor="website">Website</Label>
-                    <Input
-                      id="website"
-                      value={company.website}
-                      onChange={(e) => setCompany({ ...company, website: e.target.value })}
-                    />
+
+                  {/* Company Info Fields */}
+                  <div className="grid grid-cols-2 gap-4 flex-1">
+                    <div className="space-y-2">
+                      <Label htmlFor="companyName">Company Name</Label>
+                      <Input
+                        id="companyName"
+                        value={localCompany.name}
+                        onChange={(e) => setLocalCompany({ ...localCompany, name: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="taxId">Tax ID</Label>
+                      <Input
+                        id="taxId"
+                        value={localCompany.taxId}
+                        onChange={(e) => setLocalCompany({ ...localCompany, taxId: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2 col-span-2">
+                      <Label htmlFor="address">Office Address</Label>
+                      <Input
+                        id="address"
+                        value={localCompany.address}
+                        onChange={(e) => setLocalCompany({ ...localCompany, address: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2 col-span-2">
+                      <Label htmlFor="website">Website</Label>
+                      <Input
+                        id="website"
+                        value={localCompany.website}
+                        onChange={(e) => setLocalCompany({ ...localCompany, website: e.target.value })}
+                      />
+                    </div>
                   </div>
                 </div>
                 <Button onClick={handleSaveCompany} className="flex items-center gap-2">

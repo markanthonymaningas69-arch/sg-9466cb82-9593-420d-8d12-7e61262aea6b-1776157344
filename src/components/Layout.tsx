@@ -35,6 +35,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { authService } from "@/services/authService";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import { useSettings } from "@/contexts/SettingsProvider";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -56,6 +57,7 @@ const navigation = [
 export function Layout({ children }: LayoutProps) {
   const router = useRouter();
   const { toast } = useToast();
+  const { company } = useSettings();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [notificationOpen, setNotificationOpen] = useState(false);
@@ -144,16 +146,22 @@ export function Layout({ children }: LayoutProps) {
       )}>
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center justify-between h-16 px-6 border-b">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
-                TX
-              </div>
-              <div>
-                <h1 className="text-lg font-heading font-bold text-primary leading-tight">
-                  Thea-X
+          <div className="flex items-center justify-between h-16 px-4 border-b">
+            <div className="flex items-center gap-3 overflow-hidden">
+              {company.logo ? (
+                <img src={company.logo} alt="Logo" className="h-10 w-10 shrink-0 rounded-lg object-contain bg-white border" />
+              ) : (
+                <div className="h-10 w-10 shrink-0 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
+                  {company.name ? company.name.substring(0, 2).toUpperCase() : "TX"}
+                </div>
+              )}
+              <div className="flex flex-col min-w-0">
+                <h1 className="text-sm font-heading font-bold text-primary leading-tight truncate">
+                  {company.name || "Thea-X"}
                 </h1>
-                <p className="text-xs text-muted-foreground">Construction Accounting System</p>
+                <p className="text-[10px] text-muted-foreground truncate" title={company.address}>
+                  {company.address || "Construction Accounting System"}
+                </p>
               </div>
             </div>
             <Button
