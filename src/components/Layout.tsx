@@ -57,7 +57,7 @@ const navigation = [
 export function Layout({ children }: LayoutProps) {
   const router = useRouter();
   const { toast } = useToast();
-  const { company, currentPlan } = useSettings();
+  const { company, currentPlan, currency } = useSettings();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [pendingLeaves, setPendingLeaves] = useState<any[]>([]);
@@ -168,7 +168,7 @@ export function Layout({ children }: LayoutProps) {
     e.stopPropagation();
     const { error } = await supabase.from('cash_advance_requests').update({ status: 'approved' }).eq('id', id);
     if (!error) {
-      toast({ title: "Cash Advance Approved", description: `${name}'s request for ${company?.currency || '$'}${amount} approved.` });
+      toast({ title: "Cash Advance Approved", description: `${name}'s request for ${currency || '$'}${amount} approved.` });
       loadPendingRequests();
     } else {
       toast({ title: "Error", description: "Failed to approve request", variant: "destructive" });
@@ -369,7 +369,7 @@ export function Layout({ children }: LayoutProps) {
                         <div className="flex items-start justify-between w-full">
                           <span className="font-medium text-sm">{adv.personnel?.name}</span>
                           <Badge variant="outline" className="text-xs text-orange-600 border-orange-200 bg-orange-50">
-                            {company?.currency || '$'} {adv.amount}
+                            {currency || '$'} {adv.amount}
                           </Badge>
                         </div>
                         <span className="text-xs text-muted-foreground">
