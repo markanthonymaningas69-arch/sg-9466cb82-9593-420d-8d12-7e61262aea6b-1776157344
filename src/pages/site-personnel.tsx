@@ -1024,7 +1024,6 @@ export default function SitePersonnel() {
                         {projectPersonnelList.length === 0 && (
                           <TableRow>
                             <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
-                              No manpower enrolled in this project yet.
                             </TableCell>
                           </TableRow>
                         )}
@@ -1698,25 +1697,19 @@ export default function SitePersonnel() {
                                   <TableHead className="w-12 text-center">#</TableHead>
                                   <TableHead className="font-medium">Item</TableHead>
                                   <TableHead>Quantity</TableHead>
-                                  <TableHead>Scope Assignment</TableHead>
-                                  <TableHead>Recorded By</TableHead>
+                                  <TableHead>Received By</TableHead>
+                                  <TableHead>Notes</TableHead>
                                   <TableHead className="text-right w-24">Actions</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {groupDeliveries.map((delivery) => (
+                                {groupDeliveries.map((delivery, index) => (
                                   <TableRow key={delivery.id}>
-                                    <TableCell className="text-center text-muted-foreground">{deliveryList.findIndex(r => r.id === delivery.id) + 1}</TableCell>
+                                    <TableCell className="text-center text-muted-foreground">{index + 1}</TableCell>
                                     <TableCell className="font-medium">{delivery.item_name}</TableCell>
                                     <TableCell>{delivery.quantity} {delivery.unit}</TableCell>
-                                    <TableCell>
-                                      {delivery.bom_scope_id ? (
-                                        <Badge variant="secondary">{delivery.bom_scope_of_work?.name || "Unknown Scope"}</Badge>
-                                      ) : (
-                                        <span className="text-muted-foreground italic">Admin / Unassigned</span>
-                                      )}
-                                    </TableCell>
-                                    <TableCell>{delivery.recorded_by || "-"}</TableCell>
+                                    <TableCell>{delivery.received_by || "-"}</TableCell>
+                                    <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate" title={delivery.notes}>{delivery.notes || "-"}</TableCell>
                                     <TableCell className="text-right">
                                       <Button size="sm" variant="ghost" onClick={async (e) => {
                                         e.stopPropagation();
