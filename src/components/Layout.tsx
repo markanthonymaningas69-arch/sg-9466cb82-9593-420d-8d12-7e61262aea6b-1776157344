@@ -430,7 +430,7 @@ export function Layout({ children }: LayoutProps) {
                           </div>
                           <Badge variant="outline" className="text-xs">
                             {req.quantity > 0 ? `${req.quantity} ${req.unit}` : ''}
-                            {req.amount > 0 ? ` ${company?.currency || '$'}${req.amount}` : ''}
+                            {req.amount > 0 ? ` ${currency || '$'}${req.amount}` : ''}
                           </Badge>
                         </div>
                         <span className="text-xs text-muted-foreground">

@@ -564,11 +564,14 @@ export default function SitePersonnel() {
 
   const resetRequestForm = () => {
     setRequestForm({
+      request_type: "Materials",
       bom_scope_id: "unassigned",
       request_date: todayStr,
       item_name: "",
+      personnel_id: "",
       quantity: 0,
       unit: "",
+      amount: 0,
       requested_by: "",
       notes: ""
     });
