@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-empty-object-type */
+ 
 export type Json =
   | string
   | number
@@ -866,6 +866,7 @@ export type Database = {
           issue_date: string
           passport_expiry_date: string | null
           passport_issue_date: string | null
+          passport_number: string | null
           personnel_id: string | null
           status: string | null
           visa_expiry_date: string | null
@@ -880,6 +881,7 @@ export type Database = {
           issue_date: string
           passport_expiry_date?: string | null
           passport_issue_date?: string | null
+          passport_number?: string | null
           personnel_id?: string | null
           status?: string | null
           visa_expiry_date?: string | null
@@ -894,6 +896,7 @@ export type Database = {
           issue_date?: string
           passport_expiry_date?: string | null
           passport_issue_date?: string | null
+          passport_number?: string | null
           personnel_id?: string | null
           status?: string | null
           visa_expiry_date?: string | null

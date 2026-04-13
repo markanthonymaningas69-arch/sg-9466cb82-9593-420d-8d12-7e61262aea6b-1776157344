@@ -27,16 +27,18 @@ export default function Personnel() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [attendance, setAttendance] = useState<any[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
-  const [payroll, setPayroll] = useState<any[]>([]);
   const [visas, setVisas] = useState<any[]>([]);
   
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [attendanceDialogOpen, setAttendanceDialogOpen] = useState(false);
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
-  const [payrollDialogOpen, setPayrollDialogOpen] = useState(false);
   const [visaDialogOpen, setVisaDialogOpen] = useState(false);
   const [editingPersonnel, setEditingPersonnel] = useState<Personnel | null>(null);
+
+  // Attendance Date Filters
+  const [attStartDate, setAttStartDate] = useState(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]);
+  const [attEndDate, setAttEndDate] = useState(new Date().toISOString().split("T")[0]);
   
   const [formData, setFormData] = useState({
     name: "",
@@ -74,22 +76,15 @@ export default function Personnel() {
     status: "pending" as const
   });
 
-  const [payrollForm, setPayrollForm] = useState({
-    personnel_id: "",
-    pay_period_start: new Date().toISOString().substring(0, 8) + "01",
-    pay_period_end: new Date().toISOString().split("T")[0],
-    regular_hours: "160",
-    overtime_hours: "0",
-    deductions: "0",
-    status: "pending" as const
-  });
-
   const [visaForm, setVisaForm] = useState({
     personnel_id: "",
     visa_number: "",
+    visa_issue_date: "",
+    visa_expiry_date: "",
+    passport_number: "",
+    passport_issue_date: "",
+    passport_expiry_date: "",
     country: "",
-    issue_date: new Date().toISOString().split("T")[0],
-    expiry_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split("T")[0]
   });
 
   useEffect(() => {
@@ -97,15 +92,11 @@ export default function Personnel() {
   }, []);
 
   const loadData = async () => {
-    const [personnelData, projectsData, attendanceData, leaveData, payrollData, visaData] = await Promise.all([
+    const [personnelData, projectsData, attendanceData, leaveData, visaData] = await Promise.all([
       personnelService.getAll(),
       projectService.getAll(),
-      personnelService.getAttendance(
-        new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-        new Date().toISOString().split("T")[0]
-      ),
+      personnelService.getAttendance(attStartDate, attEndDate),
       personnelService.getLeaveRequests(),
-      personnelService.getPayroll(new Date().toISOString().substring(0, 8) + "01"),
       personnelService.getVisas()
     ]);
     
@@ -113,7 +104,6 @@ export default function Personnel() {
     setProjects(projectsData.data || []);
     setAttendance(attendanceData.data || []);
     setLeaveRequests(leaveData.data || []);
-    setPayroll(payrollData.data || []);
     setVisas(visaData.data || []);
     setLoading(false);
   };
@@ -177,33 +167,6 @@ export default function Personnel() {
     loadData();
   };
 
-  const handlePayrollSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const person = personnel.find(p => p.id === payrollForm.personnel_id);
-    const regularHours = parseFloat(payrollForm.regular_hours);
-    const overtimeHours = parseFloat(payrollForm.overtime_hours);
-    const hourlyRate = person?.hourly_rate || 0;
-    const grossPay = (regularHours * hourlyRate) + (overtimeHours * hourlyRate * 1.5);
-    const deductions = parseFloat(payrollForm.deductions);
-    const netPay = grossPay - deductions;
-
-    await personnelService.generatePayroll({
-      personnel_id: payrollForm.personnel_id,
-      pay_period_start: payrollForm.pay_period_start,
-      pay_period_end: payrollForm.pay_period_end,
-      regular_hours: regularHours,
-      overtime_hours: overtimeHours,
-      hourly_rate: hourlyRate,
-      gross_pay: grossPay,
-      deductions,
-      net_pay: netPay,
-      status: payrollForm.status
-    });
-    setPayrollDialogOpen(false);
-    resetPayrollForm();
-    loadData();
-  };
-
   const handleVisaSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await personnelService.addVisa(visaForm);
@@ -237,14 +200,11 @@ export default function Personnel() {
     }
   };
 
-  const handleLeaveApproval = async (id: string, status: string) => {
-    await personnelService.updateLeaveStatus(id, status);
-    loadData();
-  };
-
-  const handlePayrollApproval = async (id: string, status: string) => {
-    await personnelService.updatePayrollStatus(id, status);
-    loadData();
+  const handleDeleteLeave = async (id: string) => {
+    if (confirm("Are you sure you want to delete this leave request?")) {
+      await personnelService.deleteLeaveRequest(id);
+      loadData();
+    }
   };
 
   const resetForm = () => {
@@ -287,25 +247,16 @@ export default function Personnel() {
     });
   };
 
-  const resetPayrollForm = () => {
-    setPayrollForm({
-      personnel_id: "",
-      pay_period_start: new Date().toISOString().substring(0, 8) + "01",
-      pay_period_end: new Date().toISOString().split("T")[0],
-      regular_hours: "160",
-      overtime_hours: "0",
-      deductions: "0",
-      status: "pending"
-    });
-  };
-
   const resetVisaForm = () => {
     setVisaForm({
       personnel_id: "",
       visa_number: "",
+      visa_issue_date: "",
+      visa_expiry_date: "",
+      passport_number: "",
+      passport_issue_date: "",
+      passport_expiry_date: "",
       country: "",
-      issue_date: new Date().toISOString().split("T")[0],
-      expiry_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split("T")[0]
     });
   };
 
@@ -326,7 +277,6 @@ export default function Personnel() {
   const filteredPersonnel = personnel.filter(p => (p.worker_type || 'construction') === workerFilter);
   const filteredAttendance = attendance.filter(a => (a.personnel?.worker_type || 'construction') === workerFilter);
   const filteredLeaveRequests = leaveRequests.filter(l => (l.personnel?.worker_type || 'construction') === workerFilter);
-  const filteredPayroll = payroll.filter(p => (p.personnel?.worker_type || 'construction') === workerFilter);
   const filteredVisas = visas.filter(v => (v.personnel?.worker_type || 'construction') === workerFilter);
 
   if (loading) {
@@ -369,7 +319,7 @@ export default function Personnel() {
         </div>
 
         <Tabs defaultValue="personnel" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 h-auto">
             <TabsTrigger value="personnel" className="py-2.5">
               <UserCheck className="h-4 w-4 mr-2" />
               Personnel
@@ -382,14 +332,10 @@ export default function Personnel() {
               <Calendar className="h-4 w-4 mr-2" />
               Leave
             </TabsTrigger>
-            <TabsTrigger value="payroll" className="py-2.5">
-              <DollarSign className="h-4 w-4 mr-2" />
-              Payroll
-            </TabsTrigger>
             {currency !== "PHP" && (
               <TabsTrigger value="visa" className="py-2.5">
                 <PassportIcon className="h-4 w-4 mr-2" />
-                Visa
+                Visa & Passport
               </TabsTrigger>
             )}
           </TabsList>
@@ -677,7 +623,25 @@ export default function Personnel() {
           </TabsContent>
 
           <TabsContent value="attendance" className="space-y-4">
-            <div className="flex justify-end">
+            <div className="flex flex-col sm:flex-row justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-md">
+                  <Input
+                    type="date"
+                    value={attStartDate}
+                    onChange={(e) => setAttStartDate(e.target.value)}
+                    className="h-9"
+                  />
+                  <span className="text-muted-foreground text-sm px-1">to</span>
+                  <Input
+                    type="date"
+                    value={attEndDate}
+                    onChange={(e) => setAttEndDate(e.target.value)}
+                    className="h-9"
+                  />
+                  <Button variant="secondary" onClick={loadData} className="h-9">Filter</Button>
+                </div>
+              </div>
               <Dialog open={attendanceDialogOpen} onOpenChange={setAttendanceDialogOpen}>
                 <DialogTrigger asChild>
                   <Button onClick={resetAttendanceForm}>
@@ -772,39 +736,45 @@ export default function Personnel() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Attendance Records</CardTitle>
+                <CardTitle>Attendance Summary</CardTitle>
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Date</TableHead>
                       <TableHead>Personnel</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Regular Hours</TableHead>
-                      <TableHead>Overtime</TableHead>
-                      <TableHead>Notes</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Days Worked</TableHead>
+                      <TableHead>Days Absent</TableHead>
+                      <TableHead>Total Regular Hours</TableHead>
+                      <TableHead>Total Overtime</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredAttendance.map((record) => (
-                      <TableRow key={record.id}>
-                        <TableCell>{new Date(record.date).toLocaleDateString()}</TableCell>
-                        <TableCell className="font-medium">{record.personnel?.name}</TableCell>
-                        <TableCell>
-                          <Badge className={statusColors[record.status]}>
-                            {record.status.replace("_", " ")}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{record.hours_worked}h</TableCell>
-                        <TableCell>{record.overtime_hours}h</TableCell>
-                        <TableCell className="max-w-xs truncate">{record.notes || "-"}</TableCell>
-                      </TableRow>
-                    ))}
+                    {filteredPersonnel.map((person) => {
+                      const records = filteredAttendance.filter(a => a.personnel_id === person.id);
+                      const daysWorked = records.filter(a => ['present', 'half_day', 'late'].includes(a.status)).length;
+                      const daysAbsent = records.filter(a => a.status === 'absent').length;
+                      const totalHours = records.reduce((sum, a) => sum + (Number(a.hours_worked) || 0), 0);
+                      const totalOvertime = records.reduce((sum, a) => sum + (Number(a.overtime_hours) || 0), 0);
+
+                      if (daysWorked === 0 && daysAbsent === 0) return null;
+
+                      return (
+                        <TableRow key={person.id}>
+                          <TableCell className="font-medium">{person.name}</TableCell>
+                          <TableCell>{person.role}</TableCell>
+                          <TableCell className="font-semibold text-green-600">{daysWorked}</TableCell>
+                          <TableCell className="font-semibold text-red-600">{daysAbsent}</TableCell>
+                          <TableCell>{totalHours}h</TableCell>
+                          <TableCell>{totalOvertime}h</TableCell>
+                        </TableRow>
+                      );
+                    })}
                     {filteredAttendance.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
-                          No attendance records found.
+                          No attendance records found for this period.
                         </TableCell>
                       </TableRow>
                     )}
@@ -932,16 +902,9 @@ export default function Personnel() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          {leave.status === "pending" && (
-                            <div className="flex justify-end gap-2">
-                              <Button size="sm" variant="outline" onClick={() => handleLeaveApproval(leave.id, "approved")}>
-                                Approve
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => handleLeaveApproval(leave.id, "rejected")}>
-                                Reject
-                              </Button>
-                            </div>
-                          )}
+                          <Button size="icon" variant="ghost" onClick={() => handleDeleteLeave(leave.id)}>
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -958,158 +921,6 @@ export default function Personnel() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="payroll" className="space-y-4">
-            <div className="flex justify-end">
-              <Dialog open={payrollDialogOpen} onOpenChange={setPayrollDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button onClick={resetPayrollForm}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Generate Payroll
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Generate Payroll</DialogTitle>
-                  </DialogHeader>
-                  <form onSubmit={handlePayrollSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="pay_personnel">Personnel *</Label>
-                      <Select value={payrollForm.personnel_id} onValueChange={(value) => setPayrollForm({ ...payrollForm, personnel_id: value })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select personnel" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {filteredPersonnel.map((person) => (
-                            <SelectItem key={person.id} value={person.id}>
-                              {person.name} - {currency} {person.hourly_rate}/hr
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="pay_period_start">Period Start *</Label>
-                        <Input
-                          id="pay_period_start"
-                          type="date"
-                          value={payrollForm.pay_period_start}
-                          onChange={(e) => setPayrollForm({ ...payrollForm, pay_period_start: e.target.value })}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="pay_period_end">Period End *</Label>
-                        <Input
-                          id="pay_period_end"
-                          type="date"
-                          value={payrollForm.pay_period_end}
-                          onChange={(e) => setPayrollForm({ ...payrollForm, pay_period_end: e.target.value })}
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="regular_hours">Regular Hours</Label>
-                        <Input
-                          id="regular_hours"
-                          type="number"
-                          step="0.5"
-                          value={payrollForm.regular_hours}
-                          onChange={(e) => setPayrollForm({ ...payrollForm, regular_hours: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="pay_overtime">Overtime Hours</Label>
-                        <Input
-                          id="pay_overtime"
-                          type="number"
-                          step="0.5"
-                          value={payrollForm.overtime_hours}
-                          onChange={(e) => setPayrollForm({ ...payrollForm, overtime_hours: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="deductions">Deductions ({currency})</Label>
-                        <Input
-                          id="deductions"
-                          type="number"
-                          step="0.01"
-                          value={payrollForm.deductions}
-                          onChange={(e) => setPayrollForm({ ...payrollForm, deductions: e.target.value })}
-                        />
-                      </div>
-                    </div>
-                    <div className="flex justify-end gap-2 pt-4">
-                      <Button type="button" variant="outline" onClick={() => setPayrollDialogOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button type="submit">Generate</Button>
-                    </div>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Payroll Records</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Personnel</TableHead>
-                      <TableHead>Period</TableHead>
-                      <TableHead>Regular Hours</TableHead>
-                      <TableHead>Overtime</TableHead>
-                      <TableHead>Gross Pay</TableHead>
-                      <TableHead>Deductions</TableHead>
-                      <TableHead>Net Pay</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredPayroll.map((record) => (
-                      <TableRow key={record.id}>
-                        <TableCell className="font-medium">{record.personnel?.name}</TableCell>
-                        <TableCell>
-                          {new Date(record.pay_period_start).toLocaleDateString()} - {new Date(record.pay_period_end).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>{record.regular_hours}h</TableCell>
-                        <TableCell>{record.overtime_hours}h</TableCell>
-                        <TableCell>{currency} {record.gross_pay.toLocaleString()}</TableCell>
-                        <TableCell>{currency} {record.deductions.toLocaleString()}</TableCell>
-                        <TableCell className="font-semibold">{currency} {record.net_pay.toLocaleString()}</TableCell>
-                        <TableCell>
-                          <Badge className={statusColors[record.status]}>
-                            {record.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {record.status === "pending" && (
-                            <Button size="sm" onClick={() => handlePayrollApproval(record.id, "paid")}>
-                              Mark Paid
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {filteredPayroll.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={9} className="text-center py-6 text-muted-foreground">
-                          No payroll records found.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           {currency !== "PHP" && (
             <TabsContent value="visa" className="space-y-4">
               <div className="flex justify-end">
@@ -1117,75 +928,111 @@ export default function Personnel() {
                   <DialogTrigger asChild>
                     <Button onClick={resetVisaForm}>
                       <Plus className="h-4 w-4 mr-2" />
-                      Add Visa Record
+                      Add Document Record
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent className="max-w-2xl">
                     <DialogHeader>
-                      <DialogTitle>Add Visa Record</DialogTitle>
+                      <DialogTitle>Add Visa & Passport Record</DialogTitle>
                     </DialogHeader>
                     <form onSubmit={handleVisaSubmit} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="visa_personnel">Personnel *</Label>
-                        <Select value={visaForm.personnel_id} onValueChange={(value) => setVisaForm({ ...visaForm, personnel_id: value })}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select personnel" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {filteredPersonnel.map((person) => (
-                              <SelectItem key={person.id} value={person.id}>
-                                {person.name} - {person.role}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="visa_number">Visa/Passport Number *</Label>
-                        <Input
-                          id="visa_number"
-                          value={visaForm.visa_number}
-                          onChange={(e) => setVisaForm({ ...visaForm, visa_number: e.target.value })}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="country">Country of Issue *</Label>
-                        <Input
-                          id="country"
-                          value={visaForm.country}
-                          onChange={(e) => setVisaForm({ ...visaForm, country: e.target.value })}
-                          placeholder="e.g. UAE, Qatar, USA"
-                          required
-                        />
-                      </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="issue_date">Issue Date *</Label>
-                          <Input
-                            id="issue_date"
-                            type="date"
-                            value={visaForm.issue_date}
-                            onChange={(e) => setVisaForm({ ...visaForm, issue_date: e.target.value })}
-                            required
-                          />
+                          <Label htmlFor="visa_personnel">Personnel *</Label>
+                          <Select value={visaForm.personnel_id} onValueChange={(value) => setVisaForm({ ...visaForm, personnel_id: value })}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select personnel" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {filteredPersonnel.map((person) => (
+                                <SelectItem key={person.id} value={person.id}>
+                                  {person.name} - {person.role}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="expiry_date">Expiry Date *</Label>
+                          <Label htmlFor="country">Country of Issue *</Label>
                           <Input
-                            id="expiry_date"
-                            type="date"
-                            value={visaForm.expiry_date}
-                            onChange={(e) => setVisaForm({ ...visaForm, expiry_date: e.target.value })}
+                            id="country"
+                            value={visaForm.country}
+                            onChange={(e) => setVisaForm({ ...visaForm, country: e.target.value })}
+                            placeholder="e.g. UAE, Qatar, USA"
                             required
                           />
                         </div>
                       </div>
-                      <div className="flex justify-end gap-2 pt-4">
+
+                      <div className="grid grid-cols-2 gap-8 border-t pt-4">
+                        {/* Passport Details */}
+                        <div className="space-y-4">
+                          <h4 className="font-semibold text-sm text-primary">Passport Details</h4>
+                          <div className="space-y-2">
+                            <Label htmlFor="passport_number">Passport Number</Label>
+                            <Input
+                              id="passport_number"
+                              value={visaForm.passport_number}
+                              onChange={(e) => setVisaForm({ ...visaForm, passport_number: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="passport_issue_date">Issue Date</Label>
+                            <Input
+                              id="passport_issue_date"
+                              type="date"
+                              value={visaForm.passport_issue_date}
+                              onChange={(e) => setVisaForm({ ...visaForm, passport_issue_date: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="passport_expiry_date">Expiry Date</Label>
+                            <Input
+                              id="passport_expiry_date"
+                              type="date"
+                              value={visaForm.passport_expiry_date}
+                              onChange={(e) => setVisaForm({ ...visaForm, passport_expiry_date: e.target.value })}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Visa Details */}
+                        <div className="space-y-4">
+                          <h4 className="font-semibold text-sm text-primary">Visa Details</h4>
+                          <div className="space-y-2">
+                            <Label htmlFor="visa_number">Visa Number</Label>
+                            <Input
+                              id="visa_number"
+                              value={visaForm.visa_number}
+                              onChange={(e) => setVisaForm({ ...visaForm, visa_number: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="visa_issue_date">Issue Date</Label>
+                            <Input
+                              id="visa_issue_date"
+                              type="date"
+                              value={visaForm.visa_issue_date}
+                              onChange={(e) => setVisaForm({ ...visaForm, visa_issue_date: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="visa_expiry_date">Expiry Date</Label>
+                            <Input
+                              id="visa_expiry_date"
+                              type="date"
+                              value={visaForm.visa_expiry_date}
+                              onChange={(e) => setVisaForm({ ...visaForm, visa_expiry_date: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-4 border-t">
                         <Button type="button" variant="outline" onClick={() => setVisaDialogOpen(false)}>
                           Cancel
                         </Button>
-                        <Button type="submit">Save</Button>
+                        <Button type="submit">Save Record</Button>
                       </div>
                     </form>
                   </DialogContent>
@@ -1201,23 +1048,28 @@ export default function Personnel() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Personnel</TableHead>
-                        <TableHead>Visa / Passport No.</TableHead>
                         <TableHead>Country</TableHead>
-                        <TableHead>Issue Date</TableHead>
-                        <TableHead>Expiry Date</TableHead>
+                        <TableHead>Passport No.</TableHead>
+                        <TableHead>Passport Expiry</TableHead>
+                        <TableHead>Visa No.</TableHead>
+                        <TableHead>Visa Expiry</TableHead>
                         <TableHead>Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredVisas.map((record) => {
-                        const daysToExpiry = Math.ceil((new Date(record.expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24));
+                        const daysToPassportExpiry = record.passport_expiry_date ? Math.ceil((new Date(record.passport_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
+                        const daysToVisaExpiry = record.visa_expiry_date ? Math.ceil((new Date(record.visa_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
+                        
+                        const minDays = Math.min(daysToPassportExpiry, daysToVisaExpiry);
+                        
                         let statusColor = "bg-green-100 text-green-800";
                         let statusText = "Active";
                         
-                        if (daysToExpiry < 0) {
+                        if (minDays < 0) {
                           statusColor = "bg-red-100 text-red-800";
                           statusText = "Expired";
-                        } else if (daysToExpiry < 30) {
+                        } else if (minDays < 30) {
                           statusColor = "bg-orange-100 text-orange-800";
                           statusText = "Expiring Soon";
                         }
@@ -1225,11 +1077,14 @@ export default function Personnel() {
                         return (
                           <TableRow key={record.id}>
                             <TableCell className="font-medium">{record.personnel?.name}</TableCell>
-                            <TableCell className="font-mono">{record.visa_number}</TableCell>
                             <TableCell>{record.country}</TableCell>
-                            <TableCell>{new Date(record.issue_date).toLocaleDateString()}</TableCell>
-                            <TableCell className={daysToExpiry < 30 ? "text-red-600 font-medium" : ""}>
-                              {new Date(record.expiry_date).toLocaleDateString()}
+                            <TableCell className="font-mono text-sm">{record.passport_number || "-"}</TableCell>
+                            <TableCell className={daysToPassportExpiry < 30 ? "text-red-600 font-medium" : ""}>
+                              {record.passport_expiry_date ? new Date(record.passport_expiry_date).toLocaleDateString() : "-"}
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">{record.visa_number || "-"}</TableCell>
+                            <TableCell className={daysToVisaExpiry < 30 ? "text-red-600 font-medium" : ""}>
+                              {record.visa_expiry_date ? new Date(record.visa_expiry_date).toLocaleDateString() : "-"}
                             </TableCell>
                             <TableCell>
                               <Badge className={statusColor}>{statusText}</Badge>
@@ -1239,8 +1094,8 @@ export default function Personnel() {
                       })}
                       {filteredVisas.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
-                            No visa records found.
+                          <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
+                            No documents found.
                           </TableCell>
                         </TableRow>
                       )}

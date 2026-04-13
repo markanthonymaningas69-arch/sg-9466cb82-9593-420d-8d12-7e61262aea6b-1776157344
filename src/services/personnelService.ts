@@ -131,6 +131,15 @@ export const personnelService = {
     return { data, error };
   },
 
+  async deleteLeaveRequest(id: string) {
+    const { error } = await supabase
+      .from("leave_requests")
+      .delete()
+      .eq("id", id);
+    
+    return { error };
+  },
+
   // Payroll Management
   async getPayroll(periodStart: string) {
     const { data, error } = await supabase

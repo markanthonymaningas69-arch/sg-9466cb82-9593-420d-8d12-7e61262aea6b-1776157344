@@ -1,0 +1,1 @@
+ALTER TABLE personnel_visas ADD COLUMN IF NOT EXISTS passport_number text;
