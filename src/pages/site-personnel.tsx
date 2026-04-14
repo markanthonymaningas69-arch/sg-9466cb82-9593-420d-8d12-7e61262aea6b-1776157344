@@ -541,7 +541,9 @@ export default function SitePersonnel() {
         request_type: requestForm.request_type,
         form_number: requestForm.form_number,
         requested_by: personName,
-        status: 'pending'
+        status: 'pending',
+        quantity: 1,
+        unit: 'lot'
       });
     } else {
       if (requestItems.length === 0) {
