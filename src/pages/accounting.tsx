@@ -20,6 +20,10 @@ export default function Accounting() {
   const [activeTab, setActiveTab] = useState(currentPlan === "starter" ? "payroll" : "dashboard");
   const [approvedVouchersCount, setApprovedVouchersCount] = useState(0);
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+  const [approvedVoucherIds, setApprovedVoucherIds] = useState("");
+  const [pendingReqIds, setPendingReqIds] = useState("");
+  const [seenVoucherIds, setSeenVoucherIds] = useState("");
+  const [seenReqIds, setSeenReqIds] = useState("");
 
   useEffect(() => {
     if (currentPlan === "starter" && activeTab !== "payroll") {
@@ -41,24 +45,41 @@ export default function Accounting() {
     };
   }, []);
 
-  const loadCounts = async () => {
-    const { count: vCount } = await supabase
-      .from('vouchers')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'approved');
-    setApprovedVouchersCount(vCount || 0);
+  useEffect(() => {
+    if (activeTab === 'vouchers') {
+      setSeenVoucherIds(approvedVoucherIds);
+    }
+  }, [activeTab, approvedVoucherIds]);
 
-    const { count: rCount1 } = await supabase
+  useEffect(() => {
+    if (activeTab === 'requests') {
+      setSeenReqIds(pendingReqIds);
+    }
+  }, [activeTab, pendingReqIds]);
+
+  const loadCounts = async () => {
+    const { data: vData } = await supabase
+      .from('vouchers')
+      .select('id')
+      .eq('status', 'approved');
+    
+    const vIds = (vData || []).map(v => v.id).sort().join(',');
+    setApprovedVoucherIds(vIds);
+    setApprovedVouchersCount(vData?.length || 0);
+
+    const { data: r1 } = await supabase
       .from('site_requests')
-      .select('*', { count: 'exact', head: true })
+      .select('id')
       .eq('status', 'pending');
       
-    const { count: rCount2 } = await supabase
+    const { data: r2 } = await supabase
       .from('cash_advance_requests')
-      .select('*', { count: 'exact', head: true })
+      .select('id')
       .eq('status', 'pending');
 
-    setPendingRequestsCount((rCount1 || 0) + (rCount2 || 0));
+    const rIds = [...(r1 || []), ...(r2 || [])].map(r => r.id).sort().join(',');
+    setPendingReqIds(rIds);
+    setPendingRequestsCount((r1?.length || 0) + (r2?.length || 0));
   };
 
   return (
@@ -90,9 +111,9 @@ export default function Accounting() {
                   <TabsTrigger value="vouchers" className="flex items-center gap-2">
                     <Receipt className="h-4 w-4" /> 
                     Vouchers
-                    {approvedVouchersCount > 0 && (
+                    {approvedVouchersCount > 0 && approvedVoucherIds !== seenVoucherIds && activeTab !== 'vouchers' && (
                       <Badge variant="destructive" className="ml-1 h-5 px-1.5 flex items-center justify-center text-[10px]">
-                        {approvedVouchersCount}
+                        New
                       </Badge>
                     )}
                   </TabsTrigger>
@@ -101,9 +122,9 @@ export default function Accounting() {
                   </TabsTrigger>
                   <TabsTrigger value="requests" className="flex items-center gap-2">
                     <FileSearch className="h-4 w-4" /> Requests
-                    {pendingRequestsCount > 0 && (
+                    {pendingRequestsCount > 0 && pendingReqIds !== seenReqIds && activeTab !== 'requests' && (
                       <Badge variant="destructive" className="ml-1 h-5 px-1.5 flex items-center justify-center text-[10px]">
-                        {pendingRequestsCount}
+                        New
                       </Badge>
                     )}
                   </TabsTrigger>

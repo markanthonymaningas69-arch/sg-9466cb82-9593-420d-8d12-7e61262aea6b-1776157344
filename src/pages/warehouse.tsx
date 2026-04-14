@@ -434,7 +434,7 @@ export default function Warehouse() {
             </TabsTrigger>
           </TabsList>
 
-          <div className="bg-muted/30 p-3 mt-4 border rounded-lg flex flex-wrap gap-4 shrink-0">
+          <div className="bg-muted/30 p-3 mt-4 border rounded-lg flex flex-wrap items-end gap-4 shrink-0">
             <div className="space-y-1">
               <Label className="text-xs">Filter by Category:</Label>
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
@@ -464,10 +464,7 @@ export default function Warehouse() {
             )}
 
             <div className="space-y-1">
-              <Label className="text-xs flex justify-between w-[200px]">
-                <span>Filter by Date:</span>
-                {dateFilter && <button className="text-destructive hover:underline" onClick={() => setDateFilter("")}>Clear</button>}
-              </Label>
+              <Label className="text-xs">Filter by Date:</Label>
               <Input 
                 type="date" 
                 className="w-[200px] h-9 bg-white dark:bg-background" 
@@ -475,6 +472,12 @@ export default function Warehouse() {
                 onChange={(e) => setDateFilter(e.target.value)} 
               />
             </div>
+            
+            {(categoryFilter !== "all" || projectFilter !== "all" || dateFilter) && (
+              <Button variant="ghost" size="sm" onClick={() => { setCategoryFilter("all"); setProjectFilter("all"); setDateFilter(""); }} className="text-muted-foreground h-9 ml-1">
+                Clear Filters
+              </Button>
+            )}
           </div>
 
           <TabsContent value="main" className="flex-1 mt-4 data-[state=active]:flex flex-col min-h-0">
