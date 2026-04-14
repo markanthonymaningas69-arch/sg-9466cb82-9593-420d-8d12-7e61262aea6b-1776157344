@@ -526,9 +526,21 @@ export default function SitePersonnel() {
         project_id: selectedProject,
         personnel_id: requestForm.personnel_id,
         amount: parseFloat(requestForm.amount.toString()) || 0,
-        reason: requestForm.notes,
+        reason: "",
         request_date: requestForm.request_date,
         form_number: requestForm.form_number,
+        status: 'pending'
+      });
+    } else if (requestForm.request_type === "Petty Cash") {
+      const personName = projectPersonnelList.find(p => p.id === requestForm.personnel_id)?.name || "Site Worker";
+      await supabase.from('site_requests').insert({
+        project_id: selectedProject,
+        request_date: requestForm.request_date,
+        item_name: "Petty Cash",
+        amount: parseFloat(requestForm.amount.toString()) || 0,
+        request_type: requestForm.request_type,
+        form_number: requestForm.form_number,
+        requested_by: personName,
         status: 'pending'
       });
     } else {
@@ -1661,14 +1673,6 @@ export default function SitePersonnel() {
                               </Select>
                             </div>
                           </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="del_notes">Notes</Label>
-                            <Textarea
-                              id="del_notes"
-                              value={deliveryForm.notes}
-                              onChange={(e) => setDeliveryForm({ ...deliveryForm, notes: e.target.value })}
-                            />
-                          </div>
                           <div className="flex justify-between items-center pt-4">
                             <Button type="button" variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={resetDeliveryForm}>
                               Clear
@@ -1947,17 +1951,9 @@ export default function SitePersonnel() {
                               onChange={(e) => setConsumptionForm({ ...consumptionForm, recorded_by: e.target.value })}
                             />
                           </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="con_notes">Notes</Label>
-                            <Textarea
-                              id="con_notes"
-                              value={consumptionForm.notes}
-                              onChange={(e) => setConsumptionForm({ ...consumptionForm, notes: e.target.value })}
-                            />
-                          </div>
-                          <div className="flex justify-between items-center pt-4">
+                          <div className="flex justify-between items-center pt-4 border-t">
                             <Button type="button" variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={resetConsumptionForm}>
-                              Clear
+                              Clear Form
                             </Button>
                             <div className="flex gap-2">
                               <Button type="button" variant="outline" onClick={() => setConsumptionDialogOpen(false)}>
@@ -2265,26 +2261,14 @@ export default function SitePersonnel() {
                         )}
                       </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-col gap-2 md:flex-row">
                       <Button onClick={() => openRequestDialog('Materials', 'MR')} variant="default" className="bg-blue-600 hover:bg-blue-700 text-white">
                         <ShoppingCart className="h-4 w-4 mr-2" />
-                        Materials
+                        Material Request
                       </Button>
-                      <Button onClick={() => openRequestDialog('Tools', 'TR')} variant="outline" className="border-orange-500 text-orange-600 hover:bg-orange-50">
+                      <Button onClick={() => openRequestDialog('Tools & Equipments', 'TE')} variant="outline" className="border-orange-500 text-orange-600 hover:bg-orange-50">
                         <Wrench className="h-4 w-4 mr-2" />
-                        Tools
-                      </Button>
-                      <Button onClick={() => openRequestDialog('Equipment (Warehouse)', 'EQW')} variant="outline" className="border-purple-500 text-purple-600 hover:bg-purple-50">
-                        <Truck className="h-4 w-4 mr-2" />
-                        Equipment (Main Warehouse)
-                      </Button>
-                      <Button onClick={() => openRequestDialog('Equipment (Rentals)', 'EQR')} variant="outline" className="border-indigo-500 text-indigo-600 hover:bg-indigo-50">
-                        <Truck className="h-4 w-4 mr-2" />
-                        Equipment (Rentals)
-                      </Button>
-                      <Button onClick={() => openRequestDialog('PPE', 'PPE')} variant="outline" className="border-yellow-500 text-yellow-600 hover:bg-yellow-50">
-                        <Users className="h-4 w-4 mr-2" />
-                        PPE
+                        Tools & Equipments
                       </Button>
                       <Button onClick={() => openRequestDialog('Petty Cash', 'PC')} variant="outline" className="border-teal-600 text-teal-700 hover:bg-teal-50">
                         <Banknote className="h-4 w-4 mr-2" />
@@ -2292,7 +2276,7 @@ export default function SitePersonnel() {
                       </Button>
                       <Button onClick={() => openRequestDialog('Cash Advance', 'CA')} variant="outline" className="border-green-600 text-green-700 hover:bg-green-50">
                         <Banknote className="h-4 w-4 mr-2" />
-                        Cash Advance for Workers
+                        Cash Advance
                       </Button>
                     </div>
                     
@@ -2321,7 +2305,7 @@ export default function SitePersonnel() {
                                 required
                               />
                             </div>
-                            {requestForm.request_type !== "Cash Advance" && (
+                            {requestForm.request_type !== "Cash Advance" && requestForm.request_type !== "Petty Cash" && (
                               <div className="space-y-2">
                                 <Label>Requested By *</Label>
                                 <Input
@@ -2333,7 +2317,7 @@ export default function SitePersonnel() {
                             )}
                           </div>
 
-                          {requestForm.request_type === "Cash Advance" ? (
+                          {requestForm.request_type === "Cash Advance" || requestForm.request_type === "Petty Cash" ? (
                             <div className="grid grid-cols-2 gap-4">
                               <div className="space-y-2 col-span-2 md:col-span-1">
                                 <Label>Personnel *</Label>
@@ -2360,14 +2344,6 @@ export default function SitePersonnel() {
                                   min="0.01"
                                   value={requestForm.amount}
                                   onChange={(e) => setRequestForm({ ...requestForm, amount: parseFloat(e.target.value) || 0 })}
-                                  required
-                                />
-                              </div>
-                              <div className="space-y-2 col-span-2">
-                                <Label>Reason / Justification *</Label>
-                                <Textarea
-                                  value={requestForm.notes}
-                                  onChange={(e) => setRequestForm({ ...requestForm, notes: e.target.value })}
                                   required
                                 />
                               </div>
@@ -2450,6 +2426,7 @@ export default function SitePersonnel() {
                                       min="0"
                                       value={requestForm.quantity}
                                       onChange={(e) => setRequestForm({ ...requestForm, quantity: parseFloat(e.target.value) || 0 })}
+                                      placeholder="Optional"
                                     />
                                   </div>
                                   <div className="space-y-2">
@@ -2650,7 +2627,7 @@ export default function SitePersonnel() {
                             <TableRow>
                               <TableHead className="w-24">Date</TableHead>
                               <TableHead className="w-32">Form No.</TableHead>
-                              <TableHead>Type</TableHead>
+                              <TableHead className="w-32">Type</TableHead>
                               <TableHead>Requested By</TableHead>
                               <TableHead>Items Count</TableHead>
                               <TableHead>Status</TableHead>
@@ -2677,7 +2654,7 @@ export default function SitePersonnel() {
                                       'bg-orange-500 text-white'
                                     }`}
                                   >
-                                    {group.status.toUpperCase()}
+                                    {group.status?.toUpperCase()}
                                   </Badge>
                                 </TableCell>
                                 <TableCell className="text-right">
