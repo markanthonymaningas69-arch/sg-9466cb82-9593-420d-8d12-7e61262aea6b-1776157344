@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,10 +6,40 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Check, CreditCard, Calendar, Users, HardDrive, Shield } from "lucide-react";
 import { useSettings } from "@/contexts/SettingsProvider";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Subscription() {
   const { currentPlan, setCurrentPlan } = useSettings();
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
+  const [billingHistory, setBillingHistory] = useState<any[]>([]);
+  const [subscriptionDetails, setSubscriptionDetails] = useState<any>(null);
+
+  useEffect(() => {
+    loadBillingHistory();
+  }, []);
+
+  const loadBillingHistory = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      const { data } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false });
+        
+      if (data && data.length > 0) {
+        setBillingHistory(data);
+        setSubscriptionDetails(data[0]);
+      } else {
+        // Fallback for new accounts
+        setSubscriptionDetails({
+          start_date: new Date().toISOString(),
+          status: "active",
+          amount: currentPlan === 'starter' ? 49 : 99
+        });
+      }
+    }
+  };
 
   const plans = [
     {
@@ -45,12 +75,6 @@ export default function Subscription() {
     }
   ];
 
-  const billingHistory = [
-    { date: "2026-04-01", amount: 99, status: "Paid", invoice: "INV-2026-04" },
-    { date: "2026-03-01", amount: 99, status: "Paid", invoice: "INV-2026-03" },
-    { date: "2026-02-01", amount: 99, status: "Paid", invoice: "INV-2026-02" },
-  ];
-
   const getPrice = (plan: typeof plans[0]) => {
     return billingCycle === "monthly" ? plan.monthlyPrice : plan.annualPrice;
   };
@@ -59,6 +83,28 @@ export default function Subscription() {
     const monthlyCost = plan.monthlyPrice * 12;
     const annualCost = plan.annualPrice;
     return monthlyCost - annualCost;
+  };
+
+  const handleUpgrade = async (planId: string) => {
+    setCurrentPlan(planId as "starter" | "professional");
+    
+    // Log the billing history
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      const planConfig = plans.find(p => p.id === planId);
+      const amount = billingCycle === "monthly" ? planConfig?.monthlyPrice : planConfig?.annualPrice;
+      
+      const newSub = {
+        user_id: session.user.id,
+        plan: planId,
+        status: 'active',
+        start_date: new Date().toISOString(),
+        amount: amount || 0,
+      };
+      
+      await supabase.from('subscriptions').insert(newSub);
+      loadBillingHistory();
+    }
   };
 
   return (
@@ -81,7 +127,9 @@ export default function Subscription() {
                   <h3 className="text-2xl font-bold capitalize">{currentPlan}</h3>
                   <Badge variant="secondary">Active</Badge>
                 </div>
-                <p className="text-sm text-muted-foreground">Next billing date: May 1, 2026</p>
+                <p className="text-sm text-muted-foreground">
+                  Since: {subscriptionDetails?.start_date ? new Date(subscriptionDetails.start_date).toLocaleDateString() : 'N/A'}
+                </p>
               </div>
               <div className="text-right">
                 <div className="text-3xl font-bold">
@@ -182,7 +230,7 @@ export default function Subscription() {
                     className="w-full"
                     variant={plan.id === currentPlan ? "secondary" : "default"}
                     disabled={plan.id === currentPlan}
-                    onClick={() => setCurrentPlan(plan.id as "starter" | "professional")}
+                    onClick={() => handleUpgrade(plan.id)}
                   >
                     {plan.id === currentPlan ? "Current Plan" : "Upgrade"}
                   </Button>
@@ -202,16 +250,16 @@ export default function Subscription() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {billingHistory.map((bill, index) => (
+              {billingHistory.length > 0 ? billingHistory.map((bill, index) => (
                 <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
                   <div className="flex items-center gap-4">
                     <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
                       <CreditCard className="h-5 w-5 text-primary" />
                     </div>
                     <div>
-                      <div className="font-medium">{bill.invoice}</div>
+                      <div className="font-medium capitalize">{bill.plan} Plan</div>
                       <div className="text-sm text-muted-foreground">
-                        {new Date(bill.date).toLocaleDateString("en-US", { 
+                        {new Date(bill.start_date).toLocaleDateString("en-US", { 
                           month: "long", 
                           day: "numeric", 
                           year: "numeric" 
@@ -222,14 +270,18 @@ export default function Subscription() {
                   <div className="text-right flex items-center gap-4">
                     <div>
                       <div className="font-semibold">${bill.amount}</div>
-                      <Badge variant="outline" className="text-success">
+                      <Badge variant="outline" className="text-success capitalize">
                         {bill.status}
                       </Badge>
                     </div>
-                    <Button variant="ghost" size="sm">Download</Button>
+                    <Button variant="ghost" size="sm">Receipt</Button>
                   </div>
                 </div>
-              ))}
+              )) : (
+                <div className="text-center py-6 text-muted-foreground">
+                  No billing history available yet.
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

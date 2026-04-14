@@ -637,11 +637,11 @@ export function Layout({ children }: LayoutProps) {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => router.push('/settings')}>
                   <Settings className="mr-2 h-4 w-4" />
-                  Settings
+                  Company Settings
                 </DropdownMenuItem>
-                <DropdownMenuItem disabled>
+                <DropdownMenuItem onClick={() => router.push('/account')}>
                   <User className="mr-2 h-4 w-4" />
-                  Account
+                  Account Settings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
