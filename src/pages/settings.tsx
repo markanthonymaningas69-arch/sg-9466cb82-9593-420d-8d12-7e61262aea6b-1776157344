@@ -31,7 +31,8 @@ import {
   Users,
   Key,
   Trash2,
-  Edit
+  Edit,
+  UserX
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -60,6 +61,9 @@ export default function Settings() {
   const [editingUser, setEditingUser] = useState<any>(null);
   const [editModules, setEditModules] = useState<string[]>([]);
   const [editProjects, setEditProjects] = useState<string[]>([]);
+  
+  // Delete User State
+  const [deletingUser, setDeletingUser] = useState<any>(null);
 
   useEffect(() => {
     setLocalCompany(company);
@@ -381,13 +385,18 @@ export default function Settings() {
                               ))}
                             </div>
                           </div>
-                          <Button size="icon" variant="ghost" onClick={() => {
-                            setEditingUser(u);
-                            setEditModules(u.assigned_modules && u.assigned_modules.length > 0 ? u.assigned_modules : [u.assigned_module]);
-                            setEditProjects(u.assigned_project_ids || []);
-                          }}>
-                            <Edit className="w-4 h-4 text-muted-foreground" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button size="icon" variant="ghost" onClick={() => {
+                              setEditingUser(u);
+                              setEditModules(u.assigned_modules && u.assigned_modules.length > 0 ? u.assigned_modules : [u.assigned_module]);
+                              setEditProjects(u.assigned_project_ids || []);
+                            }}>
+                              <Edit className="w-4 h-4 text-muted-foreground" />
+                            </Button>
+                            <Button size="icon" variant="ghost" onClick={() => setDeletingUser(u)} className="text-red-500 hover:text-red-700 hover:bg-red-50">
+                              <UserX className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -514,6 +523,39 @@ export default function Settings() {
                 }
               }}>
                 Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Remove User Dialog */}
+        <Dialog open={!!deletingUser} onOpenChange={(open) => !open && setDeletingUser(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Remove Team Member</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <p>Are you sure you want to remove <strong>{deletingUser?.email || deletingUser?.full_name || 'this user'}</strong> from the team?</p>
+              <p className="text-sm text-muted-foreground mt-2">This will instantly revoke their access to all modules and free up their allocated seats.</p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeletingUser(null)}>Cancel</Button>
+              <Button variant="destructive" onClick={async () => {
+                const { error } = await supabase.from('profiles').update({
+                  assigned_module: null,
+                  assigned_modules: [],
+                  assigned_project_ids: []
+                }).eq('id', deletingUser.id);
+                
+                if (error) {
+                  toast({ title: "Error", description: "Failed to remove user.", variant: "destructive" });
+                } else {
+                  toast({ title: "User Removed", description: "Team member has been removed and seats are now available." });
+                  setDeletingUser(null);
+                  loadTeamData();
+                }
+              }}>
+                Remove User
               </Button>
             </DialogFooter>
           </DialogContent>
