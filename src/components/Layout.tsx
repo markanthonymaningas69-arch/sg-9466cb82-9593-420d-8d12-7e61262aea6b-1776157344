@@ -304,7 +304,7 @@ export function Layout({ children }: LayoutProps) {
                 if (assignedModule === "GM") {
                   return !(currentPlan === "starter" && item.name === "Human Resources");
                 }
-                return item.name === assignedModule || item.name === "Dashboard";
+                return item.name === assignedModule;
               }).map((item) => {
                 const Icon = item.icon;
                 const isActive = router.pathname === item.href;
