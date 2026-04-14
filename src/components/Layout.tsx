@@ -64,13 +64,29 @@ export function Layout({ children }: LayoutProps) {
   const [pendingCashAdvances, setPendingCashAdvances] = useState<any[]>([]);
   const [expiringDocuments, setExpiringDocuments] = useState<any[]>([]);
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const [assignedModule, setAssignedModule] = useState<string>("GM");
+  const [userName, setUserName] = useState<string>("Admin User");
+  const [userEmail, setUserEmail] = useState<string>("");
 
   useEffect(() => {
+    loadUserProfile();
     loadPendingRequests();
     // Poll for new requests every 30 seconds
     const interval = setInterval(loadPendingRequests, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  const loadUserProfile = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      setUserEmail(session.user.email || "");
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+      if (profile) {
+        setAssignedModule(profile.assigned_module || "GM");
+        setUserName(profile.full_name || profile.email?.split('@')[0] || "User");
+      }
+    }
+  };
 
   const loadPendingRequests = async () => {
     const { data: reqs } = await supabase.
@@ -278,9 +294,12 @@ export function Layout({ children }: LayoutProps) {
           {/* Navigation */}
           <nav className="flex-1 overflow-y-auto py-4">
             <ul className="space-y-1 px-3">
-              {navigation.
-              filter((item) => !(currentPlan === "starter" && item.name === "Human Resources")).
-              map((item) => {
+              {navigation.filter((item) => {
+                if (assignedModule === "GM") {
+                  return !(currentPlan === "starter" && item.name === "Human Resources");
+                }
+                return item.name === assignedModule || item.name === "Settings" || item.name === "Dashboard" || item.name === "Project Profile";
+              }).map((item) => {
                 const Icon = item.icon;
                 const isActive = router.pathname === item.href;
 
@@ -328,11 +347,11 @@ export function Layout({ children }: LayoutProps) {
           <div className="border-t p-4">
             <div className="flex items-center gap-3 px-3 py-2">
               <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold text-sm">
-                A
+                {userName.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">Admin User</p>
-                <p className="text-xs text-muted-foreground truncate">admin@constructpro.com</p>
+                <p className="text-sm font-medium truncate">{userName}</p>
+                <p className="text-xs text-muted-foreground truncate">{assignedModule} Role</p>
               </div>
             </div>
           </div>
@@ -603,15 +622,16 @@ export function Layout({ children }: LayoutProps) {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="rounded-full">
                   <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold text-sm">
-                    A
+                    {userName.charAt(0).toUpperCase()}
                   </div>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium">Admin User</p>
-                    <p className="text-xs text-muted-foreground">admin@constructpro.com</p>
+                    <p className="text-sm font-medium">{userName}</p>
+                    <p className="text-xs text-muted-foreground">{userEmail}</p>
+                    <p className="text-xs text-primary font-medium mt-1 uppercase tracking-wider">{assignedModule} Access</p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
