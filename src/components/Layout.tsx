@@ -445,45 +445,66 @@ export function Layout({ children }: LayoutProps) {
             </span>
 
             {/* Notifications */}
-            <DropdownMenu open={notificationOpen} onOpenChange={setNotificationOpen}>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative">
-                  <Bell className="h-5 w-5" />
-                  {pendingRequests.length + pendingLeaves.length + pendingCashAdvances.length + expiringDocuments.length > 0 &&
-                  <Badge
-                    variant="destructive"
-                    className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
-                    
-                      {pendingRequests.length + pendingLeaves.length + pendingCashAdvances.length + expiringDocuments.length}
-                    </Badge>
-                  }
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-80">
-                <DropdownMenuLabel className="font-semibold">
-                  Notifications ({pendingRequests.length + pendingLeaves.length + pendingCashAdvances.length + expiringDocuments.length} pending)
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {pendingRequests.length === 0 && pendingLeaves.length === 0 && pendingCashAdvances.length === 0 && expiringDocuments.length === 0 ?
-                <div className="p-4 text-center text-sm text-muted-foreground">
-                    No pending notifications
-                  </div> :
+            {(() => {
+              const isGM = assignedModules.includes("GM");
+              const isHR = assignedModules.includes("Human Resources");
+              const isAccounting = assignedModules.includes("Accounting");
+              const isWarehouse = assignedModules.includes("Warehouse");
+              
+              const displayCashAdvances = (isGM || isAccounting) ? pendingCashAdvances : [];
+              const displayLeaves = (isGM || isHR) ? pendingLeaves : [];
+              const displayExpiring = (isGM || isHR) ? expiringDocuments : [];
+              const displayRequests = pendingRequests.filter(req => {
+                if (isGM) return true;
+                const isAcctReq = ['Equipment (Rentals)', 'PPE', 'Petty Cash'].includes(req.request_type);
+                const isWhseReq = ['Tools', 'Equipment (Warehouse)', 'PPE', 'Materials'].includes(req.request_type) || !req.request_type;
+                if (isAccounting && isAcctReq) return true;
+                if (isWarehouse && isWhseReq) return true;
+                return false;
+              });
 
-                <ScrollArea className="max-h-[400px]">
-                    {pendingCashAdvances.length > 0 &&
-                  <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase bg-muted/50">
-                        Cash Advances
-                      </div>
-                  }
-                    {pendingCashAdvances.map((adv) =>
-                  <DropdownMenuItem
-                    key={adv.id}
-                    className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-muted"
-                    onClick={() => {
-                      router.push('/accounting');
-                      setNotificationOpen(false);
-                    }}>
-                    
+              const totalNotifications = displayCashAdvances.length + displayLeaves.length + displayExpiring.length + displayRequests.length;
+
+              return (
+                <DropdownMenu open={notificationOpen} onOpenChange={setNotificationOpen}>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="relative">
+                      <Bell className="h-5 w-5" />
+                      {totalNotifications > 0 &&
+                      <Badge
+                        variant="destructive"
+                        className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
+                        
+                          {totalNotifications}
+                        </Badge>
+                      }
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-80">
+                    <DropdownMenuLabel className="font-semibold">
+                      Notifications ({totalNotifications} pending)
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {totalNotifications === 0 ?
+                    <div className="p-4 text-center text-sm text-muted-foreground">
+                        No pending notifications
+                      </div> :
+
+                    <ScrollArea className="max-h-[400px]">
+                        {displayCashAdvances.length > 0 &&
+                      <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase bg-muted/50">
+                            Cash Advances
+                          </div>
+                      }
+                        {displayCashAdvances.map((adv) =>
+                      <DropdownMenuItem
+                        key={adv.id}
+                        className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-muted"
+                        onClick={() => {
+                          router.push('/accounting');
+                          setNotificationOpen(false);
+                        }}>
+                        
                         <div className="flex items-start justify-between w-full">
                           <span className="font-medium text-sm">{adv.personnel?.name}</span>
                           <Badge variant="outline" className="text-xs text-orange-600 border-orange-200 bg-orange-50">
@@ -519,12 +540,12 @@ export function Layout({ children }: LayoutProps) {
                       </DropdownMenuItem>
                   )}
 
-                    {pendingRequests.length > 0 &&
+                    {displayRequests.length > 0 &&
                   <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase bg-muted/50 mt-2">
                         Site Requests
                       </div>
                   }
-                    {pendingRequests.map((req) =>
+                    {displayRequests.map((req) =>
                   <DropdownMenuItem
                     key={req.id}
                     className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-muted"
@@ -572,12 +593,12 @@ export function Layout({ children }: LayoutProps) {
                       </DropdownMenuItem>
                   )}
 
-                    {pendingLeaves.length > 0 &&
+                    {displayLeaves.length > 0 &&
                   <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase bg-muted/50 mt-2">
                         Leave Requests
                       </div>
                   }
-                    {pendingLeaves.map((leave) =>
+                    {displayLeaves.map((leave) =>
                   <DropdownMenuItem
                     key={leave.id}
                     className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-muted"
@@ -621,12 +642,12 @@ export function Layout({ children }: LayoutProps) {
                       </DropdownMenuItem>
                   )}
 
-                    {expiringDocuments.length > 0 &&
+                    {displayExpiring.length > 0 &&
                   <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase bg-muted/50 mt-2 text-red-700">
                         Expiring Documents
                       </div>
                   }
-                    {expiringDocuments.map((doc) => {
+                    {displayExpiring.map((doc) => {
                     const daysToPassportExpiry = doc.passport_expiry_date ? Math.ceil((new Date(doc.passport_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
                     const daysToVisaExpiry = doc.visa_expiry_date ? Math.ceil((new Date(doc.visa_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
                     const docType = [];
@@ -656,6 +677,8 @@ export function Layout({ children }: LayoutProps) {
                 }
               </DropdownMenuContent>
             </DropdownMenu>
+            );
+            })()}
 
             {/* Profile */}
             <DropdownMenu>
