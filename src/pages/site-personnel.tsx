@@ -526,7 +526,6 @@ export default function SitePersonnel() {
       item_name: "", 
       quantity: 0, 
       unit: "", 
-      receipt_number: "", 
       notes: "" 
     }));
     setIsManualItem(false);
