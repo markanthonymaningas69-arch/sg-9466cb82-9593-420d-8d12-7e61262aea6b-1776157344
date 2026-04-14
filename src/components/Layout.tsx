@@ -304,7 +304,7 @@ export function Layout({ children }: LayoutProps) {
                 if (assignedModule === "GM") {
                   return !(currentPlan === "starter" && item.name === "Human Resources");
                 }
-                return item.name === assignedModule || item.name === "Settings" || item.name === "Dashboard" || item.name === "Project Profile";
+                return item.name === assignedModule || item.name === "Dashboard";
               }).map((item) => {
                 const Icon = item.icon;
                 const isActive = router.pathname === item.href;
@@ -641,10 +641,12 @@ export function Layout({ children }: LayoutProps) {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => router.push('/settings')}>
-                  <Settings className="mr-2 h-4 w-4" />
-                  Company Settings
-                </DropdownMenuItem>
+                {assignedModule === "GM" && (
+                  <DropdownMenuItem onClick={() => router.push('/settings')}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Company Settings
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={() => router.push('/account')}>
                   <User className="mr-2 h-4 w-4" />
                   Account Settings
