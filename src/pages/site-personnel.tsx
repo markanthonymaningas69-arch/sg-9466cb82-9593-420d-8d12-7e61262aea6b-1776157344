@@ -2393,20 +2393,20 @@ export default function SitePersonnel() {
                         )}
                       </div>
                     </div>
-                    <div className="flex flex-col gap-2 md:flex-row">
-                      <Button onClick={() => openRequestDialog('Materials', 'MR')} variant="default" className="bg-blue-600 hover:bg-blue-700 text-white">
+                    <div className="flex items-center gap-2 overflow-x-auto pb-2 shrink-0 hide-scrollbar w-full">
+                      <Button onClick={() => openRequestDialog('Materials', 'MR')} variant="default" className="bg-blue-600 hover:bg-blue-700 text-white shrink-0">
                         <ShoppingCart className="h-4 w-4 mr-2" />
                         Material Request
                       </Button>
-                      <Button onClick={() => openRequestDialog('Tools & Equipments', 'TE')} variant="outline" className="border-orange-500 text-orange-600 hover:bg-orange-50">
+                      <Button onClick={() => openRequestDialog('Tools & Equipments', 'TE')} variant="outline" className="border-orange-500 text-orange-600 hover:bg-orange-50 shrink-0">
                         <Wrench className="h-4 w-4 mr-2" />
                         Tools & Equipments
                       </Button>
-                      <Button onClick={() => openRequestDialog('Petty Cash', 'PC')} variant="outline" className="border-teal-600 text-teal-700 hover:bg-teal-50">
+                      <Button onClick={() => openRequestDialog('Petty Cash', 'PC')} variant="outline" className="border-teal-600 text-teal-700 hover:bg-teal-50 shrink-0">
                         <Banknote className="h-4 w-4 mr-2" />
                         Petty Cash
                       </Button>
-                      <Button onClick={() => openRequestDialog('Cash Advance', 'CA')} variant="outline" className="border-green-600 text-green-700 hover:bg-green-50">
+                      <Button onClick={() => openRequestDialog('Cash Advance', 'CA')} variant="outline" className="border-green-600 text-green-700 hover:bg-green-50 shrink-0">
                         <Banknote className="h-4 w-4 mr-2" />
                         Cash Advance
                       </Button>
