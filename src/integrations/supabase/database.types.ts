@@ -318,6 +318,44 @@ export type Database = {
           },
         ]
       }
+      bom_progress_updates: {
+        Row: {
+          bom_scope_id: string | null
+          created_at: string | null
+          id: string
+          notes: string | null
+          percentage_completed: number | null
+          update_date: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          bom_scope_id?: string | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          percentage_completed?: number | null
+          update_date?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          bom_scope_id?: string | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          percentage_completed?: number | null
+          update_date?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bom_progress_updates_bom_scope_id_fkey"
+            columns: ["bom_scope_id"]
+            isOneToOne: false
+            referencedRelation: "bom_scope_of_work"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bom_scope_of_work: {
         Row: {
           bom_id: string
