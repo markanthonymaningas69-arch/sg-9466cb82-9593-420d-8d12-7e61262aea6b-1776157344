@@ -29,6 +29,8 @@ interface SettingsContextType {
   setCompany: (company: CompanySettings) => void;
   currentPlan: PlanType;
   setCurrentPlan: (plan: PlanType) => void;
+  isTrialExpired: boolean;
+  daysRemaining: number;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -36,7 +38,9 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [currency, setCurrencyState] = useState<CurrencyType>("USD");
   const [company, setCompanyState] = useState<CompanySettings>(defaultCompany);
-  const [currentPlan, setCurrentPlanState] = useState<PlanType>("starter");
+  const [currentPlan, setCurrentPlanState] = useState<PlanType>("professional");
+  const [isTrialExpired, setIsTrialExpired] = useState<boolean>(false);
+  const [daysRemaining, setDaysRemaining] = useState<number>(7);
 
   useEffect(() => {
     const savedCurrency = localStorage.getItem("app_currency") as CurrencyType;
@@ -56,6 +60,34 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const savedPlan = localStorage.getItem("app_plan") as PlanType;
     if (savedPlan && ["starter", "professional"].includes(savedPlan)) {
       setCurrentPlanState(savedPlan);
+    }
+
+    // Trial logic based on company creation date (mocked via localStorage for now)
+    let companyCreated = localStorage.getItem("app_created_at");
+    if (!companyCreated) {
+      companyCreated = new Date().toISOString();
+      localStorage.setItem("app_created_at", companyCreated);
+    }
+
+    const createdDate = new Date(companyCreated);
+    const currentDate = new Date();
+    
+    // Check for paid subscription
+    const isPaid = localStorage.getItem("app_is_paid") === "true";
+    
+    if (!isPaid) {
+      const diffTime = Math.abs(currentDate.getTime() - createdDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      const remaining = Math.max(0, 7 - diffDays);
+      setDaysRemaining(remaining);
+      
+      if (diffDays > 7) {
+        setIsTrialExpired(true);
+      }
+    } else {
+      setDaysRemaining(0);
+      setIsTrialExpired(false);
     }
   }, []);
 
@@ -95,7 +127,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <SettingsContext.Provider value={{ currency, setCurrency, formatCurrency, formatNumber, company, setCompany, currentPlan, setCurrentPlan }}>
+    <SettingsContext.Provider value={{ currency, setCurrency, formatCurrency, formatNumber, company, setCompany, currentPlan, setCurrentPlan, isTrialExpired, daysRemaining }}>
       {children}
     </SettingsContext.Provider>
   );

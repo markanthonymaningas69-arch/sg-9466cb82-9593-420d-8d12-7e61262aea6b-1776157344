@@ -112,6 +112,7 @@ export default function Subscription() {
 
   const handleUpgrade = async (planId: string) => {
     setCurrentPlan(planId as "starter" | "professional");
+    localStorage.setItem("app_is_paid", "true"); // Mark as paid to remove trial lock
     
     // Log the billing history
     const { data: { session } } = await supabase.auth.getSession();
