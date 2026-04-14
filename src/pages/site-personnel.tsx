@@ -41,7 +41,7 @@ export default function SitePersonnel() {
   const [deliveriesDate, setDeliveriesDate] = useState<string>(todayStr);
   const [scopeDate, setScopeDate] = useState<string>(todayStr);
   
-  const [assignedProjectId, setAssignedProjectId] = useState<string | null>(null);
+  const [assignedProjectIds, setAssignedProjectIds] = useState<string[]>([]);
   const [userRole, setUserRole] = useState<string>("");
   
   // Site Attendance (Roll Call)
@@ -165,9 +165,9 @@ export default function SitePersonnel() {
       const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       if (profile) {
         setUserRole(profile.assigned_module);
-        if (profile.assigned_project_id) {
-          setAssignedProjectId(profile.assigned_project_id);
-          setSelectedProject(profile.assigned_project_id);
+        if (profile.assigned_project_ids && profile.assigned_project_ids.length > 0) {
+          setAssignedProjectIds(profile.assigned_project_ids);
+          setSelectedProject(profile.assigned_project_ids[0]);
         }
       }
     }
@@ -717,19 +717,19 @@ export default function SitePersonnel() {
         <div className="grid gap-4 md:grid-cols-1 shrink-0">
           <div>
             <Label htmlFor="project">Select Project</Label>
-            <Select value={selectedProject} onValueChange={setSelectedProject} disabled={!!assignedProjectId}>
+            <Select value={selectedProject} onValueChange={setSelectedProject} disabled={assignedProjectIds.length === 1}>
               <SelectTrigger>
                 <SelectValue placeholder="Choose a project" />
               </SelectTrigger>
               <SelectContent>
-                {projects.filter(p => !assignedProjectId || p.id === assignedProjectId).map((project) => (
+                {projects.filter(p => assignedProjectIds.length === 0 || assignedProjectIds.includes(p.id)).map((project) => (
                   <SelectItem key={project.id} value={project.id}>
                     {project.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {assignedProjectId && <p className="text-xs text-muted-foreground mt-1">Your account is restricted to this project only.</p>}
+            {assignedProjectIds.length > 0 && <p className="text-xs text-muted-foreground mt-1">Your account is restricted to {assignedProjectIds.length} assigned project(s).</p>}
           </div>
         </div>
 

@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
@@ -49,7 +50,7 @@ export default function Settings() {
   const [teamUsers, setTeamUsers] = useState<any[]>([]);
   const [selectedModule, setSelectedModule] = useState<string>("Site Personnel");
   const [projects, setProjects] = useState<any[]>([]);
-  const [selectedProject, setSelectedProject] = useState<string>("all");
+  const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
 
   useEffect(() => {
     setLocalCompany(company);
@@ -93,11 +94,16 @@ export default function Settings() {
       return;
     }
 
+    if (selectedModule === "Site Personnel" && currentPlan === 'starter' && selectedProjects.length > 2) {
+      toast({ title: "Limit Reached", description: "Starter plan limits Site Personnel to a maximum of 2 projects.", variant: "destructive" });
+      return;
+    }
+
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
     const { error } = await supabase.from('invite_codes').insert({
       code,
       module: selectedModule,
-      project_id: selectedProject !== "all" ? selectedProject : null
+      project_ids: selectedModule === "Site Personnel" ? selectedProjects : []
     });
 
     if (error) {
@@ -279,18 +285,32 @@ export default function Settings() {
                     </div>
                     {selectedModule === "Site Personnel" && (
                       <div className="space-y-2 flex-1">
-                        <Label>Restrict to Project (Optional)</Label>
-                        <Select value={selectedProject} onValueChange={setSelectedProject}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">Any Project (No restriction)</SelectItem>
-                            {projects.map(p => (
-                              <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Label>Restrict to Projects (Max {currentPlan === 'starter' ? 2 : 'Unlimited'})</Label>
+                        <div className="border rounded-md p-2 max-h-32 overflow-y-auto space-y-2 bg-background">
+                          {projects.map(p => (
+                            <div key={p.id} className="flex items-center space-x-2">
+                              <Checkbox 
+                                id={`proj-${p.id}`} 
+                                checked={selectedProjects.includes(p.id)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    if (currentPlan === 'starter' && selectedProjects.length >= 2) {
+                                      toast({ title: "Limit Reached", description: "Starter plan allows a maximum of 2 projects per user.", variant: "destructive" });
+                                      return;
+                                    }
+                                    setSelectedProjects([...selectedProjects, p.id]);
+                                  } else {
+                                    setSelectedProjects(selectedProjects.filter(id => id !== p.id));
+                                  }
+                                }}
+                              />
+                              <label htmlFor={`proj-${p.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
+                                {p.name}
+                              </label>
+                            </div>
+                          ))}
+                          {projects.length === 0 && <p className="text-xs text-muted-foreground">No projects found.</p>}
+                        </div>
                       </div>
                     )}
                     <Button onClick={handleGenerateCode} className="bg-primary">

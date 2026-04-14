@@ -74,14 +74,14 @@ export default function Onboarding() {
       const { error: rpcError } = await supabase.rpc('assign_user_module', {
         p_user_id: user.id,
         p_module: invData.module,
-        p_project_id: invData.project_id
+        p_project_ids: invData.project_ids || []
       });
 
       if (rpcError) {
         const { error: upsertError } = await supabase.from('profiles').upsert({
           id: user.id,
           assigned_module: invData.module,
-          assigned_project_id: invData.project_id,
+          assigned_project_ids: invData.project_ids || [],
           updated_at: new Date().toISOString()
         });
         if (upsertError) throw upsertError;
