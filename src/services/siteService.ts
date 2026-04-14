@@ -272,7 +272,7 @@ export const siteService = {
   // Progress Updates Management
   async getProgressUpdates(scopeId: string) {
     const { data, error } = await supabase
-      .from("progress_updates")
+      .from("bom_progress_updates")
       .select("*, bom_scope_of_work(name)")
       .eq("bom_scope_id", scopeId)
       .order("update_date", { ascending: false });
@@ -282,7 +282,7 @@ export const siteService = {
 
   async createProgressUpdate(update: any) {
     const { data, error } = await supabase
-      .from("progress_updates")
+      .from("bom_progress_updates")
       .insert(update)
       .select()
       .single();
@@ -306,7 +306,7 @@ export const siteService = {
 
   async updateProgressUpdate(id: string, updates: any) {
     const { data, error } = await supabase
-      .from("progress_updates")
+      .from("bom_progress_updates")
       .update(updates)
       .eq("id", id)
       .select()
@@ -317,7 +317,7 @@ export const siteService = {
 
   async deleteProgressUpdate(id: string) {
     const { error } = await supabase
-      .from("progress_updates")
+      .from("bom_progress_updates")
       .delete()
       .eq("id", id);
     

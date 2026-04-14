@@ -4,11 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Building2, TrendingUp, Wallet, Activity, Archive } from "lucide-react";
+import { Building2, TrendingUp, Wallet, Activity, Archive, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/contexts/SettingsProvider";
 import { ArchiveViewer } from "@/components/ArchiveViewer";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer } from "recharts";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function Dashboard() {
   const { formatCurrency } = useSettings();
@@ -21,6 +24,11 @@ export default function Dashboard() {
     avgMargin: 0,
     avgCompletion: 0
   });
+
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [selectedProjectDetails, setSelectedProjectDetails] = useState<any>(null);
+  const [projectProgressData, setProjectProgressData] = useState<any[]>([]);
+  const [projectProgressHistory, setProjectProgressHistory] = useState<any[]>([]);
 
   useEffect(() => {
     loadDashboardData();
@@ -144,6 +152,49 @@ export default function Dashboard() {
     setLoading(false);
   };
 
+  const openProjectDetails = async (project: any) => {
+    setSelectedProjectDetails(project);
+    setDetailsOpen(true);
+    setProjectProgressData([]);
+    setProjectProgressHistory([]);
+    
+    const { data: bom } = await supabase.from('bill_of_materials').select('id').eq('project_id', project.id).maybeSingle();
+    if (bom) {
+      const { data: scopes } = await supabase.from('bom_scope_of_work').select('id, name').eq('bom_id', bom.id);
+      if (scopes && scopes.length > 0) {
+        const scopeIds = scopes.map(s => s.id);
+        const { data: updates } = await supabase.from('bom_progress_updates').select('*, bom_scope_of_work(name)').in('bom_scope_id', scopeIds).order('update_date', { ascending: true });
+        
+        if (updates) {
+          setProjectProgressHistory([...updates].reverse());
+          
+          const dailyScopes: Record<string, number> = {};
+          const dataPoints: any[] = [];
+          const uniqueDates = Array.from(new Set(updates.map(u => u.update_date)));
+          
+          for (const date of uniqueDates) {
+            const updatesOnDate = updates.filter(u => u.update_date === date);
+            updatesOnDate.forEach(u => {
+              dailyScopes[u.bom_scope_id] = u.percentage_completed || 0;
+            });
+            
+            let totalPct = 0;
+            const count = scopes.length || 1;
+            scopes.forEach(s => {
+              totalPct += (dailyScopes[s.id] || 0);
+            });
+            
+            dataPoints.push({
+              date,
+              completion: parseFloat((totalPct / count).toFixed(2))
+            });
+          }
+          setProjectProgressData(dataPoints);
+        }
+      }
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch(status?.toLowerCase()) {
       case 'active': return 'bg-blue-500 hover:bg-blue-600';
@@ -244,12 +295,13 @@ export default function Dashboard() {
                     <TableHead className="text-right">Cost to Date</TableHead>
                     <TableHead className="text-right">Profit Margin</TableHead>
                     <TableHead className="w-48 text-right">Accomplishment</TableHead>
+                    <TableHead className="w-24 text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {portfolio.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         No projects found.
                       </TableCell>
                     </TableRow>
@@ -282,6 +334,11 @@ export default function Dashboard() {
                             <Progress value={project.completion} className="h-1.5 w-full bg-muted" />
                           </div>
                         </TableCell>
+                        <TableCell className="text-right">
+                          <Button size="sm" variant="outline" className="h-8" onClick={() => openProjectDetails(project)}>
+                            <Eye className="h-3 w-3 mr-1" /> View
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))
                   )}
@@ -291,6 +348,89 @@ export default function Dashboard() {
           </CardContent>
         </Card>
         <ArchiveViewer open={archiveOpen} onOpenChange={setArchiveOpen} />
+
+        {/* Project Details Modal */}
+        <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+          <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold">{selectedProjectDetails?.name} Details</DialogTitle>
+            </DialogHeader>
+            
+            <div className="flex-1 overflow-hidden flex flex-col gap-6 pt-4">
+              <div className="grid grid-cols-3 gap-4 shrink-0">
+                <div className="bg-muted/50 p-4 rounded-lg border">
+                  <div className="text-sm text-muted-foreground">Contract Amount</div>
+                  <div className="text-xl font-bold">{selectedProjectDetails ? formatCurrency(selectedProjectDetails.contractAmount) : '-'}</div>
+                </div>
+                <div className="bg-muted/50 p-4 rounded-lg border">
+                  <div className="text-sm text-muted-foreground">Cost to Date</div>
+                  <div className="text-xl font-bold">{selectedProjectDetails ? formatCurrency(selectedProjectDetails.costToDate) : '-'}</div>
+                </div>
+                <div className="bg-muted/50 p-4 rounded-lg border">
+                  <div className="text-sm text-muted-foreground">Overall Completion</div>
+                  <div className="text-xl font-bold text-primary">{selectedProjectDetails?.completion?.toFixed(2)}%</div>
+                </div>
+              </div>
+
+              <div className="flex-1 min-h-[250px] border rounded-lg p-4 bg-white shrink-0">
+                <h4 className="font-semibold mb-4 text-sm text-muted-foreground">Overall Project Accomplishment Curve</h4>
+                {projectProgressData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={projectProgressData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                      <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} tickFormatter={(val) => `${val}%`} />
+                      <ChartTooltip formatter={(value) => [`${value}%`, 'Overall Completion']} />
+                      <Line type="monotone" dataKey="completion" stroke="#22c55e" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-muted-foreground border-2 border-dashed rounded-lg bg-gray-50">
+                    No progress history recorded yet.
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-1 border rounded-lg overflow-hidden flex flex-col min-h-[200px]">
+                <div className="bg-muted/50 px-4 py-2 border-b font-semibold text-sm">Recent Scope Updates</div>
+                <ScrollArea className="flex-1">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Scope of Work</TableHead>
+                        <TableHead>Completion</TableHead>
+                        <TableHead>Notes</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {projectProgressHistory.length > 0 ? (
+                        projectProgressHistory.map((update) => (
+                          <TableRow key={update.id}>
+                            <TableCell className="whitespace-nowrap">{update.update_date}</TableCell>
+                            <TableCell className="font-medium">{update.bom_scope_of_work?.name || "Unknown Scope"}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={update.percentage_completed === 100 ? "bg-green-50 text-green-700" : ""}>
+                                {update.percentage_completed}%
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate" title={update.notes}>{update.notes || "-"}</TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
+                            No recent updates.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );

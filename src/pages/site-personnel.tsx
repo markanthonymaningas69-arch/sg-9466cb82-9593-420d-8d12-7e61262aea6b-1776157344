@@ -15,8 +15,9 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { siteService } from "@/services/siteService";
 import { projectService } from "@/services/projectService";
 import { personnelService } from "@/services/personnelService";
-import { Plus, Pencil, Trash2, Archive, Users, Truck, ClipboardList, ArrowUp, ArrowDown, Check, ArrowUpDown, ShoppingCart, Banknote, Wrench, Eye } from "lucide-react";
+import { Plus, Pencil, Trash2, Archive, Users, Truck, ClipboardList, ArrowUp, ArrowDown, Check, ArrowUpDown, ShoppingCart, Banknote, Wrench, Eye, Activity, List as ListIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer } from "recharts";
 
 type Project = { id: string; name: string; location: string; status: string };
 type Personnel = { id: string; name: string; role: string; daily_rate: number; overtime_rate: number; created_source?: string; updated_source?: string };
@@ -138,6 +139,8 @@ export default function SitePersonnel() {
   const [scopes, setScopes] = useState<ScopeOfWork[]>([]);
   const [progressUpdates, setProgressUpdates] = useState<any[]>([]);
   const [progressFilterDate, setProgressFilterDate] = useState<string>("");
+  const [showProgressChart, setShowProgressChart] = useState(false);
+  const [progressChartRange, setProgressChartRange] = useState("7");
   const [updateProgressDialogOpen, setUpdateProgressDialogOpen] = useState(false);
   const [progressForm, setProgressForm] = useState({
     bom_scope_id: "",
@@ -2793,69 +2796,151 @@ export default function SitePersonnel() {
                   <div className="flex justify-between items-start">
                     <div>
                       <CardTitle>Update Progress History</CardTitle>
-                      <CardDescription>Track historical completion updates for Scopes of Work (showing last 6 days)</CardDescription>
-                      <div className="flex items-center gap-3 mt-4">
-                        <Label>Date Filter:</Label>
-                        <Input
-                          type="date"
-                          value={progressFilterDate}
-                          onChange={(e) => setProgressFilterDate(e.target.value)}
-                          className="w-auto h-9"
-                        />
-                        {progressFilterDate && (
-                          <Button variant="ghost" size="sm" onClick={() => setProgressFilterDate("")} className="text-muted-foreground h-9">
-                            Clear
-                          </Button>
-                        )}
-                      </div>
+                      <CardDescription>Track historical completion updates for Scopes of Work</CardDescription>
+                      {!showProgressChart ? (
+                        <div className="flex items-center gap-3 mt-4">
+                          <Label>Date Filter:</Label>
+                          <Input
+                            type="date"
+                            value={progressFilterDate}
+                            onChange={(e) => setProgressFilterDate(e.target.value)}
+                            className="w-auto h-9"
+                          />
+                          {progressFilterDate && (
+                            <Button variant="ghost" size="sm" onClick={() => setProgressFilterDate("")} className="text-muted-foreground h-9">
+                              Clear
+                            </Button>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-3 mt-4">
+                          <Label>Range:</Label>
+                          <Select value={progressChartRange} onValueChange={setProgressChartRange}>
+                            <SelectTrigger className="w-32 h-9">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="7">Last 7 Days</SelectItem>
+                              <SelectItem value="30">Last 30 Days</SelectItem>
+                              <SelectItem value="all">All Time</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                     </div>
-                    <Dialog open={updateProgressDialogOpen} onOpenChange={setUpdateProgressDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button className="bg-green-600 hover:bg-green-700 text-white">
-                          <Plus className="h-4 w-4 mr-2" /> Update Progress
+                    <div className="flex flex-col items-end gap-2">
+                      <div className="flex bg-muted p-1 rounded-md">
+                        <Button variant={!showProgressChart ? "secondary" : "ghost"} size="sm" className="h-7 text-xs" onClick={() => setShowProgressChart(false)}>
+                          <ListIcon className="h-3 w-3 mr-1" /> List
                         </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Update Scope Progress</DialogTitle>
-                        </DialogHeader>
-                        <form onSubmit={handleProgressSubmit} className="space-y-4">
-                          <div className="space-y-2">
-                            <Label>Scope of Work *</Label>
-                            <Select required value={progressForm.bom_scope_id} onValueChange={(val) => setProgressForm({...progressForm, bom_scope_id: val})}>
-                              <SelectTrigger><SelectValue placeholder="Select scope..." /></SelectTrigger>
-                              <SelectContent>
-                                {scopes.map(s => (
-                                  <SelectItem key={s.id} value={s.id}>{s.name} (Currently {s.completion_percentage || 0}%)</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
+                        <Button variant={showProgressChart ? "secondary" : "ghost"} size="sm" className="h-7 text-xs" onClick={() => setShowProgressChart(true)}>
+                          <Activity className="h-3 w-3 mr-1" /> Chart
+                        </Button>
+                      </div>
+                      <Dialog open={updateProgressDialogOpen} onOpenChange={setUpdateProgressDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button className="bg-green-600 hover:bg-green-700 text-white h-9">
+                            <Plus className="h-4 w-4 mr-2" /> Update Progress
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Update Scope Progress</DialogTitle>
+                          </DialogHeader>
+                          <form onSubmit={handleProgressSubmit} className="space-y-4">
                             <div className="space-y-2">
-                              <Label>New Completion % *</Label>
-                              <Input type="number" min="0" max="100" step="0.1" required value={progressForm.percentage} onChange={(e) => setProgressForm({...progressForm, percentage: parseFloat(e.target.value) || 0})} />
+                              <Label>Scope of Work *</Label>
+                              <Select required value={progressForm.bom_scope_id} onValueChange={(val) => setProgressForm({...progressForm, bom_scope_id: val})}>
+                                <SelectTrigger><SelectValue placeholder="Select scope..." /></SelectTrigger>
+                                <SelectContent>
+                                  {scopes.map(s => (
+                                    <SelectItem key={s.id} value={s.id}>{s.name} (Currently {s.completion_percentage || 0}%)</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label>New Completion % *</Label>
+                                <Input type="number" min="0" max="100" step="0.1" required value={progressForm.percentage} onChange={(e) => setProgressForm({...progressForm, percentage: parseFloat(e.target.value) || 0})} />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Update Date *</Label>
+                                <Input type="date" required value={progressForm.update_date} onChange={(e) => setProgressForm({...progressForm, update_date: e.target.value})} />
+                              </div>
                             </div>
                             <div className="space-y-2">
-                              <Label>Update Date *</Label>
-                              <Input type="date" required value={progressForm.update_date} onChange={(e) => setProgressForm({...progressForm, update_date: e.target.value})} />
+                              <Label>Notes / Details</Label>
+                              <Textarea value={progressForm.notes} onChange={(e) => setProgressForm({...progressForm, notes: e.target.value})} placeholder="Describe the work completed..." />
                             </div>
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Notes / Details</Label>
-                            <Textarea value={progressForm.notes} onChange={(e) => setProgressForm({...progressForm, notes: e.target.value})} placeholder="Describe the work completed..." />
-                          </div>
-                          <div className="flex justify-end gap-2 pt-4">
-                            <Button type="button" variant="outline" onClick={() => setUpdateProgressDialogOpen(false)}>Cancel</Button>
-                            <Button type="submit">Save Update</Button>
-                          </div>
-                        </form>
-                      </DialogContent>
-                    </Dialog>
+                            <div className="flex justify-end gap-2 pt-4">
+                              <Button type="button" variant="outline" onClick={() => setUpdateProgressDialogOpen(false)}>Cancel</Button>
+                              <Button type="submit">Save Update</Button>
+                            </div>
+                          </form>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="flex-1 overflow-hidden pb-4">
                   {(() => {
+                    if (showProgressChart) {
+                      const sorted = [...progressUpdates].sort((a,b) => new Date(a.update_date).getTime() - new Date(b.update_date).getTime());
+                      const dailyScopes: Record<string, number> = {};
+                      const dataPoints: any[] = [];
+                      
+                      const uniqueDates = Array.from(new Set(sorted.map(u => u.update_date)));
+                      
+                      for (const date of uniqueDates) {
+                        const updatesOnDate = sorted.filter(u => u.update_date === date);
+                        updatesOnDate.forEach(u => {
+                          dailyScopes[u.bom_scope_id] = u.percentage_completed || 0;
+                        });
+                        
+                        let totalPct = 0;
+                        const count = scopes.length || 1;
+                        scopes.forEach(s => {
+                          totalPct += (dailyScopes[s.id] || 0);
+                        });
+                        
+                        dataPoints.push({
+                          date,
+                          completion: parseFloat((totalPct / count).toFixed(2))
+                        });
+                      }
+                      
+                      let finalData = dataPoints;
+                      if (progressChartRange !== 'all') {
+                        const days = parseInt(progressChartRange);
+                        const cutoff = new Date();
+                        cutoff.setDate(cutoff.getDate() - days);
+                        finalData = dataPoints.filter(d => new Date(d.date) >= cutoff);
+                      }
+
+                      if (finalData.length === 0) {
+                        return (
+                          <div className="flex items-center justify-center h-full text-muted-foreground border-2 border-dashed rounded-lg bg-gray-50">
+                            No chart data available for the selected range.
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="h-full w-full min-h-[300px] border rounded-lg p-4 bg-white">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={finalData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                              <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                              <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} tickFormatter={(val) => `${val}%`} />
+                              <ChartTooltip formatter={(value) => [`${value}%`, 'Overall Completion']} />
+                              <Line type="monotone" dataKey="completion" stroke="#22c55e" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      );
+                    }
+
                     const filteredUpdates = progressUpdates.filter(pu => {
                       if (progressFilterDate) return pu.update_date === progressFilterDate;
                       const puDate = new Date(pu.update_date);
