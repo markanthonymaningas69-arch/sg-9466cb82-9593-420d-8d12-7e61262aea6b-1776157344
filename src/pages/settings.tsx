@@ -510,44 +510,50 @@ export default function Settings() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setEditingUser(null)}>Cancel</Button>
               <Button onClick={async () => {
-                if (editModules.length === 0) {
-                  toast({ title: "Error", description: "Select at least one module.", variant: "destructive" });
-                  return;
-                }
-
-                const isSitePersonnel = editModules.includes("Site Personnel");
-                const currentProjects = editingUser.assigned_project_ids || [];
-                const isProjectChanged = isSitePersonnel && JSON.stringify([...editProjects].sort()) !== JSON.stringify([...currentProjects].sort());
-
-                if (isProjectChanged) {
-                  if ((editingUser.project_change_count || 0) >= 5) {
-                    toast({ 
-                      title: "Limit Reached", 
-                      description: "You have reached the maximum limit of 5 project reassignments for this user.", 
-                      variant: "destructive" 
-                    });
+                try {
+                  if (editModules.length === 0) {
+                    toast({ title: "Error", description: "Select at least one module.", variant: "destructive" });
                     return;
                   }
-                }
 
-                const updates: any = {
-                  assigned_module: editModules[0],
-                  assigned_modules: editModules,
-                  assigned_project_ids: isSitePersonnel ? editProjects : []
-                };
+                  const isSitePersonnel = editModules.includes("Site Personnel");
+                  const currentProjects = editingUser.assigned_project_ids || [];
+                  const isProjectChanged = isSitePersonnel && JSON.stringify([...editProjects].sort()) !== JSON.stringify([...currentProjects].sort());
 
-                if (isProjectChanged) {
-                  updates.project_change_count = (editingUser.project_change_count || 0) + 1;
-                }
+                  if (isProjectChanged) {
+                    if ((editingUser.project_change_count || 0) >= 5) {
+                      toast({ 
+                        title: "Limit Reached", 
+                        description: "You have reached the maximum limit of 5 project reassignments for this user.", 
+                        variant: "destructive" 
+                      });
+                      return;
+                    }
+                  }
 
-                const { error } = await supabase.from('profiles').update(updates).eq('id', editingUser.id);
-                
-                if (error) {
-                  toast({ title: "Error", description: "Failed to update user access.", variant: "destructive" });
-                } else {
-                  toast({ title: "Success", description: "User access updated successfully." });
-                  setEditingUser(null);
-                  loadTeamData();
+                  const updates: any = {
+                    assigned_module: editModules[0],
+                    assigned_modules: editModules,
+                    assigned_project_ids: isSitePersonnel ? editProjects : []
+                  };
+
+                  if (isProjectChanged) {
+                    updates.project_change_count = (editingUser.project_change_count || 0) + 1;
+                  }
+
+                  const { error } = await supabase.from('profiles').update(updates).eq('id', editingUser.id);
+                  
+                  if (error) {
+                    console.error("Supabase update error:", error);
+                    toast({ title: "Error Saving", description: error.message || "Failed to update user access.", variant: "destructive" });
+                  } else {
+                    toast({ title: "Success", description: "User access updated successfully." });
+                    setEditingUser(null);
+                    loadTeamData();
+                  }
+                } catch (err: any) {
+                  console.error("Caught error in save:", err);
+                  toast({ title: "Error", description: err.message || "An unexpected error occurred.", variant: "destructive" });
                 }
               }}>
                 Save Changes
