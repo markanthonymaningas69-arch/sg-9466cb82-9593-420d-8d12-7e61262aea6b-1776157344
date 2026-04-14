@@ -24,6 +24,7 @@ type Project = Database["public"]["Tables"]["projects"]["Row"];
 export default function Personnel() {
   const { currency } = useSettings();
   const [workerFilter, setWorkerFilter] = useState<"office" | "construction">("construction");
+  const [activeTab, setActiveTab] = useState("personnel");
 
   const [personnel, setPersonnel] = useState<any[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -90,6 +91,15 @@ export default function Personnel() {
     passport_expiry_date: "",
     country: "",
   });
+
+  const pendingLeaveIds = leaveRequests.filter(l => l.status === 'pending').map(l => l.id).sort().join(',');
+  const [seenLeaveIds, setSeenLeaveIds] = useState<string>("");
+
+  useEffect(() => {
+    if (activeTab === 'leave') {
+      setSeenLeaveIds(pendingLeaveIds);
+    }
+  }, [activeTab, pendingLeaveIds]);
 
   useEffect(() => {
     loadData();
@@ -348,7 +358,7 @@ export default function Personnel() {
           </Alert>
         )}
 
-        <Tabs defaultValue="personnel" className="space-y-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 h-auto">
             <TabsTrigger value="personnel" className="py-2.5">
               <UserCheck className="h-4 w-4 mr-2" />
@@ -358,9 +368,21 @@ export default function Personnel() {
               <Clock className="h-4 w-4 mr-2" />
               Attendance
             </TabsTrigger>
-            <TabsTrigger value="leave" className="py-2.5">
+            <TabsTrigger value="leave" className="py-2.5 relative">
               <Calendar className="h-4 w-4 mr-2" />
               Leave
+              {(() => {
+                const hasNewLeaves = pendingLeaveIds !== seenLeaveIds && activeTab !== 'leave';
+                const pendingCount = leaveRequests.filter(l => l.status === 'pending').length;
+                if (hasNewLeaves && pendingCount > 0) {
+                  return (
+                    <Badge variant="destructive" className="ml-2 h-5 min-w-5 flex items-center justify-center p-0 px-1.5 text-[10px]">
+                      New
+                    </Badge>
+                  );
+                }
+                return null;
+              })()}
             </TabsTrigger>
             {currency !== "PHP" && (
               <TabsTrigger value="visa" className="py-2.5">
@@ -693,6 +715,13 @@ export default function Personnel() {
                     className="h-9 w-20"
                   />
                 </div>
+                {(attStartDate || attEndDate || minDaysWorked || minDaysAbsent) && (
+                  <Button variant="ghost" size="sm" onClick={() => {
+                    setAttStartDate(""); setAttEndDate(""); setMinDaysWorked(""); setMinDaysAbsent("");
+                  }} className="text-muted-foreground h-9 ml-1">
+                    Clear Filters
+                  </Button>
+                )}
                 <Button variant="secondary" onClick={loadData} className="h-9 ml-auto">Refresh</Button>
               </div>
             </div>

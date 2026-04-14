@@ -1569,9 +1569,9 @@ export default function SitePersonnel() {
                               value={deliveryForm.source_type} 
                               onValueChange={(val) => {
                                 if (val === "warehouse") {
-                                  setDeliveryForm({ ...deliveryForm, supplier: "Main Warehouse" });
+                                  setDeliveryForm({ ...deliveryForm, source_type: val, supplier: "Main Warehouse" });
                                 } else {
-                                  setDeliveryForm({ ...deliveryForm, supplier: "" });
+                                  setDeliveryForm({ ...deliveryForm, source_type: val, supplier: "" });
                                 }
                               }}
                               className="flex gap-4"
@@ -2348,12 +2348,12 @@ export default function SitePersonnel() {
                               <SelectItem value="Cash Advance">Cash Advance</SelectItem>
                             </SelectContent>
                           </Select>
+                          {(requestDate || requestFilterType !== "all") && (
+                            <Button variant="ghost" size="sm" onClick={() => { setRequestDate(""); setRequestFilterType("all"); }} className="text-muted-foreground h-9 ml-1">
+                              Clear Filters
+                            </Button>
+                          )}
                         </div>
-                        {(requestDate || requestFilterType !== "all") && (
-                          <Button variant="ghost" size="sm" onClick={() => { setRequestDate(""); setRequestFilterType("all"); }} className="text-muted-foreground h-9">
-                            Clear Filters
-                          </Button>
-                        )}
                       </div>
                     </div>
                     <div className="flex flex-col gap-2 md:flex-row">
