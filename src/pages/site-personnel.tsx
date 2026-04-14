@@ -74,6 +74,7 @@ export default function SitePersonnel() {
   const [isManualItem, setIsManualItem] = useState(false);
   const [isManualUnit, setIsManualUnit] = useState(false);
   const [deliveryDialogOpen, setDeliveryDialogOpen] = useState(false);
+  const [editingDeliveryId, setEditingDeliveryId] = useState<string | null>(null);
   const [expandedReceipts, setExpandedReceipts] = useState<Record<string, boolean>>({});
   const [deliveryForm, setDeliveryForm] = useState({
     project_id: "",
@@ -512,7 +513,11 @@ export default function SitePersonnel() {
       notes: deliveryForm.notes
     };
 
-    await siteService.createDelivery(payload);
+    if (editingDeliveryId) {
+      await siteService.updateDelivery(editingDeliveryId, payload);
+    } else {
+      await siteService.createDelivery(payload);
+    }
     
     setDeliveryForm(prev => ({ 
       ...prev, 
@@ -524,8 +529,30 @@ export default function SitePersonnel() {
     }));
     setIsManualItem(false);
     setIsManualUnit(false);
-    setDeliveryDialogOpen(false);
+    setEditingDeliveryId(null);
+    // Keep dialog open for rapid entry
     loadDeliveries();
+  };
+
+  const openEditDelivery = (delivery: Delivery) => {
+    const isWarehouse = delivery.supplier === "Main Warehouse";
+    setDeliveryForm({
+      project_id: delivery.project_id,
+      delivery_date: delivery.delivery_date,
+      item_name: delivery.item_name,
+      quantity: delivery.quantity,
+      unit: delivery.unit,
+      source_type: isWarehouse ? "warehouse" : "supplier",
+      supplier: delivery.supplier,
+      receipt_number: delivery.receipt_number || "",
+      received_by: delivery.received_by || "",
+      status: delivery.status || "pending",
+      notes: delivery.notes || ""
+    });
+    setEditingDeliveryId(delivery.id);
+    setIsManualItem(!bomMaterials.some(m => m.name === delivery.item_name));
+    setIsManualUnit(!availableUnits.includes(delivery.unit));
+    setDeliveryDialogOpen(true);
   };
 
   const resetDeliveryForm = () => {
@@ -544,6 +571,7 @@ export default function SitePersonnel() {
     });
     setIsManualItem(false);
     setIsManualUnit(false);
+    setEditingDeliveryId(null);
   };
 
   const handleConsumptionSubmit = async (e: React.FormEvent) => {
@@ -1553,14 +1581,14 @@ export default function SitePersonnel() {
                     </div>
                     <Dialog open={deliveryDialogOpen} onOpenChange={setDeliveryDialogOpen}>
                       <DialogTrigger asChild>
-                        <Button>
+                        <Button onClick={() => { resetDeliveryForm(); setDeliveryDialogOpen(true); }}>
                           <Plus className="h-4 w-4 mr-2" />
                           New Delivery
                         </Button>
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
-                          <DialogTitle>Record Delivery</DialogTitle>
+                          <DialogTitle>{editingDeliveryId ? 'Edit Delivery' : 'Record Delivery'}</DialogTitle>
                         </DialogHeader>
                         <form onSubmit={handleDeliverySubmit} className="space-y-4">
                           <div className="space-y-3 pb-2 border-b">
@@ -1750,10 +1778,10 @@ export default function SitePersonnel() {
                               Clear
                             </Button>
                             <div className="flex gap-2">
-                              <Button type="button" variant="outline" onClick={() => setDeliveryDialogOpen(false)}>
+                              <Button type="button" variant="outline" onClick={() => { setDeliveryDialogOpen(false); resetDeliveryForm(); }}>
                                 Done / Close
                               </Button>
-                              <Button type="submit">Save</Button>
+                              <Button type="submit">{editingDeliveryId ? 'Save Changes' : 'Save Delivery'}</Button>
                             </div>
                           </div>
                         </form>
@@ -1820,15 +1848,23 @@ export default function SitePersonnel() {
                                     <TableCell>{delivery.received_by || "-"}</TableCell>
                                     <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate" title={delivery.notes}>{delivery.notes || "-"}</TableCell>
                                     <TableCell className="text-right">
-                                      <Button size="sm" variant="ghost" onClick={async (e) => {
-                                        e.stopPropagation();
-                                        if(confirm("Archive this delivery?")) {
-                                          await siteService.deleteDelivery(delivery.id);
-                                          loadDeliveries();
-                                        }
-                                      }} title="Archive">
-                                        <Archive className="h-4 w-4 text-orange-600" />
-                                      </Button>
+                                      <div className="flex justify-end gap-1">
+                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-500 hover:bg-blue-50" onClick={(e) => {
+                                          e.stopPropagation();
+                                          openEditDelivery(delivery);
+                                        }}>
+                                          <Pencil className="h-4 w-4" />
+                                        </Button>
+                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-orange-600 hover:bg-orange-50" onClick={async (e) => {
+                                          e.stopPropagation();
+                                          if(confirm("Archive this delivery?")) {
+                                            await siteService.deleteDelivery(delivery.id);
+                                            loadDeliveries();
+                                          }
+                                        }} title="Archive">
+                                          <Archive className="h-4 w-4" />
+                                        </Button>
+                                      </div>
                                     </TableCell>
                                   </TableRow>
                                 ))}
@@ -2324,18 +2360,18 @@ export default function SitePersonnel() {
                     <div>
                       <CardTitle>Site Requests</CardTitle>
                       <CardDescription>Request materials, tools, equipment, PPE, and cash advances</CardDescription>
-                      <div className="flex items-center gap-3 mt-4 flex-wrap">
-                        <div className="flex items-center gap-2">
-                          <Label>Date:</Label>
+                      <div className="flex items-center gap-3 mt-4 flex-nowrap shrink-0 overflow-x-auto pb-1">
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Label className="whitespace-nowrap">Date:</Label>
                           <Input
                             type="date"
                             value={requestDate}
                             onChange={(e) => setRequestDate(e.target.value)}
-                            className="w-auto h-9"
+                            className="w-auto h-9 min-w-[130px]"
                           />
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Label>Type:</Label>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Label className="whitespace-nowrap">Type:</Label>
                           <Select value={requestFilterType} onValueChange={setRequestFilterType}>
                             <SelectTrigger className="w-[180px] h-9">
                               <SelectValue placeholder="All Types" />
@@ -2348,12 +2384,12 @@ export default function SitePersonnel() {
                               <SelectItem value="Cash Advance">Cash Advance</SelectItem>
                             </SelectContent>
                           </Select>
-                          {(requestDate || requestFilterType !== "all") && (
-                            <Button variant="ghost" size="sm" onClick={() => { setRequestDate(""); setRequestFilterType("all"); }} className="text-muted-foreground h-9 ml-1">
-                              Clear Filters
-                            </Button>
-                          )}
                         </div>
+                        {(requestDate || requestFilterType !== "all") && (
+                          <Button variant="ghost" size="sm" onClick={() => { setRequestDate(""); setRequestFilterType("all"); }} className="text-muted-foreground h-9 shrink-0">
+                            Clear Filters
+                          </Button>
+                        )}
                       </div>
                     </div>
                     <div className="flex flex-col gap-2 md:flex-row">
