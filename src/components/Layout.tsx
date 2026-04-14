@@ -82,9 +82,15 @@ export function Layout({ children }: LayoutProps) {
       setUserEmail(session.user.email || "");
       const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
       if (profile) {
+        if (!profile.assigned_module) {
+          router.push('/onboarding');
+          return;
+        }
         setAssignedModule(profile.assigned_module || "GM");
         setUserName(profile.full_name || profile.email?.split('@')[0] || "User");
       }
+    } else {
+      router.push('/auth/login');
     }
   };
 

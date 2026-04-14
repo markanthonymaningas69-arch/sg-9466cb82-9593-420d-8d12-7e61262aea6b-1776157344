@@ -13,8 +13,10 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer } from "recharts";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useRouter } from "next/router";
 
 export default function Dashboard() {
+  const router = useRouter();
   const { formatCurrency } = useSettings();
   const [loading, setLoading] = useState(true);
   const [archiveOpen, setArchiveOpen] = useState(false);
@@ -43,6 +45,33 @@ export default function Dashboard() {
 
   const loadDashboardData = async () => {
     setLoading(true);
+    
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      router.push('/auth/login');
+      return;
+    }
+    
+    const { data: profile } = await supabase.from('profiles').select('assigned_module').eq('id', session.user.id).maybeSingle();
+    
+    if (!profile?.assigned_module) {
+      router.push('/onboarding');
+      return;
+    }
+
+    const moduleMap: Record<string, string> = {
+      'Project Profile': '/projects',
+      'Site Personnel': '/site-personnel',
+      'Purchasing': '/purchasing',
+      'Accounting': '/accounting',
+      'Human Resources': '/personnel',
+      'Warehouse': '/warehouse'
+    };
+
+    if (profile.assigned_module !== 'GM' && moduleMap[profile.assigned_module]) {
+      router.push(moduleMap[profile.assigned_module]);
+      return;
+    }
     
     const [
       { data: projectsData },
