@@ -49,7 +49,7 @@ export function ArchiveViewer({ open, onOpenChange }: { open: boolean, onOpenCha
   };
 
   const handleRestore = async (table: string, id: string) => {
-    const { error } = await supabase.from(table).update({ is_archived: false }).eq('id', id);
+    const { error } = await supabase.from(table as any).update({ is_archived: false }).eq('id', id);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
@@ -60,7 +60,7 @@ export function ArchiveViewer({ open, onOpenChange }: { open: boolean, onOpenCha
 
   const handlePermanentDelete = async (table: string, id: string) => {
     if (!confirm("WARNING: This will permanently delete the record from the database and it cannot be recovered. Are you absolutely sure?")) return;
-    const { error } = await supabase.from(table).delete().eq('id', id);
+    const { error } = await supabase.from(table as any).delete().eq('id', id);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
