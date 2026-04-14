@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Building2, TrendingUp, Wallet, Activity, Archive, Eye } from "lucide-react";
+import { Building2, TrendingUp, Wallet, Activity, Archive, Eye, Maximize2, Minimize2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/contexts/SettingsProvider";
 import { ArchiveViewer } from "@/components/ArchiveViewer";
@@ -26,6 +26,7 @@ export default function Dashboard() {
   });
 
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(true);
   const [selectedProjectDetails, setSelectedProjectDetails] = useState<any>(null);
   const [projectProgressData, setProjectProgressData] = useState<any[]>([]);
   const [projectProgressHistory, setProjectProgressHistory] = useState<any[]>([]);
@@ -155,6 +156,7 @@ export default function Dashboard() {
   const openProjectDetails = async (project: any) => {
     setSelectedProjectDetails(project);
     setDetailsOpen(true);
+    setIsFullScreen(true);
     setProjectProgressData([]);
     setProjectProgressHistory([]);
     
@@ -351,9 +353,17 @@ export default function Dashboard() {
 
         {/* Project Details Modal */}
         <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-          <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
+          <DialogContent className={`flex flex-col transition-all duration-200 ${isFullScreen ? 'max-w-[100vw] w-screen h-[100dvh] m-0 rounded-none border-0' : 'max-w-5xl h-[85vh]'}`}>
+            <button 
+              onClick={() => setIsFullScreen(!isFullScreen)}
+              className="absolute right-12 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 disabled:pointer-events-none p-0.5 z-50 bg-background"
+              title={isFullScreen ? "Minimize" : "Maximize"}
+            >
+              {isFullScreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              <span className="sr-only">Toggle full screen</span>
+            </button>
             <DialogHeader>
-              <DialogTitle className="text-2xl font-bold">{selectedProjectDetails?.name} Details</DialogTitle>
+              <DialogTitle className="text-2xl font-bold mr-16">{selectedProjectDetails?.name} Details</DialogTitle>
             </DialogHeader>
             
             <div className="flex-1 overflow-hidden flex flex-col gap-6 pt-4">
