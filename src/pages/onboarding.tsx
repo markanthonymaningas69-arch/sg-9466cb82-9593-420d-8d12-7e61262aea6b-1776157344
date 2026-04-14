@@ -67,14 +67,34 @@ export default function Onboarding() {
         return;
       }
 
-      // Use upsert here too to be safe
-      const { error: updateError } = await supabase
+      // First try to update existing profile
+      const { data: existingProfile } = await supabase
         .from('profiles')
-        .upsert({ 
-          id: userId, 
-          assigned_module: invData.module,
-          updated_at: new Date().toISOString()
-        });
+        .select('id')
+        .eq('id', userId)
+        .maybeSingle();
+
+      let updateError;
+
+      if (existingProfile) {
+        const { error } = await supabase
+          .from('profiles')
+          .update({ 
+            assigned_module: invData.module,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', userId);
+        updateError = error;
+      } else {
+        const { error } = await supabase
+          .from('profiles')
+          .insert({ 
+            id: userId, 
+            assigned_module: invData.module,
+            updated_at: new Date().toISOString()
+          });
+        updateError = error;
+      }
 
       if (updateError) throw updateError;
 
@@ -91,6 +111,7 @@ export default function Onboarding() {
 
       router.push('/');
     } catch (error: any) {
+      console.error("Join company error:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to join company.",
@@ -104,14 +125,34 @@ export default function Onboarding() {
     if (!userId) return;
     setCreating(true);
     try {
-      // Use upsert to handle cases where the profile might not exist yet
-      const { error: updateError } = await supabase
+      // First try to update existing profile
+      const { data: existingProfile } = await supabase
         .from('profiles')
-        .upsert({ 
-          id: userId, 
-          assigned_module: 'GM',
-          updated_at: new Date().toISOString()
-        });
+        .select('id')
+        .eq('id', userId)
+        .maybeSingle();
+
+      let updateError;
+
+      if (existingProfile) {
+        const { error } = await supabase
+          .from('profiles')
+          .update({ 
+            assigned_module: 'GM',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', userId);
+        updateError = error;
+      } else {
+        const { error } = await supabase
+          .from('profiles')
+          .insert({ 
+            id: userId, 
+            assigned_module: 'GM',
+            updated_at: new Date().toISOString()
+          });
+        updateError = error;
+      }
 
       if (updateError) throw updateError;
 
@@ -122,6 +163,7 @@ export default function Onboarding() {
 
       router.push('/');
     } catch (error: any) {
+      console.error("Create company error:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to create workspace.",
