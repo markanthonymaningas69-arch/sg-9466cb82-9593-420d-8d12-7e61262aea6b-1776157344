@@ -8,12 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const TAX_RULES = [
-  { id: 'uae', name: 'UAE VAT', rate: 0.05, code: 'VAT' },
-  { id: 'us', name: 'US Sales Tax', rate: 0.07, code: 'Sales Tax' },
-  { id: 'uk', name: 'UK VAT', rate: 0.20, code: 'VAT' },
-  { id: 'aus', name: 'Australia GST', rate: 0.10, code: 'GST' },
-  { id: 'sg', name: 'Singapore GST', rate: 0.09, code: 'GST' },
-  { id: 'ph', name: 'Philippines VAT', rate: 0.12, code: 'VAT' },
+  { id: 'uae', name: 'UAE VAT', rate: 0.05, code: 'VAT' }
 ];
 
 export function TaxReportTab() {
@@ -71,26 +66,12 @@ export function TaxReportTab() {
       <div className="flex justify-between items-center bg-card p-4 rounded-lg border">
         <div>
           <h3 className="font-semibold">Taxation Rule</h3>
-          <p className="text-sm text-muted-foreground">Select the applicable tax jurisdiction for your reports</p>
+          <p className="text-sm text-muted-foreground">Applicable tax jurisdiction for your reports</p>
         </div>
-        <Select 
-          value={selectedTax.id} 
-          onValueChange={(val) => {
-            const rule = TAX_RULES.find(r => r.id === val);
-            if (rule) setSelectedTax(rule);
-          }}
-        >
-          <SelectTrigger className="w-[250px]">
-            <SelectValue placeholder="Select Tax Rule" />
-          </SelectTrigger>
-          <SelectContent>
-            {TAX_RULES.map(rule => (
-              <SelectItem key={rule.id} value={rule.id}>
-                {rule.name} ({(rule.rate * 100).toFixed(1)}%)
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="text-right">
+          <div className="font-medium">{selectedTax.name}</div>
+          <div className="text-sm text-muted-foreground">Standard Rate ({(selectedTax.rate * 100).toFixed(1)}%)</div>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">

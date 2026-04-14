@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/contexts/ThemeProvider";
@@ -29,7 +30,8 @@ import {
   DollarSign,
   Users,
   Key,
-  Trash2
+  Trash2,
+  Edit
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -53,6 +55,11 @@ export default function Settings() {
   const [selectedModules, setSelectedModules] = useState<string[]>(["Site Personnel"]);
   const [projects, setProjects] = useState<any[]>([]);
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
+  
+  // Edit User State
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [editModules, setEditModules] = useState<string[]>([]);
+  const [editProjects, setEditProjects] = useState<string[]>([]);
 
   useEffect(() => {
     setLocalCompany(company);
@@ -172,7 +179,7 @@ export default function Settings() {
         </div>
 
         <Tabs defaultValue="company" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-3 max-w-2xl">
             <TabsTrigger value="company" className="flex items-center gap-2">
               <Building2 className="h-4 w-4" />
               Company
@@ -181,17 +188,9 @@ export default function Settings() {
               <Users className="h-4 w-4" />
               Team Access
             </TabsTrigger>
-            <TabsTrigger value="notifications" className="flex items-center gap-2">
-              <Bell className="h-4 w-4" />
-              Notifications
-            </TabsTrigger>
             <TabsTrigger value="appearance" className="flex items-center gap-2">
               <Palette className="h-4 w-4" />
               Appearance
-            </TabsTrigger>
-            <TabsTrigger value="currency" className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
-              Currency
             </TabsTrigger>
           </TabsList>
 
@@ -382,71 +381,18 @@ export default function Settings() {
                               ))}
                             </div>
                           </div>
+                          <Button size="icon" variant="ghost" onClick={() => {
+                            setEditingUser(u);
+                            setEditModules(u.assigned_modules && u.assigned_modules.length > 0 ? u.assigned_modules : [u.assigned_module]);
+                            setEditProjects(u.assigned_project_ids || []);
+                          }}>
+                            <Edit className="w-4 h-4 text-muted-foreground" />
+                          </Button>
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="notifications">
-            <Card>
-              <CardHeader>
-                <CardTitle>Notification Preferences</CardTitle>
-                <CardDescription>Choose what notifications you want to receive</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Email Notifications</Label>
-                      <p className="text-sm text-muted-foreground">Receive email updates about your account</p>
-                    </div>
-                    <Switch
-                      checked={notifications.emailNotifications}
-                      onCheckedChange={(checked) => setNotifications({ ...notifications, emailNotifications: checked })}
-                    />
-                  </div>
-                  <Separator />
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Project Updates</Label>
-                      <p className="text-sm text-muted-foreground">Get notified about project status changes</p>
-                    </div>
-                    <Switch
-                      checked={notifications.projectUpdates}
-                      onCheckedChange={(checked) => setNotifications({ ...notifications, projectUpdates: checked })}
-                    />
-                  </div>
-                  <Separator />
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Inventory Alerts</Label>
-                      <p className="text-sm text-muted-foreground">Receive alerts when inventory is low</p>
-                    </div>
-                    <Switch
-                      checked={notifications.inventoryAlerts}
-                      onCheckedChange={(checked) => setNotifications({ ...notifications, inventoryAlerts: checked })}
-                    />
-                  </div>
-                  <Separator />
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Financial Reports</Label>
-                      <p className="text-sm text-muted-foreground">Get monthly financial reports</p>
-                    </div>
-                    <Switch
-                      checked={notifications.financialReports}
-                      onCheckedChange={(checked) => setNotifications({ ...notifications, financialReports: checked })}
-                    />
-                  </div>
-                </div>
-                <Button onClick={handleSaveNotifications} className="flex items-center gap-2">
-                  <Save className="h-4 w-4" />
-                  Save Preferences
-                </Button>
               </CardContent>
             </Card>
           </TabsContent>
@@ -481,41 +427,97 @@ export default function Settings() {
             </Card>
           </TabsContent>
           
-          <TabsContent value="currency">
-            <Card>
-              <CardHeader>
-                <CardTitle>Currency Settings</CardTitle>
-                <CardDescription>Set the global currency used across all modules (BOM, Purchasing, Accounting, etc.)</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-2 max-w-md">
-                  <Label htmlFor="currency">Global Currency format</Label>
-                  <Select value={currency} onValueChange={handleSaveCurrency}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="USD">United States Dollar (USD $)</SelectItem>
-                      <SelectItem value="EUR">Euro (EUR €)</SelectItem>
-                      <SelectItem value="GBP">British Pound (GBP £)</SelectItem>
-                      <SelectItem value="JPY">Japanese Yen (JPY ¥)</SelectItem>
-                      <SelectItem value="PHP">Philippine Peso (PHP ₱)</SelectItem>
-                      <SelectItem value="AUD">Australian Dollar (AUD $)</SelectItem>
-                      <SelectItem value="CAD">Canadian Dollar (CAD $)</SelectItem>
-                      <SelectItem value="SGD">Singapore Dollar (SGD $)</SelectItem>
-                      <SelectItem value="AED">UAE Dirham (AED)</SelectItem>
-                      <SelectItem value="INR">Indian Rupee (INR ₹)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-sm text-muted-foreground mt-2 pt-2 border-t">
-                    Updating this setting instantly formats all monetary values across the entire application to the selected currency.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
         </Tabs>
+
+        {/* Edit User Access Dialog */}
+        <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit User Access</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Assigned Modules</Label>
+                <div className="border rounded-md p-2 max-h-32 overflow-y-auto space-y-2 bg-background">
+                  {Object.keys(planLimits).map(mod => {
+                    const disabled = planLimits[mod] === 0;
+                    return (
+                      <div key={mod} className="flex items-center space-x-2">
+                        <Checkbox 
+                          id={`edit-mod-${mod}`} 
+                          checked={editModules.includes(mod)}
+                          disabled={disabled}
+                          onCheckedChange={(checked) => {
+                            if (checked) setEditModules([...editModules, mod]);
+                            else setEditModules(editModules.filter(m => m !== mod));
+                          }}
+                        />
+                        <label htmlFor={`edit-mod-${mod}`} className={cn("text-sm font-medium leading-none cursor-pointer", disabled && "opacity-50")}>
+                          {mod}
+                        </label>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {editModules.includes("Site Personnel") && (
+                <div className="space-y-2">
+                  <Label>Restrict to Projects (Max {currentPlan === 'starter' ? 2 : 'Unlimited'})</Label>
+                  <div className="border rounded-md p-2 max-h-32 overflow-y-auto space-y-2 bg-background">
+                    {projects.map(p => (
+                      <div key={p.id} className="flex items-center space-x-2">
+                        <Checkbox 
+                          id={`edit-proj-${p.id}`} 
+                          checked={editProjects.includes(p.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              if (currentPlan === 'starter' && editProjects.length >= 2) {
+                                toast({ title: "Limit Reached", description: "Starter plan allows a maximum of 2 projects per user.", variant: "destructive" });
+                                return;
+                              }
+                              setEditProjects([...editProjects, p.id]);
+                            } else {
+                              setEditProjects(editProjects.filter(id => id !== p.id));
+                            }
+                          }}
+                        />
+                        <label htmlFor={`edit-proj-${p.id}`} className="text-sm font-medium cursor-pointer">
+                          {p.name}
+                        </label>
+                      </div>
+                    ))}
+                    {projects.length === 0 && <p className="text-xs text-muted-foreground">No projects found.</p>}
+                  </div>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingUser(null)}>Cancel</Button>
+              <Button onClick={async () => {
+                if (editModules.length === 0) {
+                  toast({ title: "Error", description: "Select at least one module.", variant: "destructive" });
+                  return;
+                }
+                const { error } = await supabase.from('profiles').update({
+                  assigned_module: editModules[0],
+                  assigned_modules: editModules,
+                  assigned_project_ids: editModules.includes("Site Personnel") ? editProjects : []
+                }).eq('id', editingUser.id);
+                
+                if (error) {
+                  toast({ title: "Error", description: "Failed to update user access.", variant: "destructive" });
+                } else {
+                  toast({ title: "Success", description: "User access updated successfully." });
+                  setEditingUser(null);
+                  loadTeamData();
+                }
+              }}>
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );

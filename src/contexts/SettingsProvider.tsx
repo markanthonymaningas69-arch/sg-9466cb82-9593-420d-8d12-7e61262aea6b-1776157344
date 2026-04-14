@@ -38,7 +38,7 @@ interface SettingsContextType {
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
-  const [currency, setCurrencyState] = useState<CurrencyType>("USD");
+  const [currency, setCurrencyState] = useState<CurrencyType>("AED");
   const [company, setCompanyState] = useState<CompanySettings>(defaultCompany);
   const [currentPlan, setCurrentPlanState] = useState<PlanType>("professional");
   const [isLocked, setIsLocked] = useState<boolean>(false);
@@ -47,10 +47,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [daysRemaining, setDaysRemaining] = useState<number>(7);
 
   useEffect(() => {
-    const savedCurrency = localStorage.getItem("app_currency") as CurrencyType;
-    if (savedCurrency && SUPPORTED_CURRENCIES.includes(savedCurrency)) {
-      setCurrencyState(savedCurrency);
-    }
+    // Force AED currency
+    setCurrencyState("AED");
+    localStorage.setItem("app_currency", "AED");
     
     const savedCompany = localStorage.getItem("app_company");
     if (savedCompany) {
