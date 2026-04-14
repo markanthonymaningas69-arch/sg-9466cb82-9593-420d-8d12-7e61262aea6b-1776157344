@@ -13,9 +13,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { personnelService } from "@/services/personnelService";
 import { projectService } from "@/services/projectService";
-import { Plus, Pencil, Trash2, UserCheck, Calendar, DollarSign, Clock, FileText as PassportIcon, AlertCircle } from "lucide-react";
+import { Plus, Pencil, Trash2, UserCheck, Calendar, DollarSign, Clock, FileText as PassportIcon, AlertCircle, Check } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 import { useSettings } from "@/contexts/SettingsProvider";
+import { supabase } from "@/integrations/supabase/client";
 
 type Personnel = Database["public"]["Tables"]["personnel"]["Row"];
 type Project = Database["public"]["Tables"]["projects"]["Row"];
@@ -287,10 +288,16 @@ export default function Personnel() {
   const filteredVisas = visas.filter(v => (v.personnel?.worker_type || 'construction') === workerFilter);
 
   const expiringDocuments = visas.filter(record => {
+    if (record.status === 'noted') return false;
     const daysToPassportExpiry = record.passport_expiry_date ? Math.ceil((new Date(record.passport_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
     const daysToVisaExpiry = record.visa_expiry_date ? Math.ceil((new Date(record.visa_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
     return daysToPassportExpiry <= 30 || daysToVisaExpiry <= 30;
   });
+
+  const handleCheckVisa = async (id: string) => {
+    await supabase.from('personnel_visas').update({ status: 'noted' }).eq('id', id);
+    loadData();
+  };
 
   if (loading) {
     return (
@@ -1001,6 +1008,7 @@ export default function Personnel() {
                         <TableHead>Visa No.</TableHead>
                         <TableHead>Visa Expiry</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1014,34 +1022,51 @@ export default function Personnel() {
                         let statusText = "Active";
                         
                         if (minDays < 0) {
-                          statusColor = "bg-red-100 text-red-800";
-                          statusText = "Expired";
+                          if (record.status === 'noted') {
+                            statusColor = "bg-gray-100 text-gray-800";
+                            statusText = "Expired / Noted";
+                          } else {
+                            statusColor = "bg-red-100 text-red-800";
+                            statusText = "Expired";
+                          }
                         } else if (minDays <= 30) {
-                          statusColor = "bg-orange-100 text-orange-800";
-                          statusText = "Expiring Soon";
+                          if (record.status === 'noted') {
+                            statusColor = "bg-gray-100 text-gray-800";
+                            statusText = "Expiring Soon / Noted";
+                          } else {
+                            statusColor = "bg-orange-100 text-orange-800";
+                            statusText = "Expiring Soon";
+                          }
                         }
 
                         return (
-                          <TableRow key={record.id} className={minDays <= 30 ? "bg-red-50/50" : ""}>
+                          <TableRow key={record.id} className={minDays <= 30 && record.status !== 'noted' ? "bg-red-50/50" : ""}>
                             <TableCell className="font-medium">{record.personnel?.name}</TableCell>
                             <TableCell>{record.country}</TableCell>
                             <TableCell className="font-mono text-sm">{record.passport_number || "-"}</TableCell>
-                            <TableCell className={daysToPassportExpiry <= 30 ? "text-red-700 font-bold bg-red-100/50" : ""}>
+                            <TableCell className={daysToPassportExpiry <= 30 && record.status !== 'noted' ? "text-red-700 font-bold bg-red-100/50" : ""}>
                               {record.passport_expiry_date ? new Date(record.passport_expiry_date).toLocaleDateString() : "-"}
                             </TableCell>
                             <TableCell className="font-mono text-sm">{record.visa_number || "-"}</TableCell>
-                            <TableCell className={daysToVisaExpiry <= 30 ? "text-red-700 font-bold bg-red-100/50" : ""}>
+                            <TableCell className={daysToVisaExpiry <= 30 && record.status !== 'noted' ? "text-red-700 font-bold bg-red-100/50" : ""}>
                               {record.visa_expiry_date ? new Date(record.visa_expiry_date).toLocaleDateString() : "-"}
                             </TableCell>
                             <TableCell>
                               <Badge className={statusColor}>{statusText}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {minDays <= 30 && record.status !== 'noted' && (
+                                <Button size="sm" variant="outline" className="h-7 border-orange-200 text-orange-700 bg-orange-50 hover:bg-orange-100" onClick={() => handleCheckVisa(record.id)}>
+                                  <Check className="h-3 w-3 mr-1" /> Check
+                                </Button>
+                              )}
                             </TableCell>
                           </TableRow>
                         );
                       })}
                       {filteredVisas.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
+                          <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
                             No documents found.
                           </TableCell>
                         </TableRow>

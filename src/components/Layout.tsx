@@ -108,6 +108,7 @@ export function Layout({ children }: LayoutProps) {
       .or(`visa_expiry_date.lte.${targetDate},passport_expiry_date.lte.${targetDate}`);
       
     const expiring = (visasData || []).filter(record => {
+      if (record.status === 'noted') return false;
       const daysToPassportExpiry = record.passport_expiry_date ? Math.ceil((new Date(record.passport_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
       const daysToVisaExpiry = record.visa_expiry_date ? Math.ceil((new Date(record.visa_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
       return daysToPassportExpiry <= 30 || daysToVisaExpiry <= 30;
