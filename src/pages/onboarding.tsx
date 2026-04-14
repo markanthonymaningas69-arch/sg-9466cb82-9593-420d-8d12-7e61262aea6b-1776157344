@@ -67,36 +67,13 @@ export default function Onboarding() {
         return;
       }
 
-      // First try to update existing profile
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', userId)
-        .maybeSingle();
+      // Use the secure backend function
+      const { error } = await supabase.rpc('assign_user_module', {
+        p_user_id: userId,
+        p_module: invData.module
+      });
 
-      let updateError;
-
-      if (existingProfile) {
-        const { error } = await supabase
-          .from('profiles')
-          .update({ 
-            assigned_module: invData.module,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', userId);
-        updateError = error;
-      } else {
-        const { error } = await supabase
-          .from('profiles')
-          .insert({ 
-            id: userId, 
-            assigned_module: invData.module,
-            updated_at: new Date().toISOString()
-          });
-        updateError = error;
-      }
-
-      if (updateError) throw updateError;
+      if (error) throw error;
 
       // Mark code as used
       await supabase
@@ -125,36 +102,13 @@ export default function Onboarding() {
     if (!userId) return;
     setCreating(true);
     try {
-      // First try to update existing profile
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', userId)
-        .maybeSingle();
+      // Use the secure backend function to bypass RLS restrictions during initial setup
+      const { error } = await supabase.rpc('assign_user_module', {
+        p_user_id: userId,
+        p_module: 'GM'
+      });
 
-      let updateError;
-
-      if (existingProfile) {
-        const { error } = await supabase
-          .from('profiles')
-          .update({ 
-            assigned_module: 'GM',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', userId);
-        updateError = error;
-      } else {
-        const { error } = await supabase
-          .from('profiles')
-          .insert({ 
-            id: userId, 
-            assigned_module: 'GM',
-            updated_at: new Date().toISOString()
-          });
-        updateError = error;
-      }
-
-      if (updateError) throw updateError;
+      if (error) throw error;
 
       toast({
         title: "Workspace Created",
