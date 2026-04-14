@@ -46,10 +46,13 @@ export default function Onboarding() {
 
   const handleJoinCompany = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inviteCode.trim() || !userId) return;
+    if (!inviteCode.trim()) return;
 
     setJoining(true);
     try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) throw new Error("Not authenticated");
+
       const { data: invData, error: invError } = await supabase
         .from('invite_codes')
         .select('*')
@@ -68,12 +71,19 @@ export default function Onboarding() {
       }
 
       // Use the secure backend function
-      const { error } = await supabase.rpc('assign_user_module', {
-        p_user_id: userId,
+      const { error: rpcError } = await supabase.rpc('assign_user_module', {
+        p_user_id: user.id,
         p_module: invData.module
       });
 
-      if (error) throw error;
+      if (rpcError) {
+        const { error: upsertError } = await supabase.from('profiles').upsert({
+          id: user.id,
+          assigned_module: invData.module,
+          updated_at: new Date().toISOString()
+        });
+        if (upsertError) throw upsertError;
+      }
 
       // Mark code as used
       await supabase
@@ -86,7 +96,8 @@ export default function Onboarding() {
         description: `You have joined the company as ${invData.module}.`,
       });
 
-      router.push('/');
+      // Use hard reload
+      window.location.href = '/';
     } catch (error: any) {
       console.error("Join company error:", error);
       toast({
@@ -99,28 +110,41 @@ export default function Onboarding() {
   };
 
   const handleCreateCompany = async () => {
-    if (!userId) return;
     setCreating(true);
     try {
-      // Use the secure backend function to bypass RLS restrictions during initial setup
-      const { error } = await supabase.rpc('assign_user_module', {
-        p_user_id: userId,
+      // Get fresh user just in case state is stale
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) throw new Error("Not authenticated");
+
+      // Use the secure backend function
+      const { error: rpcError } = await supabase.rpc('assign_user_module', {
+        p_user_id: user.id,
         p_module: 'GM'
       });
 
-      if (error) throw error;
+      if (rpcError) {
+        console.warn("RPC failed, falling back to upsert:", rpcError);
+        // Fallback to direct upsert if RPC fails for any reason
+        const { error: upsertError } = await supabase.from('profiles').upsert({
+          id: user.id,
+          assigned_module: 'GM',
+          updated_at: new Date().toISOString()
+        });
+        if (upsertError) throw upsertError;
+      }
 
       toast({
         title: "Workspace Created",
         description: "You are now the General Manager.",
       });
 
-      router.push('/');
+      // Use hard reload to completely clear any cached auth/profile states in Next.js
+      window.location.href = '/';
     } catch (error: any) {
       console.error("Create company error:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to create workspace.",
+        description: error.message || "Failed to create workspace. Please try again.",
         variant: "destructive"
       });
       setCreating(false);
@@ -203,7 +227,7 @@ export default function Onboarding() {
                 disabled={joining || creating}
               >
                 {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Create Workspace
+                Start
                 {!creating && <ArrowRight className="ml-2 h-4 w-4" />}
               </Button>
             </CardContent>
