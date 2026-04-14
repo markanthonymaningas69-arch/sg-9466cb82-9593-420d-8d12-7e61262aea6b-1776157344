@@ -139,6 +139,7 @@ export default function SitePersonnel() {
   const [scopes, setScopes] = useState<ScopeOfWork[]>([]);
   const [progressUpdates, setProgressUpdates] = useState<any[]>([]);
   const [progressFilterDate, setProgressFilterDate] = useState<string>("");
+  const [progressScopeFilter, setProgressScopeFilter] = useState<string>("all");
   const [showProgressChart, setShowProgressChart] = useState(false);
   const [progressChartRange, setProgressChartRange] = useState("7");
   const [updateProgressDialogOpen, setUpdateProgressDialogOpen] = useState(false);
@@ -2798,8 +2799,20 @@ export default function SitePersonnel() {
                       <CardTitle>Update Progress History</CardTitle>
                       <CardDescription>Track historical completion updates for Scopes of Work</CardDescription>
                       {!showProgressChart ? (
-                        <div className="flex items-center gap-3 mt-4">
-                          <Label>Date Filter:</Label>
+                        <div className="flex items-center gap-3 mt-4 flex-wrap">
+                          <Label>Scope Filter:</Label>
+                          <Select value={progressScopeFilter} onValueChange={setProgressScopeFilter}>
+                            <SelectTrigger className="w-[200px] h-9">
+                              <SelectValue placeholder="All Scopes" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Scopes</SelectItem>
+                              {scopes.map(s => (
+                                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Label className="ml-2">Date Filter:</Label>
                           <Input
                             type="date"
                             value={progressFilterDate}
@@ -2813,8 +2826,20 @@ export default function SitePersonnel() {
                           )}
                         </div>
                       ) : (
-                        <div className="flex items-center gap-3 mt-4">
-                          <Label>Range:</Label>
+                        <div className="flex items-center gap-3 mt-4 flex-wrap">
+                          <Label>Scope Filter:</Label>
+                          <Select value={progressScopeFilter} onValueChange={setProgressScopeFilter}>
+                            <SelectTrigger className="w-[200px] h-9">
+                              <SelectValue placeholder="All Scopes" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Scopes</SelectItem>
+                              {scopes.map(s => (
+                                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Label className="ml-2">Range:</Label>
                           <Select value={progressChartRange} onValueChange={setProgressChartRange}>
                             <SelectTrigger className="w-32 h-9">
                               <SelectValue />
@@ -2899,10 +2924,16 @@ export default function SitePersonnel() {
                         });
                         
                         let totalPct = 0;
-                        const count = scopes.length || 1;
-                        scopes.forEach(s => {
-                          totalPct += (dailyScopes[s.id] || 0);
-                        });
+                        let count = scopes.length || 1;
+                        
+                        if (progressScopeFilter !== 'all') {
+                          totalPct = dailyScopes[progressScopeFilter] || 0;
+                          count = 1;
+                        } else {
+                          scopes.forEach(s => {
+                            totalPct += (dailyScopes[s.id] || 0);
+                          });
+                        }
                         
                         dataPoints.push({
                           date,
@@ -2933,7 +2964,7 @@ export default function SitePersonnel() {
                               <CartesianGrid strokeDasharray="3 3" vertical={false} />
                               <XAxis dataKey="date" tick={{ fontSize: 12 }} />
                               <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} tickFormatter={(val) => `${val}%`} />
-                              <ChartTooltip formatter={(value) => [`${value}%`, 'Overall Completion']} />
+                              <ChartTooltip formatter={(value) => [`${value}%`, progressScopeFilter === 'all' ? 'Overall Completion' : 'Scope Completion']} />
                               <Line type="monotone" dataKey="completion" stroke="#22c55e" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
                             </LineChart>
                           </ResponsiveContainer>
@@ -2942,6 +2973,7 @@ export default function SitePersonnel() {
                     }
 
                     const filteredUpdates = progressUpdates.filter(pu => {
+                      if (progressScopeFilter !== 'all' && pu.bom_scope_id !== progressScopeFilter) return false;
                       if (progressFilterDate) return pu.update_date === progressFilterDate;
                       const puDate = new Date(pu.update_date);
                       const today = new Date();
