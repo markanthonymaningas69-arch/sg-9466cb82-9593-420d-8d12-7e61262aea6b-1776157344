@@ -103,7 +103,7 @@ export function Layout({ children }: LayoutProps) {
     const targetDate = thirtyDaysFromNow.toISOString().split("T")[0];
 
     const { data: visasData } = await supabase
-      .from('visas')
+      .from('personnel_visas')
       .select('*, personnel(name)')
       .or(`visa_expiry_date.lte.${targetDate},passport_expiry_date.lte.${targetDate}`);
       
