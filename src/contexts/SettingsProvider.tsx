@@ -10,6 +10,7 @@ export interface CompanySettings {
   taxId: string;
   website: string;
   logo: string;
+  logo_url?: string;
 }
 
 const defaultCompany: CompanySettings = {
