@@ -67,11 +67,14 @@ export default function Onboarding() {
         return;
       }
 
-      // Assign user the module from the invite code
+      // Use upsert here too to be safe
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ assigned_module: invData.module })
-        .eq('id', userId);
+        .upsert({ 
+          id: userId, 
+          assigned_module: invData.module,
+          updated_at: new Date().toISOString()
+        });
 
       if (updateError) throw updateError;
 
@@ -101,10 +104,14 @@ export default function Onboarding() {
     if (!userId) return;
     setCreating(true);
     try {
+      // Use upsert to handle cases where the profile might not exist yet
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ assigned_module: 'GM' })
-        .eq('id', userId);
+        .upsert({ 
+          id: userId, 
+          assigned_module: 'GM',
+          updated_at: new Date().toISOString()
+        });
 
       if (updateError) throw updateError;
 
