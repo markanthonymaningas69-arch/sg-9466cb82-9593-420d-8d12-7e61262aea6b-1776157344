@@ -65,6 +65,11 @@ export function Layout({ children }: LayoutProps) {
   const [pendingLeaves, setPendingLeaves] = useState<any[]>([]);
   const [pendingCashAdvances, setPendingCashAdvances] = useState<any[]>([]);
   const [expiringDocuments, setExpiringDocuments] = useState<any[]>([]);
+  
+  const [resolvedRequests, setResolvedRequests] = useState<any[]>([]);
+  const [resolvedLeaves, setResolvedLeaves] = useState<any[]>([]);
+  const [resolvedCashAdvances, setResolvedCashAdvances] = useState<any[]>([]);
+  
   const [notificationOpen, setNotificationOpen] = useState(false);
   
   const [assignedModule, setAssignedModule] = useState<string>(() => typeof window !== 'undefined' ? localStorage.getItem('app_assigned_module') || "GM" : "GM");
@@ -158,6 +163,31 @@ export function Layout({ children }: LayoutProps) {
       return daysToPassportExpiry <= 30 || daysToVisaExpiry <= 30;
     });
     setExpiringDocuments(expiring);
+
+    // Load recent resolved requests (Approved / Rejected) for notifications
+    const { data: rReqs } = await supabase.
+    from('site_requests').
+    select('*, projects(name)').
+    in('status', ['approved', 'rejected']).
+    order('id', { ascending: false }).
+    limit(5);
+    setResolvedRequests(rReqs || []);
+
+    const { data: rLeaves } = await supabase.
+    from('leave_requests').
+    select('*, personnel(name)').
+    in('status', ['approved', 'rejected']).
+    order('created_at', { ascending: false }).
+    limit(5);
+    setResolvedLeaves(rLeaves || []);
+
+    const { data: rAdvances } = await supabase.
+    from('cash_advance_requests').
+    select('*, personnel(name), projects(name)').
+    in('status', ['approved', 'rejected']).
+    order('created_at', { ascending: false }).
+    limit(5);
+    setResolvedCashAdvances(rAdvances || []);
   };
 
   const handleApproveRequest = async (req: any, e: React.MouseEvent) => {
@@ -450,11 +480,13 @@ export function Layout({ children }: LayoutProps) {
               const isHR = assignedModules.includes("Human Resources");
               const isAccounting = assignedModules.includes("Accounting");
               const isWarehouse = assignedModules.includes("Warehouse");
+              const isSitePersonnel = assignedModules.includes("Site Personnel");
               
-              const displayCashAdvances = (isGM || isAccounting) ? pendingCashAdvances : [];
-              const displayLeaves = (isGM || isHR) ? pendingLeaves : [];
+              // Pending Actions
+              const displayPendingAdvances = (isGM || isAccounting) ? pendingCashAdvances : [];
+              const displayPendingLeaves = (isGM || isHR) ? pendingLeaves : [];
               const displayExpiring = (isGM || isHR) ? expiringDocuments : [];
-              const displayRequests = pendingRequests.filter(req => {
+              const displayPendingRequests = pendingRequests.filter(req => {
                 if (isGM) return true;
                 const isAcctReq = ['Equipment (Rentals)', 'PPE', 'Petty Cash'].includes(req.request_type);
                 const isWhseReq = ['Tools', 'Equipment (Warehouse)', 'PPE', 'Materials'].includes(req.request_type) || !req.request_type;
@@ -463,7 +495,31 @@ export function Layout({ children }: LayoutProps) {
                 return false;
               });
 
-              const totalNotifications = displayCashAdvances.length + displayLeaves.length + displayExpiring.length + displayRequests.length;
+              // Resolved Updates
+              const displayResolvedAdvances = resolvedCashAdvances.filter(adv => {
+                if (isGM || isSitePersonnel) return true;
+                if (isAccounting && adv.status === 'approved') return true;
+                return false;
+              });
+
+              const displayResolvedLeaves = resolvedLeaves.filter(leave => {
+                if (isGM || isSitePersonnel) return true;
+                if (isHR && leave.status === 'approved') return true;
+                return false;
+              });
+
+              const displayResolvedRequests = resolvedRequests.filter(req => {
+                if (isGM || isSitePersonnel) return true;
+                const isAcctReq = ['Equipment (Rentals)', 'PPE', 'Petty Cash'].includes(req.request_type);
+                const isWhseReq = ['Tools', 'Equipment (Warehouse)', 'PPE', 'Materials'].includes(req.request_type) || !req.request_type;
+                if (isAccounting && isAcctReq && req.status === 'approved') return true;
+                if (isWarehouse && isWhseReq && req.status === 'approved') return true;
+                return false;
+              });
+
+              const totalNotifications = displayPendingAdvances.length + displayPendingLeaves.length + displayExpiring.length + displayPendingRequests.length + displayResolvedAdvances.length + displayResolvedLeaves.length + displayResolvedRequests.length;
+              const hasActionRequired = displayPendingAdvances.length > 0 || displayPendingLeaves.length > 0 || displayExpiring.length > 0 || displayPendingRequests.length > 0;
+              const hasRecentUpdates = displayResolvedAdvances.length > 0 || displayResolvedLeaves.length > 0 || displayResolvedRequests.length > 0;
 
               return (
                 <DropdownMenu open={notificationOpen} onOpenChange={setNotificationOpen}>
@@ -491,14 +547,16 @@ export function Layout({ children }: LayoutProps) {
                       </div> :
 
                     <ScrollArea className="max-h-[400px]">
-                        {displayCashAdvances.length > 0 &&
-                      <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase bg-muted/50">
-                            Cash Advances
+                        {hasActionRequired && (
+                          <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase bg-muted/50 sticky top-0 z-10 backdrop-blur">
+                            Action Required
                           </div>
-                      }
-                        {displayCashAdvances.map((adv) =>
+                        )}
+
+                        {/* Pending Cash Advances */}
+                        {displayPendingAdvances.map((adv) =>
                       <DropdownMenuItem
-                        key={adv.id}
+                        key={`pending-adv-${adv.id}`}
                         className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-muted"
                         onClick={() => {
                           router.push('/accounting');
@@ -540,14 +598,14 @@ export function Layout({ children }: LayoutProps) {
                       </DropdownMenuItem>
                   )}
 
-                    {displayRequests.length > 0 &&
-                  <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase bg-muted/50 mt-2">
+                        {displayPendingRequests.length > 0 &&
+                  <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase bg-muted/50 mt-2 sticky top-0 z-10 backdrop-blur">
                         Site Requests
                       </div>
                   }
-                    {displayRequests.map((req) =>
+                        {displayPendingRequests.map((req) =>
                   <DropdownMenuItem
-                    key={req.id}
+                    key={`pending-req-${req.id}`}
                     className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-muted"
                     onClick={() => {
                       router.push('/site-personnel?tab=request');
@@ -593,14 +651,14 @@ export function Layout({ children }: LayoutProps) {
                       </DropdownMenuItem>
                   )}
 
-                    {displayLeaves.length > 0 &&
-                  <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase bg-muted/50 mt-2">
+                        {displayPendingLeaves.length > 0 &&
+                  <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase bg-muted/50 mt-2 sticky top-0 z-10 backdrop-blur">
                         Leave Requests
                       </div>
                   }
-                    {displayLeaves.map((leave) =>
+                        {displayPendingLeaves.map((leave) =>
                   <DropdownMenuItem
-                    key={leave.id}
+                    key={`pending-leave-${leave.id}`}
                     className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-muted"
                     onClick={() => {
                       router.push('/personnel?tab=leave');
@@ -642,12 +700,12 @@ export function Layout({ children }: LayoutProps) {
                       </DropdownMenuItem>
                   )}
 
-                    {displayExpiring.length > 0 &&
-                  <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase bg-muted/50 mt-2 text-red-700">
+                        {displayExpiring.length > 0 &&
+                  <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase bg-muted/50 mt-2 sticky top-0 z-10 backdrop-blur">
                         Expiring Documents
                       </div>
                   }
-                    {displayExpiring.map((doc) => {
+                        {displayExpiring.map((doc) => {
                     const daysToPassportExpiry = doc.passport_expiry_date ? Math.ceil((new Date(doc.passport_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
                     const daysToVisaExpiry = doc.visa_expiry_date ? Math.ceil((new Date(doc.visa_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
                     const docType = [];
@@ -673,6 +731,69 @@ export function Layout({ children }: LayoutProps) {
                         </DropdownMenuItem>);
 
                   })}
+
+                        {hasRecentUpdates && (
+                          <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase bg-muted/50 mt-2 sticky top-0 z-10 backdrop-blur">
+                            Recent Updates
+                          </div>
+                        )}
+
+                        {/* Resolved Cash Advances */}
+                        {displayResolvedAdvances.map((adv) => (
+                          <DropdownMenuItem
+                            key={`res-adv-${adv.id}`}
+                            className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-muted"
+                            onClick={() => {
+                              router.push('/site-personnel?tab=advances');
+                              setNotificationOpen(false);
+                            }}>
+                            <div className="flex items-start justify-between w-full">
+                              <span className="font-medium text-sm">Cash Advance: {adv.personnel?.name}</span>
+                              <Badge variant={adv.status === 'approved' ? 'default' : 'destructive'} className={adv.status === 'approved' ? 'bg-green-600' : ''}>
+                                {adv.status}
+                              </Badge>
+                            </div>
+                            <span className="text-xs text-muted-foreground italic">"{adv.reason}"</span>
+                          </DropdownMenuItem>
+                        ))}
+
+                        {/* Resolved Site Requests */}
+                        {displayResolvedRequests.map((req) => (
+                          <DropdownMenuItem
+                            key={`res-req-${req.id}`}
+                            className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-muted"
+                            onClick={() => {
+                              router.push('/site-personnel?tab=request');
+                              setNotificationOpen(false);
+                            }}>
+                            <div className="flex items-start justify-between w-full">
+                              <span className="font-medium text-sm">{req.item_name}</span>
+                              <Badge variant={req.status === 'approved' ? 'default' : 'destructive'} className={req.status === 'approved' ? 'bg-green-600' : ''}>
+                                {req.status}
+                              </Badge>
+                            </div>
+                            <span className="text-xs text-muted-foreground">{req.request_type || 'Materials'} - {req.quantity} {req.unit}</span>
+                          </DropdownMenuItem>
+                        ))}
+
+                        {/* Resolved Leaves */}
+                        {displayResolvedLeaves.map((leave) => (
+                          <DropdownMenuItem
+                            key={`res-leave-${leave.id}`}
+                            className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-muted"
+                            onClick={() => {
+                              router.push('/personnel?tab=leave');
+                              setNotificationOpen(false);
+                            }}>
+                            <div className="flex items-start justify-between w-full">
+                              <span className="font-medium text-sm">Leave: {leave.personnel?.name}</span>
+                              <Badge variant={leave.status === 'approved' ? 'default' : 'destructive'} className={leave.status === 'approved' ? 'bg-green-600' : ''}>
+                                {leave.status}
+                              </Badge>
+                            </div>
+                            <span className="text-xs text-muted-foreground">{new Date(leave.start_date).toLocaleDateString()} - {new Date(leave.end_date).toLocaleDateString()}</span>
+                          </DropdownMenuItem>
+                        ))}
                   </ScrollArea>
                 }
               </DropdownMenuContent>
