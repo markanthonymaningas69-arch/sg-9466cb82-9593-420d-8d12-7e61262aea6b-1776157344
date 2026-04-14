@@ -12,10 +12,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { siteService } from "@/services/siteService";
 import { projectService } from "@/services/projectService";
 import { personnelService } from "@/services/personnelService";
-import { Plus, Pencil, Trash2, Archive, Users, Truck, ClipboardList, ArrowUp, ArrowDown, Check, ArrowUpDown, ShoppingCart, Banknote, Wrench, Eye, Activity, List as ListIcon } from "lucide-react";
+import { Plus, Pencil, Trash2, Archive, Users, Truck, ClipboardList, ArrowUp, ArrowDown, Check, ArrowUpDown, ShoppingCart, Banknote, Wrench, Eye, Activity, List as ListIcon, CheckCircle2, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer } from "recharts";
 
@@ -2649,6 +2650,8 @@ export default function SitePersonnel() {
                       }))
                     ].sort((a: any, b: any) => new Date(b.request_date).getTime() - new Date(a.request_date).getTime());
 
+                    const recentResolved = combinedGroups.filter((g: any) => g.status === 'approved' || g.status === 'rejected');
+
                     if (combinedGroups.length === 0) {
                       return (
                         <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg bg-gray-50">
@@ -2658,69 +2661,89 @@ export default function SitePersonnel() {
                     }
 
                     return (
-                      <div className="overflow-y-auto h-full border rounded-md relative">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="w-24">Date</TableHead>
-                              <TableHead className="w-32">Form No.</TableHead>
-                              <TableHead className="w-32">Type</TableHead>
-                              <TableHead>Requested By</TableHead>
-                              <TableHead>Items Count</TableHead>
-                              <TableHead>Status</TableHead>
-                              <TableHead className="text-right w-24">Act</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {combinedGroups.map((group: any) => (
-                              <TableRow key={group.id}>
-                                <TableCell className="whitespace-nowrap text-sm">{group.request_date}</TableCell>
-                                <TableCell className="font-mono text-xs font-bold text-primary">{group.form_number}</TableCell>
-                                <TableCell>
-                                  <Badge variant="secondary" className="font-normal text-xs">{group.request_type}</Badge>
-                                </TableCell>
-                                <TableCell className="text-sm font-medium">{group.requested_by}</TableCell>
-                                <TableCell className="text-sm">{group.items.length} item(s)</TableCell>
-                                <TableCell>
-                                  <Badge 
-                                    variant="outline" 
-                                    className={`text-[10px] ${
-                                      group.status === 'fulfilled' || group.status === 'paid' ? 'bg-green-500 text-white' : 
-                                      group.status === 'approved' ? 'bg-blue-500 text-white' : 
-                                      group.status === 'rejected' ? 'bg-red-500 text-white' : 
-                                      'bg-orange-500 text-white'
-                                    }`}
-                                  >
-                                    {group.status?.toUpperCase()}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <div className="flex justify-end gap-1">
-                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-500 hover:bg-blue-50" onClick={() => {
-                                      setSelectedFormGroup(group);
-                                      setViewFormDialogOpen(true);
-                                    }}>
-                                      <Eye className="h-4 w-4" />
-                                    </Button>
-                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-orange-600 hover:bg-orange-50" onClick={(e) => {
-                                      if(confirm("Archive this request?")) {
-                                        e.stopPropagation();
-                                        if (group.isCA) {
-                                          siteService.deleteCashAdvance(group.id).then(() => loadCashAdvances());
-                                        } else {
-                                          const ids = group.items.map((i: any) => i.id);
-                                          supabase.from('site_requests').update({ is_archived: true }).in('id', ids).then(() => loadRequests());
-                                        }
-                                      }
-                                    }} title="Archive">
-                                      <Archive className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
+                      <div className="flex flex-col h-full space-y-4">
+                        {recentResolved.length > 0 && (
+                          <div className="shrink-0 space-y-2 mb-2">
+                            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Recent Notifications</h3>
+                            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                              {recentResolved.slice(0, 3).map((req: any) => (
+                                <Alert key={`alert-${req.id}`} className={req.status === 'approved' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}>
+                                  {req.status === 'approved' ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <AlertCircle className="h-4 w-4 text-red-600" />}
+                                  <AlertTitle className={req.status === 'approved' ? 'text-green-800' : 'text-red-800'}>
+                                    {req.request_type} {req.status === 'approved' ? 'Approved' : 'Rejected'}
+                                  </AlertTitle>
+                                  <AlertDescription className={req.status === 'approved' ? 'text-green-700' : 'text-red-700'}>
+                                    Form <span className="font-bold">{req.form_number}</span> by {req.requested_by} was {req.status}.
+                                  </AlertDescription>
+                                </Alert>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        <div className="overflow-y-auto flex-1 border rounded-md relative">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-24">Date</TableHead>
+                                <TableHead className="w-32">Form No.</TableHead>
+                                <TableHead className="w-32">Type</TableHead>
+                                <TableHead>Requested By</TableHead>
+                                <TableHead>Items Count</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="text-right w-24">Act</TableHead>
                               </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
+                            </TableHeader>
+                            <TableBody>
+                              {combinedGroups.map((group: any) => (
+                                <TableRow key={group.id}>
+                                  <TableCell className="whitespace-nowrap text-sm">{group.request_date}</TableCell>
+                                  <TableCell className="font-mono text-xs font-bold text-primary">{group.form_number}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="secondary" className="font-normal text-xs">{group.request_type}</Badge>
+                                  </TableCell>
+                                  <TableCell className="text-sm font-medium">{group.requested_by}</TableCell>
+                                  <TableCell className="text-sm">{group.items.length} item(s)</TableCell>
+                                  <TableCell>
+                                    <Badge 
+                                      variant="outline" 
+                                      className={`text-[10px] ${
+                                        group.status === 'fulfilled' || group.status === 'paid' ? 'bg-green-500 text-white' : 
+                                        group.status === 'approved' ? 'bg-blue-500 text-white' : 
+                                        group.status === 'rejected' ? 'bg-red-500 text-white' : 
+                                        'bg-orange-500 text-white'
+                                      }`}
+                                    >
+                                      {group.status?.toUpperCase()}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <div className="flex justify-end gap-1">
+                                      <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-500 hover:bg-blue-50" onClick={() => {
+                                        setSelectedFormGroup(group);
+                                        setViewFormDialogOpen(true);
+                                      }}>
+                                        <Eye className="h-4 w-4" />
+                                      </Button>
+                                      <Button size="icon" variant="ghost" className="h-8 w-8 text-orange-600 hover:bg-orange-50" onClick={(e) => {
+                                        if(confirm("Archive this request?")) {
+                                          e.stopPropagation();
+                                          if (group.isCA) {
+                                            siteService.deleteCashAdvance(group.id).then(() => loadCashAdvances());
+                                          } else {
+                                            const ids = group.items.map((i: any) => i.id);
+                                            supabase.from('site_requests').update({ is_archived: true }).in('id', ids).then(() => loadRequests());
+                                          }
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
                       </div>
                     );
                   })()}
