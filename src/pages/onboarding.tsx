@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Building2, UserPlus, LogOut, ArrowRight, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/services/authService";
@@ -177,7 +177,7 @@ export default function Onboarding() {
 
         <div className="grid md:grid-cols-2 gap-6">
           {/* Join Company Card */}
-          <Card className="relative overflow-hidden border-2 hover:border-primary/50 transition-colors">
+          <Card className="relative overflow-hidden border-2 hover:border-primary/50 transition-colors flex flex-col">
             <CardHeader>
               <div className="h-12 w-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mb-4">
                 <UserPlus className="h-6 w-6" />
@@ -187,8 +187,8 @@ export default function Onboarding() {
                 Enter an invite code provided by your General Manager to access your assigned module.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <form onSubmit={handleJoinCompany} className="flex flex-col gap-4">
+            <CardContent className="flex-1">
+              <form id="join-form" onSubmit={handleJoinCompany} className="flex flex-col gap-4">
                 <div className="space-y-2">
                   <Input 
                     placeholder="Enter 6-character code" 
@@ -199,38 +199,44 @@ export default function Onboarding() {
                     disabled={joining || creating}
                   />
                 </div>
-                <Button type="submit" disabled={!inviteCode.trim() || joining || creating} className="w-full">
-                  {joining ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Join Workspace
-                  {!joining && <ArrowRight className="ml-2 h-4 w-4" />}
-                </Button>
               </form>
             </CardContent>
+            <CardFooter>
+              <Button type="submit" form="join-form" disabled={!inviteCode.trim() || joining || creating} className="w-full">
+                {joining ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Join Workspace
+                {!joining && <ArrowRight className="ml-2 h-4 w-4" />}
+              </Button>
+            </CardFooter>
           </Card>
 
           {/* Create Company Card */}
-          <Card className="relative overflow-hidden border-2 hover:border-primary/50 transition-colors">
+          <Card className="relative overflow-hidden border-2 hover:border-primary/50 transition-colors flex flex-col">
             <CardHeader>
               <div className="h-12 w-12 bg-green-100 text-green-600 rounded-lg flex items-center justify-center mb-4">
                 <Building2 className="h-6 w-6" />
               </div>
               <CardTitle>Create a Company</CardTitle>
               <CardDescription>
-                Set up a new workspace. You will be assigned the General Manager (GM) role with full access.
+                Set up a new workspace. You will be assigned the General Manager (GM) role with full access to all modules.
               </CardDescription>
             </CardHeader>
-            <CardContent className="h-full flex flex-col justify-end pb-6">
+            <CardContent className="flex-1 flex flex-col justify-center">
+              <div className="text-sm text-center text-muted-foreground p-4 bg-muted/50 rounded-lg">
+                Clicking start will initialize a new workspace and assign you as the administrator.
+              </div>
+            </CardContent>
+            <CardFooter>
               <Button 
-                variant="outline" 
-                className="w-full border-2 border-primary/20 hover:bg-primary/5"
                 onClick={handleCreateCompany}
                 disabled={joining || creating}
+                className="w-full bg-green-600 hover:bg-green-700 text-white"
               >
                 {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Start
                 {!creating && <ArrowRight className="ml-2 h-4 w-4" />}
               </Button>
-            </CardContent>
+            </CardFooter>
           </Card>
         </div>
 
