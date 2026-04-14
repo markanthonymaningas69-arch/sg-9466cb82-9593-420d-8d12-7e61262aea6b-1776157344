@@ -384,6 +384,12 @@ export default function Settings() {
                                 <Badge key={m} variant="outline" className="text-[10px]">{m}</Badge>
                               ))}
                             </div>
+                            {(u.assigned_modules?.includes("Site Personnel") || u.assigned_module === "Site Personnel") && u.assigned_project_ids?.length > 0 && (
+                              <div className="text-xs text-muted-foreground mt-1">
+                                <strong className="text-foreground">Projects:</strong> {projects.filter(p => (u.assigned_project_ids || []).includes(p.id)).map(p => p.name).join(", ")}
+                                <span className="ml-2 text-[10px] bg-muted px-1.5 py-0.5 rounded">Changes: {u.project_change_count || 0}/5</span>
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center gap-1">
                             <Button size="icon" variant="ghost" onClick={() => {
@@ -508,11 +514,33 @@ export default function Settings() {
                   toast({ title: "Error", description: "Select at least one module.", variant: "destructive" });
                   return;
                 }
-                const { error } = await supabase.from('profiles').update({
+
+                const isSitePersonnel = editModules.includes("Site Personnel");
+                const currentProjects = editingUser.assigned_project_ids || [];
+                const isProjectChanged = isSitePersonnel && JSON.stringify([...editProjects].sort()) !== JSON.stringify([...currentProjects].sort());
+
+                if (isProjectChanged) {
+                  if ((editingUser.project_change_count || 0) >= 5) {
+                    toast({ 
+                      title: "Limit Reached", 
+                      description: "You have reached the maximum limit of 5 project reassignments for this user.", 
+                      variant: "destructive" 
+                    });
+                    return;
+                  }
+                }
+
+                const updates: any = {
                   assigned_module: editModules[0],
                   assigned_modules: editModules,
-                  assigned_project_ids: editModules.includes("Site Personnel") ? editProjects : []
-                }).eq('id', editingUser.id);
+                  assigned_project_ids: isSitePersonnel ? editProjects : []
+                };
+
+                if (isProjectChanged) {
+                  updates.project_change_count = (editingUser.project_change_count || 0) + 1;
+                }
+
+                const { error } = await supabase.from('profiles').update(updates).eq('id', editingUser.id);
                 
                 if (error) {
                   toast({ title: "Error", description: "Failed to update user access.", variant: "destructive" });
