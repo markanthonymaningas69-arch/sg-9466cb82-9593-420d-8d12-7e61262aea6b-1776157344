@@ -71,7 +71,7 @@ export function Layout({ children }: LayoutProps) {
   const [resolvedCashAdvances, setResolvedCashAdvances] = useState<any[]>([]);
   
   const [notificationOpen, setNotificationOpen] = useState(false);
-  const [viewedNotifications, setViewedNotifications] = useState(false);
+  const [lastSeenNotificationIds, setLastSeenNotificationIds] = useState<string>(() => typeof window !== 'undefined' ? localStorage.getItem('lastSeenNotificationIds') || "" : "");
   
   const [assignedModule, setAssignedModule] = useState<string>(() => typeof window !== 'undefined' ? localStorage.getItem('app_assigned_module') || "GM" : "GM");
   const [assignedModules, setAssignedModules] = useState<string[]>(() => {
@@ -91,11 +91,6 @@ export function Layout({ children }: LayoutProps) {
     const interval = setInterval(loadPendingRequests, 30000);
     return () => clearInterval(interval);
   }, []);
-
-  // Reset viewed flag when new notifications arrive
-  useEffect(() => {
-    setViewedNotifications(false);
-  }, [pendingRequests, pendingLeaves, pendingCashAdvances, expiringDocuments, resolvedRequests, resolvedLeaves, resolvedCashAdvances]);
 
   const loadUserProfile = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -527,15 +522,30 @@ export function Layout({ children }: LayoutProps) {
               const hasActionRequired = displayPendingAdvances.length > 0 || displayPendingLeaves.length > 0 || displayExpiring.length > 0 || displayPendingRequests.length > 0;
               const hasRecentUpdates = displayResolvedAdvances.length > 0 || displayResolvedLeaves.length > 0 || displayResolvedRequests.length > 0;
 
+              const currentNotificationIds = [
+                ...displayPendingAdvances,
+                ...displayPendingLeaves,
+                ...displayExpiring,
+                ...displayPendingRequests,
+                ...displayResolvedAdvances,
+                ...displayResolvedLeaves,
+                ...displayResolvedRequests
+              ].map((item: any) => `${item.id}-${item.status || 'pending'}`).sort().join(',');
+
+              const hasUnseenNotifications = totalNotifications > 0 && currentNotificationIds !== lastSeenNotificationIds;
+
               return (
                 <DropdownMenu open={notificationOpen} onOpenChange={(open) => {
                   setNotificationOpen(open);
-                  if (open) setViewedNotifications(true);
+                  if (open) {
+                    setLastSeenNotificationIds(currentNotificationIds);
+                    localStorage.setItem('lastSeenNotificationIds', currentNotificationIds);
+                  }
                 }}>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="relative">
                       <Bell className="h-5 w-5" />
-                      {totalNotifications > 0 && !viewedNotifications &&
+                      {hasUnseenNotifications &&
                       <Badge
                         variant="destructive"
                         className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">

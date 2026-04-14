@@ -116,6 +116,7 @@ export default function SitePersonnel() {
   const [isManualRequestUnit, setIsManualRequestUnit] = useState(false);
   const [requestItems, setRequestItems] = useState<any[]>([]);
   const [requestFilterType, setRequestFilterType] = useState<string>("all");
+  const [seenResolvedIds, setSeenResolvedIds] = useState<string>("");
   const [requestForm, setRequestForm] = useState({
     request_type: "Materials",
     form_number: "",
@@ -197,6 +198,18 @@ export default function SitePersonnel() {
       loadCashAdvances();
     }
   }, [selectedProject, deliveriesDate, consumptionDate, requestDate]);
+
+  const resolvedRequestIds = [...requests, ...cashAdvances]
+    .filter(r => r.status === 'approved' || r.status === 'rejected')
+    .map(r => `${r.id}-${r.status}`)
+    .sort()
+    .join(',');
+
+  useEffect(() => {
+    if (activeTab === 'request') {
+      setSeenResolvedIds(resolvedRequestIds);
+    }
+  }, [activeTab, resolvedRequestIds]);
 
   useEffect(() => {
     if (!selectedProject) return;
@@ -758,11 +771,12 @@ export default function SitePersonnel() {
                 <ShoppingCart className="h-4 w-4 mr-2" />
                 Requests
                 {(() => {
+                  const hasNewResolved = resolvedRequestIds !== seenResolvedIds && activeTab !== 'request';
                   const resolvedCount = [...requests, ...cashAdvances].filter(r => r.status === 'approved' || r.status === 'rejected').length;
-                  if (resolvedCount > 0) {
+                  if (hasNewResolved && resolvedCount > 0) {
                     return (
                       <Badge variant="destructive" className="ml-2 h-5 min-w-5 flex items-center justify-center p-0 px-1.5 text-[10px]">
-                        {resolvedCount}
+                        New
                       </Badge>
                     );
                   }
@@ -2497,6 +2511,7 @@ export default function SitePersonnel() {
                                             placeholder="Type item name"
                                             value={requestForm.item_name}
                                             onChange={(e) => setRequestForm({ ...requestForm, item_name: e.target.value })}
+                                            required
                                           />
                                           <Button type="button" variant="outline" className="px-2" onClick={() => {
                                             setIsManualRequestItem(false);
@@ -2550,6 +2565,7 @@ export default function SitePersonnel() {
                                             value={requestForm.unit}
                                             onChange={(e) => setRequestForm({ ...requestForm, unit: e.target.value })}
                                             placeholder="Custom unit"
+                                            required
                                           />
                                           <Button type="button" variant="outline" className="px-2" onClick={() => {
                                             setIsManualRequestUnit(false);
@@ -2687,8 +2703,6 @@ export default function SitePersonnel() {
                       return true;
                     });
 
-                    const recentResolved = combinedGroups.filter((g: any) => g.status === 'approved' || g.status === 'rejected');
-
                     if (filteredGroups.length === 0) {
                       return (
                         <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg bg-gray-50 mt-4">
@@ -2699,24 +2713,6 @@ export default function SitePersonnel() {
 
                     return (
                       <div className="flex flex-col h-full space-y-4 mt-4">
-                        {recentResolved.length > 0 && (
-                          <div className="shrink-0 space-y-2 mb-2">
-                            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Recent Notifications</h3>
-                            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                              {recentResolved.slice(0, 3).map((req: any) => (
-                                <Alert key={`alert-${req.id}`} className={req.status === 'approved' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}>
-                                  {req.status === 'approved' ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <AlertCircle className="h-4 w-4 text-red-600" />}
-                                  <AlertTitle className={req.status === 'approved' ? 'text-green-800' : 'text-red-800'}>
-                                    {req.request_type} {req.status === 'approved' ? 'Approved' : 'Rejected'}
-                                  </AlertTitle>
-                                  <AlertDescription className={req.status === 'approved' ? 'text-green-700' : 'text-red-700'}>
-                                    Form <span className="font-bold">{req.form_number}</span> by {req.requested_by} was {req.status}.
-                                  </AlertDescription>
-                                </Alert>
-                              ))}
-                            </div>
-                          </div>
-                        )}
                         <div className="overflow-y-auto flex-1 border rounded-md relative">
                           <Table>
                             <TableHeader>
