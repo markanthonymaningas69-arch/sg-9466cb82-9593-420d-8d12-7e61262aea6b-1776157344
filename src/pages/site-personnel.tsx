@@ -136,6 +136,15 @@ export default function SitePersonnel() {
 
   // Scope of Works
   const [scopes, setScopes] = useState<ScopeOfWork[]>([]);
+  const [progressUpdates, setProgressUpdates] = useState<any[]>([]);
+  const [progressFilterDate, setProgressFilterDate] = useState<string>("");
+  const [updateProgressDialogOpen, setUpdateProgressDialogOpen] = useState(false);
+  const [progressForm, setProgressForm] = useState({
+    bom_scope_id: "",
+    percentage: 0,
+    update_date: todayStr,
+    notes: ""
+  });
 
   useEffect(() => {
     loadProjects();
@@ -337,6 +346,18 @@ export default function SitePersonnel() {
     if (!selectedProject) return;
     const { data } = await siteService.getScopeOfWorks(selectedProject);
     setScopes(data || []);
+    
+    if (data && data.length > 0) {
+      const scopeIds = data.map((s: any) => s.id);
+      const { data: progressData } = await supabase
+        .from('bom_progress_updates')
+        .select('*, bom_scope_of_work(name)')
+        .in('bom_scope_id', scopeIds)
+        .order('update_date', { ascending: false });
+      setProgressUpdates(progressData || []);
+    } else {
+      setProgressUpdates([]);
+    }
   };
 
   const loadBomMaterials = async () => {
@@ -345,20 +366,17 @@ export default function SitePersonnel() {
     setBomMaterials(data || []);
   };
 
-  const handleUpdateProgress = async (scope: ScopeOfWork, newValue: string) => {
-    const percentage = parseFloat(newValue);
-    if (isNaN(percentage)) return;
-
-    const clamped = Math.min(Math.max(percentage, 0), 100);
-    if (clamped === (scope.completion_percentage || 0)) return;
-
+  const handleProgressSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     await siteService.createProgressUpdate({
-      bom_scope_id: scope.id,
-      percentage_completed: clamped,
-      update_date: scopeDate,
+      bom_scope_id: progressForm.bom_scope_id,
+      percentage_completed: parseFloat(progressForm.percentage.toString()),
+      update_date: progressForm.update_date,
       updated_by: "Site App",
-      notes: "Inline progress update"
+      notes: progressForm.notes
     });
+    setUpdateProgressDialogOpen(false);
+    setProgressForm(prev => ({ ...prev, percentage: 0, notes: "" }));
     loadScopes();
   };
 
@@ -2363,26 +2381,35 @@ export default function SitePersonnel() {
                               <div className="bg-muted/30 p-4 rounded-md border space-y-4">
                                 <h4 className="font-semibold text-sm">Add Item to Request</h4>
                                 <div className="grid grid-cols-2 gap-4">
-                                  <div className="space-y-2 col-span-2 md:col-span-1">
-                                    <Label>Scope of Work (Optional)</Label>
-                                    <Select
-                                      value={requestForm.bom_scope_id}
-                                      onValueChange={(val) => setRequestForm({ ...requestForm, bom_scope_id: val })}
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Assign to scope..." />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="unassigned" className="text-muted-foreground italic">General / Unassigned</SelectItem>
-                                        {scopes.map((s) => (
-                                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  <div className="space-y-2 col-span-2 md:col-span-1">
+                                  {requestForm.request_type === "Materials" && (
+                                    <div className="space-y-2 col-span-2 md:col-span-1">
+                                      <Label>Scope of Work (Optional)</Label>
+                                      <Select
+                                        value={requestForm.bom_scope_id}
+                                        onValueChange={(val) => setRequestForm({ ...requestForm, bom_scope_id: val })}
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Assign to scope..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="unassigned" className="text-muted-foreground italic">General / Unassigned</SelectItem>
+                                          {scopes.map((s) => (
+                                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  )}
+                                  <div className={`space-y-2 col-span-2 ${requestForm.request_type === "Materials" ? "md:col-span-1" : ""}`}>
                                     <Label>Requested Item *</Label>
-                                    {!isManualRequestItem ? (
+                                    {requestForm.request_type !== "Materials" ? (
+                                      <Input
+                                        placeholder="Type item name"
+                                        value={requestForm.item_name}
+                                        onChange={(e) => setRequestForm({ ...requestForm, item_name: e.target.value })}
+                                        required
+                                      />
+                                    ) : !isManualRequestItem ? (
                                       <Select
                                         value={requestForm.item_name}
                                         onValueChange={(val) => {
@@ -2427,7 +2454,7 @@ export default function SitePersonnel() {
                                     )}
                                   </div>
                                 </div>
-                                <div className="grid grid-cols-3 gap-4">
+                                <div className="grid grid-cols-2 gap-4">
                                   <div className="space-y-2">
                                     <Label>Quantity</Label>
                                     <Input
@@ -2436,7 +2463,7 @@ export default function SitePersonnel() {
                                       min="0"
                                       value={requestForm.quantity}
                                       onChange={(e) => setRequestForm({ ...requestForm, quantity: parseFloat(e.target.value) || 0 })}
-                                      placeholder="Optional"
+                                      placeholder="Required"
                                     />
                                   </div>
                                   <div className="space-y-2">
@@ -2479,17 +2506,6 @@ export default function SitePersonnel() {
                                       </div>
                                     )}
                                   </div>
-                                  <div className="space-y-2">
-                                    <Label>Est. Amount</Label>
-                                    <Input
-                                      type="number"
-                                      step="0.01"
-                                      min="0"
-                                      value={requestForm.amount}
-                                      onChange={(e) => setRequestForm({ ...requestForm, amount: parseFloat(e.target.value) || 0 })}
-                                      placeholder="Optional"
-                                    />
-                                  </div>
                                 </div>
                                 <div className="space-y-2">
                                   <Label>Item Notes</Label>
@@ -2513,7 +2529,6 @@ export default function SitePersonnel() {
                                         <TableHead>Scope</TableHead>
                                         <TableHead>Item Details</TableHead>
                                         <TableHead>Qty</TableHead>
-                                        <TableHead>Amount</TableHead>
                                         <TableHead className="text-right">Action</TableHead>
                                       </TableRow>
                                     </TableHeader>
@@ -2521,7 +2536,7 @@ export default function SitePersonnel() {
                                       {requestItems.map((item, idx) => (
                                         <TableRow key={idx}>
                                           <TableCell>
-                                            {item.bom_scope_id === "unassigned" ? (
+                                            {item.bom_scope_id === "unassigned" || !item.bom_scope_id ? (
                                               <span className="text-muted-foreground italic text-xs">General</span>
                                             ) : (
                                               <Badge variant="secondary" className="text-xs">
@@ -2534,7 +2549,6 @@ export default function SitePersonnel() {
                                             {item.notes && <div className="text-[10px] text-muted-foreground truncate max-w-[150px]">{item.notes}</div>}
                                           </TableCell>
                                           <TableCell className="text-sm">{item.quantity} {item.unit}</TableCell>
-                                          <TableCell className="text-sm">{item.amount || 0 > 0 ? item.amount.toLocaleString() : "-"}</TableCell>
                                           <TableCell className="text-right">
                                             <Button type="button" size="sm" variant="ghost" onClick={() => handleRemoveItem(idx)} className="h-6 w-6 p-0 text-red-500">
                                               <Trash2 className="h-4 w-4" />
@@ -2546,16 +2560,6 @@ export default function SitePersonnel() {
                                   </Table>
                                 </div>
                               )}
-                            </div>
-                          )}
-                          {requestForm.request_type === "Cash Advance" && (
-                            <div className="space-y-2">
-                              <Label>Notes / Reason *</Label>
-                              <Textarea
-                                value={requestForm.notes}
-                                onChange={(e) => setRequestForm({ ...requestForm, notes: e.target.value })}
-                                required
-                              />
                             </div>
                           )}
                           <div className="flex justify-between items-center pt-4 border-t">
@@ -2675,21 +2679,19 @@ export default function SitePersonnel() {
                                     }}>
                                       <Eye className="h-4 w-4" />
                                     </Button>
-                                    {group.status === 'pending' && (
-                                      <Button size="icon" variant="ghost" className="h-8 w-8 text-orange-600 hover:bg-orange-50" onClick={(e) => {
-                                        if(confirm("Archive this pending request?")) {
-                                          e.stopPropagation();
-                                          if (group.isCA) {
-                                            siteService.deleteCashAdvance(group.id).then(() => loadCashAdvances());
-                                          } else {
-                                            const ids = group.items.map((i: any) => i.id);
-                                            supabase.from('site_requests').update({ is_archived: true }).in('id', ids).then(() => loadRequests());
-                                          }
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-orange-600 hover:bg-orange-50" onClick={(e) => {
+                                      if(confirm("Archive this request?")) {
+                                        e.stopPropagation();
+                                        if (group.isCA) {
+                                          siteService.deleteCashAdvance(group.id).then(() => loadCashAdvances());
+                                        } else {
+                                          const ids = group.items.map((i: any) => i.id);
+                                          supabase.from('site_requests').update({ is_archived: true }).in('id', ids).then(() => loadRequests());
                                         }
-                                      }} title="Archive">
-                                        <Archive className="h-4 w-4" />
-                                      </Button>
-                                    )}
+                                      }
+                                    }} title="Archive">
+                                      <Archive className="h-4 w-4" />
+                                    </Button>
                                   </div>
                                 </TableCell>
                               </TableRow>
@@ -2750,7 +2752,6 @@ export default function SitePersonnel() {
                               {!selectedFormGroup?.isCA && <TableHead>Scope of Work</TableHead>}
                               <TableHead>Item / Description</TableHead>
                               {!selectedFormGroup?.isCA && <TableHead>Quantity</TableHead>}
-                              <TableHead className="text-right">Est. Amount</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -2774,9 +2775,6 @@ export default function SitePersonnel() {
                                 {!selectedFormGroup?.isCA && (
                                   <TableCell>{item.quantity > 0 ? `${item.quantity} ${item.unit}` : '-'}</TableCell>
                                 )}
-                                <TableCell className="text-right font-medium text-primary">
-                                  {item.amount > 0 ? item.amount.toLocaleString(undefined, {minimumFractionDigits: 2}) : '-'}
-                                </TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
@@ -2794,101 +2792,123 @@ export default function SitePersonnel() {
                 <CardHeader className="shrink-0">
                   <div className="flex justify-between items-start">
                     <div>
-                      <CardTitle>Update Progress</CardTitle>
-                      <CardDescription>Track progress for scopes officially defined in the Bill of Materials</CardDescription>
+                      <CardTitle>Update Progress History</CardTitle>
+                      <CardDescription>Track historical completion updates for Scopes of Work (showing last 6 days)</CardDescription>
                       <div className="flex items-center gap-3 mt-4">
-                        <Label>Update Date:</Label>
+                        <Label>Date Filter:</Label>
                         <Input
                           type="date"
-                          value={scopeDate}
-                          onChange={(e) => setScopeDate(e.target.value)}
+                          value={progressFilterDate}
+                          onChange={(e) => setProgressFilterDate(e.target.value)}
                           className="w-auto h-9"
                         />
+                        {progressFilterDate && (
+                          <Button variant="ghost" size="sm" onClick={() => setProgressFilterDate("")} className="text-muted-foreground h-9">
+                            Clear
+                          </Button>
+                        )}
                       </div>
                     </div>
+                    <Dialog open={updateProgressDialogOpen} onOpenChange={setUpdateProgressDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button className="bg-green-600 hover:bg-green-700 text-white">
+                          <Plus className="h-4 w-4 mr-2" /> Update Progress
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Update Scope Progress</DialogTitle>
+                        </DialogHeader>
+                        <form onSubmit={handleProgressSubmit} className="space-y-4">
+                          <div className="space-y-2">
+                            <Label>Scope of Work *</Label>
+                            <Select required value={progressForm.bom_scope_id} onValueChange={(val) => setProgressForm({...progressForm, bom_scope_id: val})}>
+                              <SelectTrigger><SelectValue placeholder="Select scope..." /></SelectTrigger>
+                              <SelectContent>
+                                {scopes.map(s => (
+                                  <SelectItem key={s.id} value={s.id}>{s.name} (Currently {s.completion_percentage || 0}%)</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>New Completion % *</Label>
+                              <Input type="number" min="0" max="100" step="0.1" required value={progressForm.percentage} onChange={(e) => setProgressForm({...progressForm, percentage: parseFloat(e.target.value) || 0})} />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Update Date *</Label>
+                              <Input type="date" required value={progressForm.update_date} onChange={(e) => setProgressForm({...progressForm, update_date: e.target.value})} />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Notes / Details</Label>
+                            <Textarea value={progressForm.notes} onChange={(e) => setProgressForm({...progressForm, notes: e.target.value})} placeholder="Describe the work completed..." />
+                          </div>
+                          <div className="flex justify-end gap-2 pt-4">
+                            <Button type="button" variant="outline" onClick={() => setUpdateProgressDialogOpen(false)}>Cancel</Button>
+                            <Button type="submit">Save Update</Button>
+                          </div>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 </CardHeader>
                 <CardContent className="flex-1 overflow-hidden pb-4">
-                  {scopes.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg bg-gray-50">
-                      <p className="mb-4">No scopes found. Ensure a Bill of Materials is created for this project with defined Scope of Works.</p>
-                    </div>
-                  ) : (
-                    <div className="overflow-y-auto h-full border rounded-md relative">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-24">Order</TableHead>
-                            <TableHead className="w-16">#</TableHead>
-                            <TableHead>Scope Name</TableHead>
-                            <TableHead className="w-48">Completion</TableHead>
-                            <TableHead className="w-32">Status</TableHead>
-                            <TableHead className="text-right w-40">Update Progress</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {scopes.map((scope, index) => (
-                            <TableRow key={scope.id}>
-                              <TableCell>
-                                <div className="flex flex-col gap-1">
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    className="h-6 w-6 p-0" 
-                                    onClick={() => handleMoveScope(index, 'up')}
-                                    disabled={index === 0}
-                                  >
-                                    <ArrowUp className="h-3 w-3" />
-                                  </Button>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    className="h-6 w-6 p-0" 
-                                    onClick={() => handleMoveScope(index, 'down')}
-                                    disabled={index === scopes.length - 1}
-                                  >
-                                    <ArrowDown className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                              <TableCell>{scope.order_number}</TableCell>
-                              <TableCell>
-                                <div className="font-medium">{scope.name}</div>
-                                {scope.description && <div className="text-sm text-muted-foreground">{scope.description}</div>}
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-3">
-                                  <div className="w-24 bg-secondary rounded-full h-2.5 overflow-hidden">
-                                    <div className="bg-green-500 h-full transition-all" style={{ width: `${scope.completion_percentage || 0}%` }} />
-                                  </div>
-                                  <span className="text-sm font-medium">{scope.completion_percentage || 0}%</span>
-                                </div>
-                              </TableCell>
-                              <TableCell>{getStatusBadge(scope.status || 'not_started')}</TableCell>
-                              <TableCell className="text-right">
-                                <div className="flex items-center justify-end gap-2">
-                                  <Input
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    className="w-20 text-right h-8"
-                                    defaultValue={scope.completion_percentage || 0}
-                                    onBlur={(e) => handleUpdateProgress(scope, e.target.value)}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        e.currentTarget.blur();
-                                      }
-                                    }}
-                                  />
-                                  <span className="text-sm font-medium">%</span>
-                                </div>
-                              </TableCell>
+                  {(() => {
+                    const filteredUpdates = progressUpdates.filter(pu => {
+                      if (progressFilterDate) return pu.update_date === progressFilterDate;
+                      const puDate = new Date(pu.update_date);
+                      const today = new Date();
+                      const sixDaysAgo = new Date();
+                      sixDaysAgo.setDate(today.getDate() - 6);
+                      sixDaysAgo.setHours(0, 0, 0, 0);
+                      puDate.setHours(0, 0, 0, 0);
+                      return puDate >= sixDaysAgo;
+                    });
+
+                    if (filteredUpdates.length === 0) {
+                      return (
+                        <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg bg-gray-50">
+                          <p>No progress updates found for the selected period.</p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="overflow-y-auto h-full border rounded-md relative">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-32">Date</TableHead>
+                              <TableHead>Scope of Work</TableHead>
+                              <TableHead className="w-32">Completion</TableHead>
+                              <TableHead>Updated By</TableHead>
+                              <TableHead>Notes</TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
+                          </TableHeader>
+                          <TableBody>
+                            {filteredUpdates.map((update) => (
+                              <TableRow key={update.id}>
+                                <TableCell className="whitespace-nowrap">{update.update_date}</TableCell>
+                                <TableCell className="font-medium">{update.bom_scope_of_work?.name || "Unknown Scope"}</TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-16 bg-secondary rounded-full h-2 overflow-hidden">
+                                      <div className="bg-green-500 h-full" style={{ width: `${update.percentage_completed || 0}%` }} />
+                                    </div>
+                                    <span className="font-bold text-sm">{update.percentage_completed || 0}%</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell>{update.updated_by}</TableCell>
+                                <TableCell className="text-sm text-muted-foreground">{update.notes || "-"}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    );
+                  })()}
                 </CardContent>
               </Card>
             </TabsContent>
