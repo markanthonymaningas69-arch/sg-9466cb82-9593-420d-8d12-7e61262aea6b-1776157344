@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -374,6 +374,7 @@ export type Database = {
           created_at: string | null
           form_number: string | null
           id: string
+          is_archived: boolean | null
           personnel_id: string | null
           project_id: string | null
           reason: string | null
@@ -385,6 +386,7 @@ export type Database = {
           created_at?: string | null
           form_number?: string | null
           id?: string
+          is_archived?: boolean | null
           personnel_id?: string | null
           project_id?: string | null
           reason?: string | null
@@ -396,6 +398,7 @@ export type Database = {
           created_at?: string | null
           form_number?: string | null
           id?: string
+          is_archived?: boolean | null
           personnel_id?: string | null
           project_id?: string | null
           reason?: string | null
@@ -471,6 +474,7 @@ export type Database = {
           created_at: string | null
           delivery_date: string
           id: string
+          is_archived: boolean | null
           item_name: string
           notes: string | null
           project_id: string
@@ -485,6 +489,7 @@ export type Database = {
           created_at?: string | null
           delivery_date: string
           id?: string
+          is_archived?: boolean | null
           item_name: string
           notes?: string | null
           project_id: string
@@ -499,6 +504,7 @@ export type Database = {
           created_at?: string | null
           delivery_date?: string
           id?: string
+          is_archived?: boolean | null
           item_name?: string
           notes?: string | null
           project_id?: string
@@ -524,6 +530,7 @@ export type Database = {
           category: string
           created_at: string | null
           id: string
+          is_archived: boolean | null
           last_restocked: string | null
           location: string | null
           name: string
@@ -537,6 +544,7 @@ export type Database = {
           category: string
           created_at?: string | null
           id?: string
+          is_archived?: boolean | null
           last_restocked?: string | null
           location?: string | null
           name: string
@@ -550,6 +558,7 @@ export type Database = {
           category?: string
           created_at?: string | null
           id?: string
+          is_archived?: boolean | null
           last_restocked?: string | null
           location?: string | null
           name?: string
@@ -736,6 +745,7 @@ export type Database = {
           created_at: string | null
           date_used: string
           id: string
+          is_archived: boolean | null
           item_name: string
           notes: string | null
           project_id: string
@@ -748,6 +758,7 @@ export type Database = {
           created_at?: string | null
           date_used?: string
           id?: string
+          is_archived?: boolean | null
           item_name: string
           notes?: string | null
           project_id: string
@@ -760,6 +771,7 @@ export type Database = {
           created_at?: string | null
           date_used?: string
           id?: string
+          is_archived?: boolean | null
           item_name?: string
           notes?: string | null
           project_id?: string
@@ -855,6 +867,7 @@ export type Database = {
           hire_date: string
           hourly_rate: number | null
           id: string
+          is_archived: boolean | null
           name: string
           overtime_rate: number | null
           phone: string | null
@@ -872,6 +885,7 @@ export type Database = {
           hire_date: string
           hourly_rate?: number | null
           id?: string
+          is_archived?: boolean | null
           name: string
           overtime_rate?: number | null
           phone?: string | null
@@ -889,6 +903,7 @@ export type Database = {
           hire_date?: string
           hourly_rate?: number | null
           id?: string
+          is_archived?: boolean | null
           name?: string
           overtime_rate?: number | null
           phone?: string | null
@@ -914,6 +929,7 @@ export type Database = {
           created_at: string | null
           expiry_date: string
           id: string
+          is_archived: boolean | null
           issue_date: string
           passport_expiry_date: string | null
           passport_issue_date: string | null
@@ -929,6 +945,7 @@ export type Database = {
           created_at?: string | null
           expiry_date: string
           id?: string
+          is_archived?: boolean | null
           issue_date: string
           passport_expiry_date?: string | null
           passport_issue_date?: string | null
@@ -944,6 +961,7 @@ export type Database = {
           created_at?: string | null
           expiry_date?: string
           id?: string
+          is_archived?: boolean | null
           issue_date?: string
           passport_expiry_date?: string | null
           passport_issue_date?: string | null
@@ -1050,6 +1068,7 @@ export type Database = {
           description: string | null
           end_date: string | null
           id: string
+          is_archived: boolean | null
           location: string
           name: string
           spent: number | null
@@ -1064,6 +1083,7 @@ export type Database = {
           description?: string | null
           end_date?: string | null
           id?: string
+          is_archived?: boolean | null
           location: string
           name: string
           spent?: number | null
@@ -1078,6 +1098,7 @@ export type Database = {
           description?: string | null
           end_date?: string | null
           id?: string
+          is_archived?: boolean | null
           location?: string
           name?: string
           spent?: number | null
@@ -1093,6 +1114,7 @@ export type Database = {
           created_at: string | null
           destination_type: string
           id: string
+          is_archived: boolean | null
           item_name: string
           notes: string | null
           order_date: string
@@ -1111,6 +1133,7 @@ export type Database = {
           created_at?: string | null
           destination_type: string
           id?: string
+          is_archived?: boolean | null
           item_name: string
           notes?: string | null
           order_date?: string
@@ -1129,6 +1152,7 @@ export type Database = {
           created_at?: string | null
           destination_type?: string
           id?: string
+          is_archived?: boolean | null
           item_name?: string
           notes?: string | null
           order_date?: string
@@ -1264,6 +1288,7 @@ export type Database = {
           created_at: string | null
           form_number: string | null
           id: string
+          is_archived: boolean | null
           item_name: string
           notes: string | null
           project_id: string
@@ -1280,6 +1305,7 @@ export type Database = {
           created_at?: string | null
           form_number?: string | null
           id?: string
+          is_archived?: boolean | null
           item_name: string
           notes?: string | null
           project_id: string
@@ -1296,6 +1322,7 @@ export type Database = {
           created_at?: string | null
           form_number?: string | null
           id?: string
+          is_archived?: boolean | null
           item_name?: string
           notes?: string | null
           project_id?: string
