@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -623,6 +623,7 @@ export type Database = {
           id: string
           module: string
           project_id: string | null
+          project_ids: string[] | null
           status: string | null
         }
         Insert: {
@@ -631,6 +632,7 @@ export type Database = {
           id?: string
           module: string
           project_id?: string | null
+          project_ids?: string[] | null
           status?: string | null
         }
         Update: {
@@ -639,6 +641,7 @@ export type Database = {
           id?: string
           module?: string
           project_id?: string | null
+          project_ids?: string[] | null
           status?: string | null
         }
         Relationships: [
@@ -1062,6 +1065,7 @@ export type Database = {
         Row: {
           assigned_module: string | null
           assigned_project_id: string | null
+          assigned_project_ids: string[] | null
           avatar_url: string | null
           created_at: string | null
           email: string | null
@@ -1072,6 +1076,7 @@ export type Database = {
         Insert: {
           assigned_module?: string | null
           assigned_project_id?: string | null
+          assigned_project_ids?: string[] | null
           avatar_url?: string | null
           created_at?: string | null
           email?: string | null
@@ -1082,6 +1087,7 @@ export type Database = {
         Update: {
           assigned_module?: string | null
           assigned_project_id?: string | null
+          assigned_project_ids?: string[] | null
           avatar_url?: string | null
           created_at?: string | null
           email?: string | null
@@ -1669,10 +1675,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      assign_user_module: {
-        Args: { p_module: string; p_project_id?: string; p_user_id: string }
-        Returns: undefined
-      }
+      assign_user_module:
+        | {
+            Args: { p_module: string; p_project_id?: string; p_user_id: string }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_module: string
+              p_project_ids?: string[]
+              p_user_id: string
+            }
+            Returns: undefined
+          }
     }
     Enums: {
       [_ in never]: never
