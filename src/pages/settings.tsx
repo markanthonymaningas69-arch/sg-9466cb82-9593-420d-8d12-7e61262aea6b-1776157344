@@ -48,11 +48,19 @@ export default function Settings() {
   const [invites, setInvites] = useState<any[]>([]);
   const [teamUsers, setTeamUsers] = useState<any[]>([]);
   const [selectedModule, setSelectedModule] = useState<string>("Site Personnel");
+  const [projects, setProjects] = useState<any[]>([]);
+  const [selectedProject, setSelectedProject] = useState<string>("all");
 
   useEffect(() => {
     setLocalCompany(company);
     loadTeamData();
+    loadProjects();
   }, [company]);
+
+  const loadProjects = async () => {
+    const { data } = await supabase.from('projects').select('id, name').order('name');
+    setProjects(data || []);
+  };
 
   const loadTeamData = async () => {
     const { data: invData } = await supabase.from('invite_codes').select('*').eq('status', 'active');
@@ -88,7 +96,8 @@ export default function Settings() {
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
     const { error } = await supabase.from('invite_codes').insert({
       code,
-      module: selectedModule
+      module: selectedModule,
+      project_id: selectedProject !== "all" ? selectedProject : null
     });
 
     if (error) {
@@ -268,6 +277,22 @@ export default function Settings() {
                         </SelectContent>
                       </Select>
                     </div>
+                    {selectedModule === "Site Personnel" && (
+                      <div className="space-y-2 flex-1">
+                        <Label>Restrict to Project (Optional)</Label>
+                        <Select value={selectedProject} onValueChange={setSelectedProject}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Any Project (No restriction)</SelectItem>
+                            {projects.map(p => (
+                              <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                     <Button onClick={handleGenerateCode} className="bg-primary">
                       <Key className="w-4 h-4 mr-2" /> Generate Code
                     </Button>

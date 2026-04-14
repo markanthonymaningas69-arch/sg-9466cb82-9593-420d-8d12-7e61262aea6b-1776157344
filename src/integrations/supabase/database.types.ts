@@ -622,6 +622,7 @@ export type Database = {
           created_at: string | null
           id: string
           module: string
+          project_id: string | null
           status: string | null
         }
         Insert: {
@@ -629,6 +630,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           module: string
+          project_id?: string | null
           status?: string | null
         }
         Update: {
@@ -636,9 +638,18 @@ export type Database = {
           created_at?: string | null
           id?: string
           module?: string
+          project_id?: string | null
           status?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "invite_codes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       leave_requests: {
         Row: {
@@ -1050,6 +1061,7 @@ export type Database = {
       profiles: {
         Row: {
           assigned_module: string | null
+          assigned_project_id: string | null
           avatar_url: string | null
           created_at: string | null
           email: string | null
@@ -1059,6 +1071,7 @@ export type Database = {
         }
         Insert: {
           assigned_module?: string | null
+          assigned_project_id?: string | null
           avatar_url?: string | null
           created_at?: string | null
           email?: string | null
@@ -1068,6 +1081,7 @@ export type Database = {
         }
         Update: {
           assigned_module?: string | null
+          assigned_project_id?: string | null
           avatar_url?: string | null
           created_at?: string | null
           email?: string | null
@@ -1075,7 +1089,15 @@ export type Database = {
           id?: string
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_assigned_project_id_fkey"
+            columns: ["assigned_project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       progress_updates: {
         Row: {
@@ -1648,7 +1670,7 @@ export type Database = {
     }
     Functions: {
       assign_user_module: {
-        Args: { p_module: string; p_user_id: string }
+        Args: { p_module: string; p_project_id?: string; p_user_id: string }
         Returns: undefined
       }
     }

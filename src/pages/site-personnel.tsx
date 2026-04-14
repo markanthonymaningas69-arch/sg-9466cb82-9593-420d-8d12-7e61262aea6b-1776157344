@@ -41,6 +41,9 @@ export default function SitePersonnel() {
   const [deliveriesDate, setDeliveriesDate] = useState<string>(todayStr);
   const [scopeDate, setScopeDate] = useState<string>(todayStr);
   
+  const [assignedProjectId, setAssignedProjectId] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string>("");
+  
   // Site Attendance (Roll Call)
   const [attendanceList, setAttendanceList] = useState<AttendanceRow[]>([]);
   const [historicalAttendance, setHistoricalAttendance] = useState<Record<string, any[]>>({});
@@ -153,7 +156,22 @@ export default function SitePersonnel() {
   useEffect(() => {
     loadProjects();
     loadPersonnel();
+    checkUserAssignment();
   }, []);
+
+  const checkUserAssignment = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      if (profile) {
+        setUserRole(profile.assigned_module);
+        if (profile.assigned_project_id) {
+          setAssignedProjectId(profile.assigned_project_id);
+          setSelectedProject(profile.assigned_project_id);
+        }
+      }
+    }
+  };
 
   useEffect(() => {
     if (selectedProject) {
@@ -699,18 +717,19 @@ export default function SitePersonnel() {
         <div className="grid gap-4 md:grid-cols-1 shrink-0">
           <div>
             <Label htmlFor="project">Select Project</Label>
-            <Select value={selectedProject} onValueChange={setSelectedProject}>
+            <Select value={selectedProject} onValueChange={setSelectedProject} disabled={!!assignedProjectId}>
               <SelectTrigger>
                 <SelectValue placeholder="Choose a project" />
               </SelectTrigger>
               <SelectContent>
-                {projects.map((project) => (
+                {projects.filter(p => !assignedProjectId || p.id === assignedProjectId).map((project) => (
                   <SelectItem key={project.id} value={project.id}>
                     {project.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {assignedProjectId && <p className="text-xs text-muted-foreground mt-1">Your account is restricted to this project only.</p>}
           </div>
         </div>
 
@@ -1305,7 +1324,7 @@ export default function SitePersonnel() {
                                         <div className="flex items-center gap-2">
                                           <Switch
                                             checked={row.status === "present"}
-                                            disabled={!canEdit}
+                                            disabled={!canEdit || row.status === "absent"}
                                             onCheckedChange={(checked) => handleAttendanceChange(row.personnel_id, "status", checked ? "present" : "absent")}
                                           />
                                           <span className={`text-xs font-semibold ${row.status === "present" ? "text-green-600" : "text-red-500"}`}>
