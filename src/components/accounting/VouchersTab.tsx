@@ -68,54 +68,70 @@ export function VouchersTab() {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
+    const projectName = v.project_id ? projects.find(p => p.id === v.project_id)?.name || 'Unknown Project' : 'Head Office';
+    const logoUrl = company?.logo_url || '';
+
     const html = `
       <!DOCTYPE html>
       <html>
         <head>
-          <title>${v.voucher_number}</title>
+          <title>Voucher ${v.voucher_number}</title>
           <style>
-            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 40px; color: #333; max-width: 800px; margin: 0 auto; }
-            .header { text-align: center; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 2px solid #222; }
-            h1 { margin: 0 0 10px 0; font-size: 24px; color: #111; letter-spacing: 1px; }
-            h3 { margin: 0; color: #555; font-weight: normal; }
-            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
-            .info-row { display: flex; margin-bottom: 10px; }
-            .label { font-weight: bold; width: 120px; color: #555; }
-            .value { flex: 1; border-bottom: 1px solid #ccc; padding-bottom: 2px; }
-            .particulars-box { border: 1px solid #ddd; padding: 20px; min-height: 100px; margin-bottom: 30px; border-radius: 4px; }
-            .particulars-title { font-weight: bold; margin-bottom: 10px; color: #555; }
-            .amount-box { text-align: right; font-size: 20px; font-weight: bold; margin-bottom: 60px; padding: 10px; background: #f9f9f9; border: 1px solid #eee; border-radius: 4px; }
-            .signatures { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 40px; margin-top: 80px; }
-            .sig-line { border-top: 1px solid #000; text-align: center; padding-top: 10px; font-size: 14px; font-weight: bold; color: #444; }
-            .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; background: #eee; text-transform: uppercase; float: right; }
+            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 40px; color: #222; max-width: 800px; margin: 0 auto; line-height: 1.5; }
+            .header-container { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 15px; }
+            .company-info { display: flex; align-items: center; gap: 15px; }
+            .company-logo { max-width: 80px; max-height: 80px; object-fit: contain; }
+            .company-text h3 { margin: 0; font-size: 18px; color: #111; text-transform: uppercase; font-weight: bold; }
+            .company-text p { margin: 3px 0 0 0; font-size: 12px; color: #555; }
+            .voucher-title { text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; background: #eee; padding: 10px 20px; border: 1px solid #ccc; display: inline-block; margin: 20px auto 40px auto; width: 100%; box-sizing: border-box; }
+            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 30px; }
+            .info-row { display: flex; margin-bottom: 12px; }
+            .label { font-weight: bold; width: 120px; color: #333; }
+            .value { flex: 1; border-bottom: 1px solid #999; padding-bottom: 2px; font-family: monospace; font-size: 14px; }
+            .particulars-box { border: 1px solid #000; padding: 20px; min-height: 150px; margin-bottom: 30px; }
+            .particulars-title { font-weight: bold; margin-bottom: 15px; color: #000; text-decoration: underline; text-transform: uppercase; font-size: 14px; }
+            .particulars-content { white-space: pre-wrap; font-size: 14px; }
+            .amount-box { text-align: right; font-size: 22px; font-weight: bold; margin-bottom: 60px; padding: 15px 20px; background: #f9f9f9; border: 1px solid #000; display: inline-block; float: right; min-width: 250px; }
+            .clearfix::after { content: ""; clear: both; display: table; }
+            .signatures { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 40px; margin-top: 60px; }
+            .sig-line { border-top: 1px solid #000; text-align: center; padding-top: 10px; font-size: 12px; font-weight: bold; color: #333; text-transform: uppercase; }
           </style>
         </head>
         <body>
-          <div class="header">
-            <span class="badge">${v.type} VOUCHER</span>
-            <h1>${v.type === 'payment' ? 'PAYMENT' : v.type === 'receipt' ? 'RECEIPT' : 'JOURNAL'} VOUCHER</h1>
-            <h3>${company?.name || 'Company Name'}</h3>
-            <p style="margin: 5px 0 0 0; font-size: 12px; color: #777;">${company?.address || ''}</p>
+          <div class="header-container">
+            <div class="company-info">
+              ${logoUrl ? `<img src="${logoUrl}" class="company-logo" alt="Logo" />` : `<div style="width: 50px; height: 50px; background: #eee; display: flex; align-items: center; justify-content: center; border: 1px solid #ccc; font-size: 10px; color: #999;">LOGO</div>`}
+              <div class="company-text">
+                <h3>${company?.name || 'Company Name'}</h3>
+                <p>${company?.address || 'Company Address line 1<br/>City, Country, ZIP'}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div class="voucher-title">
+            ${v.type === 'payment' ? 'PAYMENT' : v.type === 'receipt' ? 'RECEIPT' : 'JOURNAL'} VOUCHER
           </div>
           
           <div class="info-grid">
             <div>
               <div class="info-row"><div class="label">Voucher No:</div><div class="value">${v.voucher_number}</div></div>
-              <div class="info-row"><div class="label">Date:</div><div class="value">${new Date(v.date).toLocaleDateString()}</div></div>
+              <div class="info-row"><div class="label">Date:</div><div class="value">${new Date(v.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div></div>
             </div>
             <div>
               <div class="info-row"><div class="label">Payee / To:</div><div class="value">${v.payee || '-'}</div></div>
-              <div class="info-row"><div class="label">Project:</div><div class="value">${v.project_id ? 'Assigned to Project' : 'Head Office'}</div></div>
+              <div class="info-row"><div class="label">Project:</div><div class="value">${projectName}</div></div>
             </div>
           </div>
 
           <div class="particulars-box">
             <div class="particulars-title">Particulars:</div>
-            <div>${v.description || v.particulars || 'No details provided.'}</div>
+            <div class="particulars-content">${v.description || v.particulars || 'No details provided.'}</div>
           </div>
 
-          <div class="amount-box">
-            Total Amount: ${currency || '$'} ${v.amount.toLocaleString(undefined, {minimumFractionDigits: 2})}
+          <div class="clearfix">
+            <div class="amount-box">
+              ${currency || 'PHP'} ${v.amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+            </div>
           </div>
 
           <div class="signatures">
