@@ -29,7 +29,9 @@ interface SettingsContextType {
   setCompany: (company: CompanySettings) => void;
   currentPlan: PlanType;
   setCurrentPlan: (plan: PlanType) => void;
-  isTrialExpired: boolean;
+  isLocked: boolean;
+  lockReason: "trial_expired" | "subscription_expired" | "none";
+  isTrial: boolean;
   daysRemaining: number;
 }
 
@@ -39,7 +41,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [currency, setCurrencyState] = useState<CurrencyType>("USD");
   const [company, setCompanyState] = useState<CompanySettings>(defaultCompany);
   const [currentPlan, setCurrentPlanState] = useState<PlanType>("professional");
-  const [isTrialExpired, setIsTrialExpired] = useState<boolean>(false);
+  const [isLocked, setIsLocked] = useState<boolean>(false);
+  const [lockReason, setLockReason] = useState<"trial_expired" | "subscription_expired" | "none">("none");
+  const [isTrial, setIsTrial] = useState<boolean>(true);
   const [daysRemaining, setDaysRemaining] = useState<number>(7);
 
   useEffect(() => {
@@ -74,8 +78,29 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     
     // Check for paid subscription
     const isPaid = localStorage.getItem("app_is_paid") === "true";
+    const expiresAtStr = localStorage.getItem("app_subscription_expires_at");
     
-    if (!isPaid) {
+    if (isPaid) {
+      setIsTrial(false);
+      setDaysRemaining(0);
+      
+      if (expiresAtStr) {
+        const expiresAt = new Date(expiresAtStr);
+        if (currentDate > expiresAt) {
+          setIsLocked(true);
+          setLockReason("subscription_expired");
+        } else {
+          setIsLocked(false);
+          setLockReason("none");
+        }
+      } else {
+        // Fallback for previously active plans without an explicit expiration date
+        setIsLocked(false);
+        setLockReason("none");
+      }
+    } else {
+      // Trial logic
+      setIsTrial(true);
       const diffTime = Math.abs(currentDate.getTime() - createdDate.getTime());
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       
@@ -83,11 +108,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setDaysRemaining(remaining);
       
       if (diffDays > 7) {
-        setIsTrialExpired(true);
+        setIsLocked(true);
+        setLockReason("trial_expired");
+      } else {
+        setIsLocked(false);
+        setLockReason("none");
       }
-    } else {
-      setDaysRemaining(0);
-      setIsTrialExpired(false);
     }
   }, []);
 
@@ -127,7 +153,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <SettingsContext.Provider value={{ currency, setCurrency, formatCurrency, formatNumber, company, setCompany, currentPlan, setCurrentPlan, isTrialExpired, daysRemaining }}>
+    <SettingsContext.Provider value={{ currency, setCurrency, formatCurrency, formatNumber, company, setCompany, currentPlan, setCurrentPlan, isLocked, lockReason, isTrial, daysRemaining }}>
       {children}
     </SettingsContext.Provider>
   );

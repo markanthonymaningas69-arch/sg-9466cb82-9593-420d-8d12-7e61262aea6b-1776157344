@@ -59,7 +59,7 @@ const navigation = [
 export function Layout({ children }: LayoutProps) {
   const router = useRouter();
   const { toast } = useToast();
-  const { company, currentPlan, currency, isTrialExpired, daysRemaining } = useSettings();
+  const { company, currentPlan, currency, isLocked, lockReason, isTrial, daysRemaining } = useSettings();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [pendingLeaves, setPendingLeaves] = useState<any[]>([]);
@@ -410,7 +410,7 @@ export function Layout({ children }: LayoutProps) {
           <div className="flex-1" />
           
           {/* Trial Banner */}
-          {!isTrialExpired && daysRemaining > 0 && (
+          {!isLocked && isTrial && daysRemaining > 0 && (
             <div className="hidden md:flex items-center px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-semibold">
               <AlertCircle className="h-3 w-3 mr-1" />
               {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'} left in Trial
@@ -684,14 +684,18 @@ export function Layout({ children }: LayoutProps) {
 
         {/* Page content */}
         <main className="p-6 relative min-h-[calc(100vh-4rem)]">
-          {isTrialExpired && router.pathname !== '/subscription' && router.pathname !== '/account' && (
+          {isLocked && router.pathname !== '/subscription' && router.pathname !== '/account' && (
             <div className="absolute inset-0 z-40 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center border rounded-lg m-6">
               <div className="h-20 w-20 rounded-full bg-destructive/10 flex items-center justify-center mb-6">
                 <Lock className="h-10 w-10 text-destructive" />
               </div>
-              <h2 className="text-3xl font-heading font-bold mb-2">Trial Expired</h2>
+              <h2 className="text-3xl font-heading font-bold mb-2">
+                {lockReason === "trial_expired" ? "Trial Expired" : "Subscription Expired"}
+              </h2>
               <p className="text-muted-foreground max-w-md mb-8 text-lg">
-                Your 7-day Professional trial has ended. All modules are currently locked and buttons have been disabled.
+                {lockReason === "trial_expired" 
+                  ? "Your 7-day Professional trial has ended. All modules are currently locked and buttons have been disabled."
+                  : "Your active subscription has expired. All modules are currently locked and buttons have been disabled."}
               </p>
               <Button size="lg" onClick={() => router.push('/subscription')} className="text-lg px-8">
                 <CreditCard className="mr-2 h-5 w-5" />
@@ -700,7 +704,7 @@ export function Layout({ children }: LayoutProps) {
             </div>
           )}
           
-          <div className={cn(isTrialExpired && router.pathname !== '/subscription' && router.pathname !== '/account' && "pointer-events-none opacity-20 select-none blur-sm transition-all duration-300")}>
+          <div className={cn(isLocked && router.pathname !== '/subscription' && router.pathname !== '/account' && "pointer-events-none opacity-20 select-none blur-sm transition-all duration-300")}>
             {children}
           </div>
         </main>

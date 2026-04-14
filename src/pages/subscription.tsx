@@ -9,7 +9,7 @@ import { useSettings } from "@/contexts/SettingsProvider";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function Subscription() {
-  const { currentPlan, setCurrentPlan } = useSettings();
+  const { currentPlan, setCurrentPlan, isTrial, isLocked } = useSettings();
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
   const [billingHistory, setBillingHistory] = useState<any[]>([]);
   const [subscriptionDetails, setSubscriptionDetails] = useState<any>(null);
@@ -71,6 +71,20 @@ export default function Subscription() {
         "3 Site personnel user accounts",
         "1 User per additional module"
       ]
+    },
+    {
+      id: "trial",
+      name: "7-Day Trial",
+      description: "Try Professional features for free",
+      monthlyPrice: 0,
+      annualPrice: 0,
+      features: [
+        "Unlimited Projects",
+        "All 5 Modules Included",
+        "Add-ons Capability Included",
+        "3 Site personnel user accounts",
+        "1 User per additional module"
+      ]
     }
   ];
 
@@ -111,9 +125,21 @@ export default function Subscription() {
   };
 
   const handleUpgrade = async (planId: string) => {
+    if (planId === "trial") return;
+
     setCurrentPlan(planId as "starter" | "professional");
     localStorage.setItem("app_is_paid", "true"); // Mark as paid to remove trial lock
     
+    // Set expiration date
+    const now = new Date();
+    const expiresAt = new Date(now);
+    if (billingCycle === "monthly") {
+      expiresAt.setMonth(expiresAt.getMonth() + 1);
+    } else {
+      expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+    }
+    localStorage.setItem("app_subscription_expires_at", expiresAt.toISOString());
+
     // Log the billing history
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) {
@@ -130,6 +156,9 @@ export default function Subscription() {
       
       await supabase.from('subscriptions').insert(newSub);
       loadBillingHistory();
+      
+      // Reload to update the global lock state
+      window.location.reload();
     }
   };
 
@@ -144,19 +173,21 @@ export default function Subscription() {
         <Card>
           <CardHeader>
             <CardTitle>Current Plan</CardTitle>
-            <CardDescription>You are currently on the {currentPlan === "starter" ? "Starter" : "Professional"} plan</CardDescription>
+            <CardDescription>You are currently on the {isTrial ? "Professional Trial" : (currentPlan === "starter" ? "Starter" : "Professional")} plan</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-2xl font-bold capitalize">{currentPlan}</h3>
-                  <Badge variant="secondary">Active</Badge>
+                  <h3 className="text-2xl font-bold capitalize">{isTrial ? "7-Day Trial" : currentPlan}</h3>
+                  <Badge variant={isLocked ? "destructive" : "secondary"}>{isLocked ? "Expired" : "Active"}</Badge>
                 </div>
                 <p className="text-sm text-muted-foreground flex items-center gap-2">
                   <span>Since: {subscriptionDetails?.start_date ? new Date(subscriptionDetails.start_date).toLocaleDateString() : 'N/A'}</span>
                   <span>•</span>
-                  <span className="text-primary font-medium">Expires: {getExpirationDate(subscriptionDetails?.start_date)}</span>
+                  <span className={isLocked ? "text-destructive font-medium" : "text-primary font-medium"}>
+                    Expires: {getExpirationDate(subscriptionDetails?.start_date)}
+                  </span>
                 </p>
               </div>
               <div className="text-right">
@@ -256,11 +287,13 @@ export default function Subscription() {
                 <CardFooter>
                   <Button
                     className="w-full"
-                    variant={plan.id === currentPlan ? "secondary" : "default"}
-                    disabled={plan.id === currentPlan}
+                    variant={plan.id === currentPlan && !isTrial ? "secondary" : "default"}
+                    disabled={plan.id === "trial" || (plan.id === currentPlan && !isTrial)}
                     onClick={() => handleUpgrade(plan.id)}
                   >
-                    {plan.id === currentPlan ? "Current Plan" : "Upgrade"}
+                    {plan.id === "trial" 
+                      ? (isTrial ? (isLocked ? "Expired" : "Active Trial") : "Used") 
+                      : (plan.id === currentPlan && !isTrial ? "Current Plan" : "Upgrade")}
                   </Button>
                 </CardFooter>
               </Card>
