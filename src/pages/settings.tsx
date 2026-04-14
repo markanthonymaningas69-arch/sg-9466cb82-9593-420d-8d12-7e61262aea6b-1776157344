@@ -17,6 +17,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/contexts/ThemeProvider";
 import { useSettings } from "@/contexts/SettingsProvider";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   Building2, 
   Bell, 
@@ -24,13 +25,16 @@ import {
   Save,
   Moon,
   Sun,
-  DollarSign
+  DollarSign,
+  Users,
+  Key,
+  Trash2
 } from "lucide-react";
 
 export default function Settings() {
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
-  const { currency, setCurrency, company, setCompany } = useSettings();
+  const { currency, setCurrency, company, setCompany, currentPlan } = useSettings();
 
   const [localCompany, setLocalCompany] = useState(company);
   const [notifications, setNotifications] = useState({
@@ -41,9 +45,64 @@ export default function Settings() {
     weeklyDigest: true
   });
 
+  const [invites, setInvites] = useState<any[]>([]);
+  const [teamUsers, setTeamUsers] = useState<any[]>([]);
+  const [selectedModule, setSelectedModule] = useState<string>("Site Personnel");
+
   useEffect(() => {
     setLocalCompany(company);
+    loadTeamData();
   }, [company]);
+
+  const loadTeamData = async () => {
+    const { data: invData } = await supabase.from('invite_codes').select('*').eq('status', 'active');
+    setInvites(invData || []);
+    
+    const { data: usrData } = await supabase.from('profiles').select('*').not('assigned_module', 'eq', 'GM');
+    setTeamUsers(usrData || []);
+  };
+
+  const planLimits: Record<string, number> = currentPlan === 'starter' 
+    ? { 'Site Personnel': 1, 'Accounting': 1, 'Purchasing': 0, 'Human Resources': 0, 'Warehouse': 0 }
+    : { 'Site Personnel': 3, 'Accounting': 1, 'Purchasing': 1, 'Human Resources': 1, 'Warehouse': 1 };
+
+  const getUsageCount = (mod: string) => {
+    const activeInvites = invites.filter(i => i.module === mod).length;
+    const activeUsers = teamUsers.filter(u => u.assigned_module === mod).length;
+    return activeInvites + activeUsers;
+  };
+
+  const handleGenerateCode = async () => {
+    const limit = planLimits[selectedModule] || 0;
+    const currentUsage = getUsageCount(selectedModule);
+    
+    if (currentUsage >= limit) {
+      toast({
+        title: "Limit Reached",
+        description: `Your ${currentPlan} plan only allows ${limit} user(s) for ${selectedModule}. Upgrade to add more.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const { error } = await supabase.from('invite_codes').insert({
+      code,
+      module: selectedModule
+    });
+
+    if (error) {
+      toast({ title: "Error", description: "Failed to generate code.", variant: "destructive" });
+    } else {
+      toast({ title: "Code Generated", description: `Invite code ${code} created for ${selectedModule}.` });
+      loadTeamData();
+    }
+  };
+
+  const handleDeleteCode = async (id: string) => {
+    await supabase.from('invite_codes').delete().eq('id', id);
+    loadTeamData();
+  };
 
   const handleSaveCompany = () => {
     setCompany(localCompany);
@@ -88,10 +147,14 @@ export default function Settings() {
         </div>
 
         <Tabs defaultValue="company" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="company" className="flex items-center gap-2">
               <Building2 className="h-4 w-4" />
               Company
+            </TabsTrigger>
+            <TabsTrigger value="team" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Team Access
             </TabsTrigger>
             <TabsTrigger value="notifications" className="flex items-center gap-2">
               <Bell className="h-4 w-4" />
@@ -176,6 +239,82 @@ export default function Settings() {
                   <Save className="h-4 w-4" />
                   Save Changes
                 </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="team">
+            <Card>
+              <CardHeader>
+                <CardTitle>Team Access & Modules</CardTitle>
+                <CardDescription>Generate invite codes to grant specific module access based on your {currentPlan} plan limits.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="bg-muted/30 p-4 rounded-lg border space-y-4">
+                  <h3 className="font-semibold text-sm">Generate Invite Code</h3>
+                  <div className="flex items-end gap-4">
+                    <div className="space-y-2 flex-1">
+                      <Label>Assign Module</Label>
+                      <Select value={selectedModule} onValueChange={setSelectedModule}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.keys(planLimits).map(mod => (
+                            <SelectItem key={mod} value={mod} disabled={planLimits[mod] === 0}>
+                              {mod} ({getUsageCount(mod)}/{planLimits[mod]} used)
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button onClick={handleGenerateCode} className="bg-primary">
+                      <Key className="w-4 h-4 mr-2" /> Generate Code
+                    </Button>
+                  </div>
+                  {planLimits[selectedModule] === 0 && (
+                    <p className="text-xs text-destructive">Your current plan does not include access to the {selectedModule} module.</p>
+                  )}
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-sm">Active Invite Codes</h3>
+                  {invites.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No active invite codes.</p>
+                  ) : (
+                    <div className="border rounded-md divide-y">
+                      {invites.map(inv => (
+                        <div key={inv.id} className="flex items-center justify-between p-3 bg-white">
+                          <div>
+                            <div className="font-mono font-bold text-lg tracking-widest text-primary">{inv.code}</div>
+                            <div className="text-xs text-muted-foreground">Module: {inv.module}</div>
+                          </div>
+                          <Button size="icon" variant="ghost" onClick={() => handleDeleteCode(inv.id)} className="text-red-500 hover:text-red-700 hover:bg-red-50">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-4 pt-4 border-t">
+                  <h3 className="font-semibold text-sm">Active Team Members</h3>
+                  {teamUsers.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No team members joined yet.</p>
+                  ) : (
+                    <div className="border rounded-md divide-y">
+                      {teamUsers.map(u => (
+                        <div key={u.id} className="flex items-center justify-between p-3 bg-white">
+                          <div>
+                            <div className="font-medium">{u.email || u.full_name || 'User'}</div>
+                            <div className="text-xs text-muted-foreground">Module: {u.assigned_module}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

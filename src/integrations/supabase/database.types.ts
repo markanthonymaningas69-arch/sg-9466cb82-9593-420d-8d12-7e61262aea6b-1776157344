@@ -616,6 +616,30 @@ export type Database = {
           },
         ]
       }
+      invite_codes: {
+        Row: {
+          code: string
+          created_at: string | null
+          id: string
+          module: string
+          status: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          id?: string
+          module: string
+          status?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          id?: string
+          module?: string
+          status?: string | null
+        }
+        Relationships: []
+      }
       leave_requests: {
         Row: {
           approved_by: string | null
@@ -1025,6 +1049,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          assigned_module: string | null
           avatar_url: string | null
           created_at: string | null
           email: string | null
@@ -1033,6 +1058,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          assigned_module?: string | null
           avatar_url?: string | null
           created_at?: string | null
           email?: string | null
@@ -1041,6 +1067,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          assigned_module?: string | null
           avatar_url?: string | null
           created_at?: string | null
           email?: string | null
