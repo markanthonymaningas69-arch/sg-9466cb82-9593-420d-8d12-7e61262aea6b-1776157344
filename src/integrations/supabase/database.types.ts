@@ -622,6 +622,7 @@ export type Database = {
           created_at: string | null
           id: string
           module: string
+          modules: string[] | null
           project_id: string | null
           project_ids: string[] | null
           status: string | null
@@ -631,6 +632,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           module: string
+          modules?: string[] | null
           project_id?: string | null
           project_ids?: string[] | null
           status?: string | null
@@ -640,6 +642,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           module?: string
+          modules?: string[] | null
           project_id?: string | null
           project_ids?: string[] | null
           status?: string | null
@@ -1064,6 +1067,7 @@ export type Database = {
       profiles: {
         Row: {
           assigned_module: string | null
+          assigned_modules: string[] | null
           assigned_project_id: string | null
           assigned_project_ids: string[] | null
           avatar_url: string | null
@@ -1075,6 +1079,7 @@ export type Database = {
         }
         Insert: {
           assigned_module?: string | null
+          assigned_modules?: string[] | null
           assigned_project_id?: string | null
           assigned_project_ids?: string[] | null
           avatar_url?: string | null
@@ -1086,6 +1091,7 @@ export type Database = {
         }
         Update: {
           assigned_module?: string | null
+          assigned_modules?: string[] | null
           assigned_project_id?: string | null
           assigned_project_ids?: string[] | null
           avatar_url?: string | null
@@ -1678,6 +1684,15 @@ export type Database = {
       assign_user_module:
         | {
             Args: { p_module: string; p_project_id?: string; p_user_id: string }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_module: string
+              p_modules?: string[]
+              p_project_ids?: string[]
+              p_user_id: string
+            }
             Returns: undefined
           }
         | {

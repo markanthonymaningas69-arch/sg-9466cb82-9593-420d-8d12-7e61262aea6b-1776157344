@@ -73,15 +73,17 @@ export default function Onboarding() {
       // Use the secure backend function
       const { error: rpcError } = await supabase.rpc('assign_user_module', {
         p_user_id: user.id,
-        p_module: invData.module,
-        p_project_ids: invData.project_ids || []
+        p_module: invData.modules && invData.modules.length > 0 ? invData.modules[0] : invData.module,
+        p_project_ids: invData.project_ids || [],
+        p_modules: invData.modules && invData.modules.length > 0 ? invData.modules : [invData.module]
       });
 
       if (rpcError) {
         const { error: upsertError } = await supabase.from('profiles').upsert({
           id: user.id,
-          assigned_module: invData.module,
+          assigned_module: invData.modules && invData.modules.length > 0 ? invData.modules[0] : invData.module,
           assigned_project_ids: invData.project_ids || [],
+          assigned_modules: invData.modules && invData.modules.length > 0 ? invData.modules : [invData.module],
           updated_at: new Date().toISOString()
         });
         if (upsertError) throw upsertError;

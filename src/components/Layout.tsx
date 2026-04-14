@@ -64,7 +64,8 @@ export function Layout({ children }: LayoutProps) {
   const [pendingCashAdvances, setPendingCashAdvances] = useState<any[]>([]);
   const [expiringDocuments, setExpiringDocuments] = useState<any[]>([]);
   const [notificationOpen, setNotificationOpen] = useState(false);
-  const [assignedModule, setAssignedModule] = useState<string>("GM");
+  const [assignedModule, setAssignedModule] = useState<string>("GM"); // Keeping for legacy reference if needed
+  const [assignedModules, setAssignedModules] = useState<string[]>(["GM"]);
   const [userName, setUserName] = useState<string>("Admin User");
   const [userEmail, setUserEmail] = useState<string>("");
 
@@ -82,11 +83,17 @@ export function Layout({ children }: LayoutProps) {
       setUserEmail(session.user.email || "");
       const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
       if (profile) {
-        if (!profile.assigned_module) {
+        if (!profile.assigned_module && (!profile.assigned_modules || profile.assigned_modules.length === 0)) {
           router.push('/onboarding');
           return;
         }
-        setAssignedModule(profile.assigned_module || "GM");
+        
+        const mods = profile.assigned_modules && profile.assigned_modules.length > 0 
+          ? profile.assigned_modules 
+          : [profile.assigned_module || "GM"];
+          
+        setAssignedModules(mods);
+        setAssignedModule(mods[0]);
         setUserName(profile.full_name || profile.email?.split('@')[0] || "User");
       }
     } else {
@@ -301,10 +308,10 @@ export function Layout({ children }: LayoutProps) {
           <nav className="flex-1 overflow-y-auto py-4">
             <ul className="space-y-1 px-3">
               {navigation.filter((item) => {
-                if (assignedModule === "GM") {
+                if (assignedModules.includes("GM")) {
                   return !(currentPlan === "starter" && item.name === "Human Resources");
                 }
-                return item.name === assignedModule;
+                return assignedModules.includes(item.name);
               }).map((item) => {
                 const Icon = item.icon;
                 const isActive = router.pathname === item.href;
@@ -637,11 +644,15 @@ export function Layout({ children }: LayoutProps) {
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium">{userName}</p>
                     <p className="text-xs text-muted-foreground">{userEmail}</p>
-                    <p className="text-xs text-primary font-medium mt-1 uppercase tracking-wider">{assignedModule} Access</p>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {assignedModules.map(mod => (
+                        <Badge key={mod} variant="secondary" className="text-[10px] uppercase tracking-wider">{mod}</Badge>
+                      ))}
+                    </div>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {assignedModule === "GM" && (
+                {assignedModules.includes("GM") && (
                   <DropdownMenuItem onClick={() => router.push('/settings')}>
                     <Settings className="mr-2 h-4 w-4" />
                     Company Settings

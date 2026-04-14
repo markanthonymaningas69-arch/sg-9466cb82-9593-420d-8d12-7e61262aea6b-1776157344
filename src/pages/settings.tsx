@@ -31,6 +31,8 @@ import {
   Key,
   Trash2
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 export default function Settings() {
   const { toast } = useToast();
@@ -48,7 +50,7 @@ export default function Settings() {
 
   const [invites, setInvites] = useState<any[]>([]);
   const [teamUsers, setTeamUsers] = useState<any[]>([]);
-  const [selectedModule, setSelectedModule] = useState<string>("Site Personnel");
+  const [selectedModules, setSelectedModules] = useState<string[]>(["Site Personnel"]);
   const [projects, setProjects] = useState<any[]>([]);
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
 
@@ -76,25 +78,32 @@ export default function Settings() {
     : { 'Site Personnel': 3, 'Accounting': 1, 'Purchasing': 1, 'Human Resources': 1, 'Warehouse': 1 };
 
   const getUsageCount = (mod: string) => {
-    const activeInvites = invites.filter(i => i.module === mod).length;
-    const activeUsers = teamUsers.filter(u => u.assigned_module === mod).length;
+    const activeInvites = invites.filter(i => (i.modules && i.modules.includes(mod)) || i.module === mod).length;
+    const activeUsers = teamUsers.filter(u => (u.assigned_modules && u.assigned_modules.includes(mod)) || u.assigned_module === mod).length;
     return activeInvites + activeUsers;
   };
 
   const handleGenerateCode = async () => {
-    const limit = planLimits[selectedModule] || 0;
-    const currentUsage = getUsageCount(selectedModule);
-    
-    if (currentUsage >= limit) {
-      toast({
-        title: "Limit Reached",
-        description: `Your ${currentPlan} plan only allows ${limit} user(s) for ${selectedModule}. Upgrade to add more.`,
-        variant: "destructive"
-      });
+    if (selectedModules.length === 0) {
+      toast({ title: "Error", description: "Select at least one module.", variant: "destructive" });
       return;
     }
 
-    if (selectedModule === "Site Personnel" && currentPlan === 'starter' && selectedProjects.length > 2) {
+    for (const mod of selectedModules) {
+      const limit = planLimits[mod] || 0;
+      const currentUsage = getUsageCount(mod);
+      
+      if (currentUsage >= limit) {
+        toast({
+          title: "Limit Reached",
+          description: `Your ${currentPlan} plan only allows ${limit} user(s) for ${mod}. Upgrade to add more.`,
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
+    if (selectedModules.includes("Site Personnel") && currentPlan === 'starter' && selectedProjects.length > 2) {
       toast({ title: "Limit Reached", description: "Starter plan limits Site Personnel to a maximum of 2 projects.", variant: "destructive" });
       return;
     }
@@ -102,14 +111,15 @@ export default function Settings() {
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
     const { error } = await supabase.from('invite_codes').insert({
       code,
-      module: selectedModule,
-      project_ids: selectedModule === "Site Personnel" ? selectedProjects : []
+      module: selectedModules[0],
+      modules: selectedModules,
+      project_ids: selectedModules.includes("Site Personnel") ? selectedProjects : []
     });
 
     if (error) {
       toast({ title: "Error", description: "Failed to generate code.", variant: "destructive" });
     } else {
-      toast({ title: "Code Generated", description: `Invite code ${code} created for ${selectedModule}.` });
+      toast({ title: "Code Generated", description: `Invite code ${code} created for ${selectedModules.join(", ")}.` });
       loadTeamData();
     }
   };
@@ -269,21 +279,30 @@ export default function Settings() {
                   <h3 className="font-semibold text-sm">Generate Invite Code</h3>
                   <div className="flex items-end gap-4">
                     <div className="space-y-2 flex-1">
-                      <Label>Assign Module</Label>
-                      <Select value={selectedModule} onValueChange={setSelectedModule}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Object.keys(planLimits).map(mod => (
-                            <SelectItem key={mod} value={mod} disabled={planLimits[mod] === 0}>
-                              {mod} ({getUsageCount(mod)}/{planLimits[mod]} used)
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Label>Assign Modules (Multiple allowed)</Label>
+                      <div className="border rounded-md p-2 max-h-32 overflow-y-auto space-y-2 bg-background">
+                        {Object.keys(planLimits).map(mod => {
+                          const disabled = planLimits[mod] === 0;
+                          return (
+                            <div key={mod} className="flex items-center space-x-2">
+                              <Checkbox 
+                                id={`mod-${mod}`} 
+                                checked={selectedModules.includes(mod)}
+                                disabled={disabled}
+                                onCheckedChange={(checked) => {
+                                  if (checked) setSelectedModules([...selectedModules, mod]);
+                                  else setSelectedModules(selectedModules.filter(m => m !== mod));
+                                }}
+                              />
+                              <label htmlFor={`mod-${mod}`} className={cn("text-sm font-medium leading-none cursor-pointer", disabled && "opacity-50")}>
+                                {mod} <span className="text-xs text-muted-foreground">({getUsageCount(mod)}/{planLimits[mod]} used)</span>
+                              </label>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                    {selectedModule === "Site Personnel" && (
+                    {selectedModules.includes("Site Personnel") && (
                       <div className="space-y-2 flex-1">
                         <Label>Restrict to Projects (Max {currentPlan === 'starter' ? 2 : 'Unlimited'})</Label>
                         <div className="border rounded-md p-2 max-h-32 overflow-y-auto space-y-2 bg-background">
@@ -317,8 +336,8 @@ export default function Settings() {
                       <Key className="w-4 h-4 mr-2" /> Generate Code
                     </Button>
                   </div>
-                  {planLimits[selectedModule] === 0 && (
-                    <p className="text-xs text-destructive">Your current plan does not include access to the {selectedModule} module.</p>
+                  {planLimits[selectedModules[0]] === 0 && (
+                    <p className="text-xs text-destructive">Your current plan does not include access to the {selectedModules[0]} module.</p>
                   )}
                 </div>
 
@@ -332,7 +351,11 @@ export default function Settings() {
                         <div key={inv.id} className="flex items-center justify-between p-3 bg-white">
                           <div>
                             <div className="font-mono font-bold text-lg tracking-widest text-primary">{inv.code}</div>
-                            <div className="text-xs text-muted-foreground">Module: {inv.module}</div>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {(inv.modules && inv.modules.length > 0 ? inv.modules : [inv.module]).map((m: string) => (
+                                <Badge key={m} variant="secondary" className="text-[10px]">{m}</Badge>
+                              ))}
+                            </div>
                           </div>
                           <Button size="icon" variant="ghost" onClick={() => handleDeleteCode(inv.id)} className="text-red-500 hover:text-red-700 hover:bg-red-50">
                             <Trash2 className="w-4 h-4" />
@@ -353,7 +376,11 @@ export default function Settings() {
                         <div key={u.id} className="flex items-center justify-between p-3 bg-white">
                           <div>
                             <div className="font-medium">{u.email || u.full_name || 'User'}</div>
-                            <div className="text-xs text-muted-foreground">Module: {u.assigned_module}</div>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {(u.assigned_modules && u.assigned_modules.length > 0 ? u.assigned_modules : [u.assigned_module]).map((m: string) => (
+                                <Badge key={m} variant="outline" className="text-[10px]">{m}</Badge>
+                              ))}
+                            </div>
                           </div>
                         </div>
                       ))}

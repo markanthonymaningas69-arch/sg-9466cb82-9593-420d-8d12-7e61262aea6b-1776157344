@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Check, CreditCard, Calendar, Users, HardDrive, Shield } from "lucide-react";
+import { Check, CreditCard, Calendar, Users, HardDrive, Shield, PlusCircle } from "lucide-react";
 import { useSettings } from "@/contexts/SettingsProvider";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -84,6 +84,13 @@ export default function Subscription() {
     const annualCost = plan.annualPrice;
     return monthlyCost - annualCost;
   };
+
+  const addOns = [
+    { name: "Extra Site Personnel Seat", price: 15, description: "Add 1 extra user to the Site Personnel module" },
+    { name: "Extra Accounting Seat", price: 25, description: "Add 1 extra user to the Accounting module" },
+    { name: "Human Resources Module", price: 35, description: "Unlock HR module on the Starter Plan" },
+    { name: "Purchasing Seat", price: 20, description: "Add 1 extra user to the Purchasing module" }
+  ];
 
   const handleUpgrade = async (planId: string) => {
     setCurrentPlan(planId as "starter" | "professional");
@@ -240,7 +247,34 @@ export default function Subscription() {
           </div>
         </div>
 
-        <Card>
+        <div className="mt-12 pt-8 border-t">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold font-heading">Add-Ons</h2>
+            <p className="text-muted-foreground">Enhance your existing plan with additional module seats.</p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {addOns.map((addon, index) => (
+              <Card key={index} className="flex flex-col">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">{addon.name}</CardTitle>
+                  <CardDescription className="text-xs">{addon.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="pb-3 flex-1">
+                  <div className="text-2xl font-bold text-primary">
+                    ${addon.price}<span className="text-sm font-normal text-muted-foreground">/mo</span>
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <Button variant="outline" className="w-full h-8 text-xs flex items-center gap-1">
+                    <PlusCircle className="h-3 w-3" /> Add to Plan
+                  </Button>
+                </CardFooter>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        <Card className="mt-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
