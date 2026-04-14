@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { 
-  LayoutDashboard, 
-  FolderKanban, 
-  Users, 
-  Calculator, 
-  Warehouse, 
-  BarChart3, 
-  Settings, 
+import {
+  LayoutDashboard,
+  FolderKanban,
+  Users,
+  Calculator,
+  Warehouse,
+  BarChart3,
+  Settings,
   CreditCard,
   Menu,
   X,
@@ -18,8 +18,8 @@ import {
   User,
   LogOut,
   Check,
-  XCircle
-} from "lucide-react";
+  XCircle } from
+"lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,8 +29,8 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  DropdownMenuTrigger } from
+"@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { authService } from "@/services/authService";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -42,17 +42,17 @@ interface LayoutProps {
 }
 
 const navigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Project Profile", href: "/projects", icon: FolderKanban },
-  { name: "Site Personnel", href: "/site-personnel", icon: ClipboardList },
-  { name: "Purchasing", href: "/purchasing", icon: ShoppingCart },
-  { name: "Accounting", href: "/accounting", icon: Calculator },
-  { name: "Human Resources", href: "/personnel", icon: Users },
-  { name: "Warehouse", href: "/warehouse", icon: Warehouse },
-  { name: "Analytics", href: "/analytics", icon: BarChart3 },
-  { name: "Settings", href: "/settings", icon: Settings },
-  { name: "Subscription", href: "/subscription", icon: CreditCard },
-];
+{ name: "Dashboard", href: "/", icon: LayoutDashboard },
+{ name: "Project Profile", href: "/projects", icon: FolderKanban },
+{ name: "Site Personnel", href: "/site-personnel", icon: ClipboardList },
+{ name: "Purchasing", href: "/purchasing", icon: ShoppingCart },
+{ name: "Accounting", href: "/accounting", icon: Calculator },
+{ name: "Human Resources", href: "/personnel", icon: Users },
+{ name: "Warehouse", href: "/warehouse", icon: Warehouse },
+{ name: "Analytics", href: "/analytics", icon: BarChart3 },
+{ name: "Settings", href: "/settings", icon: Settings },
+{ name: "Subscription", href: "/subscription", icon: CreditCard }];
+
 
 export function Layout({ children }: LayoutProps) {
   const router = useRouter();
@@ -73,28 +73,28 @@ export function Layout({ children }: LayoutProps) {
   }, []);
 
   const loadPendingRequests = async () => {
-    const { data: reqs } = await supabase
-      .from('site_requests')
-      .select('*, projects(name)')
-      .eq('status', 'pending')
-      .order('request_date', { ascending: false })
-      .limit(10);
+    const { data: reqs } = await supabase.
+    from('site_requests').
+    select('*, projects(name)').
+    eq('status', 'pending').
+    order('request_date', { ascending: false }).
+    limit(10);
     setPendingRequests(reqs || []);
 
-    const { data: leaves } = await supabase
-      .from('leave_requests')
-      .select('*, personnel(name)')
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false })
-      .limit(10);
+    const { data: leaves } = await supabase.
+    from('leave_requests').
+    select('*, personnel(name)').
+    eq('status', 'pending').
+    order('created_at', { ascending: false }).
+    limit(10);
     setPendingLeaves(leaves || []);
 
-    const { data: advances } = await supabase
-      .from('cash_advance_requests')
-      .select('*, personnel(name), projects(name)')
-      .eq('status', 'pending')
-      .order('request_date', { ascending: false })
-      .limit(10);
+    const { data: advances } = await supabase.
+    from('cash_advance_requests').
+    select('*, personnel(name), projects(name)').
+    eq('status', 'pending').
+    order('request_date', { ascending: false }).
+    limit(10);
     setPendingCashAdvances(advances || []);
 
     // Load expiring documents
@@ -102,12 +102,12 @@ export function Layout({ children }: LayoutProps) {
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
     const targetDate = thirtyDaysFromNow.toISOString().split("T")[0];
 
-    const { data: visasData } = await supabase
-      .from('personnel_visas')
-      .select('*, personnel(name)')
-      .or(`visa_expiry_date.lte.${targetDate},passport_expiry_date.lte.${targetDate}`);
-      
-    const expiring = (visasData || []).filter(record => {
+    const { data: visasData } = await supabase.
+    from('personnel_visas').
+    select('*, personnel(name)').
+    or(`visa_expiry_date.lte.${targetDate},passport_expiry_date.lte.${targetDate}`);
+
+    const expiring = (visasData || []).filter((record) => {
       if (record.status === 'noted') return false;
       const daysToPassportExpiry = record.passport_expiry_date ? Math.ceil((new Date(record.passport_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
       const daysToVisaExpiry = record.visa_expiry_date ? Math.ceil((new Date(record.visa_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
@@ -118,11 +118,11 @@ export function Layout({ children }: LayoutProps) {
 
   const handleApproveRequest = async (req: any, e: React.MouseEvent) => {
     e.stopPropagation();
-    const { error } = await supabase
-      .from('site_requests')
-      .update({ status: 'approved' })
-      .eq('id', req.id);
-    
+    const { error } = await supabase.
+    from('site_requests').
+    update({ status: 'approved' }).
+    eq('id', req.id);
+
     if (error) {
       toast({
         title: "Error",
@@ -146,7 +146,7 @@ export function Layout({ children }: LayoutProps) {
 
       toast({
         title: "Request Approved",
-        description: `${req.item_name} has been approved`,
+        description: `${req.item_name} has been approved`
       });
       loadPendingRequests();
     }
@@ -154,11 +154,11 @@ export function Layout({ children }: LayoutProps) {
 
   const handleRejectRequest = async (requestId: string, itemName: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const { error } = await supabase
-      .from('site_requests')
-      .update({ status: 'rejected' })
-      .eq('id', requestId);
-    
+    const { error } = await supabase.
+    from('site_requests').
+    update({ status: 'rejected' }).
+    eq('id', requestId);
+
     if (error) {
       toast({
         title: "Error",
@@ -239,12 +239,12 @@ export function Layout({ children }: LayoutProps) {
   return (
     <div className="min-h-screen bg-background">
       {/* Mobile sidebar backdrop */}
-      {sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      {sidebarOpen &&
+      <div
+        className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+        onClick={() => setSidebarOpen(false)} />
+
+      }
 
       {/* Sidebar */}
       <aside className={cn(
@@ -269,8 +269,8 @@ export function Layout({ children }: LayoutProps) {
               variant="ghost"
               size="icon"
               className="lg:hidden"
-              onClick={() => setSidebarOpen(false)}
-            >
+              onClick={() => setSidebarOpen(false)}>
+              
               <X className="h-5 w-5" />
             </Button>
           </div>
@@ -278,14 +278,14 @@ export function Layout({ children }: LayoutProps) {
           {/* Navigation */}
           <nav className="flex-1 overflow-y-auto py-4">
             <ul className="space-y-1 px-3">
-              {navigation
-                .filter(item => !(currentPlan === "starter" && item.name === "Human Resources"))
-                .map((item) => {
+              {navigation.
+              filter((item) => !(currentPlan === "starter" && item.name === "Human Resources")).
+              map((item) => {
                 const Icon = item.icon;
                 const isActive = router.pathname === item.href;
-                
-                const acctCount = pendingCashAdvances.length + pendingRequests.filter(r => ['Equipment (Rentals)', 'PPE', 'Petty Cash'].includes(r.request_type)).length;
-                const whseCount = pendingRequests.filter(r => ['Tools', 'Equipment (Warehouse)', 'PPE', 'Materials'].includes(r.request_type) || !r.request_type).length;
+
+                const acctCount = pendingCashAdvances.length + pendingRequests.filter((r) => ['Equipment (Rentals)', 'PPE', 'Petty Cash'].includes(r.request_type)).length;
+                const whseCount = pendingRequests.filter((r) => ['Tools', 'Equipment (Warehouse)', 'PPE', 'Materials'].includes(r.request_type) || !r.request_type).length;
                 const hrCount = pendingLeaves.length + expiringDocuments.length;
 
                 return (
@@ -294,32 +294,32 @@ export function Layout({ children }: LayoutProps) {
                       href={item.href}
                       className={cn(
                         "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-                        isActive
-                          ? "bg-primary text-primary-foreground"
-                          : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                        isActive ?
+                        "bg-primary text-primary-foreground" :
+                        "text-muted-foreground hover:bg-secondary hover:text-foreground"
                       )}
-                      onClick={() => setSidebarOpen(false)}
-                    >
+                      onClick={() => setSidebarOpen(false)}>
+                      
                       <Icon className="h-5 w-5 shrink-0" />
                       {item.name}
-                      {item.name === "Accounting" && acctCount > 0 && (
-                        <Badge variant="destructive" className="ml-auto h-5 px-1.5 flex items-center justify-center text-[10px]">
+                      {item.name === "Accounting" && acctCount > 0 &&
+                      <Badge variant="destructive" className="ml-auto h-5 px-1.5 flex items-center justify-center text-[10px]">
                           {acctCount}
                         </Badge>
-                      )}
-                      {item.name === "Warehouse" && whseCount > 0 && (
-                        <Badge variant="destructive" className="ml-auto h-5 px-1.5 flex items-center justify-center text-[10px]">
+                      }
+                      {item.name === "Warehouse" && whseCount > 0 &&
+                      <Badge variant="destructive" className="ml-auto h-5 px-1.5 flex items-center justify-center text-[10px]">
                           {whseCount}
                         </Badge>
-                      )}
-                      {item.name === "Human Resources" && hrCount > 0 && (
-                        <Badge variant="destructive" className="ml-auto h-5 px-1.5 flex items-center justify-center text-[10px]">
+                      }
+                      {item.name === "Human Resources" && hrCount > 0 &&
+                      <Badge variant="destructive" className="ml-auto h-5 px-1.5 flex items-center justify-center text-[10px]">
                           {hrCount}
                         </Badge>
-                      )}
+                      }
                     </Link>
-                  </li>
-                );
+                  </li>);
+
               })}
             </ul>
           </nav>
@@ -347,29 +347,29 @@ export function Layout({ children }: LayoutProps) {
             variant="ghost"
             size="icon"
             className="lg:hidden shrink-0"
-            onClick={() => setSidebarOpen(true)}
-          >
+            onClick={() => setSidebarOpen(true)}>
+            
             <Menu className="h-5 w-5" />
           </Button>
           
           {/* Company Information */}
           <div className="flex items-center gap-3 lg:border-l lg:pl-6 lg:-ml-2 lg:h-10">
-            {company.logo ? (
-              <img src={company.logo} alt="Company Logo" className="h-8 w-8 shrink-0 rounded object-contain bg-white border" />
-            ) : (
-              <div className="h-8 w-8 shrink-0 rounded bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+            {company.logo ?
+            <img src={company.logo} alt="Company Logo" className="h-8 w-8 shrink-0 rounded object-contain bg-white border" /> :
+
+            <div className="h-8 w-8 shrink-0 rounded bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
                 {company.name ? company.name.substring(0, 2).toUpperCase() : "CO"}
               </div>
-            )}
+            }
             <div className="flex flex-col min-w-0 hidden sm:flex">
               <h2 className="text-sm font-semibold leading-tight text-foreground truncate max-w-[200px] lg:max-w-[300px]">
                 {company.name || "Company Name"}
               </h2>
-              {company.address && (
-                <p className="text-[10px] text-muted-foreground truncate max-w-[200px] lg:max-w-[300px]">
+              {company.address &&
+              <p className="text-[10px] text-muted-foreground truncate max-w-[200px] lg:max-w-[300px]">
                   {company.address}
                 </p>
-              )}
+              }
             </div>
           </div>
 
@@ -377,11 +377,11 @@ export function Layout({ children }: LayoutProps) {
           
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground hidden md:block">
-              {new Date().toLocaleDateString("en-US", { 
-                weekday: "short", 
-                year: "numeric", 
-                month: "short", 
-                day: "numeric" 
+              {new Date().toLocaleDateString("en-US", {
+                weekday: "short",
+                year: "numeric",
+                month: "short",
+                day: "numeric"
               })}
             </span>
 
@@ -390,14 +390,14 @@ export function Layout({ children }: LayoutProps) {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative">
                   <Bell className="h-5 w-5" />
-                  {(pendingRequests.length + pendingLeaves.length + pendingCashAdvances.length + expiringDocuments.length) > 0 && (
-                    <Badge 
-                      variant="destructive" 
-                      className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
-                    >
+                  {pendingRequests.length + pendingLeaves.length + pendingCashAdvances.length + expiringDocuments.length > 0 &&
+                  <Badge
+                    variant="destructive"
+                    className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
+                    
                       {pendingRequests.length + pendingLeaves.length + pendingCashAdvances.length + expiringDocuments.length}
                     </Badge>
-                  )}
+                  }
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-80">
@@ -405,26 +405,26 @@ export function Layout({ children }: LayoutProps) {
                   Notifications ({pendingRequests.length + pendingLeaves.length + pendingCashAdvances.length + expiringDocuments.length} pending)
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {pendingRequests.length === 0 && pendingLeaves.length === 0 && pendingCashAdvances.length === 0 && expiringDocuments.length === 0 ? (
-                  <div className="p-4 text-center text-sm text-muted-foreground">
+                {pendingRequests.length === 0 && pendingLeaves.length === 0 && pendingCashAdvances.length === 0 && expiringDocuments.length === 0 ?
+                <div className="p-4 text-center text-sm text-muted-foreground">
                     No pending notifications
-                  </div>
-                ) : (
-                  <ScrollArea className="max-h-[400px]">
-                    {pendingCashAdvances.length > 0 && (
-                      <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase bg-muted/50">
+                  </div> :
+
+                <ScrollArea className="max-h-[400px]">
+                    {pendingCashAdvances.length > 0 &&
+                  <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase bg-muted/50">
                         Cash Advances
                       </div>
-                    )}
-                    {pendingCashAdvances.map((adv) => (
-                      <DropdownMenuItem 
-                        key={adv.id} 
-                        className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-muted"
-                        onClick={() => {
-                          router.push('/accounting');
-                          setNotificationOpen(false);
-                        }}
-                      >
+                  }
+                    {pendingCashAdvances.map((adv) =>
+                  <DropdownMenuItem
+                    key={adv.id}
+                    className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-muted"
+                    onClick={() => {
+                      router.push('/accounting');
+                      setNotificationOpen(false);
+                    }}>
+                    
                         <div className="flex items-start justify-between w-full">
                           <span className="font-medium text-sm">{adv.personnel?.name}</span>
                           <Badge variant="outline" className="text-xs text-orange-600 border-orange-200 bg-orange-50">
@@ -439,41 +439,41 @@ export function Layout({ children }: LayoutProps) {
                         </span>
                         <div className="flex gap-2 w-full mt-1" onClick={(e) => e.stopPropagation()}>
                           <Button
-                            size="sm"
-                            variant="default"
-                            className="flex-1 h-8 bg-green-600 hover:bg-green-700 text-white"
-                            onClick={(e) => handleApproveCashAdvance(adv.id, adv.personnel?.name, adv.amount, adv.project_id, adv.reason, e)}
-                          >
+                        size="sm"
+                        variant="default"
+                        className="flex-1 h-8 bg-green-600 hover:bg-green-700 text-white"
+                        onClick={(e) => handleApproveCashAdvance(adv.id, adv.personnel?.name, adv.amount, adv.project_id, adv.reason, e)}>
+                        
                             <Check className="h-3 w-3 mr-1" />
                             Approve
                           </Button>
                           <Button
-                            size="sm"
-                            variant="destructive"
-                            className="flex-1 h-8"
-                            onClick={(e) => handleRejectCashAdvance(adv.id, adv.personnel?.name, e)}
-                          >
+                        size="sm"
+                        variant="destructive"
+                        className="flex-1 h-8"
+                        onClick={(e) => handleRejectCashAdvance(adv.id, adv.personnel?.name, e)}>
+                        
                             <XCircle className="h-3 w-3 mr-1" />
                             Reject
                           </Button>
                         </div>
                       </DropdownMenuItem>
-                    ))}
+                  )}
 
-                    {pendingRequests.length > 0 && (
-                      <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase bg-muted/50 mt-2">
+                    {pendingRequests.length > 0 &&
+                  <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase bg-muted/50 mt-2">
                         Site Requests
                       </div>
-                    )}
-                    {pendingRequests.map((req) => (
-                      <DropdownMenuItem 
-                        key={req.id} 
-                        className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-muted"
-                        onClick={() => {
-                          router.push('/site-personnel?tab=request');
-                          setNotificationOpen(false);
-                        }}
-                      >
+                  }
+                    {pendingRequests.map((req) =>
+                  <DropdownMenuItem
+                    key={req.id}
+                    className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-muted"
+                    onClick={() => {
+                      router.push('/site-personnel?tab=request');
+                      setNotificationOpen(false);
+                    }}>
+                    
                         <div className="flex items-start justify-between w-full">
                           <div className="flex flex-col">
                             <span className="font-medium text-sm">{req.item_name}</span>
@@ -492,41 +492,41 @@ export function Layout({ children }: LayoutProps) {
                         </span>
                         <div className="flex gap-2 w-full mt-1" onClick={(e) => e.stopPropagation()}>
                           <Button
-                            size="sm"
-                            variant="default"
-                            className="flex-1 h-8 bg-green-600 hover:bg-green-700 text-white"
-                            onClick={(e) => handleApproveRequest(req, e)}
-                          >
+                        size="sm"
+                        variant="default"
+                        className="flex-1 h-8 bg-green-600 hover:bg-green-700 text-white"
+                        onClick={(e) => handleApproveRequest(req, e)}>
+                        
                             <Check className="h-3 w-3 mr-1" />
                             Approve
                           </Button>
                           <Button
-                            size="sm"
-                            variant="destructive"
-                            className="flex-1 h-8"
-                            onClick={(e) => handleRejectRequest(req.id, req.item_name, e)}
-                          >
+                        size="sm"
+                        variant="destructive"
+                        className="flex-1 h-8"
+                        onClick={(e) => handleRejectRequest(req.id, req.item_name, e)}>
+                        
                             <XCircle className="h-3 w-3 mr-1" />
                             Reject
                           </Button>
                         </div>
                       </DropdownMenuItem>
-                    ))}
+                  )}
 
-                    {pendingLeaves.length > 0 && (
-                      <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase bg-muted/50 mt-2">
+                    {pendingLeaves.length > 0 &&
+                  <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase bg-muted/50 mt-2">
                         Leave Requests
                       </div>
-                    )}
-                    {pendingLeaves.map((leave) => (
-                      <DropdownMenuItem 
-                        key={leave.id} 
-                        className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-muted"
-                        onClick={() => {
-                          router.push('/personnel?tab=leave');
-                          setNotificationOpen(false);
-                        }}
-                      >
+                  }
+                    {pendingLeaves.map((leave) =>
+                  <DropdownMenuItem
+                    key={leave.id}
+                    className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-muted"
+                    onClick={() => {
+                      router.push('/personnel?tab=leave');
+                      setNotificationOpen(false);
+                    }}>
+                    
                         <div className="flex items-start justify-between w-full">
                           <span className="font-medium text-sm">{leave.personnel?.name}</span>
                           <Badge variant="outline" className="text-xs capitalize">
@@ -541,48 +541,48 @@ export function Layout({ children }: LayoutProps) {
                         </span>
                         <div className="flex gap-2 w-full mt-1" onClick={(e) => e.stopPropagation()}>
                           <Button
-                            size="sm"
-                            variant="default"
-                            className="flex-1 h-8 bg-green-600 hover:bg-green-700 text-white"
-                            onClick={(e) => handleApproveLeave(leave.id, leave.personnel?.name, e)}
-                          >
+                        size="sm"
+                        variant="default"
+                        className="flex-1 h-8 bg-green-600 hover:bg-green-700 text-white"
+                        onClick={(e) => handleApproveLeave(leave.id, leave.personnel?.name, e)}>
+                        
                             <Check className="h-3 w-3 mr-1" />
                             Approve
                           </Button>
                           <Button
-                            size="sm"
-                            variant="destructive"
-                            className="flex-1 h-8"
-                            onClick={(e) => handleRejectLeave(leave.id, leave.personnel?.name, e)}
-                          >
+                        size="sm"
+                        variant="destructive"
+                        className="flex-1 h-8"
+                        onClick={(e) => handleRejectLeave(leave.id, leave.personnel?.name, e)}>
+                        
                             <XCircle className="h-3 w-3 mr-1" />
                             Reject
                           </Button>
                         </div>
                       </DropdownMenuItem>
-                    ))}
+                  )}
 
-                    {expiringDocuments.length > 0 && (
-                      <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase bg-muted/50 mt-2 text-red-700">
+                    {expiringDocuments.length > 0 &&
+                  <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase bg-muted/50 mt-2 text-red-700">
                         Expiring Documents
                       </div>
-                    )}
+                  }
                     {expiringDocuments.map((doc) => {
-                      const daysToPassportExpiry = doc.passport_expiry_date ? Math.ceil((new Date(doc.passport_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
-                      const daysToVisaExpiry = doc.visa_expiry_date ? Math.ceil((new Date(doc.visa_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
-                      const docType = [];
-                      if (daysToPassportExpiry <= 30) docType.push("Passport");
-                      if (daysToVisaExpiry <= 30) docType.push("Visa");
+                    const daysToPassportExpiry = doc.passport_expiry_date ? Math.ceil((new Date(doc.passport_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
+                    const daysToVisaExpiry = doc.visa_expiry_date ? Math.ceil((new Date(doc.visa_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
+                    const docType = [];
+                    if (daysToPassportExpiry <= 30) docType.push("Passport");
+                    if (daysToVisaExpiry <= 30) docType.push("Visa");
 
-                      return (
-                        <DropdownMenuItem 
-                          key={`doc-${doc.id}`} 
-                          className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-red-50"
-                          onClick={() => {
-                            router.push('/personnel');
-                            setNotificationOpen(false);
-                          }}
-                        >
+                    return (
+                      <DropdownMenuItem
+                        key={`doc-${doc.id}`}
+                        className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-red-50"
+                        onClick={() => {
+                          router.push('/personnel');
+                          setNotificationOpen(false);
+                        }}>
+                        
                           <div className="flex items-start justify-between w-full">
                             <span className="font-medium text-sm text-red-700">{doc.personnel?.name}</span>
                             <Badge variant="destructive" className="text-[10px]">Action Required</Badge>
@@ -590,11 +590,11 @@ export function Layout({ children }: LayoutProps) {
                           <span className="text-xs text-red-600 font-medium">
                             {docType.join(" & ")} expiring soon or expired.
                           </span>
-                        </DropdownMenuItem>
-                      );
-                    })}
+                        </DropdownMenuItem>);
+
+                  })}
                   </ScrollArea>
-                )}
+                }
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -638,6 +638,6 @@ export function Layout({ children }: LayoutProps) {
           {children}
         </main>
       </div>
-    </div>
-  );
+    </div>);
+
 }

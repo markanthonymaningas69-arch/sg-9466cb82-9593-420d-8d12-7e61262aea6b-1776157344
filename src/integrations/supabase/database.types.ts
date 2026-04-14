@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-empty-object-type */
+ 
 export type Json =
   | string
   | number
@@ -586,6 +586,7 @@ export type Database = {
           days_requested: number
           end_date: string
           id: string
+          is_archived: boolean | null
           leave_type: string
           notes: string | null
           personnel_id: string
@@ -600,6 +601,7 @@ export type Database = {
           days_requested: number
           end_date: string
           id?: string
+          is_archived?: boolean | null
           leave_type: string
           notes?: string | null
           personnel_id: string
@@ -614,6 +616,7 @@ export type Database = {
           days_requested?: number
           end_date?: string
           id?: string
+          is_archived?: boolean | null
           leave_type?: string
           notes?: string | null
           personnel_id?: string

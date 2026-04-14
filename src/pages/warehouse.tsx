@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { warehouseService } from "@/services/warehouseService";
 import { projectService } from "@/services/projectService";
 import { useSettings } from "@/contexts/SettingsProvider";
-import { Plus, Pencil, Trash2, Package, Building2, Warehouse as WarehouseIcon } from "lucide-react";
+import { Plus, Pencil, Trash2, Archive, Package, Building2, Warehouse as WarehouseIcon } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
 type WarehouseItem = Database["public"]["Tables"]["inventory"]["Row"] & {
@@ -129,7 +129,7 @@ export default function Warehouse() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm("Are you sure you want to delete this item?")) {
+    if (confirm("Are you sure you want to archive this item?")) {
       await warehouseService.delete(id);
       loadData();
     }
@@ -534,8 +534,8 @@ export default function Warehouse() {
                               <Button size="sm" variant="ghost" onClick={() => handleEdit(item)}>
                                 <Pencil className="h-4 w-4" />
                               </Button>
-                              <Button size="sm" variant="ghost" onClick={() => handleDelete(item.id)}>
-                                <Trash2 className="h-4 w-4 text-destructive" />
+                              <Button size="sm" variant="ghost" onClick={() => handleDelete(item.id)} title="Archive">
+                                <Archive className="h-4 w-4 text-orange-600" />
                               </Button>
                             </div>
                           </TableCell>
@@ -600,8 +600,8 @@ export default function Warehouse() {
                               <Button size="sm" variant="ghost" onClick={() => handleEdit(item)}>
                                 <Pencil className="h-4 w-4" />
                               </Button>
-                              <Button size="sm" variant="ghost" onClick={() => handleDelete(item.id)}>
-                                <Trash2 className="h-4 w-4 text-destructive" />
+                              <Button size="sm" variant="ghost" onClick={() => handleDelete(item.id)} title="Archive">
+                                <Archive className="h-4 w-4 text-orange-600" />
                               </Button>
                             </div>
                           </TableCell>

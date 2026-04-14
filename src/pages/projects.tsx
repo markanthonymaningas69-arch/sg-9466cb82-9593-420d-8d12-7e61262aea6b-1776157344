@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { projectService } from "@/services/projectService";
-import { Plus, Pencil, Trash2, FileText, Database, X, CheckCircle2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Archive, FileText, Database, X, CheckCircle2 } from "lucide-react";
 import type { Database as SupabaseDatabase } from "@/integrations/supabase/types";
 import { useToast } from "@/hooks/use-toast";
 
@@ -245,9 +245,9 @@ export default function Projects() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm("Are you sure you want to delete this project?")) {
+    if (confirm("Are you sure you want to archive this project?")) {
       await projectService.delete(id);
-      toast({ title: "Deleted", description: "Project removed successfully." });
+      toast({ title: "Archived", description: "Project archived successfully." });
       loadProjects();
     }
   };
@@ -446,8 +446,8 @@ export default function Projects() {
                         <Button size="icon" variant="outline" className="h-8 w-8 text-amber-600 border-amber-200 hover:bg-amber-50" onClick={() => handleEdit(project)}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
-                        <Button size="icon" variant="outline" className="h-8 w-8 text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleDelete(project.id)}>
-                          <Trash2 className="h-3.5 w-3.5" />
+                        <Button size="icon" variant="outline" className="h-8 w-8 text-orange-600 border-orange-200 hover:bg-orange-50" onClick={() => handleDelete(project.id)} title="Archive">
+                          <Archive className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </TableCell>

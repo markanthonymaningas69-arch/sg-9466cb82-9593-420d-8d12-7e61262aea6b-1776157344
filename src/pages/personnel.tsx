@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { personnelService } from "@/services/personnelService";
 import { projectService } from "@/services/projectService";
-import { Plus, Pencil, Trash2, UserCheck, Calendar, DollarSign, Clock, FileText as PassportIcon, AlertCircle, Check } from "lucide-react";
+import { Plus, Pencil, Trash2, Archive, UserCheck, Calendar, DollarSign, Clock, FileText as PassportIcon, AlertCircle, Check } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 import { useSettings } from "@/contexts/SettingsProvider";
 import { supabase } from "@/integrations/supabase/client";
@@ -202,14 +202,14 @@ export default function Personnel() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm("Are you sure you want to delete this personnel?")) {
+    if (confirm("Are you sure you want to archive this personnel?")) {
       await personnelService.delete(id);
       loadData();
     }
   };
 
   const handleDeleteLeave = async (id: string) => {
-    if (confirm("Are you sure you want to delete this leave request?")) {
+    if (confirm("Are you sure you want to archive this leave request?")) {
       await personnelService.deleteLeaveRequest(id);
       loadData();
     }
@@ -632,8 +632,8 @@ export default function Personnel() {
                             <Button size="icon" variant="ghost" onClick={() => handleEdit(person)}>
                               <Pencil className="h-4 w-4" />
                             </Button>
-                            <Button size="icon" variant="ghost" onClick={() => handleDelete(person.id)}>
-                              <Trash2 className="h-4 w-4" />
+                            <Button size="icon" variant="ghost" onClick={() => handleDelete(person.id)} title="Archive">
+                              <Archive className="h-4 w-4 text-orange-600" />
                             </Button>
                           </div>
                         </TableCell>
@@ -868,8 +868,8 @@ export default function Personnel() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button size="icon" variant="ghost" onClick={() => handleDeleteLeave(leave.id)}>
-                            <Trash2 className="h-4 w-4 text-red-500" />
+                          <Button size="icon" variant="ghost" onClick={() => handleDeleteLeave(leave.id)} title="Archive">
+                            <Archive className="h-4 w-4 text-orange-600" />
                           </Button>
                         </TableCell>
                       </TableRow>

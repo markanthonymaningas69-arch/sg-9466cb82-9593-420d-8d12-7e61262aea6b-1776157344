@@ -15,7 +15,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { siteService } from "@/services/siteService";
 import { projectService } from "@/services/projectService";
 import { personnelService } from "@/services/personnelService";
-import { Plus, Pencil, Trash2, Users, Truck, ClipboardList, ArrowUp, ArrowDown, Check, ArrowUpDown, ShoppingCart, Banknote, Wrench, Eye } from "lucide-react";
+import { Plus, Pencil, Trash2, Archive, Users, Truck, ClipboardList, ArrowUp, ArrowDown, Check, ArrowUpDown, ShoppingCart, Banknote, Wrench, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 type Project = { id: string; name: string; location: string; status: string };
@@ -1056,10 +1056,12 @@ export default function SitePersonnel() {
                                   <Pencil className="h-4 w-4 text-blue-500" />
                                 </Button>
                                 <Button variant="ghost" size="sm" onClick={async () => {
-                                  await siteService.deletePersonnel(p.id);
-                                  loadProjectPersonnelList();
-                                }}>
-                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                  if(confirm("Archive this personnel?")) {
+                                    await siteService.deletePersonnel(p.id);
+                                    loadProjectPersonnelList();
+                                  }
+                                }} title="Archive">
+                                  <Archive className="h-4 w-4 text-orange-600" />
                                 </Button>
                               </div>
                             )}
@@ -1752,10 +1754,12 @@ export default function SitePersonnel() {
                                     <TableCell className="text-right">
                                       <Button size="sm" variant="ghost" onClick={async (e) => {
                                         e.stopPropagation();
-                                        await siteService.deleteDelivery(delivery.id);
-                                        loadDeliveries();
-                                      }}>
-                                        <Trash2 className="h-4 w-4 text-red-500" />
+                                        if(confirm("Archive this delivery?")) {
+                                          await siteService.deleteDelivery(delivery.id);
+                                          loadDeliveries();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
                                       </Button>
                                     </TableCell>
                                   </TableRow>
@@ -2149,10 +2153,12 @@ export default function SitePersonnel() {
                                       <Pencil className="h-4 w-4 text-blue-500" />
                                     </Button>
                                     <Button size="sm" variant="ghost" onClick={async () => {
-                                      await siteService.deleteMaterialConsumption(row.id);
-                                      loadConsumptions();
-                                    }}>
-                                      <Trash2 className="h-4 w-4 text-red-500" />
+                                      if(confirm("Archive this record?")) {
+                                        await siteService.deleteMaterialConsumption(row.id);
+                                        loadConsumptions();
+                                      }
+                                    }} title="Archive">
+                                      <Archive className="h-4 w-4 text-orange-600" />
                                     </Button>
                                   </div>
                                 )}
@@ -2221,10 +2227,12 @@ export default function SitePersonnel() {
                                       <TableCell className="text-right">
                                         <Button size="sm" variant="ghost" onClick={async (e) => {
                                           e.stopPropagation();
-                                          await siteService.deleteMaterialConsumption(record.id);
-                                          loadConsumptions();
-                                        }}>
-                                          <Trash2 className="h-4 w-4 text-red-500" />
+                                          if(confirm("Archive this record?")) {
+                                            await siteService.deleteMaterialConsumption(record.id);
+                                            loadConsumptions();
+                                          }
+                                        }} title="Archive">
+                                          <Archive className="h-4 w-4 text-orange-600" />
                                         </Button>
                                       </TableCell>
                                     </TableRow>
@@ -2668,18 +2676,18 @@ export default function SitePersonnel() {
                                       <Eye className="h-4 w-4" />
                                     </Button>
                                     {group.status === 'pending' && (
-                                      <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 hover:bg-red-50" onClick={(e) => {
-                                        if(confirm("Delete this pending request?")) {
+                                      <Button size="icon" variant="ghost" className="h-8 w-8 text-orange-600 hover:bg-orange-50" onClick={(e) => {
+                                        if(confirm("Archive this pending request?")) {
                                           e.stopPropagation();
                                           if (group.isCA) {
                                             siteService.deleteCashAdvance(group.id).then(() => loadCashAdvances());
                                           } else {
                                             const ids = group.items.map((i: any) => i.id);
-                                            supabase.from('site_requests').delete().in('id', ids).then(() => loadRequests());
+                                            supabase.from('site_requests').update({ is_archived: true }).in('id', ids).then(() => loadRequests());
                                           }
                                         }
-                                      }}>
-                                        <Trash2 className="h-4 w-4" />
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4" />
                                       </Button>
                                     )}
                                   </div>

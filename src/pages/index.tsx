@@ -4,13 +4,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Building2, TrendingUp, Wallet, Activity } from "lucide-react";
+import { Building2, TrendingUp, Wallet, Activity, Archive } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/contexts/SettingsProvider";
+import { ArchiveViewer } from "@/components/ArchiveViewer";
+import { Button } from "@/components/ui/button";
 
 export default function Dashboard() {
   const { formatCurrency } = useSettings();
   const [loading, setLoading] = useState(true);
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const [portfolio, setPortfolio] = useState<any[]>([]);
   const [summary, setSummary] = useState({
     totalValue: 0,
@@ -165,9 +168,15 @@ export default function Dashboard() {
     <Layout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-heading font-bold text-foreground">Dashboard | GM</h1>
-          <p className="text-muted-foreground mt-1">Executive overview of project portfolios and financial health</p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-heading font-bold text-foreground">Dashboard | GM</h1>
+            <p className="text-muted-foreground mt-1">Executive overview of project portfolios and financial health</p>
+          </div>
+          <Button variant="outline" onClick={() => setArchiveOpen(true)} className="border-orange-200 text-orange-700 hover:bg-orange-50 mt-2 sm:mt-0">
+            <Archive className="mr-2 h-4 w-4" />
+            Archived Files
+          </Button>
         </div>
 
         {/* Top KPIs */}
@@ -281,6 +290,7 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
+        <ArchiveViewer open={archiveOpen} onOpenChange={setArchiveOpen} />
       </div>
     </Layout>
   );
