@@ -7,12 +7,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { personnelService } from "@/services/personnelService";
 import { projectService } from "@/services/projectService";
-import { Plus, Pencil, Trash2, UserCheck, Calendar, DollarSign, Clock, FileText as PassportIcon } from "lucide-react";
+import { Plus, Pencil, Trash2, UserCheck, Calendar, DollarSign, Clock, FileText as PassportIcon, AlertCircle } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 import { useSettings } from "@/contexts/SettingsProvider";
 
@@ -285,6 +286,12 @@ export default function Personnel() {
   const filteredLeaveRequests = leaveRequests.filter(l => (l.personnel?.worker_type || 'construction') === workerFilter);
   const filteredVisas = visas.filter(v => (v.personnel?.worker_type || 'construction') === workerFilter);
 
+  const expiringDocuments = visas.filter(record => {
+    const daysToPassportExpiry = record.passport_expiry_date ? Math.ceil((new Date(record.passport_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
+    const daysToVisaExpiry = record.visa_expiry_date ? Math.ceil((new Date(record.visa_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
+    return daysToPassportExpiry <= 30 || daysToVisaExpiry <= 30;
+  });
+
   if (loading) {
     return (
       <Layout>
@@ -323,6 +330,16 @@ export default function Personnel() {
             </button>
           </div>
         </div>
+
+        {currency !== "PHP" && expiringDocuments.length > 0 && (
+          <Alert variant="destructive" className="bg-red-50 text-red-900 border-red-200">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            <AlertTitle className="text-red-800 font-bold">Document Expiry Warning</AlertTitle>
+            <AlertDescription className="text-red-700">
+              <strong>{expiringDocuments.length}</strong> employee(s) have passports or visas that are expired or expiring within 30 days. Please review the Visa & Passport tab immediately.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <Tabs defaultValue="personnel" className="space-y-4">
           <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 h-auto">
@@ -999,21 +1016,21 @@ export default function Personnel() {
                         if (minDays < 0) {
                           statusColor = "bg-red-100 text-red-800";
                           statusText = "Expired";
-                        } else if (minDays < 30) {
+                        } else if (minDays <= 30) {
                           statusColor = "bg-orange-100 text-orange-800";
                           statusText = "Expiring Soon";
                         }
 
                         return (
-                          <TableRow key={record.id}>
+                          <TableRow key={record.id} className={minDays <= 30 ? "bg-red-50/50" : ""}>
                             <TableCell className="font-medium">{record.personnel?.name}</TableCell>
                             <TableCell>{record.country}</TableCell>
                             <TableCell className="font-mono text-sm">{record.passport_number || "-"}</TableCell>
-                            <TableCell className={daysToPassportExpiry < 30 ? "text-red-600 font-medium" : ""}>
+                            <TableCell className={daysToPassportExpiry <= 30 ? "text-red-700 font-bold bg-red-100/50" : ""}>
                               {record.passport_expiry_date ? new Date(record.passport_expiry_date).toLocaleDateString() : "-"}
                             </TableCell>
                             <TableCell className="font-mono text-sm">{record.visa_number || "-"}</TableCell>
-                            <TableCell className={daysToVisaExpiry < 30 ? "text-red-600 font-medium" : ""}>
+                            <TableCell className={daysToVisaExpiry <= 30 ? "text-red-700 font-bold bg-red-100/50" : ""}>
                               {record.visa_expiry_date ? new Date(record.visa_expiry_date).toLocaleDateString() : "-"}
                             </TableCell>
                             <TableCell>
