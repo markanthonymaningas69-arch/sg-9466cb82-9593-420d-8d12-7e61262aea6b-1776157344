@@ -878,35 +878,23 @@ export default function Personnel() {
                       <DialogTitle>Add Visa & Passport Record</DialogTitle>
                     </DialogHeader>
                     <form onSubmit={handleVisaSubmit} className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="visa_personnel">Personnel *</Label>
-                          <Select value={visaForm.personnel_id} onValueChange={(value) => setVisaForm({ ...visaForm, personnel_id: value })}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select personnel" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {filteredPersonnel.map((person) => (
-                                <SelectItem key={person.id} value={person.id}>
-                                  {person.name} - {person.role}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="country">Country of Issue *</Label>
-                          <Input
-                            id="country"
-                            value={visaForm.country}
-                            onChange={(e) => setVisaForm({ ...visaForm, country: e.target.value })}
-                            placeholder="e.g. UAE, Qatar, USA"
-                            required
-                          />
-                        </div>
+                      <div className="space-y-2 md:w-1/2 pr-4">
+                        <Label htmlFor="visa_personnel">Personnel *</Label>
+                        <Select value={visaForm.personnel_id} onValueChange={(value) => setVisaForm({ ...visaForm, personnel_id: value })}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select personnel" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {filteredPersonnel.map((person) => (
+                              <SelectItem key={person.id} value={person.id}>
+                                {person.name} - {person.role}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-8 border-t pt-4">
+                      <div className="grid grid-cols-2 gap-8 border-t pt-4 mt-2">
                         {/* Passport Details */}
                         <div className="space-y-4">
                           <h4 className="font-semibold text-sm text-primary">Passport Details</h4>
