@@ -93,11 +93,12 @@ export default function Personnel() {
   });
 
   const pendingLeaveIds = leaveRequests.filter(l => l.status === 'pending').map(l => l.id).sort().join(',');
-  const [seenLeaveIds, setSeenLeaveIds] = useState<string>("");
+  const [seenLeaveIds, setSeenLeaveIds] = useState<string>(() => typeof window !== 'undefined' ? localStorage.getItem('seenLeaveIds') || "" : "");
 
   useEffect(() => {
     if (activeTab === 'leave') {
       setSeenLeaveIds(pendingLeaveIds);
+      if (typeof window !== 'undefined') localStorage.setItem('seenLeaveIds', pendingLeaveIds);
     }
   }, [activeTab, pendingLeaveIds]);
 

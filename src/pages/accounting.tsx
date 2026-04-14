@@ -22,8 +22,8 @@ export default function Accounting() {
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   const [approvedVoucherIds, setApprovedVoucherIds] = useState("");
   const [pendingReqIds, setPendingReqIds] = useState("");
-  const [seenVoucherIds, setSeenVoucherIds] = useState("");
-  const [seenReqIds, setSeenReqIds] = useState("");
+  const [seenVoucherIds, setSeenVoucherIds] = useState<string>(() => typeof window !== 'undefined' ? localStorage.getItem('seenVoucherIds') || "" : "");
+  const [seenReqIds, setSeenReqIds] = useState<string>(() => typeof window !== 'undefined' ? localStorage.getItem('seenReqIds') || "" : "");
 
   useEffect(() => {
     if (currentPlan === "starter" && activeTab !== "payroll") {
@@ -48,12 +48,14 @@ export default function Accounting() {
   useEffect(() => {
     if (activeTab === 'vouchers') {
       setSeenVoucherIds(approvedVoucherIds);
+      if (typeof window !== 'undefined') localStorage.setItem('seenVoucherIds', approvedVoucherIds);
     }
   }, [activeTab, approvedVoucherIds]);
 
   useEffect(() => {
     if (activeTab === 'requests') {
       setSeenReqIds(pendingReqIds);
+      if (typeof window !== 'undefined') localStorage.setItem('seenReqIds', pendingReqIds);
     }
   }, [activeTab, pendingReqIds]);
 

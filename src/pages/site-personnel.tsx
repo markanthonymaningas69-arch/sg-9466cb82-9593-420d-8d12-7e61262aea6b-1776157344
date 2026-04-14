@@ -117,7 +117,7 @@ export default function SitePersonnel() {
   const [isManualRequestUnit, setIsManualRequestUnit] = useState(false);
   const [requestItems, setRequestItems] = useState<any[]>([]);
   const [requestFilterType, setRequestFilterType] = useState<string>("all");
-  const [seenResolvedIds, setSeenResolvedIds] = useState<string>("");
+  const [seenResolvedIds, setSeenResolvedIds] = useState<string>(() => typeof window !== 'undefined' ? localStorage.getItem('seenResolvedIds') || "" : "");
   const [requestForm, setRequestForm] = useState({
     request_type: "Materials",
     form_number: "",
@@ -209,6 +209,7 @@ export default function SitePersonnel() {
   useEffect(() => {
     if (activeTab === 'request') {
       setSeenResolvedIds(resolvedRequestIds);
+      if (typeof window !== 'undefined') localStorage.setItem('seenResolvedIds', resolvedRequestIds);
     }
   }, [activeTab, resolvedRequestIds]);
 
