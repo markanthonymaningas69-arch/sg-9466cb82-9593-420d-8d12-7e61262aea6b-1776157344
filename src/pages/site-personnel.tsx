@@ -40,6 +40,7 @@ export default function SitePersonnel() {
   const todayStr = new Date().toISOString().split("T")[0];
   const [attendanceDate, setAttendanceDate] = useState<string>(todayStr);
   const [deliveriesDate, setDeliveriesDate] = useState<string>(todayStr);
+  const [deliverySupplierFilter, setDeliverySupplierFilter] = useState<string>("all");
   const [scopeDate, setScopeDate] = useState<string>(todayStr);
   
   const [assignedProjectIds, setAssignedProjectIds] = useState<string[]>([]);
@@ -1565,17 +1566,33 @@ export default function SitePersonnel() {
                     <div>
                       <CardTitle>Material Deliveries</CardTitle>
                       <CardDescription>Track deliveries to site</CardDescription>
-                      <div className="flex items-center gap-3 mt-4">
-                        <Label>Date Filter:</Label>
-                        <Input
-                          type="date"
-                          value={deliveriesDate}
-                          onChange={(e) => setDeliveriesDate(e.target.value)}
-                          className="w-auto h-9"
-                        />
-                        {deliveriesDate && (
-                          <Button variant="ghost" size="sm" onClick={() => setDeliveriesDate("")} className="text-muted-foreground h-9">
-                            Clear Filter
+                      <div className="flex items-center gap-3 mt-4 flex-nowrap shrink-0 overflow-x-auto pb-1">
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Label className="whitespace-nowrap">Date:</Label>
+                          <Input
+                            type="date"
+                            value={deliveriesDate}
+                            onChange={(e) => setDeliveriesDate(e.target.value)}
+                            className="w-auto h-9 min-w-[130px]"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Label className="whitespace-nowrap">Supplier:</Label>
+                          <Select value={deliverySupplierFilter} onValueChange={setDeliverySupplierFilter}>
+                            <SelectTrigger className="w-[180px] h-9">
+                              <SelectValue placeholder="All Suppliers" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Suppliers</SelectItem>
+                              {Array.from(new Set(deliveries.map(d => d.supplier))).filter(Boolean).sort().map(s => (
+                                <SelectItem key={s} value={s}>{s}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {(deliveriesDate || deliverySupplierFilter !== "all") && (
+                          <Button variant="ghost" size="sm" onClick={() => { setDeliveriesDate(""); setDeliverySupplierFilter("all"); }} className="text-muted-foreground h-9 shrink-0">
+                            Clear Filters
                           </Button>
                         )}
                       </div>
@@ -1794,6 +1811,7 @@ export default function SitePersonnel() {
                   <div className="space-y-4 overflow-y-auto h-full pr-2">
                     {Object.entries(
                       deliveries.reduce((acc, curr) => {
+                        if (deliverySupplierFilter !== "all" && curr.supplier !== deliverySupplierFilter) return acc;
                         const key = `${curr.supplier}::${curr.receipt_number || 'No Receipt'}::${curr.delivery_date}`;
                         if (!acc[key]) acc[key] = [];
                         acc[key].push(curr);
@@ -2394,20 +2412,20 @@ export default function SitePersonnel() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 overflow-x-auto pb-2 shrink-0 hide-scrollbar w-full">
-                      <Button onClick={() => openRequestDialog('Materials', 'MR')} variant="default" className="bg-blue-600 hover:bg-blue-700 text-white shrink-0">
-                        <ShoppingCart className="h-4 w-4 mr-2" />
+                      <Button size="sm" onClick={() => openRequestDialog('Materials', 'MR')} variant="default" className="bg-blue-600 hover:bg-blue-700 text-white shrink-0 h-8 text-xs px-2.5">
+                        <ShoppingCart className="h-3 w-3 mr-1.5" />
                         Material Request
                       </Button>
-                      <Button onClick={() => openRequestDialog('Tools & Equipments', 'TE')} variant="outline" className="border-orange-500 text-orange-600 hover:bg-orange-50 shrink-0">
-                        <Wrench className="h-4 w-4 mr-2" />
+                      <Button size="sm" onClick={() => openRequestDialog('Tools & Equipments', 'TE')} variant="outline" className="border-orange-500 text-orange-600 hover:bg-orange-50 shrink-0 h-8 text-xs px-2.5">
+                        <Wrench className="h-3 w-3 mr-1.5" />
                         Tools & Equipments
                       </Button>
-                      <Button onClick={() => openRequestDialog('Petty Cash', 'PC')} variant="outline" className="border-teal-600 text-teal-700 hover:bg-teal-50 shrink-0">
-                        <Banknote className="h-4 w-4 mr-2" />
+                      <Button size="sm" onClick={() => openRequestDialog('Petty Cash', 'PC')} variant="outline" className="border-teal-600 text-teal-700 hover:bg-teal-50 shrink-0 h-8 text-xs px-2.5">
+                        <Banknote className="h-3 w-3 mr-1.5" />
                         Petty Cash
                       </Button>
-                      <Button onClick={() => openRequestDialog('Cash Advance', 'CA')} variant="outline" className="border-green-600 text-green-700 hover:bg-green-50 shrink-0">
-                        <Banknote className="h-4 w-4 mr-2" />
+                      <Button size="sm" onClick={() => openRequestDialog('Cash Advance', 'CA')} variant="outline" className="border-green-600 text-green-700 hover:bg-green-50 shrink-0 h-8 text-xs px-2.5">
+                        <Banknote className="h-3 w-3 mr-1.5" />
                         Cash Advance
                       </Button>
                     </div>
