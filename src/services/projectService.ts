@@ -10,6 +10,7 @@ export const projectService = {
     const { data, error } = await supabase
       .from("projects")
       .select("*")
+      .eq("is_archived", false)
       .order("created_at", { ascending: false });
     
     console.log("Projects query:", { data, error });
@@ -67,7 +68,7 @@ export const projectService = {
   async delete(id: string) {
     const { error } = await supabase
       .from("projects")
-      .delete()
+      .update({ is_archived: true } as any)
       .eq("id", id);
     
     // Auto-invalidate caches

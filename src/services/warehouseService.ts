@@ -9,6 +9,7 @@ export const warehouseService = {
     const { data, error } = await supabase
       .from("inventory")
       .select("*, projects(name)")
+      .eq("is_archived", false)
       .order("created_at", { ascending: false });
     
     console.log("Warehouse query:", { data, error });
@@ -19,6 +20,7 @@ export const warehouseService = {
     const { data, error } = await supabase
       .from("inventory")
       .select("*")
+      .eq("is_archived", false)
       .lte("quantity", threshold)
       .order("quantity", { ascending: true });
     
@@ -52,7 +54,7 @@ export const warehouseService = {
   async delete(id: string) {
     const { error } = await supabase
       .from("inventory")
-      .delete()
+      .update({ is_archived: true } as any)
       .eq("id", id);
     
     console.log("Delete item:", { error });

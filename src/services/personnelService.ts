@@ -18,6 +18,7 @@ export const personnelService = {
     const { data, error } = await supabase
       .from("personnel")
       .select("*, projects(name)")
+      .eq("is_archived", false)
       .order("created_at", { ascending: false });
     
     console.log("Personnel query:", { data, error });
@@ -28,7 +29,8 @@ export const personnelService = {
     const { data, error } = await supabase
       .from("personnel")
       .select("*")
-      .eq("project_id", projectId);
+      .eq("project_id", projectId)
+      .eq("is_archived", false);
     
     console.log("Personnel by project:", { data, error });
     return { data: data || [], error };
@@ -60,7 +62,7 @@ export const personnelService = {
   async delete(id: string) {
     const { error } = await supabase
       .from("personnel")
-      .delete()
+      .update({ is_archived: true } as any)
       .eq("id", id);
     
     console.log("Delete personnel:", { error });
@@ -177,6 +179,7 @@ export const personnelService = {
     let query = supabase
       .from("personnel_visas")
       .select("*, personnel(name, role, worker_type)")
+      .eq("is_archived", false)
       .order("expiry_date", { ascending: true });
     
     if (personnelId) {

@@ -17,6 +17,7 @@ export const siteService = {
       .from("personnel")
       .select("*")
       .eq("project_id", projectId)
+      .eq("is_archived", false)
       .order("name");
     return { data: data || [], error };
   },
@@ -43,7 +44,7 @@ export const siteService = {
   async deletePersonnel(id: string) {
     const { error } = await supabase
       .from("personnel")
-      .delete()
+      .update({ is_archived: true } as any)
       .eq("id", id);
     return { error };
   },
@@ -108,6 +109,7 @@ export const siteService = {
       .from("deliveries")
       .select("*, projects(name)")
       .eq("project_id", projectId)
+      .eq("is_archived", false)
       .order("delivery_date", { ascending: false });
       
     if (dateFilter) {
@@ -142,7 +144,7 @@ export const siteService = {
   async deleteDelivery(id: string) {
     const { error } = await supabase
       .from("deliveries")
-      .delete()
+      .update({ is_archived: true } as any)
       .eq("id", id);
     
     return { error };
@@ -154,6 +156,7 @@ export const siteService = {
       .from("material_consumption")
       .select("*, bom_scope_of_work(name)")
       .eq("project_id", projectId)
+      .eq("is_archived", false)
       .order("date_used", { ascending: false });
       
     if (dateFilter) {
@@ -188,7 +191,7 @@ export const siteService = {
   async deleteMaterialConsumption(id: string) {
     const { error } = await supabase
       .from("material_consumption")
-      .delete()
+      .update({ is_archived: true } as any)
       .eq("id", id);
     
     return { error };
@@ -327,6 +330,7 @@ export const siteService = {
       .from("cash_advance_requests")
       .select("*, personnel(name, role)")
       .eq("project_id", projectId)
+      .eq("is_archived", false)
       .order("request_date", { ascending: false });
     return { data: data || [], error };
   },
@@ -353,7 +357,7 @@ export const siteService = {
   async deleteCashAdvance(id: string) {
     const { error } = await supabase
       .from("cash_advance_requests")
-      .delete()
+      .update({ is_archived: true } as any)
       .eq("id", id);
     return { error };
   }

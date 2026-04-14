@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingCart, Plus, Search, Building2, Warehouse as WarehouseIcon, FilterX, List, Edit2, Trash2 } from "lucide-react";
+import { ShoppingCart, Plus, Search, Building2, Warehouse as WarehouseIcon, FilterX, List, Edit2, Archive } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { projectService } from "@/services/projectService";
 import { useSettings } from "@/contexts/SettingsProvider";
@@ -74,7 +74,7 @@ export default function Purchasing() {
   const loadData = async () => {
     setLoading(true);
     const [{ data: pData }, { data: projData }, { data: supData }, { data: vouchData }] = await Promise.all([
-      supabase.from("purchases").select(`*, projects(name)`).order('created_at', { ascending: false }),
+      supabase.from("purchases").select(`*, projects(name)`).eq('is_archived', false).order('created_at', { ascending: false }),
       projectService.getAll(),
       supabase.from("suppliers").select("*").order("name"),
       supabase.from("vouchers").select("*").order("created_at", { ascending: false })
@@ -170,6 +170,12 @@ export default function Purchasing() {
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this purchase order item?")) return;
     const { error } = await supabase.from("purchases").delete().eq("id", id);
+    if (!error) loadData();
+  };
+
+  const handleArchive = async (id: string) => {
+    if (!confirm("Are you sure you want to archive this purchase order item?")) return;
+    const { error } = await supabase.from("purchases").update({ is_archived: true }).eq("id", id);
     if (!error) loadData();
   };
 
@@ -560,8 +566,8 @@ export default function Purchasing() {
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" onClick={() => handleEdit(p)}>
                             <Edit2 className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => handleDelete(p.id)}>
-                            <Trash2 className="h-4 w-4" />
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50" onClick={() => handleArchive(p.id)} title="Archive">
+                            <Archive className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>
