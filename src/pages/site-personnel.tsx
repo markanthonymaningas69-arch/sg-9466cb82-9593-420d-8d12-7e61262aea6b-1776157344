@@ -115,6 +115,7 @@ export default function SitePersonnel() {
   const [isManualRequestItem, setIsManualRequestItem] = useState(false);
   const [isManualRequestUnit, setIsManualRequestUnit] = useState(false);
   const [requestItems, setRequestItems] = useState<any[]>([]);
+  const [requestFilterType, setRequestFilterType] = useState<string>("all");
   const [requestForm, setRequestForm] = useState({
     request_type: "Materials",
     form_number: "",
@@ -753,9 +754,20 @@ export default function SitePersonnel() {
                 <ClipboardList className="h-4 w-4 mr-2" />
                 Material Usage
               </TabsTrigger>
-              <TabsTrigger value="request">
+              <TabsTrigger value="request" className="relative">
                 <ShoppingCart className="h-4 w-4 mr-2" />
                 Requests
+                {(() => {
+                  const resolvedCount = [...requests, ...cashAdvances].filter(r => r.status === 'approved' || r.status === 'rejected').length;
+                  if (resolvedCount > 0) {
+                    return (
+                      <Badge variant="destructive" className="ml-2 h-5 min-w-5 flex items-center justify-center p-0 px-1.5 text-[10px]">
+                        {resolvedCount}
+                      </Badge>
+                    );
+                  }
+                  return null;
+                })()}
               </TabsTrigger>
               <TabsTrigger value="scope">
                 <Plus className="h-4 w-4 mr-2" />
@@ -2298,17 +2310,34 @@ export default function SitePersonnel() {
                     <div>
                       <CardTitle>Site Requests</CardTitle>
                       <CardDescription>Request materials, tools, equipment, PPE, and cash advances</CardDescription>
-                      <div className="flex items-center gap-3 mt-4">
-                        <Label>Date Filter:</Label>
-                        <Input
-                          type="date"
-                          value={requestDate}
-                          onChange={(e) => setRequestDate(e.target.value)}
-                          className="w-auto h-9"
-                        />
-                        {requestDate && (
-                          <Button variant="ghost" size="sm" onClick={() => setRequestDate("")} className="text-muted-foreground h-9">
-                            Clear Filter
+                      <div className="flex items-center gap-3 mt-4 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <Label>Date:</Label>
+                          <Input
+                            type="date"
+                            value={requestDate}
+                            onChange={(e) => setRequestDate(e.target.value)}
+                            className="w-auto h-9"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Label>Type:</Label>
+                          <Select value={requestFilterType} onValueChange={setRequestFilterType}>
+                            <SelectTrigger className="w-[180px] h-9">
+                              <SelectValue placeholder="All Types" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Types</SelectItem>
+                              <SelectItem value="Materials">Materials</SelectItem>
+                              <SelectItem value="Tools & Equipments">Tools & Equipments</SelectItem>
+                              <SelectItem value="Petty Cash">Petty Cash</SelectItem>
+                              <SelectItem value="Cash Advance">Cash Advance</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {(requestDate || requestFilterType !== "all") && (
+                          <Button variant="ghost" size="sm" onClick={() => { setRequestDate(""); setRequestFilterType("all"); }} className="text-muted-foreground h-9">
+                            Clear Filters
                           </Button>
                         )}
                       </div>
@@ -2434,7 +2463,6 @@ export default function SitePersonnel() {
                                           placeholder="Type item name"
                                           value={requestForm.item_name}
                                           onChange={(e) => setRequestForm({ ...requestForm, item_name: e.target.value })}
-                                          required
                                         />
                                       ) : !isManualRequestItem ? (
                                         <Select
@@ -2469,7 +2497,6 @@ export default function SitePersonnel() {
                                             placeholder="Type item name"
                                             value={requestForm.item_name}
                                             onChange={(e) => setRequestForm({ ...requestForm, item_name: e.target.value })}
-                                            required
                                           />
                                           <Button type="button" variant="outline" className="px-2" onClick={() => {
                                             setIsManualRequestItem(false);
@@ -2655,18 +2682,23 @@ export default function SitePersonnel() {
                       }))
                     ].sort((a: any, b: any) => new Date(b.request_date).getTime() - new Date(a.request_date).getTime());
 
+                    const filteredGroups = combinedGroups.filter((g: any) => {
+                      if (requestFilterType !== "all" && g.request_type !== requestFilterType) return false;
+                      return true;
+                    });
+
                     const recentResolved = combinedGroups.filter((g: any) => g.status === 'approved' || g.status === 'rejected');
 
-                    if (combinedGroups.length === 0) {
+                    if (filteredGroups.length === 0) {
                       return (
-                        <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg bg-gray-50">
-                          <p className="mb-4">No requests found for the selected date.</p>
+                        <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg bg-gray-50 mt-4">
+                          <p className="mb-4">No requests found matching your filters.</p>
                         </div>
                       );
                     }
 
                     return (
-                      <div className="flex flex-col h-full space-y-4">
+                      <div className="flex flex-col h-full space-y-4 mt-4">
                         {recentResolved.length > 0 && (
                           <div className="shrink-0 space-y-2 mb-2">
                             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Recent Notifications</h3>
@@ -2693,13 +2725,13 @@ export default function SitePersonnel() {
                                 <TableHead className="w-32">Form No.</TableHead>
                                 <TableHead className="w-32">Type</TableHead>
                                 <TableHead>Requested By</TableHead>
-                                <TableHead>Items Count</TableHead>
+                                <TableHead>Details / Amount</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead className="text-right w-24">Act</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {combinedGroups.map((group: any) => (
+                              {filteredGroups.map((group: any) => (
                                 <TableRow key={group.id}>
                                   <TableCell className="whitespace-nowrap text-sm">{group.request_date}</TableCell>
                                   <TableCell className="font-mono text-xs font-bold text-primary">{group.form_number}</TableCell>
@@ -2707,7 +2739,13 @@ export default function SitePersonnel() {
                                     <Badge variant="secondary" className="font-normal text-xs">{group.request_type}</Badge>
                                   </TableCell>
                                   <TableCell className="text-sm font-medium">{group.requested_by}</TableCell>
-                                  <TableCell className="text-sm">{group.items.length} item(s)</TableCell>
+                                  <TableCell className="text-sm">
+                                    {(group.request_type === "Petty Cash" || group.request_type === "Cash Advance") ? (
+                                      <span className="font-semibold text-green-700">₱{group.items[0]?.amount?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || '0.00'}</span>
+                                    ) : (
+                                      <span>{group.items.length} item(s)</span>
+                                    )}
+                                  </TableCell>
                                   <TableCell>
                                     <Badge 
                                       variant="outline" 
