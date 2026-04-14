@@ -66,10 +66,17 @@ export function Layout({ children }: LayoutProps) {
   const [pendingCashAdvances, setPendingCashAdvances] = useState<any[]>([]);
   const [expiringDocuments, setExpiringDocuments] = useState<any[]>([]);
   const [notificationOpen, setNotificationOpen] = useState(false);
-  const [assignedModule, setAssignedModule] = useState<string>("GM"); // Keeping for legacy reference if needed
-  const [assignedModules, setAssignedModules] = useState<string[]>(["GM"]);
-  const [userName, setUserName] = useState<string>("Admin User");
-  const [userEmail, setUserEmail] = useState<string>("");
+  
+  const [assignedModule, setAssignedModule] = useState<string>(() => typeof window !== 'undefined' ? localStorage.getItem('app_assigned_module') || "GM" : "GM");
+  const [assignedModules, setAssignedModules] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('app_assigned_modules');
+      if (saved) return JSON.parse(saved);
+    }
+    return [];
+  });
+  const [userName, setUserName] = useState<string>(() => typeof window !== 'undefined' ? localStorage.getItem('app_user_name') || "User" : "User");
+  const [userEmail, setUserEmail] = useState<string>(() => typeof window !== 'undefined' ? localStorage.getItem('app_user_email') || "" : "");
 
   useEffect(() => {
     loadUserProfile();
@@ -97,6 +104,12 @@ export function Layout({ children }: LayoutProps) {
         setAssignedModules(mods);
         setAssignedModule(mods[0]);
         setUserName(profile.full_name || profile.email?.split('@')[0] || "User");
+
+        // Cache to prevent flash on navigation
+        localStorage.setItem('app_assigned_modules', JSON.stringify(mods));
+        localStorage.setItem('app_assigned_module', mods[0]);
+        localStorage.setItem('app_user_name', profile.full_name || profile.email?.split('@')[0] || "User");
+        localStorage.setItem('app_user_email', session.user.email || "");
       }
     } else {
       router.push('/auth/login');
@@ -263,6 +276,10 @@ export function Layout({ children }: LayoutProps) {
   };
 
   const handleLogout = async () => {
+    localStorage.removeItem('app_assigned_modules');
+    localStorage.removeItem('app_assigned_module');
+    localStorage.removeItem('app_user_name');
+    localStorage.removeItem('app_user_email');
     await authService.signOut();
     router.push('/auth/login');
   };
