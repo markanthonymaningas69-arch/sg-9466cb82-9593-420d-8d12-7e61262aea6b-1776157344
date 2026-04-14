@@ -62,6 +62,7 @@ export function Layout({ children }: LayoutProps) {
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [pendingLeaves, setPendingLeaves] = useState<any[]>([]);
   const [pendingCashAdvances, setPendingCashAdvances] = useState<any[]>([]);
+  const [expiringDocuments, setExpiringDocuments] = useState<any[]>([]);
   const [notificationOpen, setNotificationOpen] = useState(false);
 
   useEffect(() => {
@@ -95,6 +96,23 @@ export function Layout({ children }: LayoutProps) {
       .order('request_date', { ascending: false })
       .limit(10);
     setPendingCashAdvances(advances || []);
+
+    // Load expiring documents
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+    const targetDate = thirtyDaysFromNow.toISOString().split("T")[0];
+
+    const { data: visasData } = await supabase
+      .from('visas')
+      .select('*, personnel(name)')
+      .or(`visa_expiry_date.lte.${targetDate},passport_expiry_date.lte.${targetDate}`);
+      
+    const expiring = (visasData || []).filter(record => {
+      const daysToPassportExpiry = record.passport_expiry_date ? Math.ceil((new Date(record.passport_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
+      const daysToVisaExpiry = record.visa_expiry_date ? Math.ceil((new Date(record.visa_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
+      return daysToPassportExpiry <= 30 || daysToVisaExpiry <= 30;
+    });
+    setExpiringDocuments(expiring);
   };
 
   const handleApproveRequest = async (req: any, e: React.MouseEvent) => {
@@ -267,6 +285,7 @@ export function Layout({ children }: LayoutProps) {
                 
                 const acctCount = pendingCashAdvances.length + pendingRequests.filter(r => ['Equipment (Rentals)', 'PPE', 'Petty Cash'].includes(r.request_type)).length;
                 const whseCount = pendingRequests.filter(r => ['Tools', 'Equipment (Warehouse)', 'PPE', 'Materials'].includes(r.request_type) || !r.request_type).length;
+                const hrCount = pendingLeaves.length + expiringDocuments.length;
 
                 return (
                   <li key={item.name}>
@@ -290,6 +309,11 @@ export function Layout({ children }: LayoutProps) {
                       {item.name === "Warehouse" && whseCount > 0 && (
                         <Badge variant="destructive" className="ml-auto h-5 px-1.5 flex items-center justify-center text-[10px]">
                           {whseCount}
+                        </Badge>
+                      )}
+                      {item.name === "Human Resources" && hrCount > 0 && (
+                        <Badge variant="destructive" className="ml-auto h-5 px-1.5 flex items-center justify-center text-[10px]">
+                          {hrCount}
                         </Badge>
                       )}
                     </Link>
@@ -365,22 +389,22 @@ export function Layout({ children }: LayoutProps) {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative">
                   <Bell className="h-5 w-5" />
-                  {(pendingRequests.length + pendingLeaves.length + pendingCashAdvances.length) > 0 && (
+                  {(pendingRequests.length + pendingLeaves.length + pendingCashAdvances.length + expiringDocuments.length) > 0 && (
                     <Badge 
                       variant="destructive" 
                       className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
                     >
-                      {pendingRequests.length + pendingLeaves.length + pendingCashAdvances.length}
+                      {pendingRequests.length + pendingLeaves.length + pendingCashAdvances.length + expiringDocuments.length}
                     </Badge>
                   )}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-80">
                 <DropdownMenuLabel className="font-semibold">
-                  Notifications ({pendingRequests.length + pendingLeaves.length + pendingCashAdvances.length} pending)
+                  Notifications ({pendingRequests.length + pendingLeaves.length + pendingCashAdvances.length + expiringDocuments.length} pending)
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {pendingRequests.length === 0 && pendingLeaves.length === 0 && pendingCashAdvances.length === 0 ? (
+                {pendingRequests.length === 0 && pendingLeaves.length === 0 && pendingCashAdvances.length === 0 && expiringDocuments.length === 0 ? (
                   <div className="p-4 text-center text-sm text-muted-foreground">
                     No pending notifications
                   </div>
@@ -536,6 +560,38 @@ export function Layout({ children }: LayoutProps) {
                         </div>
                       </DropdownMenuItem>
                     ))}
+
+                    {expiringDocuments.length > 0 && (
+                      <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase bg-muted/50 mt-2 text-red-700">
+                        Expiring Documents
+                      </div>
+                    )}
+                    {expiringDocuments.map((doc) => {
+                      const daysToPassportExpiry = doc.passport_expiry_date ? Math.ceil((new Date(doc.passport_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
+                      const daysToVisaExpiry = doc.visa_expiry_date ? Math.ceil((new Date(doc.visa_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
+                      const docType = [];
+                      if (daysToPassportExpiry <= 30) docType.push("Passport");
+                      if (daysToVisaExpiry <= 30) docType.push("Visa");
+
+                      return (
+                        <DropdownMenuItem 
+                          key={`doc-${doc.id}`} 
+                          className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-red-50"
+                          onClick={() => {
+                            router.push('/personnel');
+                            setNotificationOpen(false);
+                          }}
+                        >
+                          <div className="flex items-start justify-between w-full">
+                            <span className="font-medium text-sm text-red-700">{doc.personnel?.name}</span>
+                            <Badge variant="destructive" className="text-[10px]">Action Required</Badge>
+                          </div>
+                          <span className="text-xs text-red-600 font-medium">
+                            {docType.join(" & ")} expiring soon or expired.
+                          </span>
+                        </DropdownMenuItem>
+                      );
+                    })}
                   </ScrollArea>
                 )}
               </DropdownMenuContent>
