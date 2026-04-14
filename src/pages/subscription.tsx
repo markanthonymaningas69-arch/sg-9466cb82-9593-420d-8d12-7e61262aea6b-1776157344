@@ -50,10 +50,10 @@ export default function Subscription() {
       monthlyPrice: 49,
       annualPrice: 470,
       features: [
-        "Full module access (except HR)",
+        "Up to 2 Projects",
+        "4 Base Modules Included",
         "Accounting: Payroll tab only",
         "1 Site personnel user account",
-        "Mobile app access",
         "Email support"
       ]
     },
@@ -65,13 +65,11 @@ export default function Subscription() {
       annualPrice: 950,
       popular: true,
       features: [
-        "Full module access (All features)",
+        "Unlimited Projects",
+        "All 5 Modules Included",
+        "Add-ons Capability Included",
         "3 Site personnel user accounts",
-        "1 Accounting user account",
-        "1 Purchasing user account",
-        "1 Human Resource user account",
-        "1 Warehouse user account",
-        "Priority support"
+        "1 User per additional module"
       ]
     }
   ];
