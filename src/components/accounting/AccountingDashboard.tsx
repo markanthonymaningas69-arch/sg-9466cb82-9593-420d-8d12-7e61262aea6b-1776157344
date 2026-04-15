@@ -61,7 +61,8 @@ export function AccountingDashboard({ onTabChange }: { onTabChange?: (tab: strin
       setRawJournalData(data);
       let totalDebits = 0;
       let totalCredits = 0;
-      let totalTax = 0;
+      let inputTax = 0;
+      let outputTax = 0;
       
       const opexMap: Record<string, number> = {};
 
@@ -69,7 +70,13 @@ export function AccountingDashboard({ onTabChange }: { onTabChange?: (tab: strin
         const amt = Number(d.amount);
         if (d.type === 'debit') totalDebits += amt;
         if (d.type === 'credit') totalCredits += amt;
-        totalTax += Number(d.tax_amount || 0);
+
+        // Dynamic Tax Calculation (5% on Operational/Revenue) - synchronized with Tax Module
+        if (d.category === 'operational' || d.category === 'revenue') {
+          const calcTax = amt * 0.05;
+          if (d.type === 'debit') inputTax += calcTax;
+          if (d.type === 'credit') outputTax += calcTax;
+        }
 
         // OpEx Breakdown
         if (d.category === 'operational') {
@@ -77,7 +84,12 @@ export function AccountingDashboard({ onTabChange }: { onTabChange?: (tab: strin
         }
       });
       
-      setSummary({ totalDebits, totalCredits, totalTax, balance: totalDebits - totalCredits });
+      setSummary({ 
+        totalDebits, 
+        totalCredits, 
+        totalTax: outputTax - inputTax, // Net VAT Payable
+        balance: totalDebits - totalCredits 
+      });
       setOpExData(Object.entries(opexMap).map(([name, value]) => ({ name, value })));
     }
     
@@ -179,16 +191,18 @@ export function AccountingDashboard({ onTabChange }: { onTabChange?: (tab: strin
             <p className="text-xs text-muted-foreground mt-1">Assets vs Liabilities</p>
           </CardContent>
         </Card>
-        <Card className="cursor-pointer hover:bg-muted/50 transition-colors border-orange-200" onClick={() => onTabChange && onTabChange('tax')}>
+        <Card className={`cursor-pointer hover:bg-muted/50 transition-colors border-2 ${summary.totalTax > 0 ? 'border-destructive/50 bg-destructive/5' : 'border-primary/50 bg-primary/5'}`} onClick={() => onTabChange && onTabChange('tax')}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">VAT Liability (5%)</CardTitle>
-            <Receipt className="h-4 w-4 text-orange-500" />
+            <CardTitle className="text-sm font-medium">Net VAT Payable (5%)</CardTitle>
+            <Receipt className={`h-4 w-4 ${summary.totalTax > 0 ? 'text-destructive' : 'text-primary'}`} />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
-              {formatCurrency(summary.totalTax)}
+            <div className={`text-2xl font-bold ${summary.totalTax > 0 ? 'text-destructive' : 'text-primary'}`}>
+              {formatCurrency(Math.abs(summary.totalTax))}
             </div>
-            <p className="text-xs text-orange-600/80 mt-1 font-medium">Click to view Tax Module →</p>
+            <p className={`text-xs mt-1 font-medium ${summary.totalTax > 0 ? 'text-destructive/80' : 'text-primary/80'}`}>
+              {summary.totalTax > 0 ? "Amount owed to Authority" : "Amount refundable"} →
+            </p>
           </CardContent>
         </Card>
       </div>
