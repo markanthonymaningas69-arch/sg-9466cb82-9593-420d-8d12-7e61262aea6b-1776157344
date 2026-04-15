@@ -54,10 +54,37 @@ export function VouchersTab() {
     setLoading(false);
   };
 
-  const handleIssueVoucher = async (id: string) => {
-    const { error } = await supabase.from('vouchers').update({ status: 'issued' }).eq('id', id);
+  const handleIssueVoucher = async (v: any) => {
+    const { error } = await supabase.from('vouchers').update({ status: 'issued' }).eq('id', v.id);
     if (!error) {
-      toast({ title: "Voucher Issued", description: "The voucher has been officially marked as issued." });
+      if (v.type === 'payment') {
+        // Auto create Purchase Order for payment vouchers
+        const { data: existingPo } = await supabase.from('purchases').select('id').eq('voucher_number', v.voucher_number).maybeSingle();
+        
+        if (!existingPo) {
+          const poNumber = `PO-${Math.floor(10000 + Math.random() * 90000)}`;
+          await supabase.from('purchases').insert({
+            order_number: poNumber,
+            voucher_number: v.voucher_number,
+            order_date: new Date().toISOString().split('T')[0],
+            supplier: v.payee || 'TBD',
+            item_name: v.description || v.particulars || 'Items from Voucher',
+            category: 'Construction Materials',
+            quantity: 1,
+            unit: 'lot',
+            unit_cost: v.amount,
+            total_cost: v.amount,
+            destination_type: v.project_id ? 'project_warehouse' : 'main_warehouse',
+            project_id: v.project_id,
+            status: 'pending'
+          });
+          toast({ title: "Voucher Issued", description: "Voucher issued and Purchase Order automatically generated." });
+        } else {
+          toast({ title: "Voucher Issued", description: "The voucher has been officially marked as issued." });
+        }
+      } else {
+        toast({ title: "Voucher Issued", description: "The voucher has been officially marked as issued." });
+      }
       loadData();
     } else {
       toast({ title: "Error", description: "Failed to issue voucher", variant: "destructive" });
@@ -314,7 +341,7 @@ export function VouchersTab() {
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         {v.status === 'approved' && (
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50" onClick={() => handleIssueVoucher(v.id)} title="Mark as Issued">
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50" onClick={() => handleIssueVoucher(v)} title="Mark as Issued">
                             <CheckCircle className="h-4 w-4" />
                           </Button>
                         )}

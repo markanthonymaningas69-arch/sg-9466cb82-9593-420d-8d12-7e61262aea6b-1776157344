@@ -19,6 +19,7 @@ import { personnelService } from "@/services/personnelService";
 import { Plus, Pencil, Trash2, Archive, Users, Truck, ClipboardList, ArrowUp, ArrowDown, Check, ArrowUpDown, ShoppingCart, Banknote, Wrench, Eye, Activity, List as ListIcon, CheckCircle2, AlertCircle, Warehouse } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer } from "recharts";
+import { toast } from "@/hooks/use-toast";
 
 type Project = { id: string; name: string; location: string; status: string };
 type Personnel = { id: string; name: string; role: string; daily_rate: number; overtime_rate: number; created_source?: string; updated_source?: string };
@@ -691,6 +692,37 @@ export default function SitePersonnel() {
     loadCashAdvances();
   };
   
+  const handleApproveRequest = async (group: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm("Approve this request and automatically generate a Payment Voucher?")) return;
+
+    const totalAmount = group.items.reduce((sum: number, i: any) => sum + (Number(i.amount) || 0), 0);
+    const description = `${group.request_type} - ${group.form_number}: ${group.items.map((i: any) => i.item_name).join(', ')}`;
+    
+    if (group.isCA) {
+      await supabase.from('cash_advance_requests').update({ status: 'approved' }).eq('id', group.id);
+    } else {
+      const ids = group.items.map((i: any) => i.id);
+      await supabase.from('site_requests').update({ status: 'approved' }).in('id', ids);
+    }
+
+    // Create Voucher Automatically
+    await supabase.from('vouchers').insert({
+      voucher_number: `PV-${Math.floor(10000 + Math.random() * 90000)}`,
+      date: new Date().toISOString().split("T")[0],
+      type: 'payment',
+      payee: group.requested_by || 'TBD',
+      amount: totalAmount,
+      description: description.substring(0, 200),
+      project_id: selectedProject,
+      status: 'approved' // Ready to be issued by accounting
+    });
+
+    toast({ title: "Approved", description: "Request approved and Voucher generated automatically." });
+    loadRequests();
+    loadCashAdvances();
+  };
+
   const handleAdvanceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await siteService.createCashAdvance({
@@ -3050,6 +3082,11 @@ export default function SitePersonnel() {
                                   </TableCell>
                                   <TableCell className="text-right">
                                     <div className="flex justify-end gap-1">
+                                      {group.status === 'pending' && (
+                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={(e) => handleApproveRequest(group, e)} title="Approve Request">
+                                          <CheckCircle2 className="h-4 w-4" />
+                                        </Button>
+                                      )}
                                       <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-500 hover:bg-blue-50" onClick={() => {
                                         setSelectedFormGroup(group);
                                         setViewFormDialogOpen(true);
