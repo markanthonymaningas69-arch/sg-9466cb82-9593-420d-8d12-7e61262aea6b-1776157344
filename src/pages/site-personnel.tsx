@@ -2041,7 +2041,7 @@ export default function SitePersonnel() {
                     
                     const siteInventory = Object.values(inventoryMap).sort((a: any, b: any) => a.name.localeCompare(b.name)) as any[];
                     
-                    const filteredSiteInventory = siteInventory.filter((item: any) => {
+                    const filteredSiteInventory: any[] = siteInventory.filter((item: any) => {
                       const matchName = item.name.toLowerCase().includes(warehouseSearch.toLowerCase());
                       const matchType = warehouseTypeFilter === "all" || item.category === warehouseTypeFilter;
                       return matchName && matchType;

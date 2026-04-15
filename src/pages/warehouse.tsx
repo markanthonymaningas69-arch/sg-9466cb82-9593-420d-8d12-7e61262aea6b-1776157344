@@ -78,7 +78,7 @@ export default function Warehouse() {
       projectService.getAll(),
       projectService.getMasterItems(),
       supabase.from('deliveries').select('*, projects(name)'),
-      supabase.from('site_material_consumption').select('*, projects(name)')
+      (supabase as any).from('site_material_consumption').select('*, projects(name)')
     ]);
     setItems(itemsData as WarehouseItem[] || []);
     setProjects(projectsData || []);
