@@ -656,14 +656,13 @@ export default function Warehouse() {
                       <TableHead className="font-bold text-black">Category</TableHead>
                       <TableHead className="text-right font-bold text-black border-l bg-gray-50">Total Items (Restocked)</TableHead>
                       <TableHead className="text-right font-bold text-blue-700 bg-blue-50">Total Deployed</TableHead>
-                      <TableHead className="text-right font-bold text-green-700 bg-green-50">Main Balance</TableHead>
-                      <TableHead className="text-right font-bold text-red-700 bg-red-50">Missing / Variance</TableHead>
+                      <TableHead className="text-right font-bold text-green-700 bg-green-50 border-r">Main Balance</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredBalance.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                           No items found matching the filter.
                         </TableCell>
                       </TableRow>
@@ -682,11 +681,8 @@ export default function Warehouse() {
                             <TableCell className="text-right font-semibold text-blue-700 bg-blue-50/30">
                               {item.deployedQty} <span className="text-xs text-blue-400 font-normal">{item.unit}</span>
                             </TableCell>
-                            <TableCell className="text-right font-semibold text-green-700 bg-green-50/30">
+                            <TableCell className="text-right font-semibold text-green-700 bg-green-50/30 border-r">
                               {item.mainQty} <span className="text-xs text-green-400 font-normal">{item.unit}</span>
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-red-600 bg-red-50/30 border-r">
-                              0
                             </TableCell>
                           </TableRow>
                         );
