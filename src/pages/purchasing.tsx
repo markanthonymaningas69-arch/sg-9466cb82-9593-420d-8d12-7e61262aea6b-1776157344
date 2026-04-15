@@ -30,6 +30,24 @@ export default function Purchasing() {
   
   const [gmSubmitDialogOpen, setGmSubmitDialogOpen] = useState(false);
   const [gmSubmitForm, setGmSubmitForm] = useState<any>(null);
+
+  // Multi-item PO State
+  const [poHeader, setPoHeader] = useState({
+    order_number: "",
+    order_date: new Date().toISOString().split("T")[0],
+    supplier: "",
+    destination_type: "main_warehouse",
+    project_id: "none"
+  });
+
+  const [poItems, setPoItems] = useState<any[]>([]);
+  const [currentItem, setCurrentItem] = useState({
+    item_name: "",
+    category: "Construction Materials",
+    quantity: "",
+    unit: "pcs",
+    unit_cost: ""
+  });
   
   // Filters
   const [filterSupplier, setFilterSupplier] = useState("all");
@@ -103,54 +121,60 @@ export default function Purchasing() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAddItem = () => {
+    if (!currentItem.item_name || !currentItem.quantity || !currentItem.unit_cost) {
+      alert("Please fill in item name, quantity, and unit cost.");
+      return;
+    }
+    setPoItems([...poItems, { ...currentItem }]);
+    setCurrentItem({
+      item_name: "",
+      category: "Construction Materials",
+      quantity: "",
+      unit: "pcs",
+      unit_cost: ""
+    });
+  };
+
+  const handleRemoveItem = (index: number) => {
+    setPoItems(poItems.filter((_, i) => i !== index));
+  };
+
+  const handleSubmitPO = async () => {
+    if (!poHeader.supplier) {
+      alert("Please select a supplier.");
+      return;
+    }
+    if (poItems.length === 0) {
+      alert("Please add at least one item to the PO.");
+      return;
+    }
     
-    const payload = {
-      order_number: formData.order_number,
-      order_date: formData.order_date,
-      supplier: formData.supplier,
-      item_name: formData.item_name,
-      category: formData.category,
-      quantity: parseFloat(formData.quantity) || 0,
-      unit: formData.unit,
-      unit_cost: parseFloat(formData.unit_cost) || 0,
-      destination_type: formData.destination_type,
-      project_id: formData.destination_type === "project_warehouse" && formData.project_id !== "none" ? formData.project_id : null,
+    const payloadArray = poItems.map(item => ({
+      order_number: poHeader.order_number,
+      order_date: poHeader.order_date,
+      supplier: poHeader.supplier,
+      item_name: item.item_name,
+      category: item.category,
+      quantity: parseFloat(item.quantity) || 0,
+      unit: item.unit,
+      unit_cost: parseFloat(item.unit_cost) || 0,
+      destination_type: poHeader.destination_type,
+      project_id: poHeader.destination_type === "project_warehouse" && poHeader.project_id !== "none" ? poHeader.project_id : null,
       status: "pending_approval",
       voucher_number: null
-    };
+    }));
 
-    const { error } = editingId 
-      ? await supabase.from("purchases").update({
-          ...payload,
-          status: purchases.find(p => p.id === editingId)?.status || 'pending',
-          voucher_number: purchases.find(p => p.id === editingId)?.voucher_number || null
-        }).eq("id", editingId)
-      : await supabase.from("purchases").insert(payload);
+    const { error } = await supabase.from("purchases").insert(payloadArray);
     
     if (error) {
-      console.error("Error saving PO item:", error);
-      alert("Failed to save item: " + error.message);
+      console.error("Error saving PO items:", error);
+      alert("Failed to save PO: " + error.message);
       return;
     }
 
-    if (!error) {
-      if (editingId) {
-        setEditingId(null);
-        setDialogOpen(false);
-      } else {
-        // Do not close dialog. Only clear item-specific fields for fast multi-item entry
-        setFormData({
-          ...formData,
-          item_name: "",
-          quantity: "",
-          unit: "pcs",
-          unit_cost: ""
-        });
-      }
-      loadData();
-    }
+    setDialogOpen(false);
+    loadData();
   };
 
   const handleEdit = (p: any) => {
@@ -185,17 +209,20 @@ export default function Purchasing() {
   const handleOpenChange = (open: boolean) => {
     setDialogOpen(open);
     if (!open) {
-      setEditingId(null);
-      setFormData(prev => ({
+      setPoHeader(prev => ({
         ...prev,
-        order_number: generateNextPONumber(purchases),
+        order_number: generateNextPONumber(purchases)
+      }));
+      setPoItems([]);
+      setCurrentItem({
         item_name: "",
+        category: "Construction Materials",
         quantity: "",
         unit: "pcs",
         unit_cost: ""
-      }));
-    } else if (!editingId) {
-      setFormData(prev => ({ ...prev, order_number: prev.order_number || generateNextPONumber(purchases) }));
+      });
+    } else {
+      setPoHeader(prev => ({ ...prev, order_number: generateNextPONumber(purchases) }));
     }
   };
 
@@ -439,26 +466,27 @@ export default function Purchasing() {
                   New Purchase Order
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-2xl">
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Create Purchase Order</DialogTitle>
                   <p className="text-sm text-muted-foreground">
-                    PO Header details remain saved to easily add multiple items.
+                    Add multiple items under a single PO Number and submit to GM.
                   </p>
                 </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-6">
+                  {/* Header Section */}
+                  <div className="grid grid-cols-2 gap-4 bg-muted/30 p-4 rounded-lg border">
                     <div className="space-y-2">
                       <Label>PO Number *</Label>
-                      <Input value={formData.order_number} onChange={(e) => setFormData({ ...formData, order_number: e.target.value })} required />
+                      <Input value={poHeader.order_number} onChange={(e) => setPoHeader({ ...poHeader, order_number: e.target.value })} required />
                     </div>
                     <div className="space-y-2">
                       <Label>Order Date *</Label>
-                      <Input type="date" value={formData.order_date} onChange={(e) => setFormData({ ...formData, order_date: e.target.value })} required />
+                      <Input type="date" value={poHeader.order_date} onChange={(e) => setPoHeader({ ...poHeader, order_date: e.target.value })} required />
                     </div>
                     <div className="space-y-2">
                       <Label>Supplier *</Label>
-                      <Select value={formData.supplier} onValueChange={(val) => setFormData({ ...formData, supplier: val })} required>
+                      <Select value={poHeader.supplier} onValueChange={(val) => setPoHeader({ ...poHeader, supplier: val })} required>
                         <SelectTrigger><SelectValue placeholder="Select registered supplier" /></SelectTrigger>
                         <SelectContent>
                           {suppliers.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
@@ -466,44 +494,8 @@ export default function Purchasing() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Category *</Label>
-                      <Select value={formData.category} onValueChange={(val) => setFormData({ ...formData, category: val })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Construction Materials">Construction Materials</SelectItem>
-                          <SelectItem value="Tools">Tools</SelectItem>
-                          <SelectItem value="Equipments">Equipments</SelectItem>
-                          <SelectItem value="PPE">PPE</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Item Name *</Label>
-                      <Input value={formData.item_name} onChange={(e) => setFormData({ ...formData, item_name: e.target.value })} required />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-2">
-                        <Label>Quantity *</Label>
-                        <Input type="number" value={formData.quantity} onChange={(e) => setFormData({ ...formData, quantity: e.target.value })} required />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Unit *</Label>
-                        <Select value={formData.unit} onValueChange={(val) => setFormData({ ...formData, unit: val })} required>
-                          <SelectTrigger><SelectValue placeholder="Select unit" /></SelectTrigger>
-                          <SelectContent>
-                            {STANDARD_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Unit Cost *</Label>
-                      <Input type="number" step="0.01" value={formData.unit_cost} onChange={(e) => setFormData({ ...formData, unit_cost: e.target.value })} required />
-                    </div>
-                    
-                    <div className="space-y-2 col-span-2">
                       <Label>Destination *</Label>
-                      <Select value={formData.destination_type} onValueChange={(val) => setFormData({ ...formData, destination_type: val })}>
+                      <Select value={poHeader.destination_type} onValueChange={(val) => setPoHeader({ ...poHeader, destination_type: val })}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="main_warehouse">Main Warehouse</SelectItem>
@@ -511,11 +503,10 @@ export default function Purchasing() {
                         </SelectContent>
                       </Select>
                     </div>
-                    
-                    {formData.destination_type === "project_warehouse" && (
+                    {poHeader.destination_type === "project_warehouse" && (
                       <div className="space-y-2 col-span-2">
                         <Label>Select Project *</Label>
-                        <Select value={formData.project_id} onValueChange={(val) => setFormData({ ...formData, project_id: val })}>
+                        <Select value={poHeader.project_id} onValueChange={(val) => setPoHeader({ ...poHeader, project_id: val })}>
                           <SelectTrigger><SelectValue placeholder="Select active project" /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="none">-- Select Project --</SelectItem>
@@ -525,16 +516,94 @@ export default function Purchasing() {
                       </div>
                     )}
                   </div>
-                  <div className="flex justify-between items-center pt-4 border-t">
-                    <p className="text-xs text-muted-foreground">
-                      * Click Submit to GM to record and clear fields for the next item
+
+                  {/* Add Item Section */}
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold">Add Line Item</h3>
+                    <div className="grid grid-cols-6 gap-3 items-end">
+                      <div className="space-y-2 col-span-2">
+                        <Label className="text-xs">Item Name *</Label>
+                        <Input value={currentItem.item_name} onChange={(e) => setCurrentItem({ ...currentItem, item_name: e.target.value })} placeholder="e.g. Cement" />
+                      </div>
+                      <div className="space-y-2 col-span-1">
+                        <Label className="text-xs">Category</Label>
+                        <Select value={currentItem.category} onValueChange={(val) => setCurrentItem({ ...currentItem, category: val })}>
+                          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Construction Materials">Materials</SelectItem>
+                            <SelectItem value="Tools">Tools</SelectItem>
+                            <SelectItem value="Equipments">Equipments</SelectItem>
+                            <SelectItem value="PPE">PPE</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2 col-span-1">
+                        <Label className="text-xs">Qty *</Label>
+                        <Input type="number" value={currentItem.quantity} onChange={(e) => setCurrentItem({ ...currentItem, quantity: e.target.value })} className="h-9" />
+                      </div>
+                      <div className="space-y-2 col-span-1">
+                        <Label className="text-xs">Unit</Label>
+                        <Select value={currentItem.unit} onValueChange={(val) => setCurrentItem({ ...currentItem, unit: val })}>
+                          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {STANDARD_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2 col-span-1">
+                        <Label className="text-xs">Unit Cost *</Label>
+                        <Input type="number" step="0.01" value={currentItem.unit_cost} onChange={(e) => setCurrentItem({ ...currentItem, unit_cost: e.target.value })} className="h-9" />
+                      </div>
+                    </div>
+                    <div className="flex justify-end">
+                      <Button type="button" variant="secondary" size="sm" onClick={handleAddItem}>
+                        <Plus className="h-3 w-3 mr-1" /> Add to PO
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Items Table */}
+                  {poItems.length > 0 && (
+                    <div className="border rounded-md">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="h-8 text-xs">Item</TableHead>
+                            <TableHead className="h-8 text-xs text-right">Qty</TableHead>
+                            <TableHead className="h-8 text-xs text-right">Unit Cost</TableHead>
+                            <TableHead className="h-8 text-xs text-right">Total</TableHead>
+                            <TableHead className="h-8 text-xs text-right"></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {poItems.map((item, index) => (
+                            <TableRow key={index}>
+                              <TableCell className="py-2 text-sm">{item.item_name} <span className="text-xs text-muted-foreground block">{item.category}</span></TableCell>
+                              <TableCell className="py-2 text-sm text-right">{item.quantity} {item.unit}</TableCell>
+                              <TableCell className="py-2 text-sm text-right">{formatCurrency(parseFloat(item.unit_cost) || 0)}</TableCell>
+                              <TableCell className="py-2 text-sm text-right font-medium">{formatCurrency((parseFloat(item.quantity) || 0) * (parseFloat(item.unit_cost) || 0))}</TableCell>
+                              <TableCell className="py-2 text-right">
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleRemoveItem(index)}>
+                                  <FilterX className="h-3 w-3" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between items-center pt-4 border-t mt-6">
+                    <p className="text-xs font-semibold">
+                      Total PO Value: {formatCurrency(poItems.reduce((sum, item) => sum + ((parseFloat(item.quantity) || 0) * (parseFloat(item.unit_cost) || 0)), 0))}
                     </p>
                     <div className="flex gap-2">
                       <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                      <Button type="submit">Submit to GM</Button>
+                      <Button type="button" onClick={handleSubmitPO}>Submit PO to GM</Button>
                     </div>
                   </div>
-                </form>
+                </div>
               </DialogContent>
             </Dialog>
           </div>
@@ -670,7 +739,7 @@ export default function Purchasing() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
-                          {p.status === 'pending' && (
+                          {p.status === 'pending' && p.order_number?.startsWith('PR-') && (
                             <Button variant="outline" size="sm" className="h-8 text-xs bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100" onClick={() => {
                               setGmSubmitForm({ ...p, unit_cost: p.unit_cost || '' });
                               setGmSubmitDialogOpen(true);
