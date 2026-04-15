@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { warehouseService } from "@/services/warehouseService";
 import { projectService } from "@/services/projectService";
 import { useSettings } from "@/contexts/SettingsProvider";
-import { Plus, Pencil, Trash2, Archive, Package, Building2, Warehouse as WarehouseIcon } from "lucide-react";
+import { Plus, Pencil, Trash2, Archive, Package, Building2, Warehouse as WarehouseIcon, FileSpreadsheet } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
 type WarehouseItem = Database["public"]["Tables"]["inventory"]["Row"] & {
@@ -186,6 +186,30 @@ export default function Warehouse() {
     const matchProject = projectFilter === "all" || item.project_id === projectFilter;
     const matchDate = !dateFilter || item.last_restocked === dateFilter || item.created_at?.startsWith(dateFilter);
     return matchCategory && matchProject && matchDate;
+  });
+
+  // Calculate Balance Checking summaries
+  const balanceSummary = Object.values(items.reduce((acc, item) => {
+    const key = `${item.name}-${item.unit}`;
+    if (!acc[key]) {
+      acc[key] = {
+        name: item.name,
+        category: getCategoryLabel(item.category || "Uncategorized"),
+        unit: item.unit,
+        mainQty: 0,
+        deployedQty: 0,
+      };
+    }
+    if (item.project_id) {
+      acc[key].deployedQty += item.quantity;
+    } else {
+      acc[key].mainQty += item.quantity;
+    }
+    return acc;
+  }, {} as Record<string, any>));
+
+  const filteredBalance = balanceSummary.filter(item => {
+    return categoryFilter === "all" || item.category === categoryFilter;
   });
 
   const totalValue = items.reduce((sum, item) => sum + (item.quantity * item.unit_cost), 0);
@@ -432,6 +456,9 @@ export default function Warehouse() {
             <TabsTrigger value="project" className="flex items-center gap-2">
               <Building2 className="h-4 w-4" /> Project Warehouse
             </TabsTrigger>
+            <TabsTrigger value="balance" className="flex items-center gap-2">
+              <FileSpreadsheet className="h-4 w-4" /> Balance Checking
+            </TabsTrigger>
           </TabsList>
 
           <div className="bg-muted/30 p-3 mt-4 border rounded-lg flex flex-wrap items-end gap-4 shrink-0">
@@ -463,15 +490,17 @@ export default function Warehouse() {
               </div>
             )}
 
-            <div className="space-y-1">
-              <Label className="text-xs">Filter by Date:</Label>
-              <Input 
-                type="date" 
-                className="w-[200px] h-9 bg-white dark:bg-background" 
-                value={dateFilter} 
-                onChange={(e) => setDateFilter(e.target.value)} 
-              />
-            </div>
+            {activeTab !== "balance" && (
+              <div className="space-y-1">
+                <Label className="text-xs">Filter by Date:</Label>
+                <Input 
+                  type="date" 
+                  className="w-[200px] h-9 bg-white dark:bg-background" 
+                  value={dateFilter} 
+                  onChange={(e) => setDateFilter(e.target.value)} 
+                />
+              </div>
+            )}
             
             {(categoryFilter !== "all" || projectFilter !== "all" || dateFilter) && (
               <Button variant="ghost" size="sm" onClick={() => { setCategoryFilter("all"); setProjectFilter("all"); setDateFilter(""); }} className="text-muted-foreground h-9 ml-1">
@@ -610,6 +639,58 @@ export default function Warehouse() {
                           </TableCell>
                         </TableRow>
                       ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="balance" className="flex-1 mt-4 data-[state=active]:flex flex-col min-h-0">
+            <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none">
+              <div className="overflow-y-auto rounded-md border h-full relative bg-white">
+                <Table>
+                  <TableHeader className="sticky top-0 bg-gray-100 z-10 border-b">
+                    <TableRow>
+                      <TableHead className="font-bold text-black">Item Name</TableHead>
+                      <TableHead className="font-bold text-black">Category</TableHead>
+                      <TableHead className="text-right font-bold text-black border-l bg-gray-50">Total Items (Restocked)</TableHead>
+                      <TableHead className="text-right font-bold text-blue-700 bg-blue-50">Total Deployed</TableHead>
+                      <TableHead className="text-right font-bold text-green-700 bg-green-50">Main Balance</TableHead>
+                      <TableHead className="text-right font-bold text-red-700 bg-red-50">Missing / Variance</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredBalance.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          No items found matching the filter.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredBalance.map((item, idx) => {
+                        const totalRestocked = item.mainQty + item.deployedQty;
+                        return (
+                          <TableRow key={idx} className="hover:bg-muted/50">
+                            <TableCell className="font-medium text-black">{item.name}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{item.category}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right font-bold text-lg border-l bg-gray-50/50">
+                              {totalRestocked} <span className="text-xs text-muted-foreground font-normal">{item.unit}</span>
+                            </TableCell>
+                            <TableCell className="text-right font-semibold text-blue-700 bg-blue-50/30">
+                              {item.deployedQty} <span className="text-xs text-blue-400 font-normal">{item.unit}</span>
+                            </TableCell>
+                            <TableCell className="text-right font-semibold text-green-700 bg-green-50/30">
+                              {item.mainQty} <span className="text-xs text-green-400 font-normal">{item.unit}</span>
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-red-600 bg-red-50/30 border-r">
+                              0
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>

@@ -110,7 +110,19 @@ export const warehouseService = {
       });
     }
 
-    // 3. Deduct from main warehouse
+    // 3. Create a delivery record for the target project so it lists in Site Personnel
+    await supabase.from("deliveries").insert({
+      project_id: targetProjectId,
+      delivery_date: new Date().toISOString().split("T")[0],
+      item_name: mainItem.name,
+      quantity: quantityToDeploy,
+      unit: mainItem.unit,
+      supplier: "Main Warehouse",
+      status: "delivered",
+      notes: "Deployed from Main Warehouse"
+    });
+
+    // 4. Deduct from main warehouse
     const remainingQuantity = mainItem.quantity - quantityToDeploy;
     if (remainingQuantity <= 0) {
       // If none left, just delete the main warehouse record
