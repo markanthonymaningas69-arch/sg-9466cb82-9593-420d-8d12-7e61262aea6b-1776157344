@@ -9,10 +9,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingCart, Plus, Search, Building2, Warehouse as WarehouseIcon, FilterX, List, Edit2, Archive, Printer } from "lucide-react";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ShoppingCart, Plus, Search, Building2, Warehouse as WarehouseIcon, FilterX, List, Edit2, Archive, Printer, ChevronsUpDown, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { projectService } from "@/services/projectService";
 import { useSettings } from "@/contexts/SettingsProvider";
+import { cn } from "@/lib/utils";
 
 const STANDARD_UNITS = ["pcs", "bags", "kgs", "liters", "units", "set", "lot", "m", "sq.m", "cu.m", "length", "box", "roll"];
 
@@ -22,6 +25,7 @@ export default function Purchasing() {
   const [projects, setProjects] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [vouchers, setVouchers] = useState<any[]>([]);
+  const [catalogItems, setCatalogItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [supplierDialogOpen, setSupplierDialogOpen] = useState(false);
@@ -30,6 +34,7 @@ export default function Purchasing() {
   
   const [gmSubmitDialogOpen, setGmSubmitDialogOpen] = useState(false);
   const [gmSubmitForm, setGmSubmitForm] = useState<any>(null);
+  const [itemPopoverOpen, setItemPopoverOpen] = useState(false);
 
   // Multi-item PO State
   const [poHeader, setPoHeader] = useState({
@@ -92,11 +97,12 @@ export default function Purchasing() {
 
   const loadData = async () => {
     setLoading(true);
-    const [{ data: pData }, { data: projData }, { data: supData }, { data: vouchData }] = await Promise.all([
+    const [{ data: pData }, { data: projData }, { data: supData }, { data: vouchData }, { data: invData }] = await Promise.all([
       supabase.from("purchases").select(`*, projects(name)`).eq('is_archived', false).order('created_at', { ascending: false }),
       projectService.getAll(),
       supabase.from("suppliers").select("*").order("name"),
-      supabase.from("vouchers").select("*").order("created_at", { ascending: false })
+      supabase.from("vouchers").select("*").order("created_at", { ascending: false }),
+      supabase.from("inventory").select("name, category, unit").order("name")
     ]);
     
     const loadedPurchases = pData || [];
@@ -105,8 +111,19 @@ export default function Purchasing() {
     setSuppliers(supData || []);
     setVouchers(vouchData || []);
     
-    if (!editingId && !formData.order_number) {
-      setFormData(prev => ({ ...prev, order_number: generateNextPONumber(loadedPurchases) }));
+    // Create unique catalog from inventory
+    const uniqueItemsMap = new Map();
+    if (invData) {
+      invData.forEach(item => {
+        if (!uniqueItemsMap.has(item.name.toLowerCase())) {
+          uniqueItemsMap.set(item.name.toLowerCase(), item);
+        }
+      });
+    }
+    setCatalogItems(Array.from(uniqueItemsMap.values()));
+    
+    if (!editingId && !poHeader.order_number) {
+      setPoHeader(prev => ({ ...prev, order_number: generateNextPONumber(loadedPurchases) }));
     }
     setLoading(false);
   };
@@ -521,11 +538,71 @@ export default function Purchasing() {
                   <div className="space-y-4">
                     <h3 className="text-sm font-semibold">Add Line Item</h3>
                     <div className="grid grid-cols-6 gap-3 items-end">
-                      <div className="space-y-2 col-span-2">
+                      <div className="space-y-2 col-span-2 flex flex-col justify-end">
                         <Label className="text-xs">Item Name *</Label>
-                        <Input value={currentItem.item_name} onChange={(e) => setCurrentItem({ ...currentItem, item_name: e.target.value })} placeholder="e.g. Cement" />
+                        <Popover open={itemPopoverOpen} onOpenChange={setItemPopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={itemPopoverOpen}
+                              className="w-full justify-between h-9 px-3 font-normal"
+                            >
+                              {currentItem.item_name ? currentItem.item_name : "Select or type item..."}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[300px] p-0" align="start">
+                            <Command>
+                              <CommandInput 
+                                placeholder="Search catalog or type new..." 
+                                value={currentItem.item_name}
+                                onValueChange={(val) => setCurrentItem({ ...currentItem, item_name: val })}
+                              />
+                              <CommandList>
+                                <CommandEmpty className="p-2 text-sm text-muted-foreground text-center">
+                                  "{currentItem.item_name}" not in catalog. <br/>
+                                  <Button 
+                                    variant="link" 
+                                    className="h-auto p-0 mt-1" 
+                                    onClick={() => {
+                                      setItemPopoverOpen(false);
+                                    }}
+                                  >
+                                    Use "{currentItem.item_name}" anyway
+                                  </Button>
+                                </CommandEmpty>
+                                <CommandGroup heading="Catalog Suggestions">
+                                  {catalogItems.map((item, i) => (
+                                    <CommandItem
+                                      key={i}
+                                      value={item.name}
+                                      onSelect={(currentValue) => {
+                                        setCurrentItem({ 
+                                          ...currentItem, 
+                                          item_name: item.name,
+                                          category: item.category || currentItem.category,
+                                          unit: item.unit || currentItem.unit
+                                        });
+                                        setItemPopoverOpen(false);
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          currentItem.item_name.toLowerCase() === item.name.toLowerCase() ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      {item.name}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                       </div>
-                      <div className="space-y-2 col-span-1">
+                      <div className="space-y-2 col-span-1 flex flex-col justify-end">
                         <Label className="text-xs">Category</Label>
                         <Select value={currentItem.category} onValueChange={(val) => setCurrentItem({ ...currentItem, category: val })}>
                           <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
