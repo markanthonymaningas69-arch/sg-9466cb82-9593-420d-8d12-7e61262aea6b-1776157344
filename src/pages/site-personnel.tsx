@@ -2040,16 +2040,18 @@ export default function SitePersonnel() {
                       inventoryMap[key].balance -= c.quantity;
                     });
                     
-                    const siteInventoryArray: InventoryItem[] = Object.values(inventoryMap);
-                    siteInventoryArray.sort((a, b) => a.name.localeCompare(b.name));
+                    const siteInventoryArray = Object.values(inventoryMap);
+                    siteInventoryArray.sort((a: any, b: any) => a.name.localeCompare(b.name));
                     
-                    const filteredItems: InventoryItem[] = siteInventoryArray.filter((item: InventoryItem) => {
+                    const filteredItems = siteInventoryArray.filter((item: any) => {
                       const matchName = item.name.toLowerCase().includes(warehouseSearch.toLowerCase());
                       const matchType = warehouseTypeFilter === "all" || item.category === warehouseTypeFilter;
                       return matchName && matchType;
                     });
                     
-                    if (filteredItems.length === 0) {
+                    const safeItems: any[] = Array.isArray(filteredItems) ? filteredItems : [];
+                    
+                    if (safeItems.length === 0) {
                       return (
                         <div className="flex flex-col h-full bg-white relative rounded-md border">
                           <div className="p-3 border-b bg-gray-50 flex gap-4 sticky top-0 z-20">
@@ -2067,7 +2069,7 @@ export default function SitePersonnel() {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="all">All Types</SelectItem>
-                                {Array.from(new Set(siteInventoryArray.map(i => i.category))).map(c => (
+                                {Array.from(new Set(siteInventoryArray.map((i:any) => i.category))).map((c:any) => (
                                   <SelectItem key={c} value={c}>{c}</SelectItem>
                                 ))}
                               </SelectContent>
@@ -2098,7 +2100,7 @@ export default function SitePersonnel() {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="all">All Types</SelectItem>
-                              {Array.from(new Set(siteInventoryArray.map(i => i.category))).map(c => (
+                              {Array.from(new Set(siteInventoryArray.map((i:any) => i.category))).map((c:any) => (
                                 <SelectItem key={c} value={c}>{c}</SelectItem>
                               ))}
                             </SelectContent>
@@ -2116,7 +2118,7 @@ export default function SitePersonnel() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {filteredItems.map((item: InventoryItem, idx: number) => (
+                              {safeItems.map((item: any, idx: number) => (
                                 <TableRow key={idx} className="hover:bg-muted/50">
                                   <TableCell className="font-medium text-black">{item.name}</TableCell>
                                   <TableCell>
