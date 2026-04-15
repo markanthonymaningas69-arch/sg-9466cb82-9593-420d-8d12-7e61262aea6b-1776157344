@@ -133,11 +133,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   };
 
   const formatCurrency = (value: number) => {
-    if (!Number.isFinite(value)) return "0.00";
+    if (!Number.isFinite(value)) return "AED 0.00";
     
-    return new Intl.NumberFormat("en-US", {
+    return new Intl.NumberFormat("en-AE", {
       style: "currency",
-      currency: currency,
+      currency: "AED",
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(value);
