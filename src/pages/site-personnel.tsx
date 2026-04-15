@@ -207,12 +207,27 @@ export default function SitePersonnel() {
     .sort()
     .join(',');
 
+  const pendingDeliveryIds = deliveries
+    .filter(d => d.supplier === "Main Warehouse" && d.status === "pending")
+    .map(d => d.id)
+    .sort()
+    .join(',');
+
+  const [seenDeliveryIds, setSeenDeliveryIds] = useState<string>(() => typeof window !== 'undefined' ? localStorage.getItem('seenDeliveryIds') || "" : "");
+
   useEffect(() => {
     if (activeTab === 'request') {
       setSeenResolvedIds(resolvedRequestIds);
       if (typeof window !== 'undefined') localStorage.setItem('seenResolvedIds', resolvedRequestIds);
     }
   }, [activeTab, resolvedRequestIds]);
+
+  useEffect(() => {
+    if (activeTab === 'deliveries') {
+      setSeenDeliveryIds(pendingDeliveryIds);
+      if (typeof window !== 'undefined') localStorage.setItem('seenDeliveryIds', pendingDeliveryIds);
+    }
+  }, [activeTab, pendingDeliveryIds]);
 
   useEffect(() => {
     if (!selectedProject) return;
@@ -575,6 +590,16 @@ export default function SitePersonnel() {
     setEditingDeliveryId(null);
   };
 
+  const handleMarkReceived = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const userName = typeof window !== 'undefined' ? localStorage.getItem('app_user_name') || "Site User" : "Site User";
+    await siteService.updateDelivery(id, { 
+      status: "received", 
+      received_by: userName 
+    });
+    loadDeliveries();
+  };
+
   const handleConsumptionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await siteService.createMaterialConsumption({
@@ -788,9 +813,21 @@ export default function SitePersonnel() {
                 <ClipboardList className="h-4 w-4 mr-2" />
                 Attendance
               </TabsTrigger>
-              <TabsTrigger value="deliveries">
+              <TabsTrigger value="deliveries" className="relative">
                 <Truck className="h-4 w-4 mr-2" />
                 Deliveries
+                {(() => {
+                  const hasNewDeliveries = pendingDeliveryIds !== seenDeliveryIds && activeTab !== 'deliveries';
+                  const pendingCount = deliveries.filter(d => d.supplier === "Main Warehouse" && d.status === "pending").length;
+                  if (hasNewDeliveries && pendingCount > 0) {
+                    return (
+                      <Badge variant="destructive" className="ml-2 h-5 min-w-5 flex items-center justify-center p-0 px-1.5 text-[10px]">
+                        New
+                      </Badge>
+                    );
+                  }
+                  return null;
+                })()}
               </TabsTrigger>
               <TabsTrigger value="consumption">
                 <ClipboardList className="h-4 w-4 mr-2" />
@@ -1852,9 +1889,10 @@ export default function SitePersonnel() {
                                   <TableHead className="w-12 text-center">#</TableHead>
                                   <TableHead className="font-medium">Item</TableHead>
                                   <TableHead>Quantity</TableHead>
+                                  <TableHead>Status</TableHead>
                                   <TableHead>Received By</TableHead>
                                   <TableHead>Notes</TableHead>
-                                  <TableHead className="text-right w-24">Actions</TableHead>
+                                  <TableHead className="text-right w-32">Actions</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -1863,10 +1901,20 @@ export default function SitePersonnel() {
                                     <TableCell className="text-center text-muted-foreground">{index + 1}</TableCell>
                                     <TableCell className="font-medium">{delivery.item_name}</TableCell>
                                     <TableCell>{delivery.quantity} {delivery.unit}</TableCell>
+                                    <TableCell>
+                                      <Badge variant={delivery.status === 'received' ? 'default' : 'secondary'} className={delivery.status === 'received' ? 'bg-green-600' : 'bg-orange-500 text-white'}>
+                                        {delivery.status?.toUpperCase() || "PENDING"}
+                                      </Badge>
+                                    </TableCell>
                                     <TableCell>{delivery.received_by || "-"}</TableCell>
                                     <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate" title={delivery.notes}>{delivery.notes || "-"}</TableCell>
                                     <TableCell className="text-right">
                                       <div className="flex justify-end gap-1">
+                                        {delivery.status === 'pending' && (
+                                          <Button size="sm" variant="outline" className="h-8 text-xs border-green-600 text-green-700 hover:bg-green-50 mr-1" onClick={(e) => handleMarkReceived(delivery.id, e)}>
+                                            <Check className="h-3 w-3 mr-1" /> Receive
+                                          </Button>
+                                        )}
                                         <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-500 hover:bg-blue-50" onClick={(e) => {
                                           e.stopPropagation();
                                           openEditDelivery(delivery);

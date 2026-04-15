@@ -66,6 +66,9 @@ export function Layout({ children }: LayoutProps) {
   const [pendingCashAdvances, setPendingCashAdvances] = useState<any[]>([]);
   const [expiringDocuments, setExpiringDocuments] = useState<any[]>([]);
   
+  const [pendingDeliveries, setPendingDeliveries] = useState<any[]>([]);
+  const [recentReceivedDeliveries, setRecentReceivedDeliveries] = useState<any[]>([]);
+  
   const [resolvedRequests, setResolvedRequests] = useState<any[]>([]);
   const [resolvedLeaves, setResolvedLeaves] = useState<any[]>([]);
   const [resolvedCashAdvances, setResolvedCashAdvances] = useState<any[]>([]);
@@ -146,6 +149,26 @@ export function Layout({ children }: LayoutProps) {
     order('request_date', { ascending: false }).
     limit(10);
     setPendingCashAdvances(advances || []);
+
+    // Load pending warehouse deliveries
+    const { data: pDeliveries } = await supabase
+      .from('deliveries')
+      .select('*, projects(name)')
+      .eq('supplier', 'Main Warehouse')
+      .eq('status', 'pending')
+      .order('delivery_date', { ascending: false })
+      .limit(10);
+    setPendingDeliveries(pDeliveries || []);
+
+    // Load recently received warehouse deliveries
+    const { data: rDeliveries } = await supabase
+      .from('deliveries')
+      .select('*, projects(name)')
+      .eq('supplier', 'Main Warehouse')
+      .eq('status', 'received')
+      .order('id', { ascending: false })
+      .limit(5);
+    setRecentReceivedDeliveries(rDeliveries || []);
 
     // Load expiring documents
     const thirtyDaysFromNow = new Date();
@@ -496,6 +519,8 @@ export function Layout({ children }: LayoutProps) {
                 return false;
               });
 
+              const displayPendingDeliveries = (isGM || isSitePersonnel) ? pendingDeliveries : [];
+
               // Resolved Updates
               const displayResolvedAdvances = resolvedCashAdvances.filter(adv => {
                 if (isGM || isSitePersonnel) return true;
@@ -509,6 +534,8 @@ export function Layout({ children }: LayoutProps) {
                 return false;
               });
 
+              const displayReceivedDeliveries = (isGM || isWarehouse) ? recentReceivedDeliveries : [];
+
               const displayResolvedRequests = resolvedRequests.filter(req => {
                 if (isGM || isSitePersonnel) return true;
                 const isAcctReq = ['Equipment (Rentals)', 'PPE', 'Petty Cash'].includes(req.request_type);
@@ -518,18 +545,20 @@ export function Layout({ children }: LayoutProps) {
                 return false;
               });
 
-              const totalNotifications = displayPendingAdvances.length + displayPendingLeaves.length + displayExpiring.length + displayPendingRequests.length + displayResolvedAdvances.length + displayResolvedLeaves.length + displayResolvedRequests.length;
-              const hasActionRequired = displayPendingAdvances.length > 0 || displayPendingLeaves.length > 0 || displayExpiring.length > 0 || displayPendingRequests.length > 0;
-              const hasRecentUpdates = displayResolvedAdvances.length > 0 || displayResolvedLeaves.length > 0 || displayResolvedRequests.length > 0;
+              const totalNotifications = displayPendingAdvances.length + displayPendingLeaves.length + displayExpiring.length + displayPendingRequests.length + displayPendingDeliveries.length + displayResolvedAdvances.length + displayResolvedLeaves.length + displayResolvedRequests.length + displayReceivedDeliveries.length;
+              const hasActionRequired = displayPendingAdvances.length > 0 || displayPendingLeaves.length > 0 || displayExpiring.length > 0 || displayPendingRequests.length > 0 || displayPendingDeliveries.length > 0;
+              const hasRecentUpdates = displayResolvedAdvances.length > 0 || displayResolvedLeaves.length > 0 || displayResolvedRequests.length > 0 || displayReceivedDeliveries.length > 0;
 
               const currentNotificationIds = [
                 ...displayPendingAdvances,
                 ...displayPendingLeaves,
                 ...displayExpiring,
                 ...displayPendingRequests,
+                ...displayPendingDeliveries,
                 ...displayResolvedAdvances,
                 ...displayResolvedLeaves,
-                ...displayResolvedRequests
+                ...displayResolvedRequests,
+                ...displayReceivedDeliveries
               ].map((item: any) => `${item.id}-${item.status || 'pending'}`).sort().join(',');
 
               const hasUnseenNotifications = totalNotifications > 0 && currentNotificationIds !== lastSeenNotificationIds;
@@ -571,6 +600,30 @@ export function Layout({ children }: LayoutProps) {
                             Action Required
                           </div>
                         )}
+
+                        {/* Pending Deliveries from Warehouse */}
+                        {displayPendingDeliveries.map((delivery) => (
+                          <DropdownMenuItem
+                            key={`pending-delivery-${delivery.id}`}
+                            className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-muted"
+                            onClick={() => {
+                              router.push('/site-personnel?tab=deliveries');
+                              setNotificationOpen(false);
+                            }}>
+                            <div className="flex items-start justify-between w-full">
+                              <span className="font-medium text-sm text-blue-700">Deployed Item</span>
+                              <Badge variant="outline" className="text-[10px] bg-orange-50 text-orange-600 border-orange-200">
+                                In Transit
+                              </Badge>
+                            </div>
+                            <span className="text-xs text-muted-foreground font-semibold">
+                              {delivery.item_name} ({delivery.quantity} {delivery.unit})
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              To: {delivery.projects?.name || "Unknown Project"}
+                            </span>
+                          </DropdownMenuItem>
+                        ))}
 
                         {/* Pending Cash Advances */}
                         {displayPendingAdvances.map((adv) =>
@@ -756,6 +809,33 @@ export function Layout({ children }: LayoutProps) {
                             Recent Updates
                           </div>
                         )}
+
+                        {/* Received Deliveries */}
+                        {displayReceivedDeliveries.map((delivery) => (
+                          <DropdownMenuItem
+                            key={`received-delivery-${delivery.id}`}
+                            className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-muted"
+                            onClick={() => {
+                              router.push(isWarehouse ? '/warehouse' : '/site-personnel?tab=deliveries');
+                              setNotificationOpen(false);
+                            }}>
+                            <div className="flex items-start justify-between w-full">
+                              <span className="font-medium text-sm text-green-700">Site Received Item</span>
+                              <Badge variant="default" className="text-[10px] bg-green-600">
+                                Received
+                              </Badge>
+                            </div>
+                            <span className="text-xs text-muted-foreground font-semibold">
+                              {delivery.item_name} ({delivery.quantity} {delivery.unit})
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              At: {delivery.projects?.name || "Unknown Project"}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              By: {delivery.received_by || "Site Staff"}
+                            </span>
+                          </DropdownMenuItem>
+                        ))}
 
                         {/* Resolved Cash Advances */}
                         {displayResolvedAdvances.map((adv) => (

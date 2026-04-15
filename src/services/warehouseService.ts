@@ -118,7 +118,7 @@ export const warehouseService = {
       quantity: quantityToDeploy,
       unit: mainItem.unit,
       supplier: "Main Warehouse",
-      status: "delivered",
+      status: "pending",
       notes: "Deployed from Main Warehouse"
     });
 
