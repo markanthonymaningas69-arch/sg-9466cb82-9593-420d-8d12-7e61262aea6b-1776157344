@@ -94,44 +94,44 @@ export default function Accounting() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
           <div className="overflow-x-auto pb-2">
-            <TabsList className="w-full justify-start min-w-max h-12">
+            <TabsList className="shrink-0 flex flex-wrap w-full gap-1 h-auto bg-transparent p-0">
               {currentPlan === "professional" && (
                 <>
-                  <TabsTrigger value="dashboard" className="flex items-center gap-2">
-                    <Landmark className="h-4 w-4" /> Dashboard
+                  <TabsTrigger value="dashboard" className="flex-1 min-w-[70px] h-9 text-xs data-[state=active]:bg-blue-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-blue-700 bg-blue-50 text-blue-700 hover:bg-blue-100">
+                    <Landmark className="h-3 w-3 mr-1.5 hidden sm:inline" /> Dash
                   </TabsTrigger>
-                  <TabsTrigger value="journal" className="flex items-center gap-2">
-                    <FileSpreadsheet className="h-4 w-4" /> Journal & OpEx
+                  <TabsTrigger value="journal" className="flex-1 min-w-[70px] h-9 text-xs data-[state=active]:bg-indigo-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-indigo-700 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
+                    <FileSpreadsheet className="h-3 w-3 mr-1.5 hidden sm:inline" /> Journal
                   </TabsTrigger>
                 </>
               )}
-              <TabsTrigger value="payroll" className="flex items-center gap-2">
-                <Users className="h-4 w-4" /> Payroll
+              <TabsTrigger value="payroll" className="flex-1 min-w-[70px] h-9 text-xs data-[state=active]:bg-emerald-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-emerald-700 bg-emerald-50 text-emerald-700 hover:bg-emerald-100">
+                <Users className="h-3 w-3 mr-1.5 hidden sm:inline" /> Payroll
               </TabsTrigger>
               {currentPlan === "professional" && (
                 <>
-                  <TabsTrigger value="vouchers" className="flex items-center gap-2">
-                    <Receipt className="h-4 w-4" /> 
+                  <TabsTrigger value="vouchers" className="flex-1 min-w-[70px] h-9 text-xs data-[state=active]:bg-amber-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-amber-700 bg-amber-50 text-amber-700 hover:bg-amber-100 relative">
+                    <Receipt className="h-3 w-3 mr-1.5 hidden sm:inline" /> 
                     Vouchers
                     {approvedVouchersCount > 0 && approvedVoucherIds !== seenVoucherIds && activeTab !== 'vouchers' && (
-                      <Badge variant="destructive" className="ml-1 h-5 px-1.5 flex items-center justify-center text-[10px]">
+                      <Badge variant="destructive" className="ml-1 h-4 min-w-4 flex items-center justify-center p-0 px-1 text-[9px] absolute -top-1 -right-1">
                         New
                       </Badge>
                     )}
                   </TabsTrigger>
-                  <TabsTrigger value="liquidations" className="flex items-center gap-2">
-                    <CircleDollarSign className="h-4 w-4" /> Liquidations
+                  <TabsTrigger value="liquidations" className="flex-1 min-w-[70px] h-9 text-xs data-[state=active]:bg-orange-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-orange-700 bg-orange-50 text-orange-700 hover:bg-orange-100">
+                    <CircleDollarSign className="h-3 w-3 mr-1.5 hidden sm:inline" /> Liquidate
                   </TabsTrigger>
-                  <TabsTrigger value="requests" className="flex items-center gap-2">
-                    <FileSearch className="h-4 w-4" /> Requests
+                  <TabsTrigger value="requests" className="flex-1 min-w-[70px] h-9 text-xs data-[state=active]:bg-rose-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-rose-700 bg-rose-50 text-rose-700 hover:bg-rose-100 relative">
+                    <FileSearch className="h-3 w-3 mr-1.5 hidden sm:inline" /> Requests
                     {pendingRequestsCount > 0 && pendingReqIds !== seenReqIds && activeTab !== 'requests' && (
-                      <Badge variant="destructive" className="ml-1 h-5 px-1.5 flex items-center justify-center text-[10px]">
+                      <Badge variant="destructive" className="ml-1 h-4 min-w-4 flex items-center justify-center p-0 px-1 text-[9px] absolute -top-1 -right-1">
                         New
                       </Badge>
                     )}
                   </TabsTrigger>
-                  <TabsTrigger value="tax" className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" /> Taxation
+                  <TabsTrigger value="tax" className="flex-1 min-w-[70px] h-9 text-xs data-[state=active]:bg-purple-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-purple-700 bg-purple-50 text-purple-700 hover:bg-purple-100">
+                    <FileText className="h-3 w-3 mr-1.5 hidden sm:inline" /> Tax
                   </TabsTrigger>
                 </>
               )}

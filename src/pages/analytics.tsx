@@ -432,26 +432,26 @@ export default function Analytics() {
           </Card>
         ) : (
           <Tabs defaultValue="swa" className="space-y-6">
-            <TabsList className="flex flex-wrap w-full gap-2 bg-transparent justify-start pb-4">
-              <TabsTrigger value="swa" className="flex-1 min-w-[160px] max-w-[250px] flex-col items-center justify-center gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-card py-2 h-auto text-center whitespace-normal leading-tight">
-                <ClipboardList className="h-4 w-4 shrink-0" />
-                <span className="text-xs md:text-sm font-medium">Statement of Work Accomplishment</span>
+            <TabsList className="shrink-0 flex flex-wrap w-full gap-1 h-auto bg-transparent p-0 pb-4">
+              <TabsTrigger value="swa" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-blue-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-blue-700 bg-blue-50 text-blue-700 hover:bg-blue-100">
+                <ClipboardList className="h-3 w-3 mr-1.5 hidden sm:inline" />
+                SWA
               </TabsTrigger>
-              <TabsTrigger value="materials" className="flex-1 min-w-[120px] max-w-[180px] flex-col items-center justify-center gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-card py-2 h-auto text-center whitespace-normal leading-tight">
-                <Package className="h-4 w-4 shrink-0" />
-                <span className="text-xs md:text-sm font-medium">Material Usage</span>
+              <TabsTrigger value="materials" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-indigo-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-indigo-700 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
+                <Package className="h-3 w-3 mr-1.5 hidden sm:inline" />
+                Materials
               </TabsTrigger>
-              <TabsTrigger value="spent" className="flex-1 min-w-[120px] max-w-[180px] flex-col items-center justify-center gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-card py-2 h-auto text-center whitespace-normal leading-tight">
-                <DollarSign className="h-4 w-4 shrink-0" />
-                <span className="text-xs md:text-sm font-medium">Spent vs Allocated</span>
+              <TabsTrigger value="spent" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-emerald-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-emerald-700 bg-emerald-50 text-emerald-700 hover:bg-emerald-100">
+                <DollarSign className="h-3 w-3 mr-1.5 hidden sm:inline" />
+                Spent vs Alloc.
               </TabsTrigger>
-              <TabsTrigger value="ocm" className="flex-1 min-w-[120px] max-w-[180px] flex-col items-center justify-center gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-card py-2 h-auto text-center whitespace-normal leading-tight">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <span className="text-xs md:text-sm font-medium">OCM Materials</span>
+              <TabsTrigger value="ocm" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-amber-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-amber-700 bg-amber-50 text-amber-700 hover:bg-amber-100">
+                <AlertCircle className="h-3 w-3 mr-1.5 hidden sm:inline" />
+                OCM
               </TabsTrigger>
-              <TabsTrigger value="visual" className="flex-1 min-w-[160px] max-w-[220px] flex-col items-center justify-center gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border bg-card py-2 h-auto text-center whitespace-normal leading-tight">
-                <BarChart3 className="h-4 w-4 shrink-0" />
-                <span className="text-xs md:text-sm font-medium">Visual Analytics</span>
+              <TabsTrigger value="visual" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-orange-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-orange-700 bg-orange-50 text-orange-700 hover:bg-orange-100">
+                <BarChart3 className="h-3 w-3 mr-1.5 hidden sm:inline" />
+                Visuals
               </TabsTrigger>
             </TabsList>
 

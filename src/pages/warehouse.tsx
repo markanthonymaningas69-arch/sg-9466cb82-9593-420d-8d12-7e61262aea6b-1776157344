@@ -487,19 +487,18 @@ export default function Warehouse() {
         </div>
 
         <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); setCategoryFilter("all"); setProjectFilter("all"); setDateFilter(""); }} className="flex-1 flex flex-col min-h-0">
-          <TabsList className="w-full flex shrink-0 justify-start">
-            <TabsTrigger value="main" className="flex items-center gap-2">
-              <WarehouseIcon className="h-4 w-4" /> Main Warehouse
+          <TabsList className="shrink-0 flex flex-wrap w-full gap-1 h-auto bg-transparent p-0">
+            <TabsTrigger value="main" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-blue-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-blue-700 bg-blue-50 text-blue-700 hover:bg-blue-100">
+              <WarehouseIcon className="h-3 w-3 mr-1.5 hidden sm:inline" /> Main
             </TabsTrigger>
-            <TabsTrigger value="balance" className="flex items-center gap-2">
-              <FileSpreadsheet className="h-4 w-4" /> Balance Checking
+            <TabsTrigger value="balance" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-indigo-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-indigo-700 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
+              <FileSpreadsheet className="h-3 w-3 mr-1.5 hidden sm:inline" /> Balance
             </TabsTrigger>
-            <TabsTrigger value="deployments" className="flex items-center gap-2">
-              <Truck className="h-4 w-4" /> Deployments
+            <TabsTrigger value="deployments" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-emerald-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-emerald-700 bg-emerald-50 text-emerald-700 hover:bg-emerald-100">
+              <Truck className="h-3 w-3 mr-1.5 hidden sm:inline" /> Deploy
             </TabsTrigger>
-            <div className="flex-1"></div>
-            <TabsTrigger value="project" className="flex items-center gap-2">
-              <Building2 className="h-4 w-4" /> Project Warehouse
+            <TabsTrigger value="project" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-amber-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-amber-700 bg-amber-50 text-amber-700 hover:bg-amber-100">
+              <Building2 className="h-3 w-3 mr-1.5 hidden sm:inline" /> Project
             </TabsTrigger>
           </TabsList>
 

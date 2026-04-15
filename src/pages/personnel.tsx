@@ -360,24 +360,24 @@ export default function Personnel() {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 h-auto">
-            <TabsTrigger value="personnel" className="py-2.5">
-              <UserCheck className="h-4 w-4 mr-2" />
-              Personnel
+          <TabsList className="shrink-0 flex flex-wrap w-full gap-1 h-auto bg-transparent p-0">
+            <TabsTrigger value="personnel" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-blue-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-blue-700 bg-blue-50 text-blue-700 hover:bg-blue-100">
+              <UserCheck className="h-3 w-3 mr-1.5 hidden sm:inline" />
+              Staff
             </TabsTrigger>
-            <TabsTrigger value="attendance" className="py-2.5">
-              <Clock className="h-4 w-4 mr-2" />
-              Attendance
+            <TabsTrigger value="attendance" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-indigo-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-indigo-700 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
+              <Clock className="h-3 w-3 mr-1.5 hidden sm:inline" />
+              Time
             </TabsTrigger>
-            <TabsTrigger value="leave" className="py-2.5 relative">
-              <Calendar className="h-4 w-4 mr-2" />
+            <TabsTrigger value="leave" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-emerald-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-emerald-700 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 relative">
+              <Calendar className="h-3 w-3 mr-1.5 hidden sm:inline" />
               Leave
               {(() => {
                 const hasNewLeaves = pendingLeaveIds !== seenLeaveIds && activeTab !== 'leave';
                 const pendingCount = leaveRequests.filter(l => l.status === 'pending').length;
                 if (hasNewLeaves && pendingCount > 0) {
                   return (
-                    <Badge variant="destructive" className="ml-2 h-5 min-w-5 flex items-center justify-center p-0 px-1.5 text-[10px]">
+                    <Badge variant="destructive" className="ml-1 h-4 min-w-4 flex items-center justify-center p-0 px-1 text-[9px] absolute -top-1 -right-1">
                       New
                     </Badge>
                   );
@@ -386,9 +386,9 @@ export default function Personnel() {
               })()}
             </TabsTrigger>
             {currency !== "PHP" && (
-              <TabsTrigger value="visa" className="py-2.5">
-                <PassportIcon className="h-4 w-4 mr-2" />
-                Visa & Passport
+              <TabsTrigger value="visa" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-amber-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-amber-700 bg-amber-50 text-amber-700 hover:bg-amber-100">
+                <PassportIcon className="h-3 w-3 mr-1.5 hidden sm:inline" />
+                Visa
               </TabsTrigger>
             )}
           </TabsList>
