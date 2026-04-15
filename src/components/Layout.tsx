@@ -555,6 +555,8 @@ export function Layout({ children }: LayoutProps) {
               const displayPendingAdvances = (isGM || isAccounting) ? pendingCashAdvances : [];
               const displayPendingLeaves = (isGM || isHR) ? pendingLeaves : [];
               const displayExpiring = (isGM || isHR) ? expiringDocuments : [];
+              const displayPendingPurchases = (isGM || isPurchasing) ? pendingPurchases : [];
+              const displayApprovedVouchers = (isGM || isAccounting) ? approvedVouchers : [];
               const displayPendingRequests = pendingRequests.filter(req => {
                 if (isGM) return true;
                 const isAcctReq = ['Equipment (Rentals)', 'PPE', 'Petty Cash'].includes(req.request_type);
