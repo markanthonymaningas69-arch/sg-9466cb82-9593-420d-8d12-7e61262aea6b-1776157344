@@ -141,7 +141,7 @@ export default function Accounting() {
           {currentPlan === "professional" && (
             <>
               <TabsContent value="dashboard" className="flex-1 mt-0">
-                <AccountingDashboard />
+                <AccountingDashboard onTabChange={setActiveTab} />
               </TabsContent>
               
               <TabsContent value="journal" className="flex-1 mt-0">

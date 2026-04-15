@@ -7,26 +7,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 
-// Mock data for visualizations
-const cashFlowData = [
-  { name: 'Jan', income: 4000, expense: 2400 },
-  { name: 'Feb', income: 3000, expense: 1398 },
-  { name: 'Mar', income: 2000, expense: 9800 },
-  { name: 'Apr', income: 2780, expense: 3908 },
-  { name: 'May', income: 1890, expense: 4800 },
-  { name: 'Jun', income: 2390, expense: 3800 },
-];
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#ef4444', '#f59e0b'];
 
-const opExData = [
-  { name: 'Payroll', value: 45000 },
-  { name: 'Materials', value: 30000 },
-  { name: 'Equipment', value: 15000 },
-  { name: 'Logistics', value: 10000 },
-];
-
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
-
-export function AccountingDashboard() {
+export function AccountingDashboard({ onTabChange }: { onTabChange?: (tab: string) => void }) {
   const { formatCurrency } = useSettings();
   const [summary, setSummary] = useState({
     totalDebits: 0,
@@ -34,6 +17,8 @@ export function AccountingDashboard() {
     totalTax: 0,
     balance: 0
   });
+  const [cashFlowData, setCashFlowData] = useState<any[]>([]);
+  const [opExData, setOpExData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [pendingCashAdvances, setPendingCashAdvances] = useState<any[]>([]);
 
@@ -63,8 +48,47 @@ export function AccountingDashboard() {
 
   const loadSummary = async () => {
     setLoading(true);
-    const { data } = await accountingService.getDashboardSummary();
-    if (data) setSummary(data);
+    const { data } = await accountingService.getJournalEntries();
+    
+    if (data) {
+      let totalDebits = 0;
+      let totalCredits = 0;
+      let totalTax = 0;
+      
+      const cfMap: Record<string, { name: string, dateVal: number, income: number, expense: number }> = {};
+      const opexMap: Record<string, number> = {};
+
+      data.forEach(d => {
+        const amt = Number(d.amount);
+        if (d.type === 'debit') totalDebits += amt;
+        if (d.type === 'credit') totalCredits += amt;
+        totalTax += Number(d.tax_amount || 0);
+
+        // Cash flow grouping by Month-Year
+        const date = new Date(d.date);
+        const month = date.toLocaleString('default', { month: 'short' });
+        const year = date.getFullYear();
+        const key = `${month} ${year}`;
+        
+        if (!cfMap[key]) cfMap[key] = { name: key, dateVal: date.getTime(), income: 0, expense: 0 };
+        
+        if (d.type === 'credit' || d.category === 'revenue') cfMap[key].income += amt;
+        if (d.type === 'debit' || d.category === 'operational' || d.category === 'capital') cfMap[key].expense += amt;
+        
+        // OpEx Breakdown
+        if (d.category === 'operational') {
+          opexMap[d.account_name] = (opexMap[d.account_name] || 0) + amt;
+        }
+      });
+      
+      setSummary({ totalDebits, totalCredits, totalTax, balance: totalDebits - totalCredits });
+      
+      const sortedCfData = Object.values(cfMap).sort((a, b) => a.dateVal - b.dateVal);
+      setCashFlowData(sortedCfData);
+      
+      setOpExData(Object.entries(opexMap).map(([name, value]) => ({ name, value })));
+    }
+    
     setLoading(false);
   };
 
@@ -110,19 +134,21 @@ export function AccountingDashboard() {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${summary.balance >= 0 ? "text-success" : "text-destructive"}`}>
-              {formatCurrency(summary.balance)}
+              {new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED' }).format(summary.balance)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">Assets vs Liabilities</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="cursor-pointer hover:bg-muted/50 transition-colors border-orange-200" onClick={() => onTabChange && onTabChange('tax')}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">VAT Liability (5%)</CardTitle>
             <Receipt className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{formatCurrency(summary.totalTax)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Pending to Authority</p>
+            <div className="text-2xl font-bold text-orange-600">
+              {new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED' }).format(summary.totalTax)}
+            </div>
+            <p className="text-xs text-orange-600/80 mt-1 font-medium">Click to view Tax Module →</p>
           </CardContent>
         </Card>
       </div>
@@ -130,47 +156,55 @@ export function AccountingDashboard() {
       <div className="grid gap-4 md:grid-cols-2">
         <Card className="min-h-[300px]">
           <CardHeader>
-            <CardTitle>Cash Flow Trend</CardTitle>
+            <CardTitle>Cash Flow Trend (Actual)</CardTitle>
           </CardHeader>
           <CardContent className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={cashFlowData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                <YAxis axisLine={false} tickLine={false} tickFormatter={(value) => `$${value}`} />
-                <RechartsTooltip cursor={{ fill: 'transparent' }} formatter={(value: number) => formatCurrency(value)} />
-                <Legend />
-                <Bar dataKey="income" name="Income (Credits)" fill="#10b981" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="expense" name="Expenses (Debits)" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {cashFlowData.length === 0 ? (
+              <div className="flex h-full items-center justify-center text-muted-foreground">No transaction data available</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={cashFlowData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                  <YAxis axisLine={false} tickLine={false} tickFormatter={(value) => `AED ${value}`} />
+                  <RechartsTooltip cursor={{ fill: 'transparent' }} formatter={(value: number) => new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED' }).format(value)} />
+                  <Legend />
+                  <Bar dataKey="income" name="Income (Credits)" fill="#10b981" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="expense" name="Expenses (Debits)" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
         <Card className="min-h-[300px]">
           <CardHeader>
-            <CardTitle>OpEx Breakdown</CardTitle>
+            <CardTitle>OpEx Breakdown (Actual)</CardTitle>
           </CardHeader>
           <CardContent className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={opExData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  fill="#8884d8"
-                  paddingAngle={5}
-                  dataKey="value"
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                >
-                  {opExData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <RechartsTooltip formatter={(value: number) => formatCurrency(value)} />
-              </PieChart>
-            </ResponsiveContainer>
+            {opExData.length === 0 ? (
+              <div className="flex h-full items-center justify-center text-muted-foreground">No operational expenses recorded</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={opExData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    fill="#8884d8"
+                    paddingAngle={5}
+                    dataKey="value"
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  >
+                    {opExData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip formatter={(value: number) => new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED' }).format(value)} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
       </div>

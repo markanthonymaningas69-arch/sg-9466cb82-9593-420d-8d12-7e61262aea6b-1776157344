@@ -29,6 +29,24 @@ export const accountingService = {
     return { data, error };
   },
 
+  async updateJournalEntry(id: string, entry: any) {
+    const { data, error } = await supabase
+      .from("accounting_transactions")
+      .update(entry)
+      .eq("id", id)
+      .select()
+      .single();
+    return { data, error };
+  },
+
+  async deleteJournalEntry(id: string) {
+    const { error } = await supabase
+      .from("accounting_transactions")
+      .delete()
+      .eq("id", id);
+    return { error };
+  },
+
   async getDashboardSummary() {
     const { data, error } = await supabase
       .from("accounting_transactions")
