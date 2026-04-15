@@ -28,6 +28,7 @@ export default function Projects() {
   // Main Dialogs
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
+  const [newItemDialogOpen, setNewItemDialogOpen] = useState(false);
   
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [formData, setFormData] = useState({
