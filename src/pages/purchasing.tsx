@@ -28,6 +28,9 @@ export default function Purchasing() {
   const [viewSuppliersDialogOpen, setViewSuppliersDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   
+  const [gmSubmitDialogOpen, setGmSubmitDialogOpen] = useState(false);
+  const [gmSubmitForm, setGmSubmitForm] = useState<any>(null);
+  
   // Filters
   const [filterSupplier, setFilterSupplier] = useState("all");
   const [filterDate, setFilterDate] = useState("");
@@ -205,6 +208,27 @@ export default function Purchasing() {
     const matchStatus = filterStatus === "all" || p.status === filterStatus;
     return matchSupplier && matchDate && matchItem && matchStatus;
   });
+
+  const handleGmSubmit = async () => {
+    const uc = parseFloat(gmSubmitForm.unit_cost) || 0;
+    if (uc <= 0 || !gmSubmitForm.supplier || gmSubmitForm.supplier === 'Pending Selection') {
+      alert("Please provide a valid supplier and unit cost.");
+      return;
+    }
+    const { error } = await supabase.from('purchases').update({
+      supplier: gmSubmitForm.supplier,
+      unit_cost: uc,
+      status: 'pending_approval' // Triggers GM approval in Layout
+    }).eq('id', gmSubmitForm.id);
+
+    if (!error) {
+      setGmSubmitDialogOpen(false);
+      setGmSubmitForm(null);
+      loadData();
+    } else {
+      alert("Failed to submit: " + error.message);
+    }
+  };
 
   return (
     <Layout>
@@ -452,9 +476,10 @@ export default function Purchasing() {
             
             <div className="space-y-1">
               <Label className="text-xs">Filter by Status:</Label>
-              <div className="flex bg-background border p-0.5 rounded-md w-fit h-9 items-center">
+              <div className="flex bg-background border p-0.5 rounded-md w-fit h-9 items-center overflow-x-auto">
                 <Button variant={filterStatus === "all" ? "secondary" : "ghost"} size="sm" className="h-full text-xs" onClick={() => setFilterStatus("all")}>All</Button>
                 <Button variant={filterStatus === "pending" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-orange-600 dark:text-orange-400" onClick={() => setFilterStatus("pending")}>Pending</Button>
+                <Button variant={filterStatus === "pending_approval" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-purple-600 dark:text-purple-400 whitespace-nowrap" onClick={() => setFilterStatus("pending_approval")}>Pending GM</Button>
                 <Button variant={filterStatus === "approved" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-blue-600 dark:text-blue-400" onClick={() => setFilterStatus("approved")}>Approved</Button>
                 <Button variant={filterStatus === "received" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-green-600 dark:text-green-400" onClick={() => setFilterStatus("received")}>Received</Button>
               </div>
@@ -555,14 +580,23 @@ export default function Purchasing() {
                           className={
                             p.status === 'received' ? 'bg-green-500 hover:bg-green-600 border-transparent text-white' : 
                             p.status === 'approved' ? 'bg-blue-500 hover:bg-blue-600 border-transparent text-white' : 
+                            p.status === 'pending_approval' ? 'bg-purple-500 hover:bg-purple-600 border-transparent text-white' : 
                             'bg-orange-500 hover:bg-orange-600 border-transparent text-white'
                           }
                         >
-                          {p.status.toUpperCase()}
+                          {p.status === 'pending_approval' ? 'WAITING GM' : p.status.toUpperCase()}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
+                          {p.status === 'pending' && (
+                            <Button variant="outline" size="sm" className="h-8 text-xs bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100" onClick={() => {
+                              setGmSubmitForm({ ...p, unit_cost: p.unit_cost || '' });
+                              setGmSubmitDialogOpen(true);
+                            }}>
+                              Price & Submit
+                            </Button>
+                          )}
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" onClick={() => handleEdit(p)}>
                             <Edit2 className="h-4 w-4" />
                           </Button>
@@ -578,6 +612,44 @@ export default function Purchasing() {
             </Table>
           </div>
         </Card>
+
+        {/* GM Submit Dialog */}
+        <Dialog open={gmSubmitDialogOpen} onOpenChange={setGmSubmitDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Submit for GM Approval</DialogTitle>
+              <CardDescription>Enter the unit cost and supplier before sending to the GM for approval.</CardDescription>
+            </DialogHeader>
+            {gmSubmitForm && (
+              <div className="space-y-4 pt-4">
+                <div className="space-y-2">
+                  <Label>Item</Label>
+                  <Input value={`${gmSubmitForm.item_name} (${gmSubmitForm.quantity} ${gmSubmitForm.unit})`} disabled />
+                </div>
+                <div className="space-y-2">
+                  <Label>Select Supplier *</Label>
+                  <Select value={gmSubmitForm.supplier !== 'Pending Selection' ? gmSubmitForm.supplier : ''} onValueChange={(val) => setGmSubmitForm({...gmSubmitForm, supplier: val})}>
+                    <SelectTrigger><SelectValue placeholder="Choose Supplier" /></SelectTrigger>
+                    <SelectContent>
+                      {suppliers.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Unit Cost (AED) *</Label>
+                  <Input type="number" step="0.01" value={gmSubmitForm.unit_cost} onChange={(e) => setGmSubmitForm({...gmSubmitForm, unit_cost: e.target.value})} />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Total Estimated Cost: AED {(parseFloat(gmSubmitForm.unit_cost) || 0) * gmSubmitForm.quantity}
+                  </p>
+                </div>
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button variant="outline" onClick={() => setGmSubmitDialogOpen(false)}>Cancel</Button>
+                  <Button onClick={handleGmSubmit}>Submit to GM</Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );

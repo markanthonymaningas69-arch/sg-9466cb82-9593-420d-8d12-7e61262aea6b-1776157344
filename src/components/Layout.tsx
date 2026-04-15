@@ -51,10 +51,7 @@ const navigation = [
 { name: "Accounting", href: "/accounting", icon: Calculator },
 { name: "Human Resources", href: "/personnel", icon: Users },
 { name: "Warehouse", href: "/warehouse", icon: Warehouse },
-{ name: "Analytics", href: "/analytics", icon: BarChart3 },
-{ name: "Settings", href: "/settings", icon: Settings },
-{ name: "Subscription", href: "/subscription", icon: CreditCard }];
-
+{ name: "Analytics", href: "/analytics", icon: BarChart3 }];
 
 export function Layout({ children }: LayoutProps) {
   const router = useRouter();
@@ -70,6 +67,7 @@ export function Layout({ children }: LayoutProps) {
   const [recentReceivedDeliveries, setRecentReceivedDeliveries] = useState<any[]>([]);
   
   const [pendingPurchases, setPendingPurchases] = useState<any[]>([]);
+  const [pendingGmPurchases, setPendingGmPurchases] = useState<any[]>([]);
   const [approvedVouchers, setApprovedVouchers] = useState<any[]>([]);
   
   const [resolvedRequests, setResolvedRequests] = useState<any[]>([]);
@@ -187,6 +185,14 @@ export function Layout({ children }: LayoutProps) {
       .order('id', { ascending: false })
       .limit(10);
     setPendingPurchases(pPurchases || []);
+
+    const { data: gmPurchases } = await supabase
+      .from('purchases')
+      .select('*, projects(name)')
+      .eq('status', 'pending_approval')
+      .order('id', { ascending: false })
+      .limit(10);
+    setPendingGmPurchases(gmPurchases || []);
 
     const { data: aVouchers } = await supabase
       .from('vouchers')
@@ -353,6 +359,35 @@ export function Layout({ children }: LayoutProps) {
     }
   };
 
+  const handleApprovePurchaseGM = async (purchase: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const { error } = await supabase.from('purchases').update({ status: 'approved' }).eq('id', purchase.id);
+    
+    if (!error) {
+      // Auto-generate voucher in Accounting
+      await supabase.from('vouchers').insert({
+        voucher_number: `PV-${Math.floor(10000 + Math.random() * 90000)}`,
+        date: new Date().toISOString().split("T")[0],
+        type: 'payment',
+        payee: purchase.supplier,
+        amount: purchase.quantity * (purchase.unit_cost || 0),
+        description: `Approved PO ${purchase.order_number}: ${purchase.item_name} (${purchase.quantity} ${purchase.unit})`,
+        project_id: purchase.project_id,
+        status: 'approved'
+      });
+
+      toast({ title: "PO Approved", description: `Purchase Order approved and Payment Voucher generated.` });
+      loadPendingRequests();
+    }
+  };
+
+  const handleRejectPurchaseGM = async (purchaseId: string, itemName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    await supabase.from('purchases').update({ status: 'pending' }).eq('id', purchaseId);
+    toast({ title: "PO Rejected", description: `${itemName} returned to Purchasing for revision.`, variant: "destructive" });
+    loadPendingRequests();
+  };
+
   const handleLogout = async () => {
     localStorage.removeItem('app_assigned_modules');
     localStorage.removeItem('app_assigned_module');
@@ -473,6 +508,21 @@ export function Layout({ children }: LayoutProps) {
             </ul>
           </nav>
 
+          {/* System Navigation (Separated visually) */}
+          <div className="mt-auto px-3 py-4 border-t space-y-1">
+            <p className="px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">System Settings</p>
+            {assignedModules.includes("GM") && (
+              <Link href="/settings" className={cn("flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors", router.pathname === "/settings" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground")} onClick={() => setSidebarOpen(false)}>
+                <Settings className="h-4 w-4 shrink-0" />
+                Company Settings
+              </Link>
+            )}
+            <Link href="/subscription" className={cn("flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors", router.pathname === "/subscription" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground")} onClick={() => setSidebarOpen(false)}>
+              <CreditCard className="h-4 w-4 shrink-0" />
+              Subscription
+            </Link>
+          </div>
+
           {/* Footer */}
           <div className="border-t p-4">
             <div className="flex items-center gap-3 px-3 py-2">
@@ -556,6 +606,7 @@ export function Layout({ children }: LayoutProps) {
               const displayPendingLeaves = (isGM || isHR) ? pendingLeaves : [];
               const displayExpiring = (isGM || isHR) ? expiringDocuments : [];
               const displayPendingPurchases = (isGM || isPurchasing) ? pendingPurchases : [];
+              const displayGmPurchases = isGM ? pendingGmPurchases : [];
               const displayApprovedVouchers = (isGM || isAccounting) ? approvedVouchers : [];
               const displayPendingRequests = pendingRequests.filter(req => {
                 if (isGM) return true;
@@ -599,8 +650,8 @@ export function Layout({ children }: LayoutProps) {
                 return false;
               });
 
-              const totalNotifications = displayPendingAdvances.length + displayPendingLeaves.length + displayExpiring.length + displayPendingRequests.length + displayPendingDeliveries.length + displayResolvedAdvances.length + displayResolvedLeaves.length + displayResolvedRequests.length + displayReceivedDeliveries.length + displayPendingPurchases.length + displayApprovedVouchers.length;
-              const hasActionRequired = displayPendingAdvances.length > 0 || displayPendingLeaves.length > 0 || displayExpiring.length > 0 || displayPendingRequests.length > 0 || displayPendingDeliveries.length > 0 || displayPendingPurchases.length > 0 || displayApprovedVouchers.length > 0;
+              const totalNotifications = displayPendingAdvances.length + displayPendingLeaves.length + displayExpiring.length + displayPendingRequests.length + displayPendingDeliveries.length + displayResolvedAdvances.length + displayResolvedLeaves.length + displayResolvedRequests.length + displayReceivedDeliveries.length + displayPendingPurchases.length + displayGmPurchases.length + displayApprovedVouchers.length;
+              const hasActionRequired = displayPendingAdvances.length > 0 || displayPendingLeaves.length > 0 || displayExpiring.length > 0 || displayPendingRequests.length > 0 || displayPendingDeliveries.length > 0 || displayPendingPurchases.length > 0 || displayGmPurchases.length > 0 || displayApprovedVouchers.length > 0;
               const hasRecentUpdates = displayResolvedAdvances.length > 0 || displayResolvedLeaves.length > 0 || displayResolvedRequests.length > 0 || displayReceivedDeliveries.length > 0;
 
               const currentNotificationIds = [
@@ -610,6 +661,7 @@ export function Layout({ children }: LayoutProps) {
                 ...displayPendingRequests,
                 ...displayPendingDeliveries,
                 ...displayPendingPurchases,
+                ...displayGmPurchases,
                 ...displayApprovedVouchers,
                 ...displayResolvedAdvances,
                 ...displayResolvedLeaves,
@@ -696,6 +748,40 @@ export function Layout({ children }: LayoutProps) {
                             <span className="text-xs text-muted-foreground">
                               Amount: AED {voucher.amount.toLocaleString()}
                             </span>
+                          </DropdownMenuItem>
+                        ))}
+
+                        {/* GM Purchase Approvals */}
+                        {displayGmPurchases.map((purchase) => (
+                          <DropdownMenuItem
+                            key={`gm-purchase-${purchase.id}`}
+                            className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-muted"
+                            onClick={() => {
+                              router.push('/purchasing');
+                              setNotificationOpen(false);
+                            }}>
+                            <div className="flex items-start justify-between w-full">
+                              <span className="font-medium text-sm text-purple-700">GM Approval Required</span>
+                              <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-600 border-purple-200">
+                                {purchase.supplier}
+                              </Badge>
+                            </div>
+                            <span className="text-xs text-muted-foreground font-semibold">
+                              {purchase.item_name} ({purchase.quantity} {purchase.unit})
+                            </span>
+                            <span className="text-xs text-muted-foreground font-bold">
+                              Cost: AED {(purchase.quantity * (purchase.unit_cost || 0)).toLocaleString()}
+                            </span>
+                            <div className="flex gap-2 w-full mt-1" onClick={(e) => e.stopPropagation()}>
+                              <Button size="sm" variant="default" className="flex-1 h-8 bg-green-600 hover:bg-green-700 text-white" onClick={(e) => handleApprovePurchaseGM(purchase, e)}>
+                                <Check className="h-3 w-3 mr-1" />
+                                Approve
+                              </Button>
+                              <Button size="sm" variant="destructive" className="flex-1 h-8" onClick={(e) => handleRejectPurchaseGM(purchase.id, purchase.item_name, e)}>
+                                <XCircle className="h-3 w-3 mr-1" />
+                                Reject
+                              </Button>
+                            </div>
                           </DropdownMenuItem>
                         ))}
 

@@ -685,6 +685,22 @@ export default function SitePersonnel() {
         status: 'pending'
       }));
       await supabase.from('site_requests').insert(inserts);
+
+      // Auto-generate Pending Purchase Orders for Materials/Tools
+      const purchaseInserts = requestItems.map(item => ({
+        order_number: `PR-${Math.floor(10000 + Math.random() * 90000)}`,
+        order_date: requestForm.request_date,
+        supplier: 'Pending Selection',
+        item_name: item.item_name,
+        category: requestForm.request_type === "Materials" ? "Construction Materials" : "Tools",
+        quantity: parseFloat(item.quantity.toString()) || 0,
+        unit: item.unit,
+        unit_cost: 0,
+        destination_type: 'project_warehouse',
+        project_id: selectedProject,
+        status: 'pending'
+      }));
+      await supabase.from('purchases').insert(purchaseInserts);
     }
     setRequestDialogOpen(false);
     resetRequestForm();
