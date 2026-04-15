@@ -227,7 +227,7 @@ export default function Analytics() {
 
     // Map allocated
     bom.bom_scope_of_work.forEach((scope: any) => {
-      if (usageScopeFilter !== "all" && scope.id !== usageScopeFilter) return;
+      if (usageScopeFilter !== "all" && usageScopeFilter !== "unassigned" && scope.id !== usageScopeFilter) return;
 
       if (Array.isArray(scope.bom_materials)) {
         scope.bom_materials.forEach((mat: any) => {
@@ -243,15 +243,18 @@ export default function Analytics() {
 
     // Map actual
     (consumption || []).forEach((cons: any) => {
-      if (usageScopeFilter !== "all" && cons.bom_scope_id !== usageScopeFilter) return;
+      const isUnassigned = !cons.bom_scope_id || !bom.bom_scope_of_work.find((s: any) => s.id === cons.bom_scope_id);
+      
+      if (usageScopeFilter === "unassigned" && !isUnassigned) return;
+      if (usageScopeFilter !== "all" && usageScopeFilter !== "unassigned" && cons.bom_scope_id !== usageScopeFilter) return;
 
       const name = cons.item_name || "Unknown";
       const qty = Number(cons.quantity || 0);
-      const key = `${cons.bom_scope_id}_${name}`;
-      const scope = bom.bom_scope_of_work.find((s: any) => s.id === cons.bom_scope_id);
+      const scope = isUnassigned ? null : bom.bom_scope_of_work.find((s: any) => s.id === cons.bom_scope_id);
+      const key = isUnassigned ? `unassigned_${name}` : `${cons.bom_scope_id}_${name}`;
       
       if (!usageMap[key]) {
-        usageMap[key] = { allocated: 0, actual: 0, unit: cons.unit || "", scopeName: scope?.name || "Unknown Scope" };
+        usageMap[key] = { allocated: 0, actual: 0, unit: cons.unit || "", scopeName: scope?.name || "General/Unassigned" };
       }
       usageMap[key].actual += qty;
     });
@@ -306,7 +309,7 @@ export default function Analytics() {
       };
     });
 
-    // Add Unassigned / OCM row for items not linked to a specific scope
+    // Add General/Unassigned row for items not linked to a specific scope
     const unassignedMatCost = (consumption || [])
       .filter(c => !c.bom_scope_id || !bom.bom_scope_of_work.find((s: any) => s.id === c.bom_scope_id))
       .reduce((sum: number, c: any) => sum + (c.calculated_total_cost || 0), 0);
@@ -320,7 +323,7 @@ export default function Analytics() {
 
     if (unassignedMatCost > 0 || unassignedLabCost > 0) {
       result.push({
-        scopeName: "Unassigned / OCM",
+        scopeName: "General/Unassigned",
         allocatedMatCost: 0,
         allocatedLabCost: 0,
         totalAllocated: 0,
@@ -588,6 +591,7 @@ export default function Analytics() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Scopes</SelectItem>
+                      <SelectItem value="unassigned">General/Unassigned</SelectItem>
                       {bom?.bom_scope_of_work?.map((scope: any) => (
                         <SelectItem key={scope.id} value={scope.id}>{scope.name}</SelectItem>
                       ))}
