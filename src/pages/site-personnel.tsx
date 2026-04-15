@@ -613,14 +613,39 @@ export default function SitePersonnel() {
       received_by: userName 
     });
     
-    // Sync status back to Purchasing Module
-    if (delivery && delivery.notes && delivery.notes.includes('From PO: ')) {
-      const poMatch = delivery.notes.match(/From PO: (PR-\d+|PO-\d+)/);
-      if (poMatch && poMatch[1]) {
-         await supabase.from('purchases')
-            .update({ status: 'received' })
-            .eq('order_number', poMatch[1])
-            .eq('item_name', delivery.item_name);
+    if (delivery) {
+      // Sync status back to Purchasing Module
+      if (delivery.notes && delivery.notes.includes('From PO: ')) {
+        const poMatch = delivery.notes.match(/From PO: (PR-\d+|PO-\d+)/);
+        if (poMatch && poMatch[1]) {
+           await supabase.from('purchases')
+              .update({ status: 'received' })
+              .eq('order_number', poMatch[1])
+              .eq('item_name', delivery.item_name);
+        }
+      }
+
+      // Add to project inventory
+      const { data: existingInv } = await supabase
+        .from('inventory')
+        .select('*')
+        .eq('project_id', delivery.project_id)
+        .eq('name', delivery.item_name)
+        .maybeSingle();
+
+      if (existingInv) {
+        await supabase.from('inventory').update({
+          quantity: (existingInv.quantity || 0) + delivery.quantity
+        }).eq('id', existingInv.id);
+      } else {
+        await supabase.from('inventory').insert({
+          project_id: delivery.project_id,
+          name: delivery.item_name,
+          quantity: delivery.quantity,
+          unit: delivery.unit,
+          category: "Construction Materials",
+          unit_cost: 0
+        });
       }
     }
     
