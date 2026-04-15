@@ -92,7 +92,7 @@ export default function SitePersonnel() {
   });
 
   // Material Consumption
-  const [consumptions, setConsumptions] = useState<MaterialConsumption[]>([]);
+  const [consumptions, setConsumptions] = useState<any[]>([]);
   const [consumptionDate, setConsumptionDate] = useState<string>(todayStr);
   const [consumptionDialogOpen, setConsumptionDialogOpen] = useState(false);
   const [editingConsumptionId, setEditingConsumptionId] = useState<string | null>(null);
@@ -134,7 +134,7 @@ export default function SitePersonnel() {
   });
 
   // Cash Advances
-  const [cashAdvances, setCashAdvances] = useState<CashAdvance[]>([]);
+  const [cashAdvances, setCashAdvances] = useState<any[]>([]);
   const [advanceDialogOpen, setAdvanceDialogOpen] = useState(false);
   const [advanceForm, setAdvanceForm] = useState({
     personnel_id: "",
@@ -157,6 +157,8 @@ export default function SitePersonnel() {
     update_date: todayStr,
     notes: ""
   });
+
+  const [masterItems, setMasterItems] = useState<any[]>([]);
 
   useEffect(() => {
     loadProjects();
@@ -1996,11 +1998,11 @@ export default function SitePersonnel() {
                     deliveries.filter(d => d.status === "received").forEach(d => {
                       const key = `${d.item_name}-${d.unit}`;
                       if (!inventoryMap[key]) {
-                        // Find category from BOM materials if available, otherwise default
-                        const mat = bomMaterials.find(m => m.name === d.item_name);
+                        // Find category from master items
+                        const mItem = masterItems.find(m => m.name.toLowerCase() === d.item_name.toLowerCase());
                         inventoryMap[key] = { 
                           name: d.item_name, 
-                          category: mat ? "Materials" : "Uncategorized", // Can be expanded with real categories if linked
+                          category: mItem ? mItem.category : "Uncategorized",
                           unit: d.unit, 
                           received: 0, 
                           consumed: 0, 
@@ -2015,10 +2017,10 @@ export default function SitePersonnel() {
                     consumptions.forEach(c => {
                       const key = `${c.item_name}-${c.unit}`;
                       if (!inventoryMap[key]) {
-                        const mat = bomMaterials.find(m => m.name === c.item_name);
+                        const mItem = masterItems.find(m => m.name.toLowerCase() === c.item_name.toLowerCase());
                         inventoryMap[key] = { 
                           name: c.item_name, 
-                          category: mat ? "Materials" : "Uncategorized",
+                          category: mItem ? mItem.category : "Uncategorized",
                           unit: c.unit, 
                           received: 0, 
                           consumed: 0, 
