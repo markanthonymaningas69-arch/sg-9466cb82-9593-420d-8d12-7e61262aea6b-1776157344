@@ -114,7 +114,7 @@ export function AccountingDashboard({ onTabChange }: { onTabChange?: (tab: strin
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
         <XAxis dataKey="name" axisLine={false} tickLine={false} />
         <YAxis axisLine={false} tickLine={false} tickFormatter={(value) => `AED ${value}`} />
-        <RechartsTooltip cursor={{ fill: 'transparent' }} formatter={(value: number) => new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED' }).format(value)} />
+        <RechartsTooltip cursor={{ fill: 'transparent' }} formatter={(value: number) => formatCurrency(value)} />
         <Legend />
         <Bar dataKey="income" name="Income (Credits)" fill="#10b981" radius={[4, 4, 0, 0]}>
           <LabelList dataKey="income" position="top" fontSize={10} fill="#10b981" formatter={(val: number) => val > 0 ? val : ''} />
@@ -168,7 +168,7 @@ export function AccountingDashboard({ onTabChange }: { onTabChange?: (tab: strin
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${summary.balance >= 0 ? "text-success" : "text-destructive"}`}>
-              {new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED' }).format(summary.balance)}
+              {formatCurrency(summary.balance)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">Assets vs Liabilities</p>
           </CardContent>
@@ -180,7 +180,7 @@ export function AccountingDashboard({ onTabChange }: { onTabChange?: (tab: strin
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">
-              {new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED' }).format(summary.totalTax)}
+              {formatCurrency(summary.totalTax)}
             </div>
             <p className="text-xs text-orange-600/80 mt-1 font-medium">Click to view Tax Module →</p>
           </CardContent>
@@ -241,7 +241,7 @@ export function AccountingDashboard({ onTabChange }: { onTabChange?: (tab: strin
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <RechartsTooltip formatter={(value: number) => new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED' }).format(value)} />
+                  <RechartsTooltip formatter={(value: number) => formatCurrency(value)} />
                 </PieChart>
               </ResponsiveContainer>
             )}

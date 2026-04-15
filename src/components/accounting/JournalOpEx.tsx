@@ -293,10 +293,10 @@ export function JournalOpEx() {
                     </TableCell>
                     <TableCell className="max-w-[200px] truncate" title={entry.description}>{entry.description}</TableCell>
                     <TableCell className="text-right font-semibold text-blue-600">
-                      {entry.type === "debit" ? new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED' }).format(entry.amount) : "-"}
+                      {entry.type === "debit" ? formatCurrency(entry.amount) : "-"}
                     </TableCell>
                     <TableCell className="text-right font-semibold text-emerald-600">
-                      {entry.type === "credit" ? new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED' }).format(entry.amount) : "-"}
+                      {entry.type === "credit" ? formatCurrency(entry.amount) : "-"}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
