@@ -1,0 +1,1 @@
+ALTER TABLE "public"."material_consumption" ADD COLUMN IF NOT EXISTS "estimated_cost" numeric(15,2) NULL DEFAULT 0;

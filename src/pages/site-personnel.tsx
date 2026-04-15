@@ -105,6 +105,7 @@ export default function SitePersonnel() {
     item_name: "",
     quantity: 0,
     unit: "",
+    estimated_cost: 0,
     recorded_by: "",
     notes: ""
   });
@@ -658,9 +659,10 @@ export default function SitePersonnel() {
       ...consumptionForm,
       bom_scope_id: consumptionForm.bom_scope_id === "unassigned" ? null : consumptionForm.bom_scope_id,
       project_id: selectedProject,
-      quantity: parseFloat(consumptionForm.quantity.toString())
+      quantity: parseFloat(consumptionForm.quantity.toString()),
+      estimated_cost: isManualItem ? parseFloat(consumptionForm.estimated_cost.toString()) : 0
     });
-    setConsumptionForm(prev => ({ ...prev, item_name: "", quantity: 0, unit: "" }));
+    setConsumptionForm(prev => ({ ...prev, item_name: "", quantity: 0, unit: "", estimated_cost: 0 }));
     setIsManualItem(false);
     setIsManualUnit(false);
     loadConsumptions();
@@ -673,6 +675,7 @@ export default function SitePersonnel() {
       item_name: "",
       quantity: 0,
       unit: "",
+      estimated_cost: 0,
       recorded_by: "",
       notes: ""
     });
@@ -2417,6 +2420,22 @@ export default function SitePersonnel() {
                               )}
                             </div>
                           </div>
+                          {isManualItem && (
+                            <div className="space-y-2 bg-orange-50 p-3 rounded-md border border-orange-100">
+                              <Label htmlFor="est_cost" className="text-orange-800">Estimated Unit Cost (AED) *</Label>
+                              <Input
+                                id="est_cost"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={consumptionForm.estimated_cost}
+                                onChange={(e) => setConsumptionForm({ ...consumptionForm, estimated_cost: parseFloat(e.target.value) || 0 })}
+                                required
+                                className="bg-white border-orange-200 focus-visible:ring-orange-500"
+                              />
+                              <p className="text-[10px] text-orange-600 mt-1">Required for custom items to accurately calculate operational costs (OCM) later.</p>
+                            </div>
+                          )}
                           <div className="space-y-2">
                             <Label htmlFor="recorded_by">Recorded By</Label>
                             <Input
@@ -2568,7 +2587,10 @@ export default function SitePersonnel() {
                                     <span>{row.unit}</span>
                                   </div>
                                 ) : (
-                                  `${row.quantity} ${row.unit}`
+                                  <div>
+                                    <span className="block">{row.quantity} {row.unit}</span>
+                                    {row.estimated_cost > 0 && <span className="text-[10px] text-muted-foreground block font-medium">Est: AED {row.estimated_cost}/{row.unit}</span>}
+                                  </div>
                                 )}
                               </TableCell>
                               <TableCell>
@@ -2683,7 +2705,10 @@ export default function SitePersonnel() {
                                     <TableRow key={record.id}>
                                       <TableCell className="text-center text-muted-foreground">{index + 1}</TableCell>
                                       <TableCell className="font-medium">{record.item_name}</TableCell>
-                                      <TableCell>{record.quantity} {record.unit}</TableCell>
+                                      <TableCell>
+                                        <span className="block">{record.quantity} {record.unit}</span>
+                                        {record.estimated_cost > 0 && <span className="text-[10px] text-muted-foreground block font-medium">Est: AED {record.estimated_cost}/{record.unit}</span>}
+                                      </TableCell>
                                       <TableCell>
                                         {record.bom_scope_id ? (
                                           <Badge variant="secondary">{record.bom_scope_of_work?.name || "Unknown Scope"}</Badge>

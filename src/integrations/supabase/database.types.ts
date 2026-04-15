@@ -732,6 +732,7 @@ export type Database = {
           bom_scope_id: string | null
           created_at: string | null
           date_used: string
+          estimated_cost: number | null
           id: string
           is_archived: boolean | null
           item_name: string
@@ -745,6 +746,7 @@ export type Database = {
           bom_scope_id?: string | null
           created_at?: string | null
           date_used?: string
+          estimated_cost?: number | null
           id?: string
           is_archived?: boolean | null
           item_name: string
@@ -758,6 +760,7 @@ export type Database = {
           bom_scope_id?: string | null
           created_at?: string | null
           date_used?: string
+          estimated_cost?: number | null
           id?: string
           is_archived?: boolean | null
           item_name?: string
