@@ -2000,7 +2000,8 @@ export default function SitePersonnel() {
                 <CardContent className="flex-1 overflow-hidden pb-4">
                   {(() => {
                     // Calculate Balance
-                    const inventoryMap: Record<string, { name: string, category: string, unit: string, received: number, consumed: number, balance: number }> = {};
+                    type InventoryItem = { name: string; category: string; unit: string; received: number; consumed: number; balance: number };
+                    const inventoryMap: Record<string, InventoryItem> = {};
                     
                     // Add all RECEIVED deliveries
                     deliveries.filter(d => d.status === "received").forEach(d => {
@@ -2039,15 +2040,16 @@ export default function SitePersonnel() {
                       inventoryMap[key].balance -= c.quantity;
                     });
                     
-                    const siteInventoryArray: any[] = Object.values(inventoryMap).sort((a: any, b: any) => a.name.localeCompare(b.name));
+                    const siteInventoryArray = Object.values(inventoryMap);
+                    siteInventoryArray.sort((a, b) => a.name.localeCompare(b.name));
                     
-                    const filteredItems: any[] = siteInventoryArray.filter((item: any) => {
+                    const filteredItems = siteInventoryArray.filter(item => {
                       const matchName = item.name.toLowerCase().includes(warehouseSearch.toLowerCase());
                       const matchType = warehouseTypeFilter === "all" || item.category === warehouseTypeFilter;
                       return matchName && matchType;
                     });
                     
-                    if ((filteredItems as any[]).length === 0) {
+                    if (filteredItems.length === 0) {
                       return (
                         <div className="flex flex-col h-full bg-white relative rounded-md border">
                           <div className="p-3 border-b bg-gray-50 flex gap-4 sticky top-0 z-20">
@@ -2114,7 +2116,7 @@ export default function SitePersonnel() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {(filteredItems as any[]).map((item: any, idx: number) => (
+                              {filteredItems.map((item, idx) => (
                                 <TableRow key={idx} className="hover:bg-muted/50">
                                   <TableCell className="font-medium text-black">{item.name}</TableCell>
                                   <TableCell>
