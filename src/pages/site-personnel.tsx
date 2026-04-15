@@ -16,7 +16,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { siteService } from "@/services/siteService";
 import { projectService } from "@/services/projectService";
 import { personnelService } from "@/services/personnelService";
-import { Plus, Pencil, Trash2, Archive, Users, Truck, ClipboardList, ArrowUp, ArrowDown, Check, ArrowUpDown, ShoppingCart, Banknote, Wrench, Eye, Activity, List as ListIcon, CheckCircle2, AlertCircle } from "lucide-react";
+import { Plus, Pencil, Trash2, Archive, Users, Truck, ClipboardList, ArrowUp, ArrowDown, Check, ArrowUpDown, ShoppingCart, Banknote, Wrench, Eye, Activity, List as ListIcon, CheckCircle2, AlertCircle, Warehouse } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer } from "recharts";
 
@@ -828,6 +828,10 @@ export default function SitePersonnel() {
                   }
                   return null;
                 })()}
+              </TabsTrigger>
+              <TabsTrigger value="warehouse">
+                <Warehouse className="h-4 w-4 mr-2" />
+                Warehouse
               </TabsTrigger>
               <TabsTrigger value="consumption">
                 <ClipboardList className="h-4 w-4 mr-2" />
@@ -1948,6 +1952,88 @@ export default function SitePersonnel() {
                       );
                     })}
                   </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="warehouse" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Site Warehouse Inventory</CardTitle>
+                      <CardDescription>Real-time balance of materials physically on site</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4">
+                  {(() => {
+                    // Calculate Balance
+                    const inventoryMap: Record<string, { name: string, unit: string, received: number, consumed: number, balance: number }> = {};
+                    
+                    // Add all RECEIVED deliveries
+                    deliveries.filter(d => d.status === "received").forEach(d => {
+                      const key = `${d.item_name}-${d.unit}`;
+                      if (!inventoryMap[key]) {
+                        inventoryMap[key] = { name: d.item_name, unit: d.unit, received: 0, consumed: 0, balance: 0 };
+                      }
+                      inventoryMap[key].received += d.quantity;
+                      inventoryMap[key].balance += d.quantity;
+                    });
+                    
+                    // Subtract all Consumed materials
+                    consumptions.forEach(c => {
+                      const key = `${c.item_name}-${c.unit}`;
+                      if (!inventoryMap[key]) {
+                        inventoryMap[key] = { name: c.item_name, unit: c.unit, received: 0, consumed: 0, balance: 0 };
+                      }
+                      inventoryMap[key].consumed += c.quantity;
+                      inventoryMap[key].balance -= c.quantity;
+                    });
+                    
+                    const siteInventory = Object.values(inventoryMap).sort((a, b) => a.name.localeCompare(b.name));
+                    
+                    if (siteInventory.length === 0) {
+                      return (
+                        <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg bg-gray-50 h-full flex flex-col items-center justify-center">
+                          <Warehouse className="h-12 w-12 text-muted-foreground/30 mb-4" />
+                          <p>No inventory records yet.</p>
+                          <p className="text-sm">Mark deliveries as "Received" to build your site stock.</p>
+                        </div>
+                      );
+                    }
+                    
+                    return (
+                      <div className="overflow-y-auto h-full border rounded-md relative bg-white">
+                        <Table>
+                          <TableHeader className="sticky top-0 bg-gray-100 z-10 border-b">
+                            <TableRow>
+                              <TableHead className="font-bold text-black">Item Name</TableHead>
+                              <TableHead className="text-right font-bold text-blue-700 bg-blue-50 border-l">Total Received</TableHead>
+                              <TableHead className="text-right font-bold text-orange-700 bg-orange-50">Total Consumed</TableHead>
+                              <TableHead className="text-right font-bold text-green-700 bg-green-50 border-r">Current Balance</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {siteInventory.map((item, idx) => (
+                              <TableRow key={idx} className="hover:bg-muted/50">
+                                <TableCell className="font-medium text-black">{item.name}</TableCell>
+                                <TableCell className="text-right font-semibold text-blue-700 bg-blue-50/30 border-l">
+                                  {item.received} <span className="text-xs text-blue-400 font-normal">{item.unit}</span>
+                                </TableCell>
+                                <TableCell className="text-right font-semibold text-orange-700 bg-orange-50/30">
+                                  {item.consumed} <span className="text-xs text-orange-400 font-normal">{item.unit}</span>
+                                </TableCell>
+                                <TableCell className={`text-right font-bold text-lg border-r ${item.balance < 0 ? 'text-red-600 bg-red-50/30' : 'text-green-700 bg-green-50/30'}`}>
+                                  {item.balance} <span className={`text-xs font-normal ${item.balance < 0 ? 'text-red-400' : 'text-green-500'}`}>{item.unit}</span>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    );
+                  })()}
                 </CardContent>
               </Card>
             </TabsContent>
