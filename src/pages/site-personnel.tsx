@@ -2041,13 +2041,13 @@ export default function SitePersonnel() {
                     
                     const siteInventory = Object.values(inventoryMap).sort((a: any, b: any) => a.name.localeCompare(b.name)) as any[];
                     
-                    const filteredSiteInventory: any[] = siteInventory.filter((item: any) => {
+                    const filteredSiteInventory = siteInventory.filter((item: any) => {
                       const matchName = item.name.toLowerCase().includes(warehouseSearch.toLowerCase());
                       const matchType = warehouseTypeFilter === "all" || item.category === warehouseTypeFilter;
                       return matchName && matchType;
-                    });
+                    }) as any[];
                     
-                    if (filteredSiteInventory.length === 0) {
+                    if ((filteredSiteInventory as any[]).length === 0) {
                       return (
                         <div className="flex flex-col h-full bg-white relative rounded-md border">
                           <div className="p-3 border-b bg-gray-50 flex gap-4 sticky top-0 z-20">
@@ -2114,7 +2114,7 @@ export default function SitePersonnel() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {filteredSiteInventory.map((item: any, idx: number) => (
+                              {(filteredSiteInventory as any[]).map((item: any, idx: number) => (
                                 <TableRow key={idx} className="hover:bg-muted/50">
                                   <TableCell className="font-medium text-black">{item.name}</TableCell>
                                   <TableCell>
