@@ -2047,7 +2047,7 @@ export default function SitePersonnel() {
                       return matchName && matchType;
                     }) as any[];
                     
-                    if (filteredSiteInventoryArray.length === 0) {
+                    if ((filteredSiteInventoryArray as any[]).length === 0) {
                       return (
                         <div className="flex flex-col h-full bg-white relative rounded-md border">
                           <div className="p-3 border-b bg-gray-50 flex gap-4 sticky top-0 z-20">
@@ -2114,7 +2114,7 @@ export default function SitePersonnel() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {filteredSiteInventoryArray.map((item: any, idx: number) => (
+                              {(filteredSiteInventoryArray as any[]).map((item: any, idx: number) => (
                                 <TableRow key={idx} className="hover:bg-muted/50">
                                   <TableCell className="font-medium text-black">{item.name}</TableCell>
                                   <TableCell>
