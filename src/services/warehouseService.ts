@@ -133,5 +133,38 @@ export const warehouseService = {
     }
 
     return { success: true };
+  },
+
+  async updateDeployment(deliveryId: string, newQuantity: number) {
+    const { data: delivery } = await supabase.from('deliveries').select('*').eq('id', deliveryId).single();
+    if (!delivery) throw new Error("Delivery not found");
+
+    const diff = newQuantity - delivery.quantity;
+
+    // Adjust main warehouse inventory
+    const { data: mainItem } = await supabase.from('inventory')
+      .select('*')
+      .eq('name', delivery.item_name)
+      .is('project_id', null)
+      .maybeSingle();
+
+    if (mainItem) {
+      await this.update(mainItem.id, { quantity: mainItem.quantity - diff });
+    }
+
+    // Adjust project warehouse inventory
+    const { data: projItem } = await supabase.from('inventory')
+      .select('*')
+      .eq('name', delivery.item_name)
+      .eq('project_id', delivery.project_id)
+      .maybeSingle();
+
+    if (projItem) {
+      await this.update(projItem.id, { quantity: projItem.quantity + diff });
+    }
+
+    // Update delivery record
+    await supabase.from('deliveries').update({ quantity: newQuantity }).eq('id', deliveryId);
+    return { success: true };
   }
 };

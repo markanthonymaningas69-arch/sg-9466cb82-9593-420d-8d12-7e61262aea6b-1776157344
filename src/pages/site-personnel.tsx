@@ -159,12 +159,20 @@ export default function SitePersonnel() {
   });
 
   const [masterItems, setMasterItems] = useState<any[]>([]);
+  const [warehouseSearch, setWarehouseSearch] = useState("");
+  const [warehouseTypeFilter, setWarehouseTypeFilter] = useState("all");
 
   useEffect(() => {
     loadProjects();
     loadPersonnel();
     checkUserAssignment();
+    loadMasterItems();
   }, []);
+
+  const loadMasterItems = async () => {
+    const { data } = await projectService.getMasterItems();
+    setMasterItems(data || []);
+  };
 
   const checkUserAssignment = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -2031,50 +2039,101 @@ export default function SitePersonnel() {
                       inventoryMap[key].balance -= c.quantity;
                     });
                     
-                    const siteInventory = Object.values(inventoryMap).sort((a, b) => a.name.localeCompare(b.name));
+                    const siteInventory = Object.values(inventoryMap).sort((a: any, b: any) => a.name.localeCompare(b.name)) as any[];
                     
-                    if (siteInventory.length === 0) {
+                    const filteredSiteInventory = siteInventory.filter((item: any) => {
+                      const matchName = item.name.toLowerCase().includes(warehouseSearch.toLowerCase());
+                      const matchType = warehouseTypeFilter === "all" || item.category === warehouseTypeFilter;
+                      return matchName && matchType;
+                    });
+                    
+                    if (filteredSiteInventory.length === 0) {
                       return (
-                        <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg bg-gray-50 h-full flex flex-col items-center justify-center">
-                          <Warehouse className="h-12 w-12 text-muted-foreground/30 mb-4" />
-                          <p>No inventory records yet.</p>
-                          <p className="text-sm">Mark deliveries as "Received" to build your site stock.</p>
+                        <div className="flex flex-col h-full bg-white relative rounded-md border">
+                          <div className="p-3 border-b bg-gray-50 flex gap-4 sticky top-0 z-20">
+                            <div className="flex-1 max-w-sm">
+                              <Input 
+                                placeholder="Search item name..." 
+                                value={warehouseSearch} 
+                                onChange={(e) => setWarehouseSearch(e.target.value)} 
+                                className="bg-white"
+                              />
+                            </div>
+                            <Select value={warehouseTypeFilter} onValueChange={setWarehouseTypeFilter}>
+                              <SelectTrigger className="w-[200px] bg-white">
+                                <SelectValue placeholder="All Types" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Types</SelectItem>
+                                {Array.from(new Set(siteInventory.map((i:any) => i.category))).map((c:any) => (
+                                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="text-center py-8 text-muted-foreground bg-gray-50 h-full flex flex-col items-center justify-center">
+                            <Warehouse className="h-12 w-12 text-muted-foreground/30 mb-4" />
+                            <p>No inventory records found matching your filters.</p>
+                          </div>
                         </div>
                       );
                     }
                     
                     return (
-                      <div className="overflow-y-auto h-full border rounded-md relative bg-white">
-                        <Table>
-                          <TableHeader className="sticky top-0 bg-gray-100 z-10 border-b">
-                            <TableRow>
-                              <TableHead className="font-bold text-black">Item Name</TableHead>
-                              <TableHead className="font-bold text-black">Type</TableHead>
-                              <TableHead className="text-right font-bold text-blue-700 bg-blue-50 border-l">Total Received</TableHead>
-                              <TableHead className="text-right font-bold text-orange-700 bg-orange-50">Total Consumed</TableHead>
-                              <TableHead className="text-right font-bold text-green-700 bg-green-50 border-r">Current Balance</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {siteInventory.map((item, idx) => (
-                              <TableRow key={idx} className="hover:bg-muted/50">
-                                <TableCell className="font-medium text-black">{item.name}</TableCell>
-                                <TableCell>
-                                  <Badge variant="outline" className="text-xs bg-gray-50">{item.category}</Badge>
-                                </TableCell>
-                                <TableCell className="text-right font-semibold text-blue-700 bg-blue-50/30 border-l">
-                                  {item.received} <span className="text-xs text-blue-400 font-normal">{item.unit}</span>
-                                </TableCell>
-                                <TableCell className="text-right font-semibold text-orange-700 bg-orange-50/30">
-                                  {item.consumed} <span className="text-xs text-orange-400 font-normal">{item.unit}</span>
-                                </TableCell>
-                                <TableCell className={`text-right font-bold text-lg border-r ${item.balance < 0 ? 'text-red-600 bg-red-50/30' : 'text-green-700 bg-green-50/30'}`}>
-                                  {item.balance} <span className={`text-xs font-normal ${item.balance < 0 ? 'text-red-400' : 'text-green-500'}`}>{item.unit}</span>
-                                </TableCell>
+                      <div className="flex flex-col h-full bg-white relative rounded-md border">
+                        <div className="p-3 border-b bg-gray-50 flex gap-4 sticky top-0 z-20">
+                          <div className="flex-1 max-w-sm">
+                            <Input 
+                              placeholder="Search item name..." 
+                              value={warehouseSearch} 
+                              onChange={(e) => setWarehouseSearch(e.target.value)} 
+                              className="bg-white"
+                            />
+                          </div>
+                          <Select value={warehouseTypeFilter} onValueChange={setWarehouseTypeFilter}>
+                            <SelectTrigger className="w-[200px] bg-white">
+                              <SelectValue placeholder="All Types" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Types</SelectItem>
+                              {Array.from(new Set(siteInventory.map((i:any) => i.category))).map((c:any) => (
+                                <SelectItem key={c} value={c}>{c}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="overflow-y-auto flex-1">
+                          <Table>
+                            <TableHeader className="sticky top-0 bg-gray-100 z-10 border-b shadow-sm">
+                              <TableRow>
+                                <TableHead className="font-bold text-black">Item Name</TableHead>
+                                <TableHead className="font-bold text-black">Type</TableHead>
+                                <TableHead className="text-right font-bold text-blue-700 bg-blue-50 border-l">Total Received</TableHead>
+                                <TableHead className="text-right font-bold text-orange-700 bg-orange-50">Total Consumed</TableHead>
+                                <TableHead className="text-right font-bold text-green-700 bg-green-50 border-r">Current Balance</TableHead>
                               </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
+                            </TableHeader>
+                            <TableBody>
+                              {filteredSiteInventory.map((item: any, idx: number) => (
+                                <TableRow key={idx} className="hover:bg-muted/50">
+                                  <TableCell className="font-medium text-black">{item.name}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="text-xs bg-gray-50">{item.category}</Badge>
+                                  </TableCell>
+                                  <TableCell className="text-right font-semibold text-blue-700 bg-blue-50/30 border-l">
+                                    {item.received} <span className="text-xs text-blue-400 font-normal">{item.unit}</span>
+                                  </TableCell>
+                                  <TableCell className="text-right font-semibold text-orange-700 bg-orange-50/30">
+                                    {item.consumed} <span className="text-xs text-orange-400 font-normal">{item.unit}</span>
+                                  </TableCell>
+                                  <TableCell className={`text-right font-bold text-lg border-r ${item.balance < 0 ? 'text-red-600 bg-red-50/30' : 'text-green-700 bg-green-50/30'}`}>
+                                    {item.balance} <span className={`text-xs font-normal ${item.balance < 0 ? 'text-red-400' : 'text-green-500'}`}>{item.unit}</span>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
                       </div>
                     );
                   })()}

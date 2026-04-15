@@ -12,8 +12,9 @@ import { Badge } from "@/components/ui/badge";
 import { warehouseService } from "@/services/warehouseService";
 import { projectService } from "@/services/projectService";
 import { useSettings } from "@/contexts/SettingsProvider";
-import { Plus, Pencil, Trash2, Archive, Package, Building2, Warehouse as WarehouseIcon, FileSpreadsheet } from "lucide-react";
+import { Plus, Pencil, Trash2, Archive, Package, Building2, Warehouse as WarehouseIcon, FileSpreadsheet, Truck } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
+import { supabase } from "@/integrations/supabase/client";
 
 type WarehouseItem = Database["public"]["Tables"]["inventory"]["Row"] & {
   projects?: { name: string } | null;
@@ -34,6 +35,8 @@ export default function Warehouse() {
   const [items, setItems] = useState<WarehouseItem[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [masterItems, setMasterItems] = useState<any[]>([]);
+  const [deliveries, setDeliveries] = useState<any[]>([]);
+  const [consumptions, setConsumptions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Tabs and Filters
@@ -45,9 +48,12 @@ export default function Warehouse() {
   // Form State
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deployDialogOpen, setDeployDialogOpen] = useState(false);
+  const [deploymentDialogOpen, setDeploymentDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<WarehouseItem | null>(null);
   const [deployingItem, setDeployingItem] = useState<WarehouseItem | null>(null);
+  const [editingDeployment, setEditingDeployment] = useState<any>(null);
   const [deployForm, setDeployForm] = useState({ project_id: "", quantity: 1 });
+  const [deploymentForm, setDeploymentForm] = useState({ quantity: 0 });
   const [isManualName, setIsManualName] = useState(false);
   const [isManualCategory, setIsManualCategory] = useState(false);
   const [isManualUnit, setIsManualUnit] = useState(false);
@@ -67,14 +73,18 @@ export default function Warehouse() {
 
   const loadData = async () => {
     setLoading(true);
-    const [{ data: itemsData }, { data: projectsData }, { data: masterData }] = await Promise.all([
+    const [{ data: itemsData }, { data: projectsData }, { data: masterData }, { data: deliveriesData }, { data: consumptionsData }] = await Promise.all([
       warehouseService.getAll(),
       projectService.getAll(),
-      projectService.getMasterItems()
+      projectService.getMasterItems(),
+      supabase.from('deliveries').select('*, projects(name)'),
+      supabase.from('site_material_consumption').select('*, projects(name)')
     ]);
     setItems(itemsData as WarehouseItem[] || []);
     setProjects(projectsData || []);
     setMasterItems(masterData || []);
+    setDeliveries(deliveriesData || []);
+    setConsumptions(consumptionsData || []);
     setLoading(false);
   };
 
@@ -172,6 +182,15 @@ export default function Warehouse() {
     setDeployDialogOpen(false);
     setDeployingItem(null);
     setDeployForm({ project_id: "", quantity: 1 });
+    loadData();
+  };
+
+  const handleDeploymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDeployment) return;
+    await warehouseService.updateDeployment(editingDeployment.id, deploymentForm.quantity);
+    setDeploymentDialogOpen(false);
+    setEditingDeployment(null);
     loadData();
   };
 
@@ -416,6 +435,43 @@ export default function Warehouse() {
               )}
             </DialogContent>
           </Dialog>
+
+          <Dialog open={deploymentDialogOpen} onOpenChange={setDeploymentDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Edit Deployment Quantity</DialogTitle>
+              </DialogHeader>
+              {editingDeployment && (
+                <form onSubmit={handleDeploymentSubmit} className="space-y-4">
+                  <div className="bg-muted p-4 rounded-lg">
+                    <div className="font-semibold text-lg">{editingDeployment.item_name}</div>
+                    <div className="text-sm text-muted-foreground">Deployed to: {editingDeployment.projects?.name}</div>
+                    <div className="text-sm text-muted-foreground mt-1">Status: <Badge variant="outline" className="ml-1">{editingDeployment.status?.toUpperCase()}</Badge></div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Deployed Quantity ({editingDeployment.unit}) *</Label>
+                    <Input 
+                      type="number" 
+                      step="0.01"
+                      min="0.01" 
+                      value={deploymentForm.quantity} 
+                      onChange={(e) => setDeploymentForm({ quantity: parseFloat(e.target.value) || 0 })} 
+                      required 
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Changing this will automatically update the Site Deliveries list and adjust the Main Warehouse balance accordingly.
+                    </p>
+                  </div>
+                  
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button type="button" variant="outline" onClick={() => setDeploymentDialogOpen(false)}>Cancel</Button>
+                    <Button type="submit">Save Changes</Button>
+                  </div>
+                </form>
+              )}
+            </DialogContent>
+          </Dialog>
         </div>
 
         <div className="grid gap-4 md:grid-cols-1 max-w-sm shrink-0">
@@ -438,6 +494,9 @@ export default function Warehouse() {
             <TabsTrigger value="balance" className="flex items-center gap-2">
               <FileSpreadsheet className="h-4 w-4" /> Balance Checking
             </TabsTrigger>
+            <TabsTrigger value="deployments" className="flex items-center gap-2">
+              <Truck className="h-4 w-4" /> Deployments
+            </TabsTrigger>
             <div className="flex-1"></div>
             <TabsTrigger value="project" className="flex items-center gap-2">
               <Building2 className="h-4 w-4" /> Project Warehouse
@@ -459,6 +518,21 @@ export default function Warehouse() {
             </div>
             
             {activeTab === "project" && (
+              <div className="space-y-1">
+                <Label className="text-xs">Filter by Project:</Label>
+                <Select value={projectFilter} onValueChange={setProjectFilter}>
+                  <SelectTrigger className="w-[200px] h-9 bg-white dark:bg-background">
+                    <SelectValue placeholder="All Projects" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Projects</SelectItem>
+                    {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            
+            {activeTab === "deployments" && (
               <div className="space-y-1">
                 <Label className="text-xs">Filter by Project:</Label>
                 <Select value={projectFilter} onValueChange={setProjectFilter}>
@@ -565,64 +639,157 @@ export default function Warehouse() {
 
           <TabsContent value="project" className="flex-1 mt-4 data-[state=active]:flex flex-col min-h-0">
             <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none">
-              <div className="overflow-y-auto rounded-md border h-full relative">
+              <div className="overflow-y-auto rounded-md border h-full relative bg-white">
                 <Table>
-                  <TableHeader className="sticky top-0 bg-background z-10">
+                  <TableHeader className="sticky top-0 bg-gray-100 z-10 border-b">
+                    <TableRow>
+                      <TableHead className="font-bold text-black">Item Name</TableHead>
+                      <TableHead className="font-bold text-black">Category</TableHead>
+                      <TableHead className="font-bold text-black">Project</TableHead>
+                      <TableHead className="text-right font-bold text-blue-700 bg-blue-50 border-l">Total Received</TableHead>
+                      <TableHead className="text-right font-bold text-orange-700 bg-orange-50">Total Consumed</TableHead>
+                      <TableHead className="text-right font-bold text-green-700 bg-green-50 border-r">Current Balance</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(() => {
+                      const projInvMap: Record<string, any> = {};
+                      
+                      deliveries.filter(d => d.status === "received").forEach(d => {
+                        if (projectFilter !== "all" && d.project_id !== projectFilter) return;
+                        if (dateFilter && d.delivery_date !== dateFilter) return;
+                        
+                        const key = `${d.project_id}-${d.item_name}-${d.unit}`;
+                        if (!projInvMap[key]) {
+                          const mItem = masterItems.find(m => m.name.toLowerCase() === d.item_name.toLowerCase());
+                          projInvMap[key] = {
+                            project_id: d.project_id,
+                            project_name: d.projects?.name || "Unknown",
+                            name: d.item_name,
+                            category: mItem ? mItem.category : "Uncategorized",
+                            unit: d.unit,
+                            received: 0,
+                            consumed: 0,
+                            balance: 0
+                          };
+                        }
+                        projInvMap[key].received += d.quantity;
+                        projInvMap[key].balance += d.quantity;
+                      });
+
+                      consumptions.forEach(c => {
+                        if (projectFilter !== "all" && c.project_id !== projectFilter) return;
+                        if (dateFilter && c.date_used !== dateFilter) return;
+
+                        const key = `${c.project_id}-${c.item_name}-${c.unit}`;
+                        if (!projInvMap[key]) {
+                          const mItem = masterItems.find(m => m.name.toLowerCase() === c.item_name.toLowerCase());
+                          projInvMap[key] = {
+                            project_id: c.project_id,
+                            project_name: c.projects?.name || "Unknown",
+                            name: c.item_name,
+                            category: mItem ? mItem.category : "Uncategorized",
+                            unit: c.unit,
+                            received: 0,
+                            consumed: 0,
+                            balance: 0
+                          };
+                        }
+                        projInvMap[key].consumed += c.quantity;
+                        projInvMap[key].balance -= c.quantity;
+                      });
+
+                      const siteInventory = Object.values(projInvMap).filter((item: any) => {
+                         const matchCategory = categoryFilter === "all" || item.category === categoryFilter;
+                         return matchCategory;
+                      }).sort((a: any, b: any) => a.project_name.localeCompare(b.project_name) || a.name.localeCompare(b.name));
+
+                      if (siteInventory.length === 0) {
+                        return (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                              No project inventory found matching the filters.
+                            </TableCell>
+                          </TableRow>
+                        );
+                      }
+
+                      return siteInventory.map((item: any, idx) => (
+                        <TableRow key={idx} className="hover:bg-muted/50">
+                          <TableCell className="font-medium text-black">{item.name}</TableCell>
+                          <TableCell><Badge variant="outline" className="text-xs">{item.category}</Badge></TableCell>
+                          <TableCell><Badge variant="secondary" className="font-semibold text-blue-700 bg-blue-50 border-blue-200">{item.project_name}</Badge></TableCell>
+                          <TableCell className="text-right font-semibold text-blue-700 bg-blue-50/30 border-l">{item.received} <span className="text-xs text-blue-400 font-normal">{item.unit}</span></TableCell>
+                          <TableCell className="text-right font-semibold text-orange-700 bg-orange-50/30">{item.consumed} <span className="text-xs text-orange-400 font-normal">{item.unit}</span></TableCell>
+                          <TableCell className={`text-right font-bold text-lg border-r ${item.balance < 0 ? 'text-red-600 bg-red-50/30' : 'text-green-700 bg-green-50/30'}`}>{item.balance} <span className={`text-xs font-normal ${item.balance < 0 ? 'text-red-400' : 'text-green-500'}`}>{item.unit}</span></TableCell>
+                        </TableRow>
+                      ));
+                    })()}
+                  </TableBody>
+                </Table>
+              </div>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="deployments" className="flex-1 mt-4 data-[state=active]:flex flex-col min-h-0">
+            <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none">
+              <div className="overflow-y-auto rounded-md border h-full relative bg-white">
+                <Table>
+                  <TableHeader className="sticky top-0 bg-gray-100 z-10 border-b">
                     <TableRow>
                       <TableHead>Date</TableHead>
-                      <TableHead>Item Name</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Deployed To</TableHead>
+                      <TableHead>Project</TableHead>
+                      <TableHead>Item</TableHead>
                       <TableHead className="text-right">Quantity</TableHead>
-                      <TableHead className="text-right">Total Value</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredProject.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                          No items currently deployed to projects.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredProject.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell className="text-muted-foreground whitespace-nowrap">{item.last_restocked || item.created_at?.split("T")[0] || "-"}</TableCell>
-                          <TableCell className="font-medium">{item.name}</TableCell>
+                    {(() => {
+                      const deployedList = deliveries.filter(d => d.supplier === "Main Warehouse");
+                      const filteredDeployed = deployedList.filter(d => {
+                        const matchProject = projectFilter === "all" || d.project_id === projectFilter;
+                        const matchDate = !dateFilter || d.delivery_date === dateFilter;
+                        const mItem = masterItems.find(m => m.name.toLowerCase() === d.item_name.toLowerCase());
+                        const cat = mItem ? mItem.category : "Uncategorized";
+                        const matchCategory = categoryFilter === "all" || cat === categoryFilter;
+                        return matchProject && matchDate && matchCategory;
+                      }).sort((a,b) => new Date(b.delivery_date).getTime() - new Date(a.delivery_date).getTime());
+
+                      if (filteredDeployed.length === 0) {
+                        return (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                              No deployments found matching the filter.
+                            </TableCell>
+                          </TableRow>
+                        );
+                      }
+
+                      return filteredDeployed.map(d => (
+                        <TableRow key={d.id}>
+                          <TableCell>{d.delivery_date}</TableCell>
+                          <TableCell><Badge variant="secondary">{d.projects?.name || "Unknown"}</Badge></TableCell>
+                          <TableCell className="font-medium">{d.item_name}</TableCell>
+                          <TableCell className="text-right font-semibold">{d.quantity} <span className="text-xs text-muted-foreground font-normal">{d.unit}</span></TableCell>
                           <TableCell>
-                            <Badge variant="outline">{getCategoryLabel(item.category || "-")}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary" className="font-semibold text-blue-700 bg-blue-50 border-blue-200">
-                              {item.projects?.name || "Unknown Project"}
+                            <Badge variant="outline" className={d.status === 'received' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-orange-50 text-orange-700 border-orange-200'}>
+                              {d.status?.toUpperCase()}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right font-semibold">{item.quantity} {item.unit}</TableCell>
-                          <TableCell className="text-right font-semibold text-primary">
-                            {formatCurrency(item.quantity * item.unit_cost)}
-                          </TableCell>
-                          <TableCell>
-                            {item.quantity <= (item.reorder_level || 0) ? (
-                              <Badge className="bg-warning/20 text-warning border-warning/50">Low Stock</Badge>
-                            ) : (
-                              <Badge className="bg-success/20 text-success border-success/50">In Stock</Badge>
-                            )}
-                          </TableCell>
                           <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button size="sm" variant="ghost" onClick={() => handleEdit(item)}>
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button size="sm" variant="ghost" onClick={() => handleDelete(item.id)} title="Archive">
-                                <Archive className="h-4 w-4 text-orange-600" />
-                              </Button>
-                            </div>
+                            <Button size="sm" variant="ghost" onClick={() => {
+                              setEditingDeployment(d);
+                              setDeploymentForm({ quantity: d.quantity });
+                              setDeploymentDialogOpen(true);
+                            }}>
+                              <Pencil className="h-4 w-4 text-blue-600" /> Edit Qty
+                            </Button>
                           </TableCell>
                         </TableRow>
-                      ))
-                    )}
+                      ));
+                    })()}
                   </TableBody>
                 </Table>
               </div>
