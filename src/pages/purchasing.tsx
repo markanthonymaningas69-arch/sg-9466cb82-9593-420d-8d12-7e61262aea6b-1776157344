@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingCart, Plus, Search, Building2, Warehouse as WarehouseIcon, FilterX, List, Edit2, Archive } from "lucide-react";
+import { ShoppingCart, Plus, Search, Building2, Warehouse as WarehouseIcon, FilterX, List, Edit2, Archive, Printer } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { projectService } from "@/services/projectService";
 import { useSettings } from "@/contexts/SettingsProvider";
@@ -17,7 +17,7 @@ import { useSettings } from "@/contexts/SettingsProvider";
 const STANDARD_UNITS = ["pcs", "bags", "kgs", "liters", "units", "set", "lot", "m", "sq.m", "cu.m", "length", "box", "roll"];
 
 export default function Purchasing() {
-  const { formatCurrency } = useSettings();
+  const { formatCurrency, company, currency } = useSettings();
   const [purchases, setPurchases] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
@@ -228,6 +228,109 @@ export default function Purchasing() {
     } else {
       alert("Failed to submit: " + error.message);
     }
+  };
+
+  const handlePrint = (p: any) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const projectName = p.projects?.name || (p.destination_type === 'main_warehouse' ? 'Main Warehouse' : 'Unknown Project');
+    const logoUrl = company?.logo_url || '';
+    const absoluteLogoUrl = logoUrl ? (logoUrl.startsWith('/') ? window.location.origin + logoUrl : logoUrl) : '';
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Purchase Order ${p.order_number}</title>
+          <style>
+            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 40px; color: #222; max-width: 800px; margin: 0 auto; line-height: 1.5; }
+            .header-container { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 15px; }
+            .company-info { display: flex; align-items: center; gap: 15px; }
+            .company-logo { max-width: 80px; max-height: 80px; object-fit: contain; }
+            .company-text h3 { margin: 0; font-size: 18px; color: #111; text-transform: uppercase; font-weight: bold; }
+            .company-text p { margin: 3px 0 0 0; font-size: 12px; color: #555; }
+            .po-title { text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; background: #eee; padding: 10px 20px; border: 1px solid #ccc; display: inline-block; margin: 20px auto 40px auto; width: 100%; box-sizing: border-box; }
+            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 30px; }
+            .info-row { display: flex; margin-bottom: 12px; }
+            .label { font-weight: bold; width: 120px; color: #333; }
+            .value { flex: 1; border-bottom: 1px solid #999; padding-bottom: 2px; font-family: monospace; font-size: 14px; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+            th, td { border: 1px solid #000; padding: 10px; text-align: left; }
+            th { background: #eee; font-weight: bold; text-transform: uppercase; font-size: 12px; }
+            td { font-size: 14px; }
+            .text-right { text-align: right; }
+            .amount-box { text-align: right; font-size: 22px; font-weight: bold; margin-bottom: 60px; padding: 15px 20px; background: #f9f9f9; border: 1px solid #000; display: inline-block; float: right; min-width: 250px; }
+            .clearfix::after { content: ""; clear: both; display: table; }
+            .signatures { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 40px; margin-top: 60px; }
+            .sig-line { border-top: 1px solid #000; text-align: center; padding-top: 10px; font-size: 12px; font-weight: bold; color: #333; text-transform: uppercase; }
+          </style>
+        </head>
+        <body>
+          <div class="header-container">
+            <div class="company-info">
+              ${absoluteLogoUrl ? `<img src="${absoluteLogoUrl}" class="company-logo" alt="Logo" />` : `<div style="width: 50px; height: 50px; background: #eee; display: flex; align-items: center; justify-content: center; border: 1px solid #ccc; font-size: 10px; color: #999;">LOGO</div>`}
+              <div class="company-text">
+                <h3>${company?.name || 'Company Name'}</h3>
+                <p>${company?.address || 'Company Address line 1<br/>City, Country, ZIP'}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div class="po-title">PURCHASE ORDER</div>
+          
+          <div class="info-grid">
+            <div>
+              <div class="info-row"><div class="label">PO Number:</div><div class="value">${p.order_number}</div></div>
+              <div class="info-row"><div class="label">Date:</div><div class="value">${new Date(p.order_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div></div>
+            </div>
+            <div>
+              <div class="info-row"><div class="label">Supplier:</div><div class="value">${p.supplier || 'Pending'}</div></div>
+              <div class="info-row"><div class="label">Deliver To:</div><div class="value">${projectName}</div></div>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Item Description</th>
+                <th>Category</th>
+                <th class="text-right">Qty</th>
+                <th class="text-right">Unit Price</th>
+                <th class="text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>${p.item_name}</td>
+                <td>${p.category || '-'}</td>
+                <td class="text-right">${p.quantity} ${p.unit}</td>
+                <td class="text-right">${currency || 'AED'} ${(p.unit_cost || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="text-right">${currency || 'AED'} ${(p.total_cost || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="clearfix">
+            <div class="amount-box">
+              TOTAL: ${currency || 'AED'} ${(p.total_cost || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+            </div>
+          </div>
+
+          <div class="signatures">
+            <div class="sig-line">Prepared By</div>
+            <div class="sig-line">Checked By</div>
+            <div class="sig-line">Approved By</div>
+          </div>
+          
+          <script>
+            window.onload = function() { window.print(); }
+          </script>
+        </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
   };
 
   return (
@@ -584,7 +687,7 @@ export default function Purchasing() {
                             'bg-orange-500 hover:bg-orange-600 border-transparent text-white'
                           }
                         >
-                          {p.status === 'pending_approval' ? 'WAITING GM' : p.status.toUpperCase()}
+                          {p.status === 'pending_approval' ? 'PENDING GM' : p.status.toUpperCase()}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
@@ -602,6 +705,9 @@ export default function Purchasing() {
                               <Edit2 className="h-4 w-4" />
                             </Button>
                           )}
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" onClick={() => handlePrint(p)} title="Print PO">
+                            <Printer className="h-4 w-4" />
+                          </Button>
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50" onClick={() => handleArchive(p.id)} title="Archive">
                             <Archive className="h-4 w-4" />
                           </Button>

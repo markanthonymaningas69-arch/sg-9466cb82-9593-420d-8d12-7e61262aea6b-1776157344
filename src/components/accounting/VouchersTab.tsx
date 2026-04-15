@@ -92,6 +92,7 @@ export function VouchersTab() {
 
     const projectName = v.project_id ? projects.find(p => p.id === v.project_id)?.name || 'Unknown Project' : 'Head Office';
     const logoUrl = company?.logo_url || '';
+    const absoluteLogoUrl = logoUrl ? (logoUrl.startsWith('/') ? window.location.origin + logoUrl : logoUrl) : '';
 
     const html = `
       <!DOCTYPE html>
@@ -122,7 +123,7 @@ export function VouchersTab() {
         <body>
           <div class="header-container">
             <div class="company-info">
-              ${logoUrl ? `<img src="${logoUrl}" class="company-logo" alt="Logo" />` : `<div style="width: 50px; height: 50px; background: #eee; display: flex; align-items: center; justify-content: center; border: 1px solid #ccc; font-size: 10px; color: #999;">LOGO</div>`}
+              ${absoluteLogoUrl ? `<img src="${absoluteLogoUrl}" class="company-logo" alt="Logo" />` : `<div style="width: 50px; height: 50px; background: #eee; display: flex; align-items: center; justify-content: center; border: 1px solid #ccc; font-size: 10px; color: #999;">LOGO</div>`}
               <div class="company-text">
                 <h3>${company?.name || 'Company Name'}</h3>
                 <p>${company?.address || 'Company Address line 1<br/>City, Country, ZIP'}</p>
