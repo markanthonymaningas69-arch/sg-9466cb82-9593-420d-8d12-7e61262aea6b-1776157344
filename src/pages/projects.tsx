@@ -471,9 +471,13 @@ export default function Projects() {
           </DialogHeader>
 
           <Tabs defaultValue="items" className="w-full mt-4">
-            <TabsList className="mb-4">
-              <TabsTrigger value="items">Materials, Tools & PPE</TabsTrigger>
-              <TabsTrigger value="scopes">Scopes of Work</TabsTrigger>
+            <TabsList className="shrink-0 flex flex-wrap w-full gap-1 h-auto bg-transparent p-0 pb-4">
+              <TabsTrigger value="items" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-blue-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-blue-700 bg-blue-50 text-blue-700 hover:bg-blue-100">
+                <Database className="h-3 w-3 mr-1.5 hidden sm:inline" /> Materials & Tools
+              </TabsTrigger>
+              <TabsTrigger value="scopes" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-indigo-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-indigo-700 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
+                <FileText className="h-3 w-3 mr-1.5 hidden sm:inline" /> Scopes of Work
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="items" className="space-y-4">

@@ -2000,8 +2000,7 @@ export default function SitePersonnel() {
                 <CardContent className="flex-1 overflow-hidden pb-4">
                   {(() => {
                     // Calculate Balance
-                    type InventoryItem = { name: string; category: string; unit: string; received: number; consumed: number; balance: number };
-                    const inventoryMap: Record<string, InventoryItem> = {};
+                    const inventoryMap: Record<string, { name: string, category: string, unit: string, received: number, consumed: number, balance: number }> = {};
                     
                     // Add all RECEIVED deliveries
                     deliveries.filter(d => d.status === "received").forEach(d => {
@@ -2040,7 +2039,8 @@ export default function SitePersonnel() {
                       inventoryMap[key].balance -= c.quantity;
                     });
                     
-                    const siteInventoryArray = Object.values(inventoryMap);
+                    const rawItems = Object.values(inventoryMap);
+                    const siteInventoryArray = Array.isArray(rawItems) ? rawItems : [];
                     siteInventoryArray.sort((a: any, b: any) => a.name.localeCompare(b.name));
                     
                     const filteredItems = siteInventoryArray.filter((item: any) => {
@@ -2049,9 +2049,9 @@ export default function SitePersonnel() {
                       return matchName && matchType;
                     });
                     
-                    const safeItems: any[] = Array.isArray(filteredItems) ? filteredItems : [];
+                    const finalItems = Array.isArray(filteredItems) ? filteredItems : [];
                     
-                    if (safeItems.length === 0) {
+                    if (finalItems.length === 0) {
                       return (
                         <div className="flex flex-col h-full bg-white relative rounded-md border">
                           <div className="p-3 border-b bg-gray-50 flex gap-4 sticky top-0 z-20">
@@ -2118,7 +2118,7 @@ export default function SitePersonnel() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {safeItems.map((item: any, idx: number) => (
+                              {finalItems.map((item: any, idx: number) => (
                                 <TableRow key={idx} className="hover:bg-muted/50">
                                   <TableCell className="font-medium text-black">{item.name}</TableCell>
                                   <TableCell>
