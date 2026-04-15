@@ -604,10 +604,26 @@ export default function SitePersonnel() {
   const handleMarkReceived = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const userName = typeof window !== 'undefined' ? localStorage.getItem('app_user_name') || "Site User" : "Site User";
+    
+    // Fetch the delivery details to see if it came from a PO
+    const { data: delivery } = await supabase.from('deliveries').select('*').eq('id', id).single();
+    
     await siteService.updateDelivery(id, { 
       status: "received", 
       received_by: userName 
     });
+    
+    // Sync status back to Purchasing Module
+    if (delivery && delivery.notes && delivery.notes.includes('From PO: ')) {
+      const poMatch = delivery.notes.match(/From PO: (PR-\d+|PO-\d+)/);
+      if (poMatch && poMatch[1]) {
+         await supabase.from('purchases')
+            .update({ status: 'received' })
+            .eq('order_number', poMatch[1])
+            .eq('item_name', delivery.item_name);
+      }
+    }
+    
     loadDeliveries();
   };
 

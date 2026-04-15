@@ -61,7 +61,25 @@ export function VouchersTab() {
         const poMatch = v.description?.match(/PO (PR-\d+|PO-\d+)/);
         if (poMatch && poMatch[1]) {
           await supabase.from('purchases').update({ voucher_number: v.voucher_number }).eq('order_number', poMatch[1]);
-          toast({ title: "Voucher Issued", description: "Voucher issued and Purchase Order updated with Voucher Number." });
+          
+          // Fetch the PO items to automatically generate pending deliveries for the site personnel
+          const { data: poItems } = await supabase.from('purchases').select('*').eq('order_number', poMatch[1]);
+          if (poItems && poItems.length > 0) {
+            const deliveryInserts = poItems.map(po => ({
+              project_id: po.project_id || null,
+              delivery_date: new Date().toISOString().split('T')[0],
+              item_name: po.item_name,
+              quantity: po.quantity,
+              unit: po.unit,
+              supplier: po.supplier,
+              status: 'pending',
+              notes: `From PO: ${po.order_number}`
+            }));
+            await supabase.from('deliveries').insert(deliveryInserts);
+            toast({ title: "Voucher Issued", description: "Voucher issued. Delivery automatically queued for Site Personnel." });
+          } else {
+            toast({ title: "Voucher Issued", description: "Voucher issued and Purchase Order updated with Voucher Number." });
+          }
         } else {
           toast({ title: "Voucher Issued", description: "The voucher has been officially marked as issued." });
         }

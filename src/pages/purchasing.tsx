@@ -50,7 +50,6 @@ export default function Purchasing() {
 
   const [formData, setFormData] = useState({
     order_number: "",
-    voucher_number: "none",
     order_date: new Date().toISOString().split("T")[0],
     supplier: "",
     item_name: "",
@@ -59,8 +58,7 @@ export default function Purchasing() {
     unit: "pcs",
     unit_cost: "",
     destination_type: "main_warehouse",
-    project_id: "none",
-    status: "pending"
+    project_id: "none"
   });
 
   const [supplierForm, setSupplierForm] = useState({
@@ -119,12 +117,16 @@ export default function Purchasing() {
       unit_cost: parseFloat(formData.unit_cost) || 0,
       destination_type: formData.destination_type,
       project_id: formData.destination_type === "project_warehouse" && formData.project_id !== "none" ? formData.project_id : null,
-      status: formData.status,
-      voucher_number: formData.voucher_number === "none" ? null : formData.voucher_number
+      status: "pending",
+      voucher_number: null
     };
 
     const { error } = editingId 
-      ? await supabase.from("purchases").update(payload).eq("id", editingId)
+      ? await supabase.from("purchases").update({
+          ...payload,
+          status: purchases.find(p => p.id === editingId)?.status || 'pending',
+          voucher_number: purchases.find(p => p.id === editingId)?.voucher_number || null
+        }).eq("id", editingId)
       : await supabase.from("purchases").insert(payload);
     
     if (error) {
@@ -155,7 +157,6 @@ export default function Purchasing() {
     setEditingId(p.id);
     setFormData({
       order_number: p.order_number,
-      voucher_number: p.voucher_number || "none",
       order_date: p.order_date,
       supplier: p.supplier,
       item_name: p.item_name,
@@ -164,8 +165,7 @@ export default function Purchasing() {
       unit: p.unit,
       unit_cost: p.unit_cost.toString(),
       destination_type: p.destination_type,
-      project_id: p.project_id || "none",
-      status: p.status
+      project_id: p.project_id || "none"
     });
     setDialogOpen(true);
   };
@@ -453,16 +453,6 @@ export default function Purchasing() {
                       <Input value={formData.order_number} onChange={(e) => setFormData({ ...formData, order_number: e.target.value })} required />
                     </div>
                     <div className="space-y-2">
-                      <Label>Voucher Number</Label>
-                      <Select value={formData.voucher_number} onValueChange={(val) => setFormData({ ...formData, voucher_number: val })}>
-                        <SelectTrigger><SelectValue placeholder="Select issued voucher" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">-- None --</SelectItem>
-                          {vouchers.map(v => <SelectItem key={v.id} value={v.voucher_number}>{v.voucher_number} ({v.payee})</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
                       <Label>Order Date *</Label>
                       <Input type="date" value={formData.order_date} onChange={(e) => setFormData({ ...formData, order_date: e.target.value })} required />
                     </div>
@@ -511,25 +501,13 @@ export default function Purchasing() {
                       <Input type="number" step="0.01" value={formData.unit_cost} onChange={(e) => setFormData({ ...formData, unit_cost: e.target.value })} required />
                     </div>
                     
-                    <div className="space-y-2">
+                    <div className="space-y-2 col-span-2">
                       <Label>Destination *</Label>
                       <Select value={formData.destination_type} onValueChange={(val) => setFormData({ ...formData, destination_type: val })}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="main_warehouse">Main Warehouse</SelectItem>
                           <SelectItem value="project_warehouse">Project Warehouse</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="space-y-2 col-span-2">
-                      <Label>Status *</Label>
-                      <Select value={formData.status} onValueChange={(val) => setFormData({ ...formData, status: val })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="pending">Pending</SelectItem>
-                          <SelectItem value="approved">Approved</SelectItem>
-                          <SelectItem value="received">Received</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
