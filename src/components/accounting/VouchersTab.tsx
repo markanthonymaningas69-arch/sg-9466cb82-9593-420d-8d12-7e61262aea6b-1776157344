@@ -58,27 +58,10 @@ export function VouchersTab() {
     const { error } = await supabase.from('vouchers').update({ status: 'issued' }).eq('id', v.id);
     if (!error) {
       if (v.type === 'payment') {
-        // Auto create Purchase Order for payment vouchers
-        const { data: existingPo } = await supabase.from('purchases').select('id').eq('voucher_number', v.voucher_number).maybeSingle();
-        
-        if (!existingPo) {
-          const poNumber = `PO-${Math.floor(10000 + Math.random() * 90000)}`;
-          await supabase.from('purchases').insert({
-            order_number: poNumber,
-            voucher_number: v.voucher_number,
-            order_date: new Date().toISOString().split('T')[0],
-            supplier: v.payee || 'TBD',
-            item_name: v.description || v.particulars || 'Items from Voucher',
-            category: 'Construction Materials',
-            quantity: 1,
-            unit: 'lot',
-            unit_cost: v.amount,
-            total_cost: v.amount,
-            destination_type: v.project_id ? 'project_warehouse' : 'main_warehouse',
-            project_id: v.project_id,
-            status: 'pending'
-          });
-          toast({ title: "Voucher Issued", description: "Voucher issued and Purchase Order automatically generated." });
+        const poMatch = v.description?.match(/PO (PR-\d+|PO-\d+)/);
+        if (poMatch && poMatch[1]) {
+          await supabase.from('purchases').update({ voucher_number: v.voucher_number }).eq('order_number', poMatch[1]);
+          toast({ title: "Voucher Issued", description: "Voucher issued and Purchase Order updated with Voucher Number." });
         } else {
           toast({ title: "Voucher Issued", description: "The voucher has been officially marked as issued." });
         }

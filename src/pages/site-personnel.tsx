@@ -685,22 +685,6 @@ export default function SitePersonnel() {
         status: 'pending'
       }));
       await supabase.from('site_requests').insert(inserts);
-
-      // Auto-generate Pending Purchase Orders for Materials/Tools
-      const purchaseInserts = requestItems.map(item => ({
-        order_number: `PR-${Math.floor(10000 + Math.random() * 90000)}`,
-        order_date: requestForm.request_date,
-        supplier: 'Pending Selection',
-        item_name: item.item_name,
-        category: requestForm.request_type === "Materials" ? "Construction Materials" : "Tools",
-        quantity: parseFloat(item.quantity.toString()) || 0,
-        unit: item.unit,
-        unit_cost: 0,
-        destination_type: 'project_warehouse',
-        project_id: selectedProject,
-        status: 'pending'
-      }));
-      await supabase.from('purchases').insert(purchaseInserts);
     }
     setRequestDialogOpen(false);
     resetRequestForm();
@@ -710,31 +694,61 @@ export default function SitePersonnel() {
   
   const handleApproveRequest = async (group: any, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm("Approve this request and automatically generate a Payment Voucher?")) return;
+    if (!confirm("Approve this request?")) return;
 
     const totalAmount = group.items.reduce((sum: number, i: any) => sum + (Number(i.amount) || 0), 0);
     const description = `${group.request_type} - ${group.form_number}: ${group.items.map((i: any) => i.item_name).join(', ')}`;
     
     if (group.isCA) {
       await supabase.from('cash_advance_requests').update({ status: 'approved' }).eq('id', group.id);
+      
+      // Create Voucher Automatically for Cash Advances
+      await supabase.from('vouchers').insert({
+        voucher_number: `PV-${Math.floor(10000 + Math.random() * 90000)}`,
+        date: new Date().toISOString().split("T")[0],
+        type: 'payment',
+        payee: group.requested_by || 'TBD',
+        amount: totalAmount,
+        description: description.substring(0, 200),
+        project_id: selectedProject,
+        status: 'approved' // Ready to be issued by accounting
+      });
+      toast({ title: "Approved", description: "Cash Advance approved and Voucher generated." });
     } else {
       const ids = group.items.map((i: any) => i.id);
       await supabase.from('site_requests').update({ status: 'approved' }).in('id', ids);
+
+      if (group.request_type === "Materials" || group.request_type === "Tools & Equipments") {
+        const purchaseInserts = group.items.map((item: any) => ({
+          order_number: `PR-${Math.floor(10000 + Math.random() * 90000)}`,
+          order_date: new Date().toISOString().split("T")[0],
+          supplier: 'Pending Selection',
+          item_name: item.item_name,
+          category: group.request_type === "Materials" ? "Construction Materials" : "Tools",
+          quantity: parseFloat(item.quantity?.toString()) || 1,
+          unit: item.unit || 'lot',
+          unit_cost: 0,
+          destination_type: 'project_warehouse',
+          project_id: selectedProject,
+          status: 'pending'
+        }));
+        await supabase.from('purchases').insert(purchaseInserts);
+        toast({ title: "Approved", description: "Request approved and sent to Purchasing list." });
+      } else {
+        await supabase.from('vouchers').insert({
+          voucher_number: `PV-${Math.floor(10000 + Math.random() * 90000)}`,
+          date: new Date().toISOString().split("T")[0],
+          type: 'payment',
+          payee: group.requested_by || 'TBD',
+          amount: totalAmount,
+          description: description.substring(0, 200),
+          project_id: selectedProject,
+          status: 'approved'
+        });
+        toast({ title: "Approved", description: "Request approved and Voucher generated." });
+      }
     }
 
-    // Create Voucher Automatically
-    await supabase.from('vouchers').insert({
-      voucher_number: `PV-${Math.floor(10000 + Math.random() * 90000)}`,
-      date: new Date().toISOString().split("T")[0],
-      type: 'payment',
-      payee: group.requested_by || 'TBD',
-      amount: totalAmount,
-      description: description.substring(0, 200),
-      project_id: selectedProject,
-      status: 'approved' // Ready to be issued by accounting
-    });
-
-    toast({ title: "Approved", description: "Request approved and Voucher generated automatically." });
     loadRequests();
     loadCashAdvances();
   };

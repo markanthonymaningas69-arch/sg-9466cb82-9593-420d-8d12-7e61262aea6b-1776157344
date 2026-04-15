@@ -260,22 +260,42 @@ export function Layout({ children }: LayoutProps) {
         variant: "destructive"
       });
     } else {
-      // Auto-generate voucher for ALL approved requests (including materials)
-      await supabase.from('vouchers').insert({
-        type: 'payment',
-        voucher_number: `PV-${Math.floor(Math.random() * 10000)}`,
-        date: new Date().toISOString().split("T")[0],
-        amount: req.amount || 0,
-        payee: req.requested_by || 'Site Personnel',
-        description: `Approved ${req.request_type || 'Materials'}: ${req.item_name} (${req.quantity} ${req.unit || ''})`,
-        project_id: req.project_id,
-        status: 'approved'
-      });
-
-      toast({
-        title: "Request Approved",
-        description: `${req.item_name} has been approved and Payment Voucher generated.`
-      });
+      const isMaterial = req.request_type === 'Materials' || req.request_type === 'Tools & Equipments' || !req.request_type;
+      
+      if (isMaterial) {
+        await supabase.from('purchases').insert({
+          order_number: `PR-${Math.floor(10000 + Math.random() * 90000)}`,
+          order_date: new Date().toISOString().split("T")[0],
+          supplier: 'Pending Selection',
+          item_name: req.item_name,
+          category: req.request_type === "Materials" ? "Construction Materials" : "Tools",
+          quantity: parseFloat(req.quantity?.toString()) || 1,
+          unit: req.unit || 'lot',
+          unit_cost: 0,
+          destination_type: 'project_warehouse',
+          project_id: req.project_id,
+          status: 'pending'
+        });
+        toast({
+          title: "Request Approved",
+          description: `${req.item_name} has been approved and sent to Purchasing.`
+        });
+      } else {
+        await supabase.from('vouchers').insert({
+          type: 'payment',
+          voucher_number: `PV-${Math.floor(10000 + Math.random() * 90000)}`,
+          date: new Date().toISOString().split("T")[0],
+          amount: req.amount || 0,
+          payee: req.requested_by || 'Site Personnel',
+          description: `Approved ${req.request_type || 'Request'}: ${req.item_name} (${req.quantity} ${req.unit || ''})`,
+          project_id: req.project_id,
+          status: 'approved'
+        });
+        toast({
+          title: "Request Approved",
+          description: `${req.item_name} has been approved and Payment Voucher generated.`
+        });
+      }
       loadPendingRequests();
     }
   };
@@ -361,7 +381,7 @@ export function Layout({ children }: LayoutProps) {
 
   const handleApprovePurchaseGM = async (purchase: any, e: React.MouseEvent) => {
     e.stopPropagation();
-    const { error } = await supabase.from('purchases').update({ status: 'approved' }).eq('id', purchase.id);
+    const { error } = await supabase.from('purchases').update({ status: 'approved', voucher_number: 'Pending Issue' }).eq('id', purchase.id);
     
     if (!error) {
       // Auto-generate voucher in Accounting
