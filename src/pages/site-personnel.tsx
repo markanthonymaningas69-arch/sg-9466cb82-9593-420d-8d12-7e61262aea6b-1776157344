@@ -2040,10 +2040,10 @@ export default function SitePersonnel() {
                     });
                     
                     type InventoryItem = { name: string; category: string; unit: string; received: number; consumed: number; balance: number };
-                    const rawItems: InventoryItem[] = Object.values(inventoryMap) as InventoryItem[];
-                    rawItems.sort((a, b) => a.name.localeCompare(b.name));
+                    const siteInventoryArray: InventoryItem[] = Object.values(inventoryMap) as InventoryItem[];
+                    siteInventoryArray.sort((a, b) => a.name.localeCompare(b.name));
                     
-                    const finalItems: InventoryItem[] = rawItems.filter((item) => {
+                    const finalItems: InventoryItem[] = siteInventoryArray.filter((item) => {
                       const matchName = item.name.toLowerCase().includes(warehouseSearch.toLowerCase());
                       const matchType = warehouseTypeFilter === "all" || item.category === warehouseTypeFilter;
                       return matchName && matchType;
@@ -2533,13 +2533,13 @@ export default function SitePersonnel() {
                   ) : (
                     <div className="space-y-4 overflow-y-auto h-full pr-2">
                       {Object.entries(
-                        consumptions.reduce((acc, curr) => {
+                        consumptions.reduce((acc: Record<string, any[]>, curr: any) => {
                           const key = curr.date_used;
                           if (!acc[key]) acc[key] = [];
                           acc[key].push(curr);
                           return acc;
-                        }, {} as Record<string, MaterialConsumption[]>)
-                      ).sort(([a], [b]) => b.localeCompare(a)).map(([dateKey, groupConsumptions]) => {
+                        }, {})
+                      ).sort(([a], [b]) => b.localeCompare(a)).map(([dateKey, groupConsumptions]: [string, any[]]) => {
                         const isExpanded = expandedConsumptions[dateKey];
                         return (
                           <div key={dateKey} className="border rounded-lg overflow-hidden">
