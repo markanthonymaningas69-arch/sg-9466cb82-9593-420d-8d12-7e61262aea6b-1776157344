@@ -63,16 +63,66 @@ export default function Analytics() {
   const loadProjectData = async (projectId: string) => {
     setLoading(true);
     try {
-      const [bomData, consumptionData, attendanceData, deliveriesData, scopesData] = await Promise.all([
+      const [bomData, consumptionData, attendanceData, deliveriesData, scopesData, purchasesResponse] = await Promise.all([
         bomService.getByProjectId(projectId),
         siteService.getMaterialConsumption(projectId),
         siteService.getSiteAttendance(projectId),
         siteService.getDeliveries(projectId),
-        siteService.getScopeOfWorks(projectId)
+        siteService.getScopeOfWorks(projectId),
+        supabase.from('purchases').select('item_name, quantity, unit_cost, order_date').order('order_date', { ascending: true })
       ]);
 
+      // 1. Build chronological purchase lots for True FIFO costing
+      const purchasesList = purchasesResponse.data || [];
+      const lots: Record<string, { qty: number; cost: number }[]> = {};
+      purchasesList.forEach(p => {
+        const name = (p.item_name || '').toLowerCase();
+        if (!lots[name]) lots[name] = [];
+        lots[name].push({ qty: Number(p.quantity || 0), cost: Number(p.unit_cost || 0) });
+      });
+
+      // 2. Sort consumptions chronologically
+      const consumptionList = [...(consumptionData.data || [])].sort((a, b) => new Date(a.date_used).getTime() - new Date(b.date_used).getTime());
+      
+      // 3. Apply FIFO depletion
+      const enrichedConsumption = consumptionList.map(c => {
+        const name = (c.item_name || c.material_name || '').toLowerCase();
+        let qtyToCost = Number(c.quantity || c.quantity_used || 0);
+        let totalCost = 0;
+
+        if (lots[name]) {
+          for (let i = 0; i < lots[name].length && qtyToCost > 0; i++) {
+            const lot = lots[name][i];
+            if (lot.qty > 0) {
+              const consumedFromLot = Math.min(qtyToCost, lot.qty);
+              totalCost += consumedFromLot * lot.cost;
+              lot.qty -= consumedFromLot;
+              qtyToCost -= consumedFromLot;
+            }
+          }
+        }
+
+        // If no purchase history or lots exhausted
+        if (qtyToCost > 0) {
+          if (Number(c.estimated_cost) > 0) {
+            // Fallback 1: Manual estimated cost from Site
+            totalCost += qtyToCost * Number(c.estimated_cost);
+          } else {
+            // Fallback 2: Original BOM estimate
+            const scope = bomData.data?.bom_scope_of_work?.find((s: any) => s.id === c.bom_scope_id);
+            const bomMat = Array.isArray(scope?.bom_materials) 
+              ? scope.bom_materials.find((m: any) => (m.material_name || '').toLowerCase() === name)
+              : null;
+            const fallbackCost = bomMat ? Number(bomMat.unit_cost || 0) : 0;
+            totalCost += qtyToCost * fallbackCost;
+          }
+        }
+
+        return { ...c, calculated_total_cost: totalCost };
+      });
+
       setBom(bomData.data || null);
-      setConsumption(consumptionData.data || []);
+      setConsumption(enrichedConsumption);
       setAttendance(attendanceData.data || []);
       setDeliveries(deliveriesData.data || []);
       
@@ -235,13 +285,7 @@ export default function Analytics() {
       // Actual Materials
       const actualMatCost = (consumption || [])
         .filter(c => c.bom_scope_id === scope.id)
-        .reduce((sum: number, c: any) => {
-          const bomMat = Array.isArray(scope.bom_materials)
-            ? scope.bom_materials.find((m: any) => m.material_name === (c.item_name || c.material_name))
-            : null;
-          const unitCost = bomMat ? Number(bomMat.unit_cost || 0) : 0;
-          return sum + (Number(c.quantity || c.quantity_used || 0) * unitCost);
-        }, 0);
+        .reduce((sum: number, c: any) => sum + (c.calculated_total_cost || 0), 0);
 
       // Actual Labor
       const actualLabCost = (attendance || [])
@@ -284,6 +328,7 @@ export default function Analytics() {
             materialName: cons.item_name || cons.material_name || "Unknown Material",
             quantity: Number(cons.quantity || cons.quantity_used || 0),
             unit: cons.unit || "",
+            cost: cons.calculated_total_cost || 0,
             remarks: cons.notes || cons.remarks || "-"
           });
         }
@@ -300,16 +345,7 @@ export default function Analytics() {
     (consumption || []).forEach(c => {
       const date = c.date_used;
       if (!consumptionByDate[date]) consumptionByDate[date] = 0;
-      
-      const scope = bom?.bom_scope_of_work?.find((s: any) => s.id === c.bom_scope_id);
-      if (scope) {
-        const consName = (c.item_name || c.material_name || "").toLowerCase();
-        const bomMat = Array.isArray(scope.bom_materials) 
-          ? scope.bom_materials.find((m: any) => (m.material_name?.toLowerCase() || "") === consName)
-          : null;
-        const unitCost = bomMat ? Number(bomMat.unit_cost || 0) : 0;
-        consumptionByDate[date] += Number(c.quantity || c.quantity_used || 0) * unitCost;
-      }
+      consumptionByDate[date] += (c.calculated_total_cost || 0);
     });
 
     // Group labor by date
@@ -639,13 +675,14 @@ export default function Analytics() {
                         <TableHead>Scope</TableHead>
                         <TableHead>Material</TableHead>
                         <TableHead className="text-right">Qty Used</TableHead>
+                        <TableHead className="text-right">Total Cost</TableHead>
                         <TableHead>Remarks</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {ocmData.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                          <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                             No OCM materials detected. All usage matches BOM.
                           </TableCell>
                         </TableRow>
@@ -656,6 +693,7 @@ export default function Analytics() {
                             <TableCell className="text-sm text-muted-foreground">{row.scopeName}</TableCell>
                             <TableCell className="font-medium">{row.materialName}</TableCell>
                             <TableCell className="text-right font-bold text-warning">{row.quantity} {row.unit}</TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(row.cost)}</TableCell>
                             <TableCell className="text-sm italic">{row.remarks || "-"}</TableCell>
                           </TableRow>
                         ))
