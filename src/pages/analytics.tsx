@@ -86,8 +86,8 @@ export default function Analytics() {
       
       // 3. Apply FIFO depletion
       const enrichedConsumption = consumptionList.map(c => {
-        const name = (c.item_name || c.material_name || '').toLowerCase();
-        let qtyToCost = Number(c.quantity || c.quantity_used || 0);
+        const name = (c.item_name || '').toLowerCase();
+        let qtyToCost = Number(c.quantity || 0);
         let totalCost = 0;
 
         if (lots[name]) {
@@ -245,8 +245,8 @@ export default function Analytics() {
     (consumption || []).forEach((cons: any) => {
       if (usageScopeFilter !== "all" && cons.bom_scope_id !== usageScopeFilter) return;
 
-      const name = cons.item_name || cons.material_name || "Unknown";
-      const qty = Number(cons.quantity || cons.quantity_used || 0);
+      const name = cons.item_name || "Unknown";
+      const qty = Number(cons.quantity || 0);
       const key = `${cons.bom_scope_id}_${name}`;
       const scope = bom.bom_scope_of_work.find((s: any) => s.id === cons.bom_scope_id);
       
@@ -316,7 +316,7 @@ export default function Analytics() {
     (consumption || []).forEach((cons: any) => {
       const scope = bom.bom_scope_of_work.find((s: any) => s.id === cons.bom_scope_id);
       if (scope) {
-        const consName = (cons.item_name || cons.material_name || "").toLowerCase();
+        const consName = (cons.item_name || "").toLowerCase();
         const isInBom = Array.isArray(scope.bom_materials) && scope.bom_materials.some((m: any) => 
           (m.material_name?.toLowerCase() || "") === consName
         );
@@ -325,8 +325,8 @@ export default function Analytics() {
           ocmList.push({
             date: cons.date_used,
             scopeName: scope.name || "Unknown Scope",
-            materialName: cons.item_name || cons.material_name || "Unknown Material",
-            quantity: Number(cons.quantity || cons.quantity_used || 0),
+            materialName: cons.item_name || "Unknown Material",
+            quantity: Number(cons.quantity || 0),
             unit: cons.unit || "",
             cost: cons.calculated_total_cost || 0,
             remarks: cons.notes || cons.remarks || "-"
