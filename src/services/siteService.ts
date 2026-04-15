@@ -7,8 +7,8 @@ type Delivery = Database["public"]["Tables"]["deliveries"]["Row"] & { receipt_nu
 type DeliveryInsert = Database["public"]["Tables"]["deliveries"]["Insert"] & { receipt_number?: string };
 type ScopeOfWork = Database["public"]["Tables"]["bom_scope_of_work"]["Row"];
 type ScopeOfWorkInsert = Database["public"]["Tables"]["bom_scope_of_work"]["Insert"];
-type ProgressUpdate = Database["public"]["Tables"]["progress_updates"]["Row"];
-type ProgressUpdateInsert = Database["public"]["Tables"]["progress_updates"]["Insert"];
+type ProgressUpdate = Database["public"]["Tables"]["bom_progress_updates"]["Row"];
+type ProgressUpdateInsert = Database["public"]["Tables"]["bom_progress_updates"]["Insert"];
 
 export const siteService = {
   // Site Attendance Management

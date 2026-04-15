@@ -3,8 +3,8 @@ import type { Database } from "@/integrations/supabase/types";
 
 type Personnel = Database["public"]["Tables"]["personnel"]["Row"];
 type PersonnelInsert = Database["public"]["Tables"]["personnel"]["Insert"];
-type Attendance = Database["public"]["Tables"]["attendance"]["Row"];
-type AttendanceInsert = Database["public"]["Tables"]["attendance"]["Insert"];
+type Attendance = Database["public"]["Tables"]["site_attendance"]["Row"];
+type AttendanceInsert = Database["public"]["Tables"]["site_attendance"]["Insert"];
 type LeaveRequest = Database["public"]["Tables"]["leave_requests"]["Row"];
 type LeaveRequestInsert = Database["public"]["Tables"]["leave_requests"]["Insert"];
 type Payroll = Database["public"]["Tables"]["payroll"]["Row"];
