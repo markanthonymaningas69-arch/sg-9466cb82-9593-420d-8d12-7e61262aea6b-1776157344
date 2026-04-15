@@ -76,7 +76,7 @@ export default function Analytics() {
       const purchasesList = purchasesResponse.data || [];
       const lots: Record<string, { qty: number; cost: number }[]> = {};
       purchasesList.forEach(p => {
-        const name = (p.item_name || '').toLowerCase();
+        const name = (p.item_name || '').toLowerCase().trim();
         if (!lots[name]) lots[name] = [];
         lots[name].push({ qty: Number(p.quantity || 0), cost: Number(p.unit_cost || 0) });
       });
@@ -86,7 +86,7 @@ export default function Analytics() {
       
       // 3. Apply FIFO depletion
       const enrichedConsumption = consumptionList.map(c => {
-        const name = (c.item_name || '').toLowerCase();
+        const name = (c.item_name || '').toLowerCase().trim();
         let qtyToCost = Number(c.quantity || 0);
         let totalCost = 0;
 
@@ -111,7 +111,7 @@ export default function Analytics() {
             // Fallback 2: Original BOM estimate
             const scope = bomData.data?.bom_scope_of_work?.find((s: any) => s.id === c.bom_scope_id);
             const bomMat = Array.isArray(scope?.bom_materials) 
-              ? scope.bom_materials.find((m: any) => (m.material_name || '').toLowerCase() === name)
+              ? scope.bom_materials.find((m: any) => (m.material_name || '').toLowerCase().trim() === name)
               : null;
             const fallbackCost = bomMat ? Number(bomMat.unit_cost || 0) : 0;
             totalCost += qtyToCost * fallbackCost;
@@ -271,7 +271,7 @@ export default function Analytics() {
   const scopeSpendingData = useMemo(() => {
     if (!bom?.bom_scope_of_work || !Array.isArray(bom.bom_scope_of_work)) return [];
 
-    return bom.bom_scope_of_work.map((scope: any) => {
+    const result = bom.bom_scope_of_work.map((scope: any) => {
       // Allocated Materials
       const allocatedMatCost = Array.isArray(scope.bom_materials) 
         ? scope.bom_materials.reduce((sum: number, m: any) => sum + (Number(m.quantity || 0) * Number(m.unit_cost || 0)), 0)
@@ -305,6 +305,32 @@ export default function Analytics() {
         totalActual: actualMatCost + actualLabCost
       };
     });
+
+    // Add Unassigned / OCM row for items not linked to a specific scope
+    const unassignedMatCost = (consumption || [])
+      .filter(c => !c.bom_scope_id || !bom.bom_scope_of_work.find((s: any) => s.id === c.bom_scope_id))
+      .reduce((sum: number, c: any) => sum + (c.calculated_total_cost || 0), 0);
+      
+    const unassignedLabCost = (attendance || [])
+      .filter(a => !a.bom_scope_id || !bom.bom_scope_of_work.find((s: any) => s.id === a.bom_scope_id))
+      .reduce((sum: number, a: any) => {
+        const hrRate = Number(a.personnel?.hourly_rate || (a.personnel?.daily_rate ? a.personnel.daily_rate / 8 : 0));
+        return sum + (Number(a.hours_worked || 0) * hrRate);
+      }, 0);
+
+    if (unassignedMatCost > 0 || unassignedLabCost > 0) {
+      result.push({
+        scopeName: "Unassigned / OCM",
+        allocatedMatCost: 0,
+        allocatedLabCost: 0,
+        totalAllocated: 0,
+        actualMatCost: unassignedMatCost,
+        actualLabCost: unassignedLabCost,
+        totalActual: unassignedMatCost + unassignedLabCost
+      });
+    }
+
+    return result;
   }, [bom, consumption, attendance]);
 
   // 4. OCM (Materials used but not in BOM)
