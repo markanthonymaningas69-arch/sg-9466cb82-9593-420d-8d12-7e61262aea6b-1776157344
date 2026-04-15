@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Building2, UserPlus, LogOut, ArrowRight, Loader2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/services/authService";
 
@@ -12,7 +14,11 @@ export default function Onboarding() {
   const router = useRouter();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
+  
+  const [fullName, setFullName] = useState("");
   const [inviteCode, setInviteCode] = useState("");
+  const [selectedModule, setSelectedModule] = useState("");
+  
   const [joining, setJoining] = useState(false);
   const [creating, setCreating] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -32,9 +38,13 @@ export default function Onboarding() {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('assigned_module')
+      .select('assigned_module, full_name')
       .eq('id', session.user.id)
       .maybeSingle();
+
+    if (profile?.full_name) {
+      setFullName(profile.full_name);
+    }
 
     if (profile?.assigned_module) {
       // Already onboarded, redirect to root which will route them properly
@@ -46,7 +56,18 @@ export default function Onboarding() {
 
   const handleJoinCompany = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inviteCode.trim()) return;
+    if (!fullName.trim()) {
+      toast({ title: "Required", description: "Please enter your full name in Step 1.", variant: "destructive" });
+      return;
+    }
+    if (!inviteCode.trim()) {
+      toast({ title: "Required", description: "Please enter an invite code.", variant: "destructive" });
+      return;
+    }
+    if (!selectedModule) {
+      toast({ title: "Required", description: "Please select the module you need access to.", variant: "destructive" });
+      return;
+    }
 
     setJoining(true);
     try {
@@ -70,20 +91,24 @@ export default function Onboarding() {
         return;
       }
 
-      // Use the secure backend function
+      // Update their profile name first
+      await supabase.from('profiles').update({ full_name: fullName.trim() }).eq('id', user.id);
+
+      // Use the secure backend function with their explicitly chosen module
       const { error: rpcError } = await supabase.rpc('assign_user_module', {
         p_user_id: user.id,
-        p_module: invData.modules && invData.modules.length > 0 ? invData.modules[0] : invData.module,
+        p_module: selectedModule,
         p_project_ids: invData.project_ids || [],
-        p_modules: invData.modules && invData.modules.length > 0 ? invData.modules : [invData.module]
+        p_modules: [selectedModule]
       });
 
       if (rpcError) {
         const { error: upsertError } = await supabase.from('profiles').upsert({
           id: user.id,
-          assigned_module: invData.modules && invData.modules.length > 0 ? invData.modules[0] : invData.module,
+          full_name: fullName.trim(),
+          assigned_module: selectedModule,
           assigned_project_ids: invData.project_ids || [],
-          assigned_modules: invData.modules && invData.modules.length > 0 ? invData.modules : [invData.module],
+          assigned_modules: [selectedModule],
           updated_at: new Date().toISOString()
         });
         if (upsertError) throw upsertError;
@@ -97,7 +122,7 @@ export default function Onboarding() {
 
       toast({
         title: "Success!",
-        description: `You have joined the company as ${invData.module}.`,
+        description: `You have joined the workspace as ${selectedModule}.`,
       });
 
       // Use hard reload
@@ -114,11 +139,19 @@ export default function Onboarding() {
   };
 
   const handleCreateCompany = async () => {
+    if (!fullName.trim()) {
+      toast({ title: "Required", description: "Please enter your full name in Step 1.", variant: "destructive" });
+      return;
+    }
+
     setCreating(true);
     try {
       // Get fresh user just in case state is stale
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) throw new Error("Not authenticated");
+
+      // Update their profile name first
+      await supabase.from('profiles').update({ full_name: fullName.trim() }).eq('id', user.id);
 
       // Use the secure backend function
       const { error: rpcError } = await supabase.rpc('assign_user_module', {
@@ -131,6 +164,7 @@ export default function Onboarding() {
         // Fallback to direct upsert if RPC fails for any reason
         const { error: upsertError } = await supabase.from('profiles').upsert({
           id: user.id,
+          full_name: fullName.trim(),
           assigned_module: 'GM',
           updated_at: new Date().toISOString()
         });
@@ -170,15 +204,37 @@ export default function Onboarding() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-muted/30 p-4">
-      <div className="max-w-4xl w-full">
-        <div className="text-center mb-10">
+      <div className="max-w-4xl w-full space-y-6">
+        <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary text-primary-foreground mb-4 font-bold text-2xl">
             TX
           </div>
           <h1 className="text-3xl font-heading font-bold">Welcome to Thea-X</h1>
-          <p className="text-muted-foreground mt-2 text-lg">Choose how you want to get started with your account.</p>
+          <p className="text-muted-foreground mt-2 text-lg">Complete your profile to access your workspace.</p>
         </div>
 
+        {/* Step 1: Account Details */}
+        <Card className="border-2 border-primary/20 shadow-md">
+          <CardHeader className="pb-4">
+            <CardTitle>Step 1: Account Details</CardTitle>
+            <CardDescription>Please confirm your name before selecting a workspace.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 max-w-md">
+              <Label>Full Name *</Label>
+              <Input 
+                placeholder="e.g. John Doe" 
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                disabled={joining || creating}
+                className="font-medium"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <h2 className="text-xl font-bold px-1 pt-4">Step 2: Choose Workspace Access</h2>
+        
         <div className="grid md:grid-cols-2 gap-6">
           {/* Join Company Card */}
           <Card className="relative overflow-hidden border-2 hover:border-primary/50 transition-colors flex flex-col">
@@ -188,12 +244,13 @@ export default function Onboarding() {
               </div>
               <CardTitle>Join a Company</CardTitle>
               <CardDescription>
-                Enter an invite code provided by your General Manager to access your assigned module.
+                Enter an invite code and select the module you need access to.
               </CardDescription>
             </CardHeader>
             <CardContent className="flex-1">
-              <form id="join-form" onSubmit={handleJoinCompany} className="flex flex-col gap-4">
+              <form id="join-form" onSubmit={handleJoinCompany} className="flex flex-col gap-5">
                 <div className="space-y-2">
+                  <Label>Invite Code *</Label>
                   <Input 
                     placeholder="Enter 6-character code" 
                     value={inviteCode}
@@ -203,13 +260,29 @@ export default function Onboarding() {
                     disabled={joining || creating}
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label>Module Access *</Label>
+                  <Select value={selectedModule} onValueChange={setSelectedModule} disabled={joining || creating}>
+                    <SelectTrigger className="h-12 text-base">
+                      <SelectValue placeholder="Select your module..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Project Profile">Project Profile</SelectItem>
+                      <SelectItem value="Site Personnel">Site Personnel</SelectItem>
+                      <SelectItem value="Purchasing">Purchasing</SelectItem>
+                      <SelectItem value="Accounting">Accounting</SelectItem>
+                      <SelectItem value="Human Resources">Human Resources</SelectItem>
+                      <SelectItem value="Warehouse">Warehouse</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </form>
             </CardContent>
             <CardFooter>
-              <Button type="submit" form="join-form" disabled={!inviteCode.trim() || joining || creating} className="w-full">
-                {joining ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              <Button type="submit" form="join-form" disabled={!inviteCode.trim() || !selectedModule || !fullName.trim() || joining || creating} className="w-full h-12 text-lg">
+                {joining ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
                 Join Workspace
-                {!joining && <ArrowRight className="ml-2 h-4 w-4" />}
+                {!joining && <ArrowRight className="ml-2 h-5 w-5" />}
               </Button>
             </CardFooter>
           </Card>
@@ -222,29 +295,29 @@ export default function Onboarding() {
               </div>
               <CardTitle>Create a Company</CardTitle>
               <CardDescription>
-                Set up a new workspace. You will be assigned the General Manager (GM) role with full access to all modules.
+                Set up a new workspace. You will be assigned the General Manager (GM) role.
               </CardDescription>
             </CardHeader>
             <CardContent className="flex-1 flex flex-col justify-center">
-              <div className="text-sm text-center text-muted-foreground p-4 bg-muted/50 rounded-lg">
-                Clicking start will initialize a new workspace and assign you as the administrator.
+              <div className="text-sm text-center text-muted-foreground p-6 bg-muted/50 rounded-xl border border-dashed">
+                Clicking start will initialize a new workspace and automatically grant you <strong>Full Administrator Access</strong> to all modules.
               </div>
             </CardContent>
             <CardFooter>
               <Button 
                 onClick={handleCreateCompany}
-                disabled={joining || creating}
-                className="w-full bg-green-600 hover:bg-green-700 text-white"
+                disabled={!fullName.trim() || joining || creating}
+                className="w-full h-12 text-lg bg-green-600 hover:bg-green-700 text-white"
               >
-                {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Start
-                {!creating && <ArrowRight className="ml-2 h-4 w-4" />}
+                {creating ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+                Start New Workspace
+                {!creating && <ArrowRight className="ml-2 h-5 w-5" />}
               </Button>
             </CardFooter>
           </Card>
         </div>
 
-        <div className="mt-8 text-center">
+        <div className="mt-8 text-center pb-8">
           <Button variant="ghost" onClick={handleLogout} className="text-muted-foreground">
             <LogOut className="mr-2 h-4 w-4" />
             Sign out and try another account
