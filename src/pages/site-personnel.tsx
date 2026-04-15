@@ -804,24 +804,33 @@ export default function SitePersonnel() {
 
         {selectedProject && (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 overflow-hidden space-y-4">
-            <TabsList className="shrink-0 grid w-full grid-cols-6">
-              <TabsTrigger value="manpower">
-                <Users className="h-4 w-4 mr-2" />
-                Project Manpower
+            <TabsList className="shrink-0 flex flex-wrap w-full gap-1 h-auto bg-transparent p-0">
+              <TabsTrigger 
+                value="manpower" 
+                className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-blue-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-blue-700 bg-blue-50 text-blue-700 hover:bg-blue-100"
+              >
+                <Users className="h-3 w-3 mr-1.5 hidden sm:inline" />
+                Manpower
               </TabsTrigger>
-              <TabsTrigger value="attendance">
-                <ClipboardList className="h-4 w-4 mr-2" />
+              <TabsTrigger 
+                value="attendance" 
+                className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-indigo-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-indigo-700 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+              >
+                <ClipboardList className="h-3 w-3 mr-1.5 hidden sm:inline" />
                 Attendance
               </TabsTrigger>
-              <TabsTrigger value="deliveries" className="relative">
-                <Truck className="h-4 w-4 mr-2" />
+              <TabsTrigger 
+                value="deliveries" 
+                className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-emerald-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-emerald-700 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 relative"
+              >
+                <Truck className="h-3 w-3 mr-1.5 hidden sm:inline" />
                 Deliveries
                 {(() => {
                   const hasNewDeliveries = pendingDeliveryIds !== seenDeliveryIds && activeTab !== 'deliveries';
                   const pendingCount = deliveries.filter(d => d.supplier === "Main Warehouse" && d.status === "pending").length;
                   if (hasNewDeliveries && pendingCount > 0) {
                     return (
-                      <Badge variant="destructive" className="ml-2 h-5 min-w-5 flex items-center justify-center p-0 px-1.5 text-[10px]">
+                      <Badge variant="destructive" className="ml-1 h-4 min-w-4 flex items-center justify-center p-0 px-1 text-[9px] absolute -top-1 -right-1">
                         New
                       </Badge>
                     );
@@ -829,23 +838,32 @@ export default function SitePersonnel() {
                   return null;
                 })()}
               </TabsTrigger>
-              <TabsTrigger value="warehouse">
-                <Warehouse className="h-4 w-4 mr-2" />
+              <TabsTrigger 
+                value="warehouse" 
+                className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-amber-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-amber-700 bg-amber-50 text-amber-700 hover:bg-amber-100"
+              >
+                <Warehouse className="h-3 w-3 mr-1.5 hidden sm:inline" />
                 Warehouse
               </TabsTrigger>
-              <TabsTrigger value="consumption">
-                <ClipboardList className="h-4 w-4 mr-2" />
-                Material Usage
+              <TabsTrigger 
+                value="consumption" 
+                className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-orange-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-orange-700 bg-orange-50 text-orange-700 hover:bg-orange-100"
+              >
+                <ClipboardList className="h-3 w-3 mr-1.5 hidden sm:inline" />
+                Usage
               </TabsTrigger>
-              <TabsTrigger value="request" className="relative">
-                <ShoppingCart className="h-4 w-4 mr-2" />
+              <TabsTrigger 
+                value="request" 
+                className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-rose-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-rose-700 bg-rose-50 text-rose-700 hover:bg-rose-100 relative"
+              >
+                <ShoppingCart className="h-3 w-3 mr-1.5 hidden sm:inline" />
                 Requests
                 {(() => {
                   const hasNewResolved = resolvedRequestIds !== seenResolvedIds && activeTab !== 'request';
                   const resolvedCount = [...requests, ...cashAdvances].filter(r => r.status === 'approved' || r.status === 'rejected').length;
                   if (hasNewResolved && resolvedCount > 0) {
                     return (
-                      <Badge variant="destructive" className="ml-2 h-5 min-w-5 flex items-center justify-center p-0 px-1.5 text-[10px]">
+                      <Badge variant="destructive" className="ml-1 h-4 min-w-4 flex items-center justify-center p-0 px-1 text-[9px] absolute -top-1 -right-1">
                         New
                       </Badge>
                     );
@@ -853,9 +871,12 @@ export default function SitePersonnel() {
                   return null;
                 })()}
               </TabsTrigger>
-              <TabsTrigger value="scope">
-                <Plus className="h-4 w-4 mr-2" />
-                Update Progress
+              <TabsTrigger 
+                value="scope" 
+                className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-purple-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-purple-700 bg-purple-50 text-purple-700 hover:bg-purple-100"
+              >
+                <Activity className="h-3 w-3 mr-1.5 hidden sm:inline" />
+                Progress
               </TabsTrigger>
             </TabsList>
 
@@ -1969,13 +1990,22 @@ export default function SitePersonnel() {
                 <CardContent className="flex-1 overflow-hidden pb-4">
                   {(() => {
                     // Calculate Balance
-                    const inventoryMap: Record<string, { name: string, unit: string, received: number, consumed: number, balance: number }> = {};
+                    const inventoryMap: Record<string, { name: string, category: string, unit: string, received: number, consumed: number, balance: number }> = {};
                     
                     // Add all RECEIVED deliveries
                     deliveries.filter(d => d.status === "received").forEach(d => {
                       const key = `${d.item_name}-${d.unit}`;
                       if (!inventoryMap[key]) {
-                        inventoryMap[key] = { name: d.item_name, unit: d.unit, received: 0, consumed: 0, balance: 0 };
+                        // Find category from BOM materials if available, otherwise default
+                        const mat = bomMaterials.find(m => m.name === d.item_name);
+                        inventoryMap[key] = { 
+                          name: d.item_name, 
+                          category: mat ? "Materials" : "Uncategorized", // Can be expanded with real categories if linked
+                          unit: d.unit, 
+                          received: 0, 
+                          consumed: 0, 
+                          balance: 0 
+                        };
                       }
                       inventoryMap[key].received += d.quantity;
                       inventoryMap[key].balance += d.quantity;
@@ -1985,7 +2015,15 @@ export default function SitePersonnel() {
                     consumptions.forEach(c => {
                       const key = `${c.item_name}-${c.unit}`;
                       if (!inventoryMap[key]) {
-                        inventoryMap[key] = { name: c.item_name, unit: c.unit, received: 0, consumed: 0, balance: 0 };
+                        const mat = bomMaterials.find(m => m.name === c.item_name);
+                        inventoryMap[key] = { 
+                          name: c.item_name, 
+                          category: mat ? "Materials" : "Uncategorized",
+                          unit: c.unit, 
+                          received: 0, 
+                          consumed: 0, 
+                          balance: 0 
+                        };
                       }
                       inventoryMap[key].consumed += c.quantity;
                       inventoryMap[key].balance -= c.quantity;
@@ -2009,6 +2047,7 @@ export default function SitePersonnel() {
                           <TableHeader className="sticky top-0 bg-gray-100 z-10 border-b">
                             <TableRow>
                               <TableHead className="font-bold text-black">Item Name</TableHead>
+                              <TableHead className="font-bold text-black">Type</TableHead>
                               <TableHead className="text-right font-bold text-blue-700 bg-blue-50 border-l">Total Received</TableHead>
                               <TableHead className="text-right font-bold text-orange-700 bg-orange-50">Total Consumed</TableHead>
                               <TableHead className="text-right font-bold text-green-700 bg-green-50 border-r">Current Balance</TableHead>
@@ -2018,6 +2057,9 @@ export default function SitePersonnel() {
                             {siteInventory.map((item, idx) => (
                               <TableRow key={idx} className="hover:bg-muted/50">
                                 <TableCell className="font-medium text-black">{item.name}</TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="text-xs bg-gray-50">{item.category}</Badge>
+                                </TableCell>
                                 <TableCell className="text-right font-semibold text-blue-700 bg-blue-50/30 border-l">
                                   {item.received} <span className="text-xs text-blue-400 font-normal">{item.unit}</span>
                                 </TableCell>

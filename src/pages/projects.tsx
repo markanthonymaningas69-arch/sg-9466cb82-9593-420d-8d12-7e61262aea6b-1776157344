@@ -476,43 +476,19 @@ export default function Projects() {
             </TabsList>
 
             <TabsContent value="items" className="space-y-4">
-              <div className="flex flex-wrap justify-between gap-4 items-center">
-                <div className="flex flex-wrap gap-3 items-center">
-                  <Input 
-                    placeholder="Search by name..." 
-                    className="h-9 w-[200px] bg-white" 
-                    value={masterItemSearch}
-                    onChange={(e) => setMasterItemSearch(e.target.value)}
-                  />
-                  <select 
-                    className="h-9 w-[160px] rounded-md border border-input bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    value={masterItemCategoryFilter}
-                    onChange={(e) => setMasterItemCategoryFilter(e.target.value)}
-                  >
-                    <option value="all">All Categories</option>
-                    {Array.from(new Set(masterItems.map(i => i.category))).filter(Boolean).map(c => <option key={c as string} value={c as string}>{c as string}</option>)}
-                  </select>
-                  <select 
-                    className="h-9 w-[160px] rounded-md border border-input bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    value={masterItemScopeFilter}
-                    onChange={(e) => setMasterItemScopeFilter(e.target.value)}
-                  >
-                    <option value="all">All Linked Scopes</option>
-                    {masterScopes.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-                  </select>
-                  {(masterItemSearch || masterItemCategoryFilter !== "all" || masterItemScopeFilter !== "all") && (
-                    <Button variant="ghost" size="sm" className="h-9 px-3 text-sm text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => {
-                      setMasterItemSearch("");
-                      setMasterItemCategoryFilter("all");
-                      setMasterItemScopeFilter("all");
-                    }}>Clear Filters</Button>
-                  )}
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-lg font-medium">Materials, Tools & Equipments</h3>
+                  <p className="text-sm text-muted-foreground">Master catalog for project procurement and warehouse</p>
                 </div>
-
-                <Button onClick={() => setIsItemModalOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add New Item
-                </Button>
+                <Dialog open={newItemDialogOpen} onOpenChange={setNewItemDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button onClick={() => setIsItemModalOpen(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add New Item
+                    </Button>
+                  </DialogTrigger>
+                </Dialog>
               </div>
 
               <Card>
