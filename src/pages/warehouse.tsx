@@ -418,25 +418,7 @@ export default function Warehouse() {
           </Dialog>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3 shrink-0">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Main Warehouse Items</CardTitle>
-              <WarehouseIcon className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{mainWarehouseItems.length}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Deployed to Projects</CardTitle>
-              <Building2 className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{projectWarehouseItems.length}</div>
-            </CardContent>
-          </Card>
+        <div className="grid gap-4 md:grid-cols-1 max-w-sm shrink-0">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Asset Value</CardTitle>
@@ -449,15 +431,16 @@ export default function Warehouse() {
         </div>
 
         <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); setCategoryFilter("all"); setProjectFilter("all"); setDateFilter(""); }} className="flex-1 flex flex-col min-h-0">
-          <TabsList className="w-full justify-start shrink-0">
+          <TabsList className="w-full flex shrink-0 justify-start">
             <TabsTrigger value="main" className="flex items-center gap-2">
               <WarehouseIcon className="h-4 w-4" /> Main Warehouse
             </TabsTrigger>
-            <TabsTrigger value="project" className="flex items-center gap-2">
-              <Building2 className="h-4 w-4" /> Project Warehouse
-            </TabsTrigger>
             <TabsTrigger value="balance" className="flex items-center gap-2">
               <FileSpreadsheet className="h-4 w-4" /> Balance Checking
+            </TabsTrigger>
+            <div className="flex-1"></div>
+            <TabsTrigger value="project" className="flex items-center gap-2">
+              <Building2 className="h-4 w-4" /> Project Warehouse
             </TabsTrigger>
           </TabsList>
 
