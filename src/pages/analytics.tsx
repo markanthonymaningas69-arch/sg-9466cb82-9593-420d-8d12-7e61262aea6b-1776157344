@@ -13,6 +13,7 @@ import { siteService } from "@/services/siteService";
 import { ClipboardList, Package, DollarSign, AlertCircle, TrendingUp, BarChart3 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type { Database } from "@/integrations/supabase/types";
+import { supabase } from "@/integrations/supabase/client";
 
 type Project = Database["public"]["Tables"]["projects"]["Row"];
 
@@ -27,6 +28,7 @@ export default function Analytics() {
   const [consumption, setConsumption] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<any[]>([]);
   const [deliveries, setDeliveries] = useState<any[]>([]);
+  const [progressUpdates, setProgressUpdates] = useState<any[]>([]);
 
   // Filters
   const [usageScopeFilter, setUsageScopeFilter] = useState<string>("all");
@@ -43,6 +45,7 @@ export default function Analytics() {
       setConsumption([]);
       setAttendance([]);
       setDeliveries([]);
+      setProgressUpdates([]);
     }
   }, [selectedProject]);
 
@@ -60,23 +63,37 @@ export default function Analytics() {
   const loadProjectData = async (projectId: string) => {
     setLoading(true);
     try {
-      const [bomData, consumptionData, attendanceData, deliveriesData] = await Promise.all([
+      const [bomData, consumptionData, attendanceData, deliveriesData, scopesData] = await Promise.all([
         bomService.getByProjectId(projectId),
         siteService.getMaterialConsumption(projectId),
         siteService.getSiteAttendance(projectId),
-        siteService.getDeliveries(projectId)
+        siteService.getDeliveries(projectId),
+        siteService.getScopeOfWorks(projectId)
       ]);
 
       setBom(bomData.data || null);
       setConsumption(consumptionData.data || []);
       setAttendance(attendanceData.data || []);
       setDeliveries(deliveriesData.data || []);
+      
+      if (scopesData.data && scopesData.data.length > 0) {
+        const scopeIds = scopesData.data.map((s: any) => s.id);
+        const { data: progressData } = await supabase
+          .from('bom_progress_updates')
+          .select('*, bom_scope_of_work(name)')
+          .in('bom_scope_id', scopeIds)
+          .order('update_date', { ascending: false });
+        setProgressUpdates(progressData || []);
+      } else {
+        setProgressUpdates([]);
+      }
     } catch (err) {
       console.error("Error loading project data:", err);
       setBom(null);
       setConsumption([]);
       setAttendance([]);
       setDeliveries([]);
+      setProgressUpdates([]);
     } finally {
       setLoading(false);
     }
@@ -333,6 +350,39 @@ export default function Analytics() {
 
     return chartData;
   }, [bom, consumption, attendance]);
+
+  // 6. Progress Chart Data
+  const progressChartData = useMemo(() => {
+    if (!bom?.bom_scope_of_work || !Array.isArray(bom.bom_scope_of_work)) return [];
+    
+    const scopes = bom.bom_scope_of_work;
+    const sorted = [...progressUpdates].sort((a,b) => new Date(a.update_date).getTime() - new Date(b.update_date).getTime());
+    const dailyScopes: Record<string, number> = {};
+    const dataPoints: any[] = [];
+    
+    const uniqueDates = Array.from(new Set(sorted.map(u => u.update_date)));
+    
+    for (const date of uniqueDates) {
+      const updatesOnDate = sorted.filter(u => u.update_date === date);
+      updatesOnDate.forEach(u => {
+        dailyScopes[u.bom_scope_id] = u.percentage_completed || 0;
+      });
+      
+      let totalPct = 0;
+      const count = scopes.length || 1;
+      
+      scopes.forEach((s: any) => {
+        totalPct += (dailyScopes[s.id] || 0);
+      });
+      
+      dataPoints.push({
+        date,
+        completion: parseFloat((totalPct / count).toFixed(2))
+      });
+    }
+    
+    return dataPoints;
+  }, [bom, progressUpdates]);
 
   if (loading && projects.length === 0) {
     return (
@@ -677,58 +727,33 @@ export default function Analytics() {
                   </CardContent>
                 </Card>
 
-                {/* Daily Labor */}
-                <div className="grid md:grid-cols-2 gap-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Daily Labor Hours</CardTitle>
-                      <CardDescription>Manpower hours logged per day</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {visualAnalyticsData.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground text-sm">
-                          No attendance data available.
-                        </div>
-                      ) : (
-                        <ResponsiveContainer width="100%" height={250}>
-                          <BarChart data={visualAnalyticsData}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="date" />
-                            <YAxis />
-                            <Tooltip />
-                            <Legend />
-                            <Bar dataKey="laborHours" fill="#ffc658" name="Labor Hours" />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Daily Labor Cost</CardTitle>
-                      <CardDescription>Manpower costs per day</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {visualAnalyticsData.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground text-sm">
-                          No attendance data available.
-                        </div>
-                      ) : (
-                        <ResponsiveContainer width="100%" height={250}>
-                          <BarChart data={visualAnalyticsData}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="date" />
-                            <YAxis />
-                            <Tooltip formatter={(value: any) => formatCurrency(Number(value))} />
-                            <Legend />
-                            <Bar dataKey="laborCost" fill="#ff7c7c" name="Labor Cost" />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
+                {/* Overall Progress Chart */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <BarChart3 className="h-5 w-5 text-primary" />
+                      Overall Project Progress
+                    </CardTitle>
+                    <CardDescription>Track overall completion percentage over time based on scope updates</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {progressChartData.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        No progress updates available yet.
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={300}>
+                        <LineChart data={progressChartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                          <XAxis dataKey="date" />
+                          <YAxis domain={[0, 100]} tickFormatter={(val) => `${val}%`} />
+                          <Tooltip formatter={(value: any) => [`${value}%`, 'Overall Completion']} />
+                          <Line type="monotone" dataKey="completion" stroke="#22c55e" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
             </TabsContent>
 
