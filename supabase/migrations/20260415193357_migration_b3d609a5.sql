@@ -1,0 +1,2 @@
+ALTER TABLE "public"."purchases" DROP CONSTRAINT IF EXISTS "purchases_status_check";
+ALTER TABLE "public"."purchases" ADD CONSTRAINT "purchases_status_check" CHECK (status IN ('pending', 'pending_approval', 'approved', 'received'));
