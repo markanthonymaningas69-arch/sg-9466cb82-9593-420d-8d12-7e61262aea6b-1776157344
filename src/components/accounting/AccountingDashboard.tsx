@@ -113,7 +113,13 @@ export function AccountingDashboard({ onTabChange }: { onTabChange?: (tab: strin
       <BarChart data={cashFlowData} margin={{ top: 25, right: 30, left: 20, bottom: 5 }}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
         <XAxis dataKey="name" axisLine={false} tickLine={false} />
-        <YAxis axisLine={false} tickLine={false} tickFormatter={(value) => `AED ${value}`} />
+        <YAxis 
+          width={80} 
+          axisLine={false} 
+          tickLine={false} 
+          tick={{ fontSize: 10 }} 
+          tickFormatter={(value) => formatCurrency(value)} 
+        />
         <RechartsTooltip cursor={{ fill: 'transparent' }} formatter={(value: number) => formatCurrency(value)} />
         <Legend />
         <Bar dataKey="income" name="Income (Credits)" fill="#10b981" radius={[4, 4, 0, 0]}>

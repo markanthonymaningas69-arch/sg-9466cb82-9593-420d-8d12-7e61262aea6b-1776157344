@@ -61,6 +61,39 @@ export function TaxReportTab() {
     setLoading(false);
   };
 
+  const handleExportCSV = () => {
+    if (transactions.length === 0) return;
+    
+    const headers = ["Date", "Account / Reference", "Description", "Tax Type", "Base Amount", "Calculated Tax"];
+    const csvRows = [headers.join(",")];
+    
+    transactions.forEach(t => {
+      const typeStr = t.type === 'debit' ? `Input ${selectedTax.code}` : `Output ${selectedTax.code}`;
+      const safeDesc = t.description ? t.description.replace(/"/g, '""') : "";
+      
+      const row = [
+        t.date,
+        `"${t.account_name}"`,
+        `"${safeDesc}"`,
+        typeStr,
+        t.amount,
+        t.calculated_tax
+      ];
+      csvRows.push(row.join(","));
+    });
+    
+    const csvString = csvRows.join("\n");
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${selectedTax.name}_Report.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="space-y-4 mt-4">
       <div className="flex justify-between items-center bg-card p-4 rounded-lg border">
@@ -119,7 +152,7 @@ export function TaxReportTab() {
             <CardTitle>{selectedTax.name} Report</CardTitle>
             <CardDescription>Detailed ledger of all taxable transactions</CardDescription>
           </div>
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExportCSV}>
             <Download className="h-4 w-4 mr-2" />
             Export CSV for Authority
           </Button>

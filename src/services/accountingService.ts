@@ -121,6 +121,14 @@ export const accountingService = {
     return { data, error };
   },
 
+  async deleteLiquidation(id: string) {
+    const { error } = await supabase
+      .from("liquidations")
+      .delete()
+      .eq("id", id);
+    return { error };
+  },
+
   // === Payroll Integration (Site Attendance) ===
   async getPayrollData(startDate: string, endDate: string, projectId?: string) {
     let query = supabase

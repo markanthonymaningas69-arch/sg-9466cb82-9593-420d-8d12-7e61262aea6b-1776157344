@@ -88,7 +88,7 @@ export default function Accounting() {
     <Layout>
       <div className="space-y-6 h-full flex flex-col">
         <div>
-          <h1 className="text-3xl font-heading font-bold">ERP Accounting System</h1>
+          <h1 className="text-3xl font-heading font-bold">Accounting</h1>
           <p className="text-muted-foreground mt-1">Manage corporate finances, liquidations, payroll, and UAE taxes</p>
         </div>
 
