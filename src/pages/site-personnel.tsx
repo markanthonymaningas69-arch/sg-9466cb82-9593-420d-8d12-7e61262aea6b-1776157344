@@ -2039,17 +2039,15 @@ export default function SitePersonnel() {
                       inventoryMap[key].balance -= c.quantity;
                     });
                     
-                    const rawItems = Object.values(inventoryMap);
-                    const siteInventoryArray = Array.isArray(rawItems) ? rawItems : [];
-                    siteInventoryArray.sort((a: any, b: any) => a.name.localeCompare(b.name));
+                    type InventoryItem = { name: string; category: string; unit: string; received: number; consumed: number; balance: number };
+                    const rawItems: InventoryItem[] = Object.values(inventoryMap) as InventoryItem[];
+                    rawItems.sort((a, b) => a.name.localeCompare(b.name));
                     
-                    const filteredItems = siteInventoryArray.filter((item: any) => {
+                    const finalItems: InventoryItem[] = rawItems.filter((item) => {
                       const matchName = item.name.toLowerCase().includes(warehouseSearch.toLowerCase());
                       const matchType = warehouseTypeFilter === "all" || item.category === warehouseTypeFilter;
                       return matchName && matchType;
                     });
-                    
-                    const finalItems = Array.isArray(filteredItems) ? filteredItems : [];
                     
                     if (finalItems.length === 0) {
                       return (
@@ -2118,7 +2116,7 @@ export default function SitePersonnel() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {finalItems.map((item: any, idx: number) => (
+                              {finalItems.map((item: InventoryItem, idx: number) => (
                                 <TableRow key={idx} className="hover:bg-muted/50">
                                   <TableCell className="font-medium text-black">{item.name}</TableCell>
                                   <TableCell>
