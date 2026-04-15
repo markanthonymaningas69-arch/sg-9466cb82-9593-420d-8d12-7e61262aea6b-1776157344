@@ -62,53 +62,6 @@ export type Database = {
           },
         ]
       }
-      attendance: {
-        Row: {
-          check_in: string | null
-          check_out: string | null
-          created_at: string | null
-          date: string
-          hours_worked: number | null
-          id: string
-          notes: string | null
-          overtime_hours: number | null
-          personnel_id: string
-          status: string
-        }
-        Insert: {
-          check_in?: string | null
-          check_out?: string | null
-          created_at?: string | null
-          date: string
-          hours_worked?: number | null
-          id?: string
-          notes?: string | null
-          overtime_hours?: number | null
-          personnel_id: string
-          status: string
-        }
-        Update: {
-          check_in?: string | null
-          check_out?: string | null
-          created_at?: string | null
-          date?: string
-          hours_worked?: number | null
-          id?: string
-          notes?: string | null
-          overtime_hours?: number | null
-          personnel_id?: string
-          status?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "attendance_personnel_id_fkey"
-            columns: ["personnel_id"]
-            isOneToOne: false
-            referencedRelation: "personnel"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       bill_of_materials: {
         Row: {
           bom_number: string
@@ -456,53 +409,6 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      certifications: {
-        Row: {
-          certificate_number: string | null
-          certification_name: string
-          created_at: string | null
-          document_url: string | null
-          expiry_date: string | null
-          id: string
-          issue_date: string | null
-          issuing_organization: string | null
-          personnel_id: string
-          status: string
-        }
-        Insert: {
-          certificate_number?: string | null
-          certification_name: string
-          created_at?: string | null
-          document_url?: string | null
-          expiry_date?: string | null
-          id?: string
-          issue_date?: string | null
-          issuing_organization?: string | null
-          personnel_id: string
-          status?: string
-        }
-        Update: {
-          certificate_number?: string | null
-          certification_name?: string
-          created_at?: string | null
-          document_url?: string | null
-          expiry_date?: string | null
-          id?: string
-          issue_date?: string | null
-          issuing_organization?: string | null
-          personnel_id?: string
-          status?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "certifications_personnel_id_fkey"
-            columns: ["personnel_id"]
-            isOneToOne: false
-            referencedRelation: "personnel"
             referencedColumns: ["id"]
           },
         ]
@@ -1114,57 +1020,6 @@ export type Database = {
           },
         ]
       }
-      progress_updates: {
-        Row: {
-          bom_scope_id: string | null
-          created_at: string | null
-          id: string
-          notes: string | null
-          percentage_completed: number | null
-          quantity_completed: number | null
-          scope_id: string | null
-          update_date: string
-          updated_by: string | null
-        }
-        Insert: {
-          bom_scope_id?: string | null
-          created_at?: string | null
-          id?: string
-          notes?: string | null
-          percentage_completed?: number | null
-          quantity_completed?: number | null
-          scope_id?: string | null
-          update_date: string
-          updated_by?: string | null
-        }
-        Update: {
-          bom_scope_id?: string | null
-          created_at?: string | null
-          id?: string
-          notes?: string | null
-          percentage_completed?: number | null
-          quantity_completed?: number | null
-          scope_id?: string | null
-          update_date?: string
-          updated_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "progress_updates_bom_scope_id_fkey"
-            columns: ["bom_scope_id"]
-            isOneToOne: false
-            referencedRelation: "bom_scope_of_work"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "progress_updates_scope_id_fkey"
-            columns: ["scope_id"]
-            isOneToOne: false
-            referencedRelation: "scope_of_works"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       projects: {
         Row: {
           budget: number
@@ -1274,50 +1129,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "purchases_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      scope_of_works: {
-        Row: {
-          completed_quantity: number | null
-          created_at: string | null
-          description: string
-          id: string
-          order_number: number | null
-          planned_quantity: number | null
-          project_id: string
-          status: string | null
-          unit: string | null
-        }
-        Insert: {
-          completed_quantity?: number | null
-          created_at?: string | null
-          description: string
-          id?: string
-          order_number?: number | null
-          planned_quantity?: number | null
-          project_id: string
-          status?: string | null
-          unit?: string | null
-        }
-        Update: {
-          completed_quantity?: number | null
-          created_at?: string | null
-          description?: string
-          id?: string
-          order_number?: number | null
-          planned_quantity?: number | null
-          project_id?: string
-          status?: string | null
-          unit?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "scope_of_works_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
@@ -1531,106 +1342,6 @@ export type Database = {
           status?: string | null
         }
         Relationships: []
-      }
-      training_records: {
-        Row: {
-          certificate_issued: boolean | null
-          completion_status: string
-          created_at: string | null
-          duration_hours: number | null
-          id: string
-          notes: string | null
-          personnel_id: string
-          score: number | null
-          trainer: string | null
-          training_date: string
-          training_title: string
-          training_type: string | null
-        }
-        Insert: {
-          certificate_issued?: boolean | null
-          completion_status?: string
-          created_at?: string | null
-          duration_hours?: number | null
-          id?: string
-          notes?: string | null
-          personnel_id: string
-          score?: number | null
-          trainer?: string | null
-          training_date: string
-          training_title: string
-          training_type?: string | null
-        }
-        Update: {
-          certificate_issued?: boolean | null
-          completion_status?: string
-          created_at?: string | null
-          duration_hours?: number | null
-          id?: string
-          notes?: string | null
-          personnel_id?: string
-          score?: number | null
-          trainer?: string | null
-          training_date?: string
-          training_title?: string
-          training_type?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "training_records_personnel_id_fkey"
-            columns: ["personnel_id"]
-            isOneToOne: false
-            referencedRelation: "personnel"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      transactions: {
-        Row: {
-          amount: number
-          category: string
-          created_at: string | null
-          date: string
-          description: string
-          id: string
-          project_id: string | null
-          reference_number: string | null
-          type: string
-          vendor: string | null
-        }
-        Insert: {
-          amount: number
-          category: string
-          created_at?: string | null
-          date: string
-          description: string
-          id?: string
-          project_id?: string | null
-          reference_number?: string | null
-          type: string
-          vendor?: string | null
-        }
-        Update: {
-          amount?: number
-          category?: string
-          created_at?: string | null
-          date?: string
-          description?: string
-          id?: string
-          project_id?: string | null
-          reference_number?: string | null
-          type?: string
-          vendor?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "transactions_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       vouchers: {
         Row: {

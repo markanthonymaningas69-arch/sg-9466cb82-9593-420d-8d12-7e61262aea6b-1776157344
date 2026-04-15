@@ -2039,9 +2039,9 @@ export default function SitePersonnel() {
                       inventoryMap[key].balance -= c.quantity;
                     });
                     
-                    const siteInventoryArray = Object.values(inventoryMap).sort((a, b) => a.name.localeCompare(b.name));
+                    const siteInventoryArray: any[] = Object.values(inventoryMap).sort((a: any, b: any) => a.name.localeCompare(b.name));
                     
-                    const filteredItems = siteInventoryArray.filter(item => {
+                    const filteredItems: any[] = siteInventoryArray.filter((item: any) => {
                       const matchName = item.name.toLowerCase().includes(warehouseSearch.toLowerCase());
                       const matchType = warehouseTypeFilter === "all" || item.category === warehouseTypeFilter;
                       return matchName && matchType;
@@ -2114,7 +2114,7 @@ export default function SitePersonnel() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {filteredItems.map((item, idx) => (
+                              {filteredItems.map((item: any, idx: number) => (
                                 <TableRow key={idx} className="hover:bg-muted/50">
                                   <TableCell className="font-medium text-black">{item.name}</TableCell>
                                   <TableCell>
