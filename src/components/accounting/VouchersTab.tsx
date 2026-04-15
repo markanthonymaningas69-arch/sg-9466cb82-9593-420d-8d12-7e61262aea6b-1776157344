@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useSettings } from "@/contexts/SettingsProvider";
 import { accountingService } from "@/services/accountingService";
 import { projectService } from "@/services/projectService";
-import { Plus, ReceiptText, Printer, CheckCircle } from "lucide-react";
+import { Plus, ReceiptText, Printer, CheckCircle, Archive } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -88,6 +88,18 @@ export function VouchersTab() {
       loadData();
     } else {
       toast({ title: "Error", description: "Failed to issue voucher", variant: "destructive" });
+    }
+  };
+
+  const handleArchive = async (v: any) => {
+    if (confirm(`Are you sure you want to archive voucher ${v.voucher_number}?`)) {
+      const { error } = await accountingService.archiveVoucher(v.id);
+      if (!error) {
+        toast({ title: "Archived", description: "Voucher archived successfully." });
+        loadData();
+      } else {
+        toast({ title: "Error", description: "Failed to archive voucher", variant: "destructive" });
+      }
     }
   };
 
@@ -347,6 +359,9 @@ export function VouchersTab() {
                         )}
                         <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" onClick={() => handlePrint(v)} title="Print to PDF">
                           <Printer className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-500 hover:text-slate-700 hover:bg-slate-100" onClick={() => handleArchive(v)} title="Archive Voucher">
+                          <Archive className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>

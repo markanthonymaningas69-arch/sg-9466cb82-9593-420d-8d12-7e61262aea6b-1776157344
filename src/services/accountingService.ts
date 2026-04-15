@@ -80,8 +80,17 @@ export const accountingService = {
     const { data, error } = await supabase
       .from("vouchers")
       .select("*")
+      .neq("status", "archived")
       .order("date", { ascending: false });
     return { data: data || [], error };
+  },
+
+  async archiveVoucher(id: string) {
+    const { error } = await supabase
+      .from("vouchers")
+      .update({ status: 'archived' })
+      .eq("id", id);
+    return { error };
   },
 
   async createVoucher(voucher: any) {
