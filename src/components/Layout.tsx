@@ -69,6 +69,9 @@ export function Layout({ children }: LayoutProps) {
   const [pendingDeliveries, setPendingDeliveries] = useState<any[]>([]);
   const [recentReceivedDeliveries, setRecentReceivedDeliveries] = useState<any[]>([]);
   
+  const [pendingPurchases, setPendingPurchases] = useState<any[]>([]);
+  const [approvedVouchers, setApprovedVouchers] = useState<any[]>([]);
+  
   const [resolvedRequests, setResolvedRequests] = useState<any[]>([]);
   const [resolvedLeaves, setResolvedLeaves] = useState<any[]>([]);
   const [resolvedCashAdvances, setResolvedCashAdvances] = useState<any[]>([]);
@@ -177,6 +180,22 @@ export function Layout({ children }: LayoutProps) {
       .limit(5);
     setRecentReceivedDeliveries(rDeliveries || []);
 
+    const { data: pPurchases } = await supabase
+      .from('purchases')
+      .select('*, projects(name)')
+      .eq('status', 'pending')
+      .order('id', { ascending: false })
+      .limit(10);
+    setPendingPurchases(pPurchases || []);
+
+    const { data: aVouchers } = await supabase
+      .from('vouchers')
+      .select('*, projects(name)')
+      .eq('status', 'approved')
+      .order('date', { ascending: false })
+      .limit(10);
+    setApprovedVouchers(aVouchers || []);
+
     // Load expiring documents
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
@@ -235,23 +254,21 @@ export function Layout({ children }: LayoutProps) {
         variant: "destructive"
       });
     } else {
-      // Auto-generate voucher if it has an amount
-      if (req.amount > 0) {
-        await supabase.from('vouchers').insert({
-          type: 'payment',
-          voucher_number: `PV-${Math.floor(Math.random() * 10000)}`,
-          date: new Date().toISOString().split("T")[0],
-          amount: req.amount,
-          payee: req.requested_by || 'Site Personnel',
-          description: `Approved ${req.request_type || 'Materials'}: ${req.item_name}`,
-          project_id: req.project_id,
-          status: 'approved'
-        });
-      }
+      // Auto-generate voucher for ALL approved requests (including materials)
+      await supabase.from('vouchers').insert({
+        type: 'payment',
+        voucher_number: `PV-${Math.floor(Math.random() * 10000)}`,
+        date: new Date().toISOString().split("T")[0],
+        amount: req.amount || 0,
+        payee: req.requested_by || 'Site Personnel',
+        description: `Approved ${req.request_type || 'Materials'}: ${req.item_name} (${req.quantity} ${req.unit || ''})`,
+        project_id: req.project_id,
+        status: 'approved'
+      });
 
       toast({
         title: "Request Approved",
-        description: `${req.item_name} has been approved`
+        description: `${req.item_name} has been approved and Payment Voucher generated.`
       });
       loadPendingRequests();
     }
@@ -410,9 +427,10 @@ export function Layout({ children }: LayoutProps) {
                 const Icon = item.icon;
                 const isActive = router.pathname === item.href;
 
-                const acctCount = pendingCashAdvances.length + pendingRequests.filter((r) => ['Equipment (Rentals)', 'PPE', 'Petty Cash'].includes(r.request_type)).length;
+                const acctCount = pendingCashAdvances.length + pendingRequests.filter((r) => ['Equipment (Rentals)', 'PPE', 'Petty Cash'].includes(r.request_type)).length + approvedVouchers.length;
                 const whseCount = pendingRequests.filter((r) => ['Tools', 'Equipment (Warehouse)', 'PPE', 'Materials'].includes(r.request_type) || !r.request_type).length;
                 const hrCount = pendingLeaves.length + expiringDocuments.length;
+                const purchCount = pendingPurchases.length;
 
                 return (
                   <li key={item.name}>
@@ -441,6 +459,11 @@ export function Layout({ children }: LayoutProps) {
                       {item.name === "Human Resources" && hrCount > 0 &&
                       <Badge variant="destructive" className="ml-auto h-5 px-1.5 flex items-center justify-center text-[10px]">
                           {hrCount}
+                        </Badge>
+                      }
+                      {item.name === "Purchasing" && purchCount > 0 &&
+                      <Badge variant="destructive" className="ml-auto h-5 px-1.5 flex items-center justify-center text-[10px]">
+                          {purchCount}
                         </Badge>
                       }
                     </Link>
@@ -526,6 +549,7 @@ export function Layout({ children }: LayoutProps) {
               const isAccounting = assignedModules.includes("Accounting");
               const isWarehouse = assignedModules.includes("Warehouse");
               const isSitePersonnel = assignedModules.includes("Site Personnel");
+              const isPurchasing = assignedModules.includes("Purchasing");
               
               // Pending Actions
               const displayPendingAdvances = (isGM || isAccounting) ? pendingCashAdvances : [];
@@ -573,8 +597,8 @@ export function Layout({ children }: LayoutProps) {
                 return false;
               });
 
-              const totalNotifications = displayPendingAdvances.length + displayPendingLeaves.length + displayExpiring.length + displayPendingRequests.length + displayPendingDeliveries.length + displayResolvedAdvances.length + displayResolvedLeaves.length + displayResolvedRequests.length + displayReceivedDeliveries.length;
-              const hasActionRequired = displayPendingAdvances.length > 0 || displayPendingLeaves.length > 0 || displayExpiring.length > 0 || displayPendingRequests.length > 0 || displayPendingDeliveries.length > 0;
+              const totalNotifications = displayPendingAdvances.length + displayPendingLeaves.length + displayExpiring.length + displayPendingRequests.length + displayPendingDeliveries.length + displayResolvedAdvances.length + displayResolvedLeaves.length + displayResolvedRequests.length + displayReceivedDeliveries.length + displayPendingPurchases.length + displayApprovedVouchers.length;
+              const hasActionRequired = displayPendingAdvances.length > 0 || displayPendingLeaves.length > 0 || displayExpiring.length > 0 || displayPendingRequests.length > 0 || displayPendingDeliveries.length > 0 || displayPendingPurchases.length > 0 || displayApprovedVouchers.length > 0;
               const hasRecentUpdates = displayResolvedAdvances.length > 0 || displayResolvedLeaves.length > 0 || displayResolvedRequests.length > 0 || displayReceivedDeliveries.length > 0;
 
               const currentNotificationIds = [
@@ -583,6 +607,8 @@ export function Layout({ children }: LayoutProps) {
                 ...displayExpiring,
                 ...displayPendingRequests,
                 ...displayPendingDeliveries,
+                ...displayPendingPurchases,
+                ...displayApprovedVouchers,
                 ...displayResolvedAdvances,
                 ...displayResolvedLeaves,
                 ...displayResolvedRequests,
@@ -646,6 +672,54 @@ export function Layout({ children }: LayoutProps) {
                             Action Required
                           </div>
                         )}
+
+                        {/* Approved Vouchers (Accounting) */}
+                        {displayApprovedVouchers.map((voucher) => (
+                          <DropdownMenuItem
+                            key={`approved-voucher-${voucher.id}`}
+                            className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-muted"
+                            onClick={() => {
+                              router.push('/accounting');
+                              setNotificationOpen(false);
+                            }}>
+                            <div className="flex items-start justify-between w-full">
+                              <span className="font-medium text-sm text-blue-700">Voucher to Issue</span>
+                              <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-600 border-blue-200">
+                                {voucher.voucher_number}
+                              </Badge>
+                            </div>
+                            <span className="text-xs text-muted-foreground font-semibold">
+                              {voucher.description || 'Payment Voucher'}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              Amount: AED {voucher.amount.toLocaleString()}
+                            </span>
+                          </DropdownMenuItem>
+                        ))}
+
+                        {/* Pending Purchases */}
+                        {displayPendingPurchases.map((purchase) => (
+                          <DropdownMenuItem
+                            key={`pending-purchase-${purchase.id}`}
+                            className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-muted"
+                            onClick={() => {
+                              router.push('/purchasing');
+                              setNotificationOpen(false);
+                            }}>
+                            <div className="flex items-start justify-between w-full">
+                              <span className="font-medium text-sm text-purple-700">Purchase Required</span>
+                              <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-600 border-purple-200">
+                                Pending
+                              </Badge>
+                            </div>
+                            <span className="text-xs text-muted-foreground font-semibold">
+                              {purchase.item_name} ({purchase.quantity} {purchase.unit})
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              From: {purchase.voucher_number || "Direct Request"}
+                            </span>
+                          </DropdownMenuItem>
+                        ))}
 
                         {/* Pending Deliveries from Warehouse */}
                         {displayPendingDeliveries.map((delivery) => (
