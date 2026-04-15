@@ -75,6 +75,13 @@ export function Layout({ children }: LayoutProps) {
   
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [lastSeenNotificationIds, setLastSeenNotificationIds] = useState<string>(() => typeof window !== 'undefined' ? localStorage.getItem('lastSeenNotificationIds') || "" : "");
+  const [clearedUpdateIds, setClearedUpdateIds] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('app_cleared_updates');
+      return saved ? JSON.parse(saved) : [];
+    }
+    return [];
+  });
   
   const [assignedModule, setAssignedModule] = useState<string>(() => typeof window !== 'undefined' ? localStorage.getItem('app_assigned_module') || "GM" : "GM");
   const [assignedModules, setAssignedModules] = useState<string[]>(() => {
@@ -338,6 +345,20 @@ export function Layout({ children }: LayoutProps) {
     router.push('/auth/login');
   };
 
+  const handleClearRecent = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const newCleared = [
+      ...clearedUpdateIds,
+      ...resolvedCashAdvances.map(a => `adv-${a.id}`),
+      ...resolvedLeaves.map(l => `leave-${l.id}`),
+      ...resolvedRequests.map(r => `req-${r.id}`),
+      ...recentReceivedDeliveries.map(d => `del-${d.id}`),
+    ];
+    setClearedUpdateIds(newCleared);
+    localStorage.setItem('app_cleared_updates', JSON.stringify(newCleared));
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Mobile sidebar backdrop */}
@@ -523,20 +544,27 @@ export function Layout({ children }: LayoutProps) {
 
               // Resolved Updates
               const displayResolvedAdvances = resolvedCashAdvances.filter(adv => {
+                if (clearedUpdateIds.includes(`adv-${adv.id}`)) return false;
                 if (isGM || isSitePersonnel) return true;
                 if (isAccounting && adv.status === 'approved') return true;
                 return false;
               });
 
               const displayResolvedLeaves = resolvedLeaves.filter(leave => {
+                if (clearedUpdateIds.includes(`leave-${leave.id}`)) return false;
                 if (isGM || isSitePersonnel) return true;
                 if (isHR && leave.status === 'approved') return true;
                 return false;
               });
 
-              const displayReceivedDeliveries = (isGM || isWarehouse) ? recentReceivedDeliveries : [];
+              const displayReceivedDeliveries = recentReceivedDeliveries.filter(del => {
+                if (clearedUpdateIds.includes(`del-${del.id}`)) return false;
+                if (isGM || isWarehouse) return true;
+                return false;
+              });
 
               const displayResolvedRequests = resolvedRequests.filter(req => {
+                if (clearedUpdateIds.includes(`req-${req.id}`)) return false;
                 if (isGM || isSitePersonnel) return true;
                 const isAcctReq = ['Equipment (Rentals)', 'PPE', 'Petty Cash'].includes(req.request_type);
                 const isWhseReq = ['Tools', 'Equipment (Warehouse)', 'PPE', 'Materials'].includes(req.request_type) || !req.request_type;
@@ -563,13 +591,25 @@ export function Layout({ children }: LayoutProps) {
 
               const hasUnseenNotifications = totalNotifications > 0 && currentNotificationIds !== lastSeenNotificationIds;
 
+              const handleClearRecent = (e: React.MouseEvent) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const newCleared = [
+                  ...clearedUpdateIds,
+                  ...displayResolvedAdvances.map(a => `adv-${a.id}`),
+                  ...displayResolvedLeaves.map(l => `leave-${l.id}`),
+                  ...displayResolvedRequests.map(r => `req-${r.id}`),
+                  ...displayReceivedDeliveries.map(d => `del-${d.id}`),
+                ];
+                setClearedUpdateIds(newCleared);
+                localStorage.setItem('app_cleared_updates', JSON.stringify(newCleared));
+              };
+
               return (
                 <DropdownMenu open={notificationOpen} onOpenChange={(open) => {
                   setNotificationOpen(open);
-                  if (open) {
-                    setLastSeenNotificationIds(currentNotificationIds);
-                    localStorage.setItem('lastSeenNotificationIds', currentNotificationIds);
-                  }
+                  setLastSeenNotificationIds(currentNotificationIds);
+                  localStorage.setItem('lastSeenNotificationIds', currentNotificationIds);
                 }}>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="relative">
@@ -585,16 +625,22 @@ export function Layout({ children }: LayoutProps) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-80">
-                    <DropdownMenuLabel className="font-semibold">
-                      Notifications ({totalNotifications} pending)
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    {totalNotifications === 0 ?
-                    <div className="p-4 text-center text-sm text-muted-foreground">
+                    <div className="flex items-center justify-between px-3 py-2 border-b">
+                      <DropdownMenuLabel className="p-0 font-semibold">
+                        Notifications ({totalNotifications})
+                      </DropdownMenuLabel>
+                      {hasRecentUpdates && (
+                        <Button variant="ghost" size="sm" className="h-6 text-xs px-2 text-muted-foreground hover:text-foreground" onClick={handleClearRecent}>
+                          Clear Recent
+                        </Button>
+                      )}
+                    </div>
+                    {totalNotifications === 0 ? (
+                      <div className="p-4 text-center text-sm text-muted-foreground">
                         No pending notifications
-                      </div> :
-
-                    <ScrollArea className="max-h-[400px]">
+                      </div>
+                    ) : (
+                      <div className="max-h-[400px] overflow-y-auto overflow-x-hidden">
                         {hasActionRequired && (
                           <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase bg-muted/50 sticky top-0 z-10 backdrop-blur">
                             Action Required
@@ -893,11 +939,11 @@ export function Layout({ children }: LayoutProps) {
                             <span className="text-xs text-muted-foreground">{new Date(leave.start_date).toLocaleDateString()} - {new Date(leave.end_date).toLocaleDateString()}</span>
                           </DropdownMenuItem>
                         ))}
-                  </ScrollArea>
-                }
-              </DropdownMenuContent>
-            </DropdownMenu>
-            );
+                      </div>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              );
             })()}
 
             {/* Profile */}
