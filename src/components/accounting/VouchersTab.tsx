@@ -130,7 +130,7 @@ export function VouchersTab() {
 
           <div class="clearfix">
             <div class="amount-box">
-              ${currency || 'PHP'} ${v.amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+              ${currency || 'AED'} ${v.amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
             </div>
           </div>
 

@@ -155,11 +155,11 @@ export function LiquidationsTab() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Cash Advance Given (₱)</Label>
+                  <Label>Cash Advance Given (AED)</Label>
                   <Input type="number" step="0.01" value={form.advance_amount} onChange={e => setForm({...form, advance_amount: e.target.value})} required />
                 </div>
                 <div className="space-y-2">
-                  <Label>Actual Amount Spent (₱)</Label>
+                  <Label>Actual Amount Spent (AED)</Label>
                   <Input type="number" step="0.01" value={form.actual_amount} onChange={e => setForm({...form, actual_amount: e.target.value})} />
                 </div>
                 <div className="space-y-2 col-span-2">
