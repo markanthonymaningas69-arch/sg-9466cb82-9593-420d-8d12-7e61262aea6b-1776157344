@@ -2,10 +2,13 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { accountingService } from "@/services/accountingService";
 import { useSettings } from "@/contexts/SettingsProvider";
-import { TrendingUp, TrendingDown, Landmark, Receipt, AlertCircle } from "lucide-react";
+import { TrendingUp, TrendingDown, Landmark, Receipt, AlertCircle, Maximize2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LabelList } from 'recharts';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#ef4444', '#f59e0b'];
 
@@ -21,6 +24,10 @@ export function AccountingDashboard({ onTabChange }: { onTabChange?: (tab: strin
   const [opExData, setOpExData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [pendingCashAdvances, setPendingCashAdvances] = useState<any[]>([]);
+
+  const [rawJournalData, setRawJournalData] = useState<any[]>([]);
+  const [cfDuration, setCfDuration] = useState<number>(30);
+  const [cfFullScreen, setCfFullScreen] = useState(false);
 
   useEffect(() => {
     loadSummary();
@@ -51,11 +58,11 @@ export function AccountingDashboard({ onTabChange }: { onTabChange?: (tab: strin
     const { data } = await accountingService.getJournalEntries();
     
     if (data) {
+      setRawJournalData(data);
       let totalDebits = 0;
       let totalCredits = 0;
       let totalTax = 0;
       
-      const cfMap: Record<string, { name: string, dateVal: number, income: number, expense: number }> = {};
       const opexMap: Record<string, number> = {};
 
       data.forEach(d => {
@@ -64,17 +71,6 @@ export function AccountingDashboard({ onTabChange }: { onTabChange?: (tab: strin
         if (d.type === 'credit') totalCredits += amt;
         totalTax += Number(d.tax_amount || 0);
 
-        // Cash flow grouping by Month-Year
-        const date = new Date(d.date);
-        const month = date.toLocaleString('default', { month: 'short' });
-        const year = date.getFullYear();
-        const key = `${month} ${year}`;
-        
-        if (!cfMap[key]) cfMap[key] = { name: key, dateVal: date.getTime(), income: 0, expense: 0 };
-        
-        if (d.type === 'credit' || d.category === 'revenue') cfMap[key].income += amt;
-        if (d.type === 'debit' || d.category === 'operational' || d.category === 'capital') cfMap[key].expense += amt;
-        
         // OpEx Breakdown
         if (d.category === 'operational') {
           opexMap[d.account_name] = (opexMap[d.account_name] || 0) + amt;
@@ -82,15 +78,53 @@ export function AccountingDashboard({ onTabChange }: { onTabChange?: (tab: strin
       });
       
       setSummary({ totalDebits, totalCredits, totalTax, balance: totalDebits - totalCredits });
-      
-      const sortedCfData = Object.values(cfMap).sort((a, b) => a.dateVal - b.dateVal);
-      setCashFlowData(sortedCfData);
-      
       setOpExData(Object.entries(opexMap).map(([name, value]) => ({ name, value })));
     }
     
     setLoading(false);
   };
+
+  useEffect(() => {
+    if (!rawJournalData.length) return;
+    
+    const cfMap: Record<string, { name: string, dateVal: number, income: number, expense: number }> = {};
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - cfDuration);
+    cutoffDate.setHours(0, 0, 0, 0);
+
+    rawJournalData.forEach(d => {
+      const date = new Date(d.date);
+      if (date >= cutoffDate) {
+        const dayKey = date.toLocaleDateString('default', { month: 'short', day: 'numeric' });
+        const amt = Number(d.amount);
+        if (!cfMap[dayKey]) cfMap[dayKey] = { name: dayKey, dateVal: date.getTime(), income: 0, expense: 0 };
+        
+        if (d.type === 'credit' || d.category === 'revenue') cfMap[dayKey].income += amt;
+        if (d.type === 'debit' || d.category === 'operational' || d.category === 'capital') cfMap[dayKey].expense += amt;
+      }
+    });
+    
+    const sortedCfData = Object.values(cfMap).sort((a, b) => a.dateVal - b.dateVal);
+    setCashFlowData(sortedCfData);
+  }, [rawJournalData, cfDuration]);
+
+  const renderCashFlowChart = () => (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={cashFlowData} margin={{ top: 25, right: 30, left: 20, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+        <XAxis dataKey="name" axisLine={false} tickLine={false} />
+        <YAxis axisLine={false} tickLine={false} tickFormatter={(value) => `AED ${value}`} />
+        <RechartsTooltip cursor={{ fill: 'transparent' }} formatter={(value: number) => new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED' }).format(value)} />
+        <Legend />
+        <Bar dataKey="income" name="Income (Credits)" fill="#10b981" radius={[4, 4, 0, 0]}>
+          <LabelList dataKey="income" position="top" fontSize={10} fill="#10b981" formatter={(val: number) => val > 0 ? val : ''} />
+        </Bar>
+        <Bar dataKey="expense" name="Expenses (Debits)" fill="#3b82f6" radius={[4, 4, 0, 0]}>
+          <LabelList dataKey="expense" position="top" fontSize={10} fill="#3b82f6" formatter={(val: number) => val > 0 ? val : ''} />
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
 
   if (loading) {
     return <div className="h-64 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>;
@@ -154,25 +188,31 @@ export function AccountingDashboard({ onTabChange }: { onTabChange?: (tab: strin
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Card className="min-h-[300px]">
-          <CardHeader>
+        <Card className="min-h-[300px] flex flex-col">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 shrink-0">
             <CardTitle>Cash Flow Trend (Actual)</CardTitle>
+            <div className="flex items-center gap-2">
+              <Select value={cfDuration.toString()} onValueChange={(val) => setCfDuration(Number(val))}>
+                <SelectTrigger className="w-[120px] h-8 text-xs">
+                  <SelectValue placeholder="Duration" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">Last 7 Days</SelectItem>
+                  <SelectItem value="15">Last 15 Days</SelectItem>
+                  <SelectItem value="30">Last 30 Days</SelectItem>
+                  <SelectItem value="60">Last 60 Days</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCfFullScreen(true)}>
+                <Maximize2 className="h-4 w-4" />
+              </Button>
+            </div>
           </CardHeader>
-          <CardContent className="h-[300px]">
+          <CardContent className="flex-1 min-h-[300px]">
             {cashFlowData.length === 0 ? (
               <div className="flex h-full items-center justify-center text-muted-foreground">No transaction data available</div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={cashFlowData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                  <YAxis axisLine={false} tickLine={false} tickFormatter={(value) => `AED ${value}`} />
-                  <RechartsTooltip cursor={{ fill: 'transparent' }} formatter={(value: number) => new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED' }).format(value)} />
-                  <Legend />
-                  <Bar dataKey="income" name="Income (Credits)" fill="#10b981" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="expense" name="Expenses (Debits)" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              renderCashFlowChart()
             )}
           </CardContent>
         </Card>
@@ -208,6 +248,21 @@ export function AccountingDashboard({ onTabChange }: { onTabChange?: (tab: strin
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={cfFullScreen} onOpenChange={setCfFullScreen}>
+        <DialogContent className="max-w-[90vw] h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Cash Flow Trend (Actual) - Last {cfDuration} Days</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 w-full min-h-0 pb-6 pt-4">
+            {cashFlowData.length === 0 ? (
+              <div className="flex h-full items-center justify-center text-muted-foreground">No transaction data available</div>
+            ) : (
+              renderCashFlowChart()
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
