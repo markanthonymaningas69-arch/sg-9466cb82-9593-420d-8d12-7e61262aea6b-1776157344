@@ -219,7 +219,7 @@ export default function SitePersonnel() {
     .join(',');
 
   const pendingDeliveryIds = deliveries
-    .filter(d => d.supplier === "Main Warehouse" && d.status === "pending")
+    .filter(d => d.status === "pending")
     .map(d => d.id)
     .sort()
     .join(',');
@@ -915,7 +915,7 @@ export default function SitePersonnel() {
                 Deliveries
                 {(() => {
                   const hasNewDeliveries = pendingDeliveryIds !== seenDeliveryIds && activeTab !== 'deliveries';
-                  const pendingCount = deliveries.filter(d => d.supplier === "Main Warehouse" && d.status === "pending").length;
+                  const pendingCount = deliveries.filter(d => d.status === "pending").length;
                   if (hasNewDeliveries && pendingCount > 0) {
                     return (
                       <Badge variant="destructive" className="ml-1 h-4 min-w-4 flex items-center justify-center p-0 px-1 text-[9px] absolute -top-1 -right-1">
@@ -2028,21 +2028,25 @@ export default function SitePersonnel() {
                                             <Check className="h-3 w-3 mr-1" /> Receive
                                           </Button>
                                         )}
-                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-500 hover:bg-blue-50" onClick={(e) => {
-                                          e.stopPropagation();
-                                          openEditDelivery(delivery);
-                                        }}>
-                                          <Pencil className="h-4 w-4" />
-                                        </Button>
-                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-orange-600 hover:bg-orange-50" onClick={async (e) => {
-                                          e.stopPropagation();
-                                          if(confirm("Archive this delivery?")) {
-                                            await siteService.deleteDelivery(delivery.id);
-                                            loadDeliveries();
-                                          }
-                                        }} title="Archive">
-                                          <Archive className="h-4 w-4" />
-                                        </Button>
+                                        {!(delivery.notes && delivery.notes.includes('From PO:')) && (
+                                          <>
+                                            <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-500 hover:bg-blue-50" onClick={(e) => {
+                                              e.stopPropagation();
+                                              openEditDelivery(delivery);
+                                            }}>
+                                              <Pencil className="h-4 w-4" />
+                                            </Button>
+                                            <Button size="icon" variant="ghost" className="h-8 w-8 text-orange-600 hover:bg-orange-50" onClick={async (e) => {
+                                              e.stopPropagation();
+                                              if(confirm("Archive this delivery?")) {
+                                                await siteService.deleteDelivery(delivery.id);
+                                                loadDeliveries();
+                                              }
+                                            }} title="Archive">
+                                              <Archive className="h-4 w-4" />
+                                            </Button>
+                                          </>
+                                        )}
                                       </div>
                                     </TableCell>
                                   </TableRow>

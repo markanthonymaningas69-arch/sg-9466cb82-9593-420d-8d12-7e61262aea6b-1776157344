@@ -162,7 +162,6 @@ export function Layout({ children }: LayoutProps) {
     const { data: pDeliveries } = await supabase
       .from('deliveries')
       .select('*, projects(name)')
-      .eq('supplier', 'Main Warehouse')
       .eq('status', 'pending')
       .order('delivery_date', { ascending: false })
       .limit(10);
@@ -172,7 +171,6 @@ export function Layout({ children }: LayoutProps) {
     const { data: rDeliveries } = await supabase
       .from('deliveries')
       .select('*, projects(name)')
-      .eq('supplier', 'Main Warehouse')
       .eq('status', 'received')
       .order('id', { ascending: false })
       .limit(5);
@@ -830,7 +828,9 @@ export function Layout({ children }: LayoutProps) {
                         ))}
 
                         {/* Pending Deliveries from Warehouse */}
-                        {displayPendingDeliveries.map((delivery) => (
+                        {displayPendingDeliveries.map((delivery) => {
+                          const isFromPO = delivery.notes && delivery.notes.includes('From PO: PO-');
+                          return (
                           <DropdownMenuItem
                             key={`pending-delivery-${delivery.id}`}
                             className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-muted"
@@ -839,7 +839,7 @@ export function Layout({ children }: LayoutProps) {
                               setNotificationOpen(false);
                             }}>
                             <div className="flex items-start justify-between w-full">
-                              <span className="font-medium text-sm text-blue-700">Deployed Item</span>
+                              <span className="font-medium text-sm text-blue-700">{isFromPO ? 'Incoming Delivery' : 'Deployed Item'}</span>
                               <Badge variant="outline" className="text-[10px] bg-orange-50 text-orange-600 border-orange-200">
                                 In Transit
                               </Badge>
@@ -851,7 +851,8 @@ export function Layout({ children }: LayoutProps) {
                               To: {delivery.projects?.name || "Unknown Project"}
                             </span>
                           </DropdownMenuItem>
-                        ))}
+                          );
+                        })}
 
                         {/* Pending Cash Advances */}
                         {displayPendingAdvances.map((adv) =>
