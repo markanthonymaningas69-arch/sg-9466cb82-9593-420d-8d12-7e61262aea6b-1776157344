@@ -597,9 +597,11 @@ export default function Purchasing() {
                               Price & Submit
                             </Button>
                           )}
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" onClick={() => handleEdit(p)}>
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
+                          {!(p.order_number && p.order_number.startsWith('PR-')) && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" onClick={() => handleEdit(p)}>
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                          )}
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50" onClick={() => handleArchive(p.id)} title="Archive">
                             <Archive className="h-4 w-4" />
                           </Button>
