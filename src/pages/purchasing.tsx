@@ -117,7 +117,7 @@ export default function Purchasing() {
       unit_cost: parseFloat(formData.unit_cost) || 0,
       destination_type: formData.destination_type,
       project_id: formData.destination_type === "project_warehouse" && formData.project_id !== "none" ? formData.project_id : null,
-      status: "pending",
+      status: "pending_approval",
       voucher_number: null
     };
 
@@ -441,9 +441,9 @@ export default function Purchasing() {
               </DialogTrigger>
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                  <DialogTitle>{editingId ? "Edit Purchase Order Item" : "Create Purchase Order"}</DialogTitle>
+                  <DialogTitle>Create Purchase Order</DialogTitle>
                   <p className="text-sm text-muted-foreground">
-                    {editingId ? "Update details for this specific item." : "PO Header details remain saved to easily add multiple items."}
+                    PO Header details remain saved to easily add multiple items.
                   </p>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -527,11 +527,11 @@ export default function Purchasing() {
                   </div>
                   <div className="flex justify-between items-center pt-4 border-t">
                     <p className="text-xs text-muted-foreground">
-                      {editingId ? "* Changes will only apply to this item" : "* Click Save Item to record and clear fields for the next item"}
+                      * Click Submit to GM to record and clear fields for the next item
                     </p>
                     <div className="flex gap-2">
                       <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                      <Button type="submit">{editingId ? "Update Item" : "Save Item to PO"}</Button>
+                      <Button type="submit">Submit to GM</Button>
                     </div>
                   </div>
                 </form>
@@ -676,11 +676,6 @@ export default function Purchasing() {
                               setGmSubmitDialogOpen(true);
                             }}>
                               Price & Submit
-                            </Button>
-                          )}
-                          {!(p.order_number && p.order_number.startsWith('PR-')) && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" onClick={() => handleEdit(p)}>
-                              <Edit2 className="h-4 w-4" />
                             </Button>
                           )}
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" onClick={() => handlePrint(p)} title="Print PO">
