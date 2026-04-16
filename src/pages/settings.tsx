@@ -33,8 +33,7 @@ import {
   Trash2,
   Edit,
   UserX,
-  Check,
-  LayoutTemplate
+  Check
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -42,7 +41,7 @@ import { cn } from "@/lib/utils";
 export default function Settings() {
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
-  const { currency, setCurrency, company, setCompany, currentPlan, themeColor, setThemeColor, glassEffect, setGlassEffect } = useSettings();
+  const { currency, setCurrency, company, setCompany, currentPlan, themeColor, setThemeColor } = useSettings();
 
   const [localCompany, setLocalCompany] = useState(company);
   const [notifications, setNotifications] = useState({
@@ -493,28 +492,6 @@ export default function Settings() {
                         {themeColor === c.value && <Check className="w-4 h-4 text-white" />}
                       </button>
                     ))}
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between max-w-md">
-                  <div className="space-y-0.5">
-                    <Label className="flex items-center gap-2">
-                      <LayoutTemplate className="h-4 w-4" />
-                      Window Effect
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Enable a translucent, frosted glass UI effect
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">Normal</span>
-                    <Switch
-                      checked={glassEffect}
-                      onCheckedChange={setGlassEffect}
-                    />
-                    <span className="text-sm text-muted-foreground">Glass</span>
                   </div>
                 </div>
               </CardContent>

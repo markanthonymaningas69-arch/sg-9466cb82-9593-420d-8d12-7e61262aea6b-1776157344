@@ -37,8 +37,6 @@ interface SettingsContextType {
   daysRemaining: number;
   themeColor: ThemeColor;
   setThemeColor: (color: ThemeColor) => void;
-  glassEffect: boolean;
-  setGlassEffect: (glass: boolean) => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -52,7 +50,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [isTrial, setIsTrial] = useState<boolean>(true);
   const [daysRemaining, setDaysRemaining] = useState<number>(7);
   const [themeColor, setThemeColorState] = useState<ThemeColor>("blue");
-  const [glassEffect, setGlassEffectState] = useState<boolean>(false);
 
   useEffect(() => {
     // Force AED currency
@@ -61,9 +58,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     
     const savedColor = localStorage.getItem("app_theme_color") as ThemeColor;
     if (savedColor) setThemeColorState(savedColor);
-    
-    const savedGlass = localStorage.getItem("app_glass_effect");
-    if (savedGlass === "true") setGlassEffectState(true);
 
     const savedCompany = localStorage.getItem("app_company");
     if (savedCompany) {
@@ -135,13 +129,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const colors = ["theme-blue", "theme-green", "theme-orange", "theme-rose", "theme-violet"];
     html.classList.remove(...colors);
     html.classList.add(`theme-${themeColor}`);
-
-    if (glassEffect) {
-      html.classList.add("glass-mode");
-    } else {
-      html.classList.remove("glass-mode");
-    }
-  }, [themeColor, glassEffect]);
+  }, [themeColor]);
 
   const setCurrency = (newCurrency: CurrencyType) => {
     setCurrencyState(newCurrency);
@@ -161,11 +149,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const setThemeColor = (color: ThemeColor) => {
     setThemeColorState(color);
     localStorage.setItem("app_theme_color", color);
-  };
-
-  const setGlassEffect = (glass: boolean) => {
-    setGlassEffectState(glass);
-    localStorage.setItem("app_glass_effect", String(glass));
   };
 
   const formatCurrency = (value: number) => {
@@ -189,7 +172,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <SettingsContext.Provider value={{ currency, setCurrency, formatCurrency, formatNumber, company, setCompany, currentPlan, setCurrentPlan, isLocked, lockReason, isTrial, daysRemaining, themeColor, setThemeColor, glassEffect, setGlassEffect }}>
+    <SettingsContext.Provider value={{ currency, setCurrency, formatCurrency, formatNumber, company, setCompany, currentPlan, setCurrentPlan, isLocked, lockReason, isTrial, daysRemaining, themeColor, setThemeColor }}>
       {children}
     </SettingsContext.Provider>
   );
