@@ -78,7 +78,7 @@ export default function RegisterPage() {
 
         setSuccess(`Account created! Joined as ${primaryModule}. Redirecting...`);
         setTimeout(() => {
-          router.push("/");
+          router.push("/dashboard");
         }, 1500);
       } else {
         // No invite code provided - send to onboarding to create workspace

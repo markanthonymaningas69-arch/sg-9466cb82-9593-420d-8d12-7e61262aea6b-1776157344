@@ -1,6 +1,6 @@
 ---
 title: Create Public Landing Page and Legal Pages
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: ["frontend", "landing-page", "design"]

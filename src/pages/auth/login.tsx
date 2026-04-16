@@ -34,7 +34,7 @@ export default function LoginPage() {
       return;
     }
 
-    router.replace("/");
+    router.replace("/dashboard");
   };
 
   return (
