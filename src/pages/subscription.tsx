@@ -132,22 +132,23 @@ export default function Subscription() {
 
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
+        // We will insert a brand new subscription record for the new billing cycle
         const newSub = {
           user_id: session.user.id,
           plan: currentPlan,
           status: 'active',
           start_date: new Date().toISOString(),
           amount: totalAmount,
-          features: addOnQuantities // Save the purchased add-ons here!
+          features: addOnQuantities
         };
         
         const { error } = await supabase.from('subscriptions').insert(newSub);
         
         if (error) {
-          console.error("Checkout error:", error);
+          console.error("Checkout database error:", error);
           toast({
-            title: "Checkout Failed",
-            description: "There was an error updating your subscription. Please try again.",
+            title: "Database Error",
+            description: error.message || "Failed to save to subscriptions table.",
             variant: "destructive"
           });
           setIsCheckingOut(false);
@@ -159,9 +160,8 @@ export default function Subscription() {
           description: "Your subscription and add-ons have been successfully updated.",
         });
         
-        loadBillingHistory();
-        setIsCheckingOut(false);
-        window.location.reload();
+        // Use window.location.href to force a full hard reload and clear all states
+        window.location.href = '/subscription';
       } else {
         setIsCheckingOut(false);
       }
