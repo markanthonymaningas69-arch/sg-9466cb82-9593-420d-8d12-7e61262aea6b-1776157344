@@ -7,7 +7,8 @@ export default function AboutPage() {
     <PublicLayout title="About Us | ConstructERP" description="Learn more about our mission to revolutionize construction management.">
       <div className="container mx-auto px-4 py-20 max-w-4xl">
         <div className="text-center mb-16">
-          <h1 className="text-4xl md:text-5xl font-bold font-heading mb-6">About ConstructERP</h1>
+          <h1 className="text-4xl md:text-5xl font-bold font-heading mb-6" style={{ lineHeight: "1", fontSize: "32px", backgroundColor: "#00000000", backgroundImage: "none" }}>About THEA-X 
+Construction Accounting System</h1>
           <p className="text-xl text-muted-foreground">
             We are building the future of construction management software, designed specifically for the unique needs of general contractors and developers.
           </p>
@@ -70,6 +71,5 @@ export default function AboutPage() {
           </div>
         </div>
       </div>
-    </PublicLayout>
-  );
+    </PublicLayout>);
 }
