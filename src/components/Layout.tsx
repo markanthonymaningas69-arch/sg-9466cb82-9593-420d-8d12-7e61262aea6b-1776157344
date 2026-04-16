@@ -1153,10 +1153,16 @@ export function Layout({ children }: LayoutProps) {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {assignedModules.includes("GM") && (
-                  <DropdownMenuItem onClick={() => router.push('/settings')}>
-                    <Settings className="mr-2 h-4 w-4" />
-                    Company Settings
-                  </DropdownMenuItem>
+                  <>
+                    <DropdownMenuItem onClick={() => router.push('/system-monitor')}>
+                      <Activity className="mr-2 h-4 w-4" />
+                      System Monitor
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push('/settings')}>
+                      <Settings className="mr-2 h-4 w-4" />
+                      Company Settings
+                    </DropdownMenuItem>
+                  </>
                 )}
                 <DropdownMenuItem onClick={() => router.push('/account')}>
                   <User className="mr-2 h-4 w-4" />
