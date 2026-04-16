@@ -141,7 +141,18 @@ export default function Subscription() {
           features: addOnQuantities // Save the purchased add-ons here!
         };
         
-        await supabase.from('subscriptions').insert(newSub);
+        const { error } = await supabase.from('subscriptions').insert(newSub);
+        
+        if (error) {
+          console.error("Checkout error:", error);
+          toast({
+            title: "Checkout Failed",
+            description: "There was an error updating your subscription. Please try again.",
+            variant: "destructive"
+          });
+          setIsCheckingOut(false);
+          return;
+        }
         
         toast({
           title: "Payment Successful",
