@@ -531,16 +531,10 @@ export function Layout({ children }: LayoutProps) {
           <div className="mt-auto px-3 py-4 border-t space-y-1">
             <p className="px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">System Settings</p>
             {assignedModules.includes("GM") && (
-              <>
-                <Link href="/settings" className={cn("flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors", router.pathname === "/settings" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground")} onClick={() => setSidebarOpen(false)}>
-                  <Settings className="h-4 w-4 shrink-0" />
-                  Company Settings
-                </Link>
-                <Link href="/admin" className={cn("flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors", router.pathname === "/admin" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground")} onClick={() => setSidebarOpen(false)}>
-                  <Activity className="h-4 w-4 shrink-0" />
-                  System Monitor
-                </Link>
-              </>
+              <Link href="/settings" className={cn("flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors", router.pathname === "/settings" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground")} onClick={() => setSidebarOpen(false)}>
+                <Settings className="h-4 w-4 shrink-0" />
+                Company Settings
+              </Link>
             )}
             <Link href="/subscription" className={cn("flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors", router.pathname === "/subscription" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground")} onClick={() => setSidebarOpen(false)}>
               <CreditCard className="h-4 w-4 shrink-0" />
@@ -1159,16 +1153,10 @@ export function Layout({ children }: LayoutProps) {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {assignedModules.includes("GM") && (
-                  <>
-                    <DropdownMenuItem onClick={() => router.push('/settings')}>
-                      <Settings className="mr-2 h-4 w-4" />
-                      Company Settings
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => router.push('/admin')}>
-                      <Activity className="mr-2 h-4 w-4" />
-                      System Monitor
-                    </DropdownMenuItem>
-                  </>
+                  <DropdownMenuItem onClick={() => router.push('/settings')}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Company Settings
+                  </DropdownMenuItem>
                 )}
                 <DropdownMenuItem onClick={() => router.push('/account')}>
                   <User className="mr-2 h-4 w-4" />
