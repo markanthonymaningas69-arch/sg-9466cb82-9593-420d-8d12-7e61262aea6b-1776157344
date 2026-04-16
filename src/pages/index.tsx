@@ -15,7 +15,7 @@ export default function LandingPage() {
           <div className="max-w-4xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary font-medium text-sm mb-6 border border-primary/20">
               <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse"></span>
-              Construction Management software built for the future
+              THEA-X Construction Accounting System
             </div>
             
             <h1 className="text-5xl md:text-7xl font-bold tracking-tight font-heading mb-8 text-foreground leading-[1.1]">

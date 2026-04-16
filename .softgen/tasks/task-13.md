@@ -13,8 +13,8 @@ tags: [ui, pricing, public]
 - Update `PublicLayout` and `index.tsx` to reflect the system name.
 
 ## Checklist
-- [ ] Extract subscription tiers from `subscription.tsx` to `src/config/pricing.ts`.
-- [ ] Update `subscription.tsx` to map over the shared pricing config.
-- [ ] Create `src/pages/pricing.tsx` using `PublicLayout` and the shared config.
-- [ ] Update `PublicLayout.tsx` to include "THEA-X Construction Accounting System" and a link to Pricing.
-- [ ] Update `index.tsx` text to use "THEA-X Construction Accounting System".
+- [x] Extract subscription tiers from `subscription.tsx` to `src/config/pricing.ts`.
+- [x] Update `subscription.tsx` to map over the shared pricing config.
+- [x] Create `src/pages/pricing.tsx` using `PublicLayout` and the shared config.
+- [x] Update `PublicLayout.tsx` to include "THEA-X Construction Accounting System" and a link to Pricing.
+- [x] Update `index.tsx` text to use "THEA-X Construction Accounting System".

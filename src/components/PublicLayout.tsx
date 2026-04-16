@@ -12,7 +12,7 @@ interface PublicLayoutProps {
 
 export function PublicLayout({ 
   children, 
-  title = "Construction Accounting System", 
+  title = "THEA-X Construction Accounting System", 
   description = "Enterprise-grade construction management and accounting software."
 }: PublicLayoutProps) {
   const currentYear = new Date().getFullYear();
@@ -29,11 +29,14 @@ export function PublicLayout({
               <Building2 className="h-5 w-5 text-primary-foreground" />
             </div>
             <span className="text-xl font-bold font-heading hidden sm:inline-block">
-              ConstructERP
+              THEA-X
             </span>
           </Link>
           
           <nav className="hidden md:flex items-center gap-6">
+            <Link href="/pricing" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
+              Pricing
+            </Link>
             <Link href="/about" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
               About
             </Link>
@@ -73,7 +76,7 @@ export function PublicLayout({
               <div className="bg-primary/10 p-1.5 rounded-md">
                 <Building2 className="h-5 w-5 text-primary" />
               </div>
-              <span className="text-lg font-bold font-heading">ConstructERP</span>
+              <span className="text-lg font-bold font-heading">THEA-X</span>
             </Link>
             <p className="text-sm text-muted-foreground max-w-sm">
               Comprehensive accounting and project management solution tailored for modern construction firms. Build better, track smarter.
@@ -83,6 +86,11 @@ export function PublicLayout({
           <div>
             <h3 className="font-semibold mb-4 text-sm tracking-tight">Company</h3>
             <ul className="space-y-3">
+              <li>
+                <Link href="/pricing" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+                  Pricing
+                </Link>
+              </li>
               <li>
                 <Link href="/about" className="text-sm text-muted-foreground hover:text-primary transition-colors">
                   About Us
@@ -113,7 +121,7 @@ export function PublicLayout({
           </div>
         </div>
         <div className="container mx-auto px-4 mt-12 pt-8 border-t border-border/50 flex flex-col sm:flex-row items-center justify-between text-xs text-muted-foreground">
-          <p>© {currentYear} ConstructERP. All rights reserved.</p>
+          <p>© {currentYear} THEA-X Construction Accounting System. All rights reserved.</p>
           <p className="mt-2 sm:mt-0">Designed for construction professionals.</p>
         </div>
       </footer>
