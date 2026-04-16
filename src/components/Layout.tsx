@@ -528,19 +528,19 @@ export function Layout({ children }: LayoutProps) {
           </nav>
 
           {/* System Navigation (Separated visually) */}
-          <div className="mt-auto px-3 py-4 border-t space-y-1">
-            <p className="px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">System Settings</p>
-            {assignedModules.includes("GM") && (
+          {assignedModules.includes("GM") && (
+            <div className="mt-auto px-3 py-4 border-t space-y-1">
+              <p className="px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">System Settings</p>
               <Link href="/settings" className={cn("flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors", router.pathname === "/settings" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground")} onClick={() => setSidebarOpen(false)}>
                 <Settings className="h-4 w-4 shrink-0" />
                 Company Settings
               </Link>
-            )}
-            <Link href="/subscription" className={cn("flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors", router.pathname === "/subscription" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground")} onClick={() => setSidebarOpen(false)}>
-              <CreditCard className="h-4 w-4 shrink-0" />
-              Subscription
-            </Link>
-          </div>
+              <Link href="/subscription" className={cn("flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors", router.pathname === "/subscription" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground")} onClick={() => setSidebarOpen(false)}>
+                <CreditCard className="h-4 w-4 shrink-0" />
+                Subscription
+              </Link>
+            </div>
+          )}
 
           {/* Footer */}
           <div className="border-t p-4">
