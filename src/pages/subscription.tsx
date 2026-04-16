@@ -28,6 +28,15 @@ export default function Subscription() {
 
   const loadBillingHistory = async () => {
     const { data: { session } } = await supabase.auth.getSession();
+    
+    // Quick load features from localStorage to prevent visual lag
+    const localFeatures = localStorage.getItem("app_subscription_features");
+    if (localFeatures) {
+      try {
+        setAddOnQuantities(JSON.parse(localFeatures));
+      } catch(e) {}
+    }
+
     if (session?.user) {
       const { data } = await supabase
         .from('subscriptions')
@@ -38,8 +47,10 @@ export default function Subscription() {
       if (data && data.length > 0) {
         setBillingHistory(data);
         setSubscriptionDetails(data[0]);
+        
         if (data[0].features) {
           setAddOnQuantities(data[0].features as Record<string, number>);
+          localStorage.setItem("app_subscription_features", JSON.stringify(data[0].features));
         }
       } else {
         // Fallback for new accounts
@@ -113,6 +124,11 @@ export default function Subscription() {
         expiresAt.setFullYear(expiresAt.getFullYear() + 1);
       }
       localStorage.setItem("app_subscription_expires_at", expiresAt.toISOString());
+      
+      // Store features to ensure instant visibility upon reload
+      if (Object.keys(addOnQuantities).length > 0) {
+        localStorage.setItem("app_subscription_features", JSON.stringify(addOnQuantities));
+      }
 
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
