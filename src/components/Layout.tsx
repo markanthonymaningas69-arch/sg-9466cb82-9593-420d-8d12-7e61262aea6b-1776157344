@@ -45,7 +45,7 @@ interface LayoutProps {
 }
 
 const navigation = [
-{ name: "Dashboard", href: "/", icon: LayoutDashboard },
+{ name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
 { name: "Project Profile", href: "/projects", icon: FolderKanban },
 { name: "Site Personnel", href: "/site-personnel", icon: ClipboardList },
 { name: "Purchasing", href: "/purchasing", icon: ShoppingCart },

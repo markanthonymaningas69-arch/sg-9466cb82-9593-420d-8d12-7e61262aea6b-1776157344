@@ -48,7 +48,7 @@ export default function Onboarding() {
 
     if (profile?.assigned_module) {
       // Already onboarded, redirect to root which will route them properly
-      router.push('/');
+      router.push('/dashboard');
     } else {
       setLoading(false);
     }
@@ -126,7 +126,7 @@ export default function Onboarding() {
       });
 
       // Use hard reload
-      window.location.href = '/';
+      window.location.href = '/dashboard';
     } catch (error: any) {
       console.error("Join company error:", error);
       toast({
@@ -177,7 +177,7 @@ export default function Onboarding() {
       });
 
       // Use hard reload to completely clear any cached auth/profile states in Next.js
-      window.location.href = '/';
+      window.location.href = '/dashboard';
     } catch (error: any) {
       console.error("Create company error:", error);
       toast({
