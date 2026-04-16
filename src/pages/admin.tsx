@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import Head from "next/head";
 import { Layout } from "@/components/Layout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, DollarSign, Activity, Server, Cpu, HardDrive, Wifi } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function AdminDashboard() {
   const [metrics, setMetrics] = useState({
@@ -13,7 +14,6 @@ export default function AdminDashboard() {
     uptime: "99.99%"
   });
 
-  // We will populate this with real Supabase data in the next step
   const [stats, setStats] = useState({
     trialUsers: 0,
     monthlyUsers: 0,
@@ -23,6 +23,7 @@ export default function AdminDashboard() {
   });
 
   useEffect(() => {
+    loadData();
     // Simulate real-time system metrics fluctuation
     const interval = setInterval(() => {
       setMetrics(prev => ({
@@ -33,6 +34,53 @@ export default function AdminDashboard() {
     }, 3000);
     return () => clearInterval(interval);
   }, []);
+
+  const loadData = async () => {
+    // 1. Get total users/profiles
+    const { count: totalUsers } = await supabase
+      .from('profiles')
+      .select('*', { count: 'exact', head: true });
+
+    // 2. Get active subscriptions
+    const { data: subs } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('status', 'active');
+
+    let mrr = 0;
+    let monthly = 0;
+    let yearly = 0;
+    let trials = 0;
+
+    if (subs) {
+      subs.forEach(sub => {
+        if (sub.plan === 'free') {
+          trials++;
+        } else {
+          // Approximate billing cycle by amount (if > 500 likely yearly)
+          if (Number(sub.amount) > 500) {
+            yearly++;
+            mrr += Number(sub.amount) / 12; // Add monthly equivalent to MRR
+          } else {
+            monthly++;
+            mrr += Number(sub.amount);
+          }
+        }
+      });
+    }
+
+    // Treat users without active sub as trials
+    const activeSubCount = monthly + yearly + trials;
+    const fallbackTrials = Math.max(0, (totalUsers || 0) - activeSubCount);
+
+    setStats({
+      trialUsers: trials + fallbackTrials,
+      monthlyUsers: monthly,
+      yearlyUsers: yearly,
+      mrr: Math.round(mrr),
+      totalUsers: totalUsers || 0
+    });
+  };
 
   return (
     <Layout>
@@ -58,7 +106,7 @@ export default function AdminDashboard() {
             <CardContent>
               <div className="text-2xl font-bold">${stats.mrr.toLocaleString()}</div>
               <p className="text-xs text-muted-foreground">
-                +15% from last month
+                Calculated from active subscriptions
               </p>
             </CardContent>
           </Card>
@@ -71,7 +119,7 @@ export default function AdminDashboard() {
             <CardContent>
               <div className="text-2xl font-bold">{stats.trialUsers}</div>
               <p className="text-xs text-muted-foreground">
-                Currently in 14-day trial
+                Users currently on free/trial plan
               </p>
             </CardContent>
           </Card>

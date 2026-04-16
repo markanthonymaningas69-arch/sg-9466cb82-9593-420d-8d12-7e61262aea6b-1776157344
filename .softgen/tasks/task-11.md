@@ -1,6 +1,6 @@
 ---
 title: System Monitoring Dashboard
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [admin, monitoring, dashboard]
@@ -16,8 +16,8 @@ The developer requested a monitoring dashboard to view:
 3. System performance metrics (Total RAM usage, CPU, uptime).
 
 ## Checklist
-- [ ] Create `/admin` page for the system dashboard
-- [ ] Implement system metrics mock/real-time display (RAM, CPU, Network)
-- [ ] Fetch and aggregate subscription data (Trial, Monthly, Yearly users)
-- [ ] Calculate and display Monthly Recurring Revenue (MRR)
-- [ ] Add navigation link for the developer/admin
+- [x] Create `/admin` page for the system dashboard
+- [x] Implement system metrics mock/real-time display (RAM, CPU, Network)
+- [x] Fetch and aggregate subscription data (Trial, Monthly, Yearly users)
+- [x] Calculate and display Monthly Recurring Revenue (MRR)
+- [x] Add navigation link for the developer/admin
