@@ -32,7 +32,9 @@ import {
   Key,
   Trash2,
   Edit,
-  UserX
+  UserX,
+  Check,
+  LayoutTemplate
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -40,7 +42,7 @@ import { cn } from "@/lib/utils";
 export default function Settings() {
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
-  const { currency, setCurrency, company, setCompany, currentPlan } = useSettings();
+  const { currency, setCurrency, company, setCompany, currentPlan, themeColor, setThemeColor, glassEffect, setGlassEffect } = useSettings();
 
   const [localCompany, setLocalCompany] = useState(company);
   const [notifications, setNotifications] = useState({
@@ -435,7 +437,7 @@ export default function Settings() {
             <Card>
               <CardHeader>
                 <CardTitle>Appearance</CardTitle>
-                <CardDescription>Customize the visual mode of the application</CardDescription>
+                <CardDescription>Customize the visual mode and styling of the application</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="flex items-center justify-between max-w-md">
@@ -455,6 +457,64 @@ export default function Settings() {
                       onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
                     />
                     <span className="text-sm text-muted-foreground">Dark</span>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div>
+                  <div className="space-y-0.5 mb-4">
+                    <Label className="flex items-center gap-2">
+                      <Palette className="h-4 w-4" />
+                      Theme Color
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Choose your preferred accent color across the app
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {[
+                      { name: "Blue", value: "blue", colorClass: "bg-blue-600" },
+                      { name: "Green", value: "green", colorClass: "bg-green-600" },
+                      { name: "Orange", value: "orange", colorClass: "bg-orange-500" },
+                      { name: "Rose", value: "rose", colorClass: "bg-rose-600" },
+                      { name: "Violet", value: "violet", colorClass: "bg-violet-600" },
+                    ].map((c) => (
+                      <button
+                        key={c.value}
+                        onClick={() => setThemeColor(c.value as any)}
+                        className={cn(
+                          "w-8 h-8 rounded-full flex items-center justify-center transition-all",
+                          c.colorClass,
+                          themeColor === c.value ? "ring-2 ring-offset-2 ring-primary scale-110" : "ring-0 hover:scale-105"
+                        )}
+                        title={c.name}
+                      >
+                        {themeColor === c.value && <Check className="w-4 h-4 text-white" />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="flex items-center justify-between max-w-md">
+                  <div className="space-y-0.5">
+                    <Label className="flex items-center gap-2">
+                      <LayoutTemplate className="h-4 w-4" />
+                      Window Effect
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Enable a translucent, frosted glass UI effect
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Normal</span>
+                    <Switch
+                      checked={glassEffect}
+                      onCheckedChange={setGlassEffect}
+                    />
+                    <span className="text-sm text-muted-foreground">Glass</span>
                   </div>
                 </div>
               </CardContent>

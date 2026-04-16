@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 type CurrencyType = "USD" | "EUR" | "GBP" | "JPY" | "PHP" | "AUD" | "CAD" | "SGD" | "AED" | "INR";
 const SUPPORTED_CURRENCIES = ["USD", "EUR", "GBP", "JPY", "PHP", "AUD", "CAD", "SGD", "AED", "INR"];
 type PlanType = "starter" | "professional";
+type ThemeColor = "blue" | "green" | "orange" | "rose" | "violet";
 
 export interface CompanySettings {
   name: string;
@@ -34,6 +35,10 @@ interface SettingsContextType {
   lockReason: "trial_expired" | "subscription_expired" | "none";
   isTrial: boolean;
   daysRemaining: number;
+  themeColor: ThemeColor;
+  setThemeColor: (color: ThemeColor) => void;
+  glassEffect: boolean;
+  setGlassEffect: (glass: boolean) => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -46,12 +51,20 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [lockReason, setLockReason] = useState<"trial_expired" | "subscription_expired" | "none">("none");
   const [isTrial, setIsTrial] = useState<boolean>(true);
   const [daysRemaining, setDaysRemaining] = useState<number>(7);
+  const [themeColor, setThemeColorState] = useState<ThemeColor>("blue");
+  const [glassEffect, setGlassEffectState] = useState<boolean>(false);
 
   useEffect(() => {
     // Force AED currency
     setCurrencyState("AED");
     localStorage.setItem("app_currency", "AED");
     
+    const savedColor = localStorage.getItem("app_theme_color") as ThemeColor;
+    if (savedColor) setThemeColorState(savedColor);
+    
+    const savedGlass = localStorage.getItem("app_glass_effect");
+    if (savedGlass === "true") setGlassEffectState(true);
+
     const savedCompany = localStorage.getItem("app_company");
     if (savedCompany) {
       try {
@@ -117,6 +130,19 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  useEffect(() => {
+    const html = document.documentElement;
+    const colors = ["theme-blue", "theme-green", "theme-orange", "theme-rose", "theme-violet"];
+    html.classList.remove(...colors);
+    html.classList.add(`theme-${themeColor}`);
+
+    if (glassEffect) {
+      html.classList.add("glass-mode");
+    } else {
+      html.classList.remove("glass-mode");
+    }
+  }, [themeColor, glassEffect]);
+
   const setCurrency = (newCurrency: CurrencyType) => {
     setCurrencyState(newCurrency);
     localStorage.setItem("app_currency", newCurrency);
@@ -130,6 +156,16 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const setCurrentPlan = (plan: PlanType) => {
     setCurrentPlanState(plan);
     localStorage.setItem("app_plan", plan);
+  };
+
+  const setThemeColor = (color: ThemeColor) => {
+    setThemeColorState(color);
+    localStorage.setItem("app_theme_color", color);
+  };
+
+  const setGlassEffect = (glass: boolean) => {
+    setGlassEffectState(glass);
+    localStorage.setItem("app_glass_effect", String(glass));
   };
 
   const formatCurrency = (value: number) => {
@@ -153,7 +189,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <SettingsContext.Provider value={{ currency, setCurrency, formatCurrency, formatNumber, company, setCompany, currentPlan, setCurrentPlan, isLocked, lockReason, isTrial, daysRemaining }}>
+    <SettingsContext.Provider value={{ currency, setCurrency, formatCurrency, formatNumber, company, setCompany, currentPlan, setCurrentPlan, isLocked, lockReason, isTrial, daysRemaining, themeColor, setThemeColor, glassEffect, setGlassEffect }}>
       {children}
     </SettingsContext.Provider>
   );
