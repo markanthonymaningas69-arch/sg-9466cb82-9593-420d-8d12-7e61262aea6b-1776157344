@@ -10,9 +10,9 @@ interface PublicLayoutProps {
   description?: string;
 }
 
-export function PublicLayout({ 
-  children, 
-  title = "THEA-X Construction Accounting System", 
+export function PublicLayout({
+  children,
+  title = "THEA-X Construction Accounting System",
   description = "Enterprise-grade construction management and accounting software."
 }: PublicLayoutProps) {
   const currentYear = new Date().getFullYear();
@@ -25,8 +25,8 @@ export function PublicLayout({
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 transition-opacity hover:opacity-90">
-            <div className="bg-primary p-2 rounded-lg">
-              <Building2 className="h-5 w-5 text-primary-foreground" />
+            <div className="bg-primary p-2 rounded-lg" style={{ backgroundImage: "none", backgroundColor: "transparent" }}>
+              
             </div>
             <span className="text-xl font-bold font-heading hidden sm:inline-block">
               THEA-X
@@ -125,6 +125,6 @@ export function PublicLayout({
           <p className="mt-2 sm:mt-0">Designed for construction professionals.</p>
         </div>
       </footer>
-    </div>
-  );
+    </div>);
+
 }
