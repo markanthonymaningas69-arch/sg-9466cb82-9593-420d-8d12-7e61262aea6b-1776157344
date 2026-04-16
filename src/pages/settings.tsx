@@ -65,10 +65,24 @@ export default function Settings() {
   // Delete User State
   const [deletingUser, setDeletingUser] = useState<any>(null);
 
+  const [isGM, setIsGM] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<string>("appearance");
+
   useEffect(() => {
     setLocalCompany(company);
     loadTeamData();
     loadProjects();
+    
+    const checkGM = () => {
+      const saved = localStorage.getItem('app_assigned_modules');
+      if (saved) {
+        const mods = JSON.parse(saved);
+        const gm = mods.includes('GM');
+        setIsGM(gm);
+        if (gm) setActiveTab("company");
+      }
+    };
+    checkGM();
   }, [company]);
 
   const loadProjects = async () => {
@@ -178,18 +192,26 @@ export default function Settings() {
     <Layout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-heading font-bold text-foreground">Settings</h1>
-          <p className="text-muted-foreground">Manage your company preferences and global application settings</p>
+          <h1 className="text-3xl font-heading font-bold text-foreground">
+            {isGM ? "Settings" : "Preferences"}
+          </h1>
+          <p className="text-muted-foreground">
+            {isGM ? "Manage your company preferences and global application settings" : "Manage your application appearance and preferences"}
+          </p>
         </div>
 
-        <Tabs defaultValue="company" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="shrink-0 flex flex-wrap w-full gap-1 h-auto bg-transparent p-0 mb-2">
-            <TabsTrigger value="company" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-blue-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-blue-700 bg-blue-50 text-blue-700 hover:bg-blue-100">
-              <Building2 className="h-3 w-3 mr-1.5 hidden sm:inline" /> Company
-            </TabsTrigger>
-            <TabsTrigger value="team" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-indigo-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-indigo-700 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
-              <Users className="h-3 w-3 mr-1.5 hidden sm:inline" /> Team Access
-            </TabsTrigger>
+            {isGM && (
+              <>
+                <TabsTrigger value="company" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-blue-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-blue-700 bg-blue-50 text-blue-700 hover:bg-blue-100">
+                  <Building2 className="h-3 w-3 mr-1.5 hidden sm:inline" /> Company
+                </TabsTrigger>
+                <TabsTrigger value="team" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-indigo-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-indigo-700 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
+                  <Users className="h-3 w-3 mr-1.5 hidden sm:inline" /> Team Access
+                </TabsTrigger>
+              </>
+            )}
             <TabsTrigger value="appearance" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-emerald-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-emerald-700 bg-emerald-50 text-emerald-700 hover:bg-emerald-100">
               <Palette className="h-3 w-3 mr-1.5 hidden sm:inline" /> Appearance
             </TabsTrigger>

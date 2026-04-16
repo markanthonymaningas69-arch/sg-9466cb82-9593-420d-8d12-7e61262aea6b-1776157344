@@ -528,19 +528,21 @@ export function Layout({ children }: LayoutProps) {
           </nav>
 
           {/* System Navigation (Separated visually) */}
-          {assignedModules.includes("GM") && (
-            <div className="mt-auto px-3 py-4 border-t space-y-1">
-              <p className="px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">System Settings</p>
-              <Link href="/settings" className={cn("flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors", router.pathname === "/settings" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground")} onClick={() => setSidebarOpen(false)}>
-                <Settings className="h-4 w-4 shrink-0" />
-                Company Settings
-              </Link>
+          <div className="mt-auto px-3 py-4 border-t space-y-1">
+            <p className="px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+              {assignedModules.includes("GM") ? "System Settings" : "Preferences"}
+            </p>
+            <Link href="/settings" className={cn("flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors", router.pathname === "/settings" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground")} onClick={() => setSidebarOpen(false)}>
+              <Settings className="h-4 w-4 shrink-0" />
+              {assignedModules.includes("GM") ? "Company Settings" : "Settings"}
+            </Link>
+            {assignedModules.includes("GM") && (
               <Link href="/subscription" className={cn("flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors", router.pathname === "/subscription" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground")} onClick={() => setSidebarOpen(false)}>
                 <CreditCard className="h-4 w-4 shrink-0" />
                 Subscription
               </Link>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Footer */}
           <div className="border-t p-4">
@@ -1152,14 +1154,10 @@ export function Layout({ children }: LayoutProps) {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {assignedModules.includes("GM") && (
-                  <>
-                    <DropdownMenuItem onClick={() => router.push('/settings')}>
-                      <Settings className="mr-2 h-4 w-4" />
-                      Company Settings
-                    </DropdownMenuItem>
-                  </>
-                )}
+                <DropdownMenuItem onClick={() => router.push('/settings')}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  {assignedModules.includes("GM") ? "Company Settings" : "Settings"}
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => router.push('/account')}>
                   <User className="mr-2 h-4 w-4" />
                   Account Settings
