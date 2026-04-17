@@ -79,7 +79,7 @@ export default function DemoProject() {
           <div className="text-right w-full md:w-auto">
             <p className="text-sm text-muted-foreground mb-1">Overall Progress</p>
             <div className="flex items-center justify-end gap-3">
-              <Progress value={75} className="w-32 md:w-48 h-3" indicatorColor="bg-primary" />
+              <Progress value={75} className="w-32 md:w-48 h-3 [&>div]:bg-primary" />
               <span className="text-2xl font-bold text-primary">75%</span>
             </div>
           </div>
@@ -166,8 +166,7 @@ export default function DemoProject() {
                         <div className="flex items-center gap-3">
                           <Progress 
                             value={scope.progress} 
-                            className="h-2 flex-1" 
-                            indicatorColor={scope.progress === 100 ? "bg-green-500" : scope.progress > 0 ? "bg-blue-500" : "bg-slate-200"} 
+                            className={`h-2 flex-1 ${scope.progress === 100 ? "[&>div]:bg-green-500" : scope.progress > 0 ? "[&>div]:bg-blue-500" : "[&>div]:bg-slate-200"}`} 
                           />
                           <span className="text-xs font-semibold w-8 text-right">{scope.progress}%</span>
                         </div>
