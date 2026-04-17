@@ -99,8 +99,6 @@ export default function RegisterPage() {
           router.push("/onboarding");
         }, 1500);
       }
-    } else {
-      setSuccess("If email confirmation is required, please check your inbox.");
     }
 
     setSubmitting(false);
