@@ -73,9 +73,9 @@ export function PublicLayout({
         <div className="container mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="md:col-span-2 space-y-4">
             <Link href="/" className="flex items-center gap-2">
-              <div className="bg-primary/10 p-1.5 rounded-md">
-                <Building2 className="h-5 w-5 text-primary" />
-              </div>
+              
+
+              
               <span className="text-lg font-bold font-heading">THEA-X</span>
             </Link>
             <p className="text-sm text-muted-foreground max-w-sm">
