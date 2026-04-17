@@ -41,14 +41,14 @@ export default function LandingPage() {
             </div>
             
             {/* Trust Badges */}
-            <div className="mt-16 pt-10 border-t border-border/50">
-              <p className="text-sm font-medium text-muted-foreground mb-6">Trusted by industry professionals</p>
-              <div className="flex flex-wrap justify-center gap-8 opacity-60 grayscale">
-                <div className="flex items-center gap-2 font-bold text-xl font-heading"><Building2 className="h-6 w-6"/> BuildCo</div>
-                <div className="flex items-center gap-2 font-bold text-xl font-heading"><HardHat className="h-6 w-6"/> Apex Contractors</div>
-                <div className="flex items-center gap-2 font-bold text-xl font-heading"><ShieldCheck className="h-6 w-6"/> Vanguard Dev</div>
-              </div>
-            </div>
+            
+
+
+
+
+
+
+            
           </div>
         </div>
       </section>
@@ -107,13 +107,13 @@ export default function LandingPage() {
               </Link>
             </div>
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-6 text-sm opacity-80">
-              <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4"/> No credit card required</div>
-              <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4"/> Setup in minutes</div>
-              <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4"/> 24/7 Priority Support</div>
+              <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4" /> No credit card required</div>
+              <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4" /> Setup in minutes</div>
+              
             </div>
           </div>
         </div>
       </section>
-    </PublicLayout>
-  );
+    </PublicLayout>);
+
 }
