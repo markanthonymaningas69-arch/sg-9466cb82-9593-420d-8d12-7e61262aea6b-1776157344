@@ -22,14 +22,7 @@ export default function DemoRedirect() {
           password: 'Demo1234!'
         });
 
-        if (error) {
-          // If the account doesn't exist yet, sign them up on the fly
-          const { error: signUpError } = await supabase.auth.signUp({
-            email: 'demo@thea-x.com',
-            password: 'Demo1234!'
-          });
-          if (signUpError) throw signUpError;
-        }
+        if (error) throw error;
         
         setStatus("Redirecting to Dashboard...");
         
