@@ -70,6 +70,7 @@ export default function RegisterPage() {
           assigned_module: primaryModule,
           assigned_modules: allModules,
           assigned_project_ids: invData.project_ids || [],
+          company_id: invData.company_id,
           updated_at: new Date().toISOString()
         }).eq('id', user.id);
 
@@ -82,9 +83,15 @@ export default function RegisterPage() {
         }, 1500);
       } else {
         // No invite code provided - send to onboarding to create workspace
+        const { data: newComp } = await supabase.from('company_settings').insert({
+          user_id: user.id,
+          name: fullName + "'s Company"
+        }).select().single();
+
         await supabase.from('profiles').update({ 
           full_name: fullName,
-          assigned_module: null 
+          assigned_module: null,
+          company_id: newComp?.id
         }).eq('id', user.id);
         
         setSuccess("Account created successfully. Redirecting to workspace setup...");

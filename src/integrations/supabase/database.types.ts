@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -413,6 +413,56 @@ export type Database = {
           },
         ]
       }
+      company_settings: {
+        Row: {
+          address: string | null
+          created_at: string | null
+          currency: string | null
+          id: string
+          logo: string | null
+          name: string
+          tax_id: string | null
+          theme_color: string | null
+          updated_at: string | null
+          user_id: string
+          website: string | null
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          logo?: string | null
+          name?: string
+          tax_id?: string | null
+          theme_color?: string | null
+          updated_at?: string | null
+          user_id: string
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          logo?: string | null
+          name?: string
+          tax_id?: string | null
+          theme_color?: string | null
+          updated_at?: string | null
+          user_id?: string
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_settings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deliveries: {
         Row: {
           created_at: string | null
@@ -525,6 +575,7 @@ export type Database = {
       invite_codes: {
         Row: {
           code: string
+          company_id: string | null
           created_at: string | null
           id: string
           module: string
@@ -535,6 +586,7 @@ export type Database = {
         }
         Insert: {
           code: string
+          company_id?: string | null
           created_at?: string | null
           id?: string
           module: string
@@ -545,6 +597,7 @@ export type Database = {
         }
         Update: {
           code?: string
+          company_id?: string | null
           created_at?: string | null
           id?: string
           module?: string
@@ -554,6 +607,13 @@ export type Database = {
           status?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "invite_codes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "invite_codes_project_id_fkey"
             columns: ["project_id"]
@@ -980,6 +1040,7 @@ export type Database = {
           assigned_project_id: string | null
           assigned_project_ids: string[] | null
           avatar_url: string | null
+          company_id: string | null
           created_at: string | null
           email: string | null
           full_name: string | null
@@ -993,6 +1054,7 @@ export type Database = {
           assigned_project_id?: string | null
           assigned_project_ids?: string[] | null
           avatar_url?: string | null
+          company_id?: string | null
           created_at?: string | null
           email?: string | null
           full_name?: string | null
@@ -1006,6 +1068,7 @@ export type Database = {
           assigned_project_id?: string | null
           assigned_project_ids?: string[] | null
           avatar_url?: string | null
+          company_id?: string | null
           created_at?: string | null
           email?: string | null
           full_name?: string | null
@@ -1019,6 +1082,13 @@ export type Database = {
             columns: ["assigned_project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
             referencedColumns: ["id"]
           },
         ]

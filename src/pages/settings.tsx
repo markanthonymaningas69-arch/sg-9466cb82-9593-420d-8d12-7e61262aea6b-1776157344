@@ -41,7 +41,7 @@ import { cn } from "@/lib/utils";
 export default function Settings() {
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
-  const { currency, setCurrency, company, setCompany, currentPlan, themeColor, setThemeColor } = useSettings();
+  const { currency, setCurrency, company, setCompany, currentPlan, themeColor, setThemeColor, companyId } = useSettings();
 
   const [localCompany, setLocalCompany] = useState(company);
   const [notifications, setNotifications] = useState({
@@ -71,8 +71,11 @@ export default function Settings() {
 
   useEffect(() => {
     setLocalCompany(company);
-    loadTeamData();
-    loadProjects();
+    
+    if (companyId) {
+      loadTeamData();
+      loadProjects();
+    }
     
     const checkGM = () => {
       const saved = localStorage.getItem('app_assigned_modules');
@@ -84,7 +87,7 @@ export default function Settings() {
       }
     };
     checkGM();
-  }, [company]);
+  }, [company, companyId]);
 
   const loadProjects = async () => {
     const { data } = await supabase.from('projects').select('id, name').order('name');
@@ -92,10 +95,11 @@ export default function Settings() {
   };
 
   const loadTeamData = async () => {
-    const { data: invData } = await supabase.from('invite_codes').select('*').eq('status', 'active');
+    if (!companyId) return;
+    const { data: invData } = await supabase.from('invite_codes').select('*').eq('status', 'active').eq('company_id', companyId);
     setInvites(invData || []);
     
-    const { data: usrData } = await supabase.from('profiles').select('*').not('assigned_module', 'eq', 'GM');
+    const { data: usrData } = await supabase.from('profiles').select('*').not('assigned_module', 'eq', 'GM').eq('company_id', companyId);
     setTeamUsers(usrData || []);
   };
 
@@ -139,7 +143,8 @@ export default function Settings() {
       code,
       module: selectedModules[0],
       modules: selectedModules,
-      project_ids: selectedModules.includes("Site Personnel") ? selectedProjects : []
+      project_ids: selectedModules.includes("Site Personnel") ? selectedProjects : [],
+      company_id: companyId
     });
 
     if (error) {
@@ -155,7 +160,16 @@ export default function Settings() {
     loadTeamData();
   };
 
-  const handleSaveCompany = () => {
+  const handleSaveCompany = async () => {
+    if (companyId) {
+      await supabase.from('company_settings').update({
+        name: localCompany.name,
+        address: localCompany.address,
+        tax_id: localCompany.taxId,
+        website: localCompany.website,
+        logo: localCompany.logo
+      }).eq('id', companyId);
+    }
     setCompany(localCompany);
     toast({
       title: "Company Settings Updated",

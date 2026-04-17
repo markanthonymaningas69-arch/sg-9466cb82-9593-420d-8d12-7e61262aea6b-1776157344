@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 type CurrencyType = "USD" | "EUR" | "GBP" | "JPY" | "PHP" | "AUD" | "CAD" | "SGD" | "AED" | "INR";
 const SUPPORTED_CURRENCIES = ["USD", "EUR", "GBP", "JPY", "PHP", "AUD", "CAD", "SGD", "AED", "INR"];
@@ -37,6 +38,7 @@ interface SettingsContextType {
   daysRemaining: number;
   themeColor: ThemeColor;
   setThemeColor: (color: ThemeColor) => void;
+  companyId: string | null;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -50,6 +52,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [isTrial, setIsTrial] = useState<boolean>(true);
   const [daysRemaining, setDaysRemaining] = useState<number>(7);
   const [themeColor, setThemeColorState] = useState<ThemeColor>("blue");
+  const [companyId, setCompanyId] = useState<string | null>(null);
 
   useEffect(() => {
     // Force AED currency
@@ -122,6 +125,44 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setLockReason("none");
       }
     }
+
+    // Load from Supabase
+    const initDbSettings = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', session.user.id).single();
+      let compId = profile?.company_id;
+
+      if (!compId) {
+        // If no company, create one (graceful fallback)
+        const { data: newComp } = await supabase.from('company_settings').insert({
+          user_id: session.user.id,
+          name: "My Company"
+        }).select().single();
+
+        if (newComp) {
+          compId = newComp.id;
+          await supabase.from('profiles').update({ company_id: compId }).eq('id', session.user.id);
+        }
+      }
+
+      if (compId) {
+        setCompanyId(compId);
+        const { data: compSettings } = await supabase.from('company_settings').select('*').eq('id', compId).single();
+        if (compSettings) {
+          setCompanyState({
+            name: compSettings.name || "",
+            address: compSettings.address || "",
+            taxId: compSettings.tax_id || "",
+            website: compSettings.website || "",
+            logo: compSettings.logo || ""
+          });
+        }
+      }
+    };
+
+    initDbSettings();
   }, []);
 
   useEffect(() => {
@@ -172,7 +213,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <SettingsContext.Provider value={{ currency, setCurrency, formatCurrency, formatNumber, company, setCompany, currentPlan, setCurrentPlan, isLocked, lockReason, isTrial, daysRemaining, themeColor, setThemeColor }}>
+    <SettingsContext.Provider value={{ currency, setCurrency, formatCurrency, formatNumber, company, setCompany, currentPlan, setCurrentPlan, isLocked, lockReason, isTrial, daysRemaining, themeColor, setThemeColor, companyId }}>
       {children}
     </SettingsContext.Provider>
   );
