@@ -62,21 +62,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const savedColor = localStorage.getItem("app_theme_color") as ThemeColor;
     if (savedColor) setThemeColorState(savedColor);
 
-    const savedCompany = localStorage.getItem("app_company");
-    if (savedCompany) {
-      try {
-        setCompanyState(JSON.parse(savedCompany));
-      } catch (e) {
-        console.error("Failed to parse company settings", e);
-      }
-    }
-    
     const savedPlan = localStorage.getItem("app_plan") as PlanType;
     if (savedPlan && ["starter", "professional"].includes(savedPlan)) {
       setCurrentPlanState(savedPlan);
     }
 
-    // Trial logic based on company creation date (mocked via localStorage for now)
+    // Trial logic based on company creation date
     let companyCreated = localStorage.getItem("app_created_at");
     if (!companyCreated) {
       companyCreated = new Date().toISOString();
@@ -104,7 +95,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           setLockReason("none");
         }
       } else {
-        // Fallback for previously active plans without an explicit expiration date
+        // Fallback for previously active plans
         setIsLocked(false);
         setLockReason("none");
       }
@@ -126,24 +117,21 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // Load from Supabase
-    const initDbSettings = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) return;
-
-      const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', session.user.id).single();
+    // Function to load company data securely from DB
+    const loadCompanyFromDb = async (userId: string) => {
+      const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', userId).single();
       let compId = profile?.company_id;
 
       if (!compId) {
         // If no company, create one (graceful fallback)
         const { data: newComp } = await supabase.from('company_settings').insert({
-          user_id: session.user.id,
+          user_id: userId,
           name: "My Company"
         }).select().single();
 
         if (newComp) {
           compId = newComp.id;
-          await supabase.from('profiles').update({ company_id: compId }).eq('id', session.user.id);
+          await supabase.from('profiles').update({ company_id: compId }).eq('id', userId);
         }
       }
 
@@ -162,7 +150,27 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    initDbSettings();
+    // Listen for Auth changes - automatically reset state on logout and fetch on login
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        loadCompanyFromDb(session.user.id);
+      } else {
+        // Completely wipe company state on logout
+        setCompanyState(defaultCompany);
+        setCompanyId(null);
+      }
+    });
+
+    // Initial load check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        loadCompanyFromDb(session.user.id);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -179,7 +187,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   const setCompany = (newCompany: CompanySettings) => {
     setCompanyState(newCompany);
-    localStorage.setItem("app_company", JSON.stringify(newCompany));
+    // REMOVED localStorage saving here to enforce strict multi-tenant isolation
   };
 
   const setCurrentPlan = (plan: PlanType) => {
