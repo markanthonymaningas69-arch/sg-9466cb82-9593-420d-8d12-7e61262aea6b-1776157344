@@ -49,11 +49,6 @@ export function PublicLayout({
           </nav>
 
           <div className="flex items-center gap-2 sm:gap-4">
-            <Link href="/demo">
-              <Button variant="outline" className="hidden md:inline-flex text-sm font-medium border-primary/20 hover:bg-primary/5">
-                Explore sample project
-              </Button>
-            </Link>
             <Link href="/auth/login">
               <Button variant="ghost" className="hidden sm:inline-flex text-sm font-medium">
                 Log in

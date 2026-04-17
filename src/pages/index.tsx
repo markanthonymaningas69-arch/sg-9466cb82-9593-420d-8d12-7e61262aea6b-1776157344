@@ -33,11 +33,6 @@ export default function LandingPage() {
                   <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
-              <Link href="/demo">
-                <Button size="lg" variant="outline" className="h-14 px-8 text-base w-full sm:w-auto">
-                  Explore Sample Project
-                </Button>
-              </Link>
             </div>
             
             {/* Trust Badges */}
