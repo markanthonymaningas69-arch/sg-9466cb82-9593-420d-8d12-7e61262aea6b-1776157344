@@ -119,34 +119,44 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
     // Function to load company data securely from DB
     const loadCompanyFromDb = async (userId: string) => {
-      const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', userId).single();
-      let compId = profile?.company_id;
+      // IMMEDIATELY clear state to prevent memory leaks from previous user in SPA
+      setCompanyState(defaultCompany);
+      setCompanyId(null);
 
-      if (!compId) {
-        // If no company, create one (graceful fallback)
-        const { data: newComp } = await supabase.from('company_settings').insert({
-          user_id: userId,
-          name: "My Company"
-        }).select().single();
+      try {
+        const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', userId).single();
+        let compId = profile?.company_id;
 
-        if (newComp) {
-          compId = newComp.id;
-          await supabase.from('profiles').update({ company_id: compId }).eq('id', userId);
+        if (!compId) {
+          // If no company, create one (graceful fallback)
+          const { data: newComp, error: insertError } = await supabase.from('company_settings').insert({
+            user_id: userId,
+            name: "My Company"
+          }).select().single();
+
+          if (newComp) {
+            compId = newComp.id;
+            await supabase.from('profiles').update({ company_id: compId }).eq('id', userId);
+          } else if (insertError) {
+            console.error("Failed to create fallback company:", insertError);
+          }
         }
-      }
 
-      if (compId) {
-        setCompanyId(compId);
-        const { data: compSettings } = await supabase.from('company_settings').select('*').eq('id', compId).single();
-        if (compSettings) {
-          setCompanyState({
-            name: compSettings.name || "",
-            address: compSettings.address || "",
-            taxId: compSettings.tax_id || "",
-            website: compSettings.website || "",
-            logo: compSettings.logo || ""
-          });
+        if (compId) {
+          setCompanyId(compId);
+          const { data: compSettings } = await supabase.from('company_settings').select('*').eq('id', compId).single();
+          if (compSettings) {
+            setCompanyState({
+              name: compSettings.name || "",
+              address: compSettings.address || "",
+              taxId: compSettings.tax_id || "",
+              website: compSettings.website || "",
+              logo: compSettings.logo || ""
+            });
+          }
         }
+      } catch (err) {
+        console.error("Error loading company data:", err);
       }
     };
 
