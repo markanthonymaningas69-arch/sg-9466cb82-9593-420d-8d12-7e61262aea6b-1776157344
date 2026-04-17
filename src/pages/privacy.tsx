@@ -31,8 +31,8 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="text-2xl font-bold">3. Data Security</h2>
-            <p>
-              We implement appropriate technical and organizational security measures designed to protect your data against accidental or unlawful destruction, loss, alteration, unauthorized disclosure, or access.
+            <p>We implement appropriate technical and organizational security measures designed to protect your data against alteration, unauthorized disclosure, or access.
+
             </p>
           </section>
 
@@ -45,12 +45,12 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="text-2xl font-bold">5. Contact Us</h2>
-            <p>
-              If you have any questions about this Privacy Policy, please contact us at privacy@constructerp.com.
+            <p>If you have any questions about this Privacy Policy, please contact us at theax5565@gmail.com
+
             </p>
           </section>
         </div>
       </div>
-    </PublicLayout>
-  );
+    </PublicLayout>);
+
 }
