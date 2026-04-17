@@ -5,7 +5,7 @@ export default function TermsPage() {
   const lastUpdated = "April 16, 2026";
 
   return (
-    <PublicLayout title="Terms & Conditions | ConstructERP">
+    <PublicLayout title="Terms & Conditions | THEA-X">
       <div className="container mx-auto px-4 py-20 max-w-3xl">
         <h1 className="text-4xl font-bold font-heading mb-4">Terms and Conditions</h1>
         <p className="text-muted-foreground mb-12">Last Updated: {lastUpdated}</p>
@@ -14,14 +14,14 @@ export default function TermsPage() {
           <section>
             <h2 className="text-2xl font-bold">1. Acceptance of Terms</h2>
             <p>
-              By accessing or using the ConstructERP platform, you agree to be bound by these Terms and Conditions. If you disagree with any part of the terms, you may not access the service.
+              By accessing or using the THEA-X platform, you agree to be bound by these Terms and Conditions. If you disagree with any part of the terms, you may not access the service.
             </p>
           </section>
 
           <section>
             <h2 className="text-2xl font-bold">2. Description of Service</h2>
             <p>
-              ConstructERP provides an online construction management and accounting software platform. The service is provided "as is" and "as available" without any warranty or condition, express, implied, or statutory.
+              THEA-X provides an online construction management and accounting software platform. The service is provided "as is" and "as available" without any warranty or condition, express, implied, or statutory.
             </p>
           </section>
 
@@ -46,7 +46,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-2xl font-bold">5. Limitation of Liability</h2>
             <p>
-              In no event shall ConstructERP, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from your access to or use of or inability to access or use the Service.
+              In no event shall THEA-X, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from your access to or use of or inability to access or use the Service.
             </p>
           </section>
         </div>
