@@ -149,6 +149,20 @@ export default function Analytics() {
     }
   };
 
+  const latestPersonnelDate = useMemo(() => {
+    if (!attendance || attendance.length === 0) return null;
+    const maxDateStr = attendance.reduce((latest, current) => {
+      if (!current.date) return latest;
+      if (!latest) return current.date;
+      return new Date(current.date) > new Date(latest) ? current.date : latest;
+    }, null);
+    return maxDateStr ? new Date(maxDateStr).toLocaleDateString(undefined, { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    }) : null;
+  }, [attendance]);
+
   // 1. SWA Data
   const swaData = useMemo(() => {
     if (!bom?.bom_scope_of_work || !Array.isArray(bom.bom_scope_of_work)) return { rows: [], totals: { cost: 0, wtPercentage: 0, accomplishment: 0, amountOfCompletion: 0 } };
@@ -523,9 +537,16 @@ export default function Analytics() {
             {/* 1. SWA */}
             <TabsContent value="swa">
               <Card>
-                <CardHeader>
-                  <CardTitle>Statement of Work Accomplishment</CardTitle>
-                  <CardDescription>Weighted progress and financial completion status per scope and indirect costs.</CardDescription>
+                <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-4">
+                  <div className="space-y-1">
+                    <CardTitle>Statement of Work Accomplishment</CardTitle>
+                    <CardDescription>Weighted progress and financial completion status per scope and indirect costs.</CardDescription>
+                  </div>
+                  {latestPersonnelDate && (
+                    <Badge variant="outline" className="ml-auto text-xs font-normal bg-muted/50 whitespace-nowrap">
+                      Latest Site Update: {latestPersonnelDate}
+                    </Badge>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <Table>
