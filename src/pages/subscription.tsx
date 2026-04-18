@@ -33,7 +33,10 @@ export default function Subscription() {
     const localFeatures = localStorage.getItem("app_subscription_features");
     if (localFeatures) {
       try {
-        setAddOnQuantities(JSON.parse(localFeatures));
+        setSubscriptionDetails((prev: any) => ({
+          ...(prev || {}),
+          features: JSON.parse(localFeatures)
+        }));
       } catch(e) {}
     }
 
@@ -49,7 +52,6 @@ export default function Subscription() {
         setSubscriptionDetails(data[0]);
         
         if (data[0].features) {
-          setAddOnQuantities(data[0].features as Record<string, number>);
           localStorage.setItem("app_subscription_features", JSON.stringify(data[0].features));
         }
       } else {
@@ -88,15 +90,23 @@ export default function Subscription() {
 
   const updateAddOnQuantity = (id: string, delta: number) => {
     const limit = currentPlanConfig.addOnLimits?.[id] || 0;
+    const activeQty = (subscriptionDetails?.features && subscriptionDetails.features[id]) || 0;
+    
     setAddOnQuantities(prev => {
-      const current = prev[id] || 0;
-      const next = Math.max(0, Math.min(current + delta, limit));
-      if (next === 0) {
+      const currentNew = prev[id] || 0;
+      const nextNew = currentNew + delta;
+      
+      // Do not allow negative cart values
+      if (nextNew < 0) return prev;
+      // Do not allow active + new to exceed plan limit
+      if (activeQty + nextNew > limit) return prev;
+      
+      if (nextNew === 0) {
         const newQs = { ...prev };
         delete newQs[id];
         return newQs;
       }
-      return { ...prev, [id]: next };
+      return { ...prev, [id]: nextNew };
     });
   };
 
@@ -125,10 +135,13 @@ export default function Subscription() {
       }
       localStorage.setItem("app_subscription_expires_at", expiresAt.toISOString());
       
-      // Store features to ensure instant visibility upon reload
-      if (Object.keys(addOnQuantities).length > 0) {
-        localStorage.setItem("app_subscription_features", JSON.stringify(addOnQuantities));
+      // Calculate final active features by merging active + cart
+      const finalFeatures = { ...(subscriptionDetails?.features || {}) };
+      for (const [id, newQty] of Object.entries(addOnQuantities)) {
+        finalFeatures[id] = (finalFeatures[id] || 0) + newQty;
       }
+      
+      localStorage.setItem("app_subscription_features", JSON.stringify(finalFeatures));
 
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
@@ -139,7 +152,7 @@ export default function Subscription() {
           status: 'active',
           start_date: new Date().toISOString(),
           amount: totalAmountDueToday,
-          features: addOnQuantities
+          features: finalFeatures
         };
         
         const { error } = await supabase.from('subscriptions').insert(newSub);
@@ -181,30 +194,20 @@ export default function Subscription() {
   // Only charge base price if they are upgrading/changing plans or don't have an active one
   const basePriceToCharge = hasActiveSamePlan ? 0 : basePrice;
 
-  // Total recurring cost of all add-ons
-  const addOnsTotal = addOns.reduce((total, addon) => {
-    const qty = addOnQuantities[addon.id] || 0;
-    const price = billingCycle === "monthly" ? addon.monthlyPrice : addon.annualPrice;
-    return total + (price * qty);
-  }, 0);
-
   // Math to strictly calculate only NEWLY added add-ons to charge today
   const addOnsToChargeTotal = addOns.reduce((total, addon) => {
-    const currentQty = addOnQuantities[addon.id] || 0;
-    const previousQty = (subscriptionDetails?.features && subscriptionDetails.features[addon.id]) || 0;
-    const newQty = Math.max(0, currentQty - previousQty);
+    const newQty = addOnQuantities[addon.id] || 0;
     const price = billingCycle === "monthly" ? addon.monthlyPrice : addon.annualPrice;
     return total + (price * newQty);
   }, 0);
 
   const totalAmountDueToday = basePriceToCharge + addOnsToChargeTotal;
-  const totalAddonItems = Object.values(addOnQuantities).reduce((a, b) => Number(a) + Number(b), 0);
   
-  const newlyAddedItemsCount = addOns.reduce((total, addon) => {
-    const currentQty = addOnQuantities[addon.id] || 0;
-    const previousQty = (subscriptionDetails?.features && subscriptionDetails.features[addon.id]) || 0;
-    return total + Math.max(0, currentQty - previousQty);
+  const totalAddonItems = addOns.reduce((total, addon) => {
+    return total + ((subscriptionDetails?.features && subscriptionDetails.features[addon.id]) || 0);
   }, 0);
+  
+  const newlyAddedItemsCount = Object.values(addOnQuantities).reduce((a, b) => Number(a) + Number(b), 0);
 
   return (
     <Layout>
@@ -380,17 +383,18 @@ export default function Subscription() {
           </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {addOns.map((addon) => {
-              const qty = addOnQuantities[addon.id] || 0;
+              const newQty = addOnQuantities[addon.id] || 0;
+              const activeQty = (subscriptionDetails?.features && subscriptionDetails.features[addon.id]) || 0;
               const limit = currentPlanConfig.addOnLimits?.[addon.id] || 0;
-              const isUnavailable = limit === 0;
-              const isSelected = qty > 0;
+              const isUnavailable = limit === 0 || activeQty >= limit;
+              const isSelected = newQty > 0;
               
               return (
                 <Card key={addon.id} className={`flex flex-col transition-colors ${isSelected ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : ''} ${isUnavailable ? 'opacity-60 grayscale-[0.5]' : ''}`}>
                   <CardHeader className="pb-3">
                     <div className="flex justify-between items-start">
                       <CardTitle className="text-lg">{addon.name}</CardTitle>
-                      {isUnavailable && <Badge variant="secondary" className="text-[10px]">Professional Only</Badge>}
+                      {isUnavailable && <Badge variant="secondary" className="text-[10px]">Max Reached</Badge>}
                     </div>
                     <CardDescription className="text-sm">{addon.description}</CardDescription>
                   </CardHeader>
@@ -399,28 +403,28 @@ export default function Subscription() {
                       AED {billingCycle === "monthly" ? addon.monthlyPrice : addon.annualPrice}
                       <span className="text-base font-medium text-muted-foreground">/{billingCycle === "monthly" ? "mo" : "yr"}</span>
                     </div>
-                    {!isUnavailable && <div className="text-sm text-muted-foreground mt-2 font-medium">Max Limit: {limit} seat{limit !== 1 ? 's' : ''}</div>}
+                    {!isUnavailable && <div className="text-sm text-muted-foreground mt-2 font-medium">Max Limit: {limit} seat{limit !== 1 ? 's' : ''} {activeQty > 0 ? `(${activeQty} active)` : ''}</div>}
                   </CardContent>
                   <CardFooter className="flex-col items-start gap-3">
                     <div className={`flex items-center justify-between w-full border bg-background rounded-lg p-1.5 shadow-sm ${isUnavailable ? 'pointer-events-none opacity-50' : ''}`}>
                       <Button 
-                        variant={qty > 0 ? "secondary" : "ghost"} 
+                        variant={newQty > 0 ? "secondary" : "ghost"} 
                         size="icon" 
                         onClick={() => updateAddOnQuantity(addon.id, -1)} 
-                        disabled={!qty || isUnavailable} 
+                        disabled={newQty === 0 || isUnavailable} 
                         className="h-8 w-8 shrink-0"
                       >
                         <Minus className="h-4 w-4" />
                       </Button>
                       <div className="flex flex-col items-center justify-center px-4 min-w-[3rem]">
-                        <span className="text-lg font-bold">{qty}</span>
+                        <span className="text-lg font-bold">{newQty}</span>
                         <span className="text-[10px] uppercase text-muted-foreground font-semibold leading-none">Seats</span>
                       </div>
                       <Button 
                         variant="secondary" 
                         size="icon" 
                         onClick={() => updateAddOnQuantity(addon.id, 1)} 
-                        disabled={qty >= limit || isUnavailable}
+                        disabled={(activeQty + newQty) >= limit || isUnavailable}
                         className="h-8 w-8 shrink-0 bg-primary/10 hover:bg-primary/20 text-primary"
                       >
                         <Plus className="h-4 w-4" />
@@ -428,7 +432,7 @@ export default function Subscription() {
                     </div>
                     {isSelected && (
                       <div className="w-full text-center text-sm font-medium text-primary">
-                        Subtotal: AED {(billingCycle === "monthly" ? addon.monthlyPrice : addon.annualPrice) * qty}
+                        Subtotal: AED {(billingCycle === "monthly" ? addon.monthlyPrice : addon.annualPrice) * newQty}
                       </div>
                     )}
                   </CardFooter>
@@ -455,9 +459,7 @@ export default function Subscription() {
                   
                   {/* List newly added add-ons individually */}
                   {addOns.map(addon => {
-                    const currentQty = addOnQuantities[addon.id] || 0;
-                    const previousQty = (subscriptionDetails?.features && subscriptionDetails.features[addon.id]) || 0;
-                    const newQty = Math.max(0, currentQty - previousQty);
+                    const newQty = addOnQuantities[addon.id] || 0;
                     
                     if (newQty === 0) return null;
                     
@@ -469,13 +471,6 @@ export default function Subscription() {
                       </div>
                     );
                   })}
-
-                  {totalAddonItems > 0 && newlyAddedItemsCount === 0 && (
-                    <div className="flex justify-between text-muted-foreground max-w-sm">
-                      <span>Add-ons ({totalAddonItems} active)</span>
-                      <span className="font-medium text-foreground">AED 0 (No changes)</span>
-                    </div>
-                  )}
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row items-center gap-6 w-full md:w-auto border-t md:border-t-0 pt-4 md:pt-0">
