@@ -243,9 +243,24 @@ export default function PricingPage() {
                       <span className="font-medium text-foreground">{currentPlanConfig.name} Plan ({billingCycle})</span>
                       <span className="font-semibold text-foreground">AED {basePrice}</span>
                     </div>
+                    
+                    {/* List add-ons individually */}
+                    {addOns.map(addon => {
+                      const qty = addOnQuantities[addon.id] || 0;
+                      if (qty === 0) return null;
+                      
+                      const price = billingCycle === "monthly" ? addon.monthlyPrice : addon.annualPrice;
+                      return (
+                        <div key={`list-${addon.id}`} className="flex justify-between items-center text-muted-foreground pt-1 pl-2 border-l-2 border-primary/20 ml-1">
+                          <span className="text-sm">+ {qty}x {addon.name}</span>
+                          <span className="font-semibold text-foreground text-sm">AED {price * qty}</span>
+                        </div>
+                      );
+                    })}
+
                     {totalAddonItems > 0 && (
-                      <div className="flex justify-between items-center text-muted-foreground pt-1">
-                        <span>Total Add-ons ({totalAddonItems} seats)</span>
+                      <div className="flex justify-between items-center text-muted-foreground pt-2 border-t mt-2">
+                        <span className="text-xs uppercase tracking-wider font-bold">Add-ons Subtotal</span>
                         <span className="font-semibold text-foreground">AED {addOnsTotal}</span>
                       </div>
                     )}

@@ -452,12 +452,24 @@ export default function Subscription() {
                       {hasActiveSamePlan ? "AED 0" : `AED ${basePriceToCharge}`}
                     </span>
                   </div>
-                  {newlyAddedItemsCount > 0 && (
-                    <div className="flex justify-between text-muted-foreground max-w-sm">
-                      <span>New Add-ons ({newlyAddedItemsCount} added)</span>
-                      <span className="font-medium text-foreground">AED {addOnsToChargeTotal}</span>
-                    </div>
-                  )}
+                  
+                  {/* List newly added add-ons individually */}
+                  {addOns.map(addon => {
+                    const currentQty = addOnQuantities[addon.id] || 0;
+                    const previousQty = (subscriptionDetails?.features && subscriptionDetails.features[addon.id]) || 0;
+                    const newQty = Math.max(0, currentQty - previousQty);
+                    
+                    if (newQty === 0) return null;
+                    
+                    const price = billingCycle === "monthly" ? addon.monthlyPrice : addon.annualPrice;
+                    return (
+                      <div key={`new-${addon.id}`} className="flex justify-between text-muted-foreground max-w-sm pl-2 border-l-2 border-primary/20 ml-1">
+                        <span className="text-sm">+ {newQty}x {addon.name}</span>
+                        <span className="font-medium text-foreground text-sm">AED {price * newQty}</span>
+                      </div>
+                    );
+                  })}
+
                   {totalAddonItems > 0 && newlyAddedItemsCount === 0 && (
                     <div className="flex justify-between text-muted-foreground max-w-sm">
                       <span>Add-ons ({totalAddonItems} active)</span>
