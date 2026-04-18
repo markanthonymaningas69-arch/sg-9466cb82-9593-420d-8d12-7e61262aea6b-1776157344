@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ShoppingCart, Plus, Search, Building2, Warehouse as WarehouseIcon, FilterX, List, Edit2, Archive, Printer, ChevronsUpDown, Check } from "lucide-react";
+import { ShoppingCart, Plus, Search, Building2, Warehouse as WarehouseIcon, FilterX, List, Edit2, Archive, Printer, ChevronsUpDown, Check, Filter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { projectService } from "@/services/projectService";
 import { useSettings } from "@/contexts/SettingsProvider";
@@ -86,6 +86,7 @@ export default function Purchasing() {
   const [filterDate, setFilterDate] = useState("");
   const [filterItem, setFilterItem] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [showFilters, setShowFilters] = useState(false);
   
   const generateNextPONumber = (list: any[]) => {
     let max = 0;
@@ -681,72 +682,84 @@ export default function Purchasing() {
         </div>
 
         <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none">
-          <div className="bg-muted/30 p-3 mb-4 border rounded-lg flex flex-wrap gap-4 shrink-0">
-            <div className="space-y-1">
-              <Label className="text-xs">Filter by Supplier:</Label>
-              <Select value={filterSupplier} onValueChange={setFilterSupplier}>
-                <SelectTrigger className="w-[180px] h-9 bg-white dark:bg-background">
-                  <SelectValue placeholder="All Suppliers" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Suppliers</SelectItem>
-                  {uniqueSuppliers.map((s: any) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-1">
-              <Label className="text-xs">Filter by Status:</Label>
-              <div className="flex bg-background border p-0.5 rounded-md w-fit h-9 items-center overflow-x-auto">
-                <Button variant={filterStatus === "all" ? "secondary" : "ghost"} size="sm" className="h-full text-xs" onClick={() => setFilterStatus("all")}>All</Button>
-                <Button variant={filterStatus === "pending" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-orange-600 dark:text-orange-400" onClick={() => setFilterStatus("pending")}>Pending</Button>
-                <Button variant={filterStatus === "pending_approval" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-purple-600 dark:text-purple-400 whitespace-nowrap" onClick={() => setFilterStatus("pending_approval")}>Pending GM</Button>
-                <Button variant={filterStatus === "approved" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-blue-600 dark:text-blue-400" onClick={() => setFilterStatus("approved")}>Approved</Button>
-                <Button variant={filterStatus === "received" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-green-600 dark:text-green-400" onClick={() => setFilterStatus("received")}>Received</Button>
-              </div>
-            </div>
+          <div className="flex justify-end mb-4 shrink-0">
+            <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="h-9">
+              <Filter className="h-4 w-4 mr-2" />
+              {showFilters ? "Hide Filters" : "Filters"}
+              {(filterSupplier !== "all" || filterStatus !== "all" || filterItem || filterDate) && (
+                <span className="ml-2 flex h-2 w-2 rounded-full bg-primary shadow-[0_0_4px_rgba(var(--primary),0.5)]"></span>
+              )}
+            </Button>
+          </div>
 
-            <div className="space-y-1">
-              <Label className="text-xs">Search Item:</Label>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          {showFilters && (
+            <div className="bg-muted/30 p-3 mb-4 border rounded-lg flex flex-wrap gap-4 shrink-0">
+              <div className="space-y-1">
+                <Label className="text-xs">Filter by Supplier:</Label>
+                <Select value={filterSupplier} onValueChange={setFilterSupplier}>
+                  <SelectTrigger className="w-[180px] h-9 bg-white dark:bg-background">
+                    <SelectValue placeholder="All Suppliers" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Suppliers</SelectItem>
+                    {uniqueSuppliers.map((s: any) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-1">
+                <Label className="text-xs">Filter by Status:</Label>
+                <div className="flex bg-background border p-0.5 rounded-md w-fit h-9 items-center overflow-x-auto">
+                  <Button variant={filterStatus === "all" ? "secondary" : "ghost"} size="sm" className="h-full text-xs" onClick={() => setFilterStatus("all")}>All</Button>
+                  <Button variant={filterStatus === "pending" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-orange-600 dark:text-orange-400" onClick={() => setFilterStatus("pending")}>Pending</Button>
+                  <Button variant={filterStatus === "pending_approval" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-purple-600 dark:text-purple-400 whitespace-nowrap" onClick={() => setFilterStatus("pending_approval")}>Pending GM</Button>
+                  <Button variant={filterStatus === "approved" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-blue-600 dark:text-blue-400" onClick={() => setFilterStatus("approved")}>Approved</Button>
+                  <Button variant={filterStatus === "received" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-green-600 dark:text-green-400" onClick={() => setFilterStatus("received")}>Received</Button>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs">Search Item:</Label>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    type="text" 
+                    placeholder="Item name..." 
+                    className="w-[180px] h-9 pl-8 bg-white dark:bg-background"
+                    value={filterItem}
+                    onChange={(e) => setFilterItem(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs">Filter by Date:</Label>
                 <Input 
-                  type="text" 
-                  placeholder="Item name..." 
-                  className="w-[180px] h-9 pl-8 bg-white dark:bg-background"
-                  value={filterItem}
-                  onChange={(e) => setFilterItem(e.target.value)}
+                  type="date" 
+                  className="w-[160px] h-9 bg-white dark:bg-background" 
+                  value={filterDate} 
+                  onChange={(e) => setFilterDate(e.target.value)} 
                 />
               </div>
-            </div>
 
-            <div className="space-y-1">
-              <Label className="text-xs">Filter by Date:</Label>
-              <Input 
-                type="date" 
-                className="w-[160px] h-9 bg-white dark:bg-background" 
-                value={filterDate} 
-                onChange={(e) => setFilterDate(e.target.value)} 
-              />
+              <div className="space-y-1 flex items-end pb-0.5">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 text-muted-foreground"
+                  onClick={() => {
+                    setFilterSupplier("all");
+                    setFilterStatus("all");
+                    setFilterItem("");
+                    setFilterDate("");
+                  }}
+                >
+                  <FilterX className="h-4 w-4 mr-2" />
+                  Clear
+                </Button>
+              </div>
             </div>
-
-            <div className="space-y-1 flex items-end pb-0.5">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-8 text-muted-foreground"
-                onClick={() => {
-                  setFilterSupplier("all");
-                  setFilterStatus("all");
-                  setFilterItem("");
-                  setFilterDate("");
-                }}
-              >
-                <FilterX className="h-4 w-4 mr-2" />
-                Clear
-              </Button>
-            </div>
-          </div>
+          )}
 
           <div className="overflow-y-auto rounded-md border h-full relative">
             <Table>

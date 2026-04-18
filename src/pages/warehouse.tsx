@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { warehouseService } from "@/services/warehouseService";
 import { projectService } from "@/services/projectService";
 import { useSettings } from "@/contexts/SettingsProvider";
-import { Plus, Pencil, Trash2, Archive, Package, Building2, Warehouse as WarehouseIcon, FileSpreadsheet, Truck } from "lucide-react";
+import { Plus, Pencil, Trash2, Archive, Package, Building2, Warehouse as WarehouseIcon, FileSpreadsheet, Truck, Filter } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -63,6 +63,7 @@ export default function Warehouse() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [projectFilter, setProjectFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
   
   // Form State
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -506,83 +507,94 @@ export default function Warehouse() {
         </div>
 
         <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); setCategoryFilter("all"); setProjectFilter("all"); setDateFilter(""); }} className="flex-1 flex flex-col min-h-0">
-          <TabsList className="shrink-0 flex flex-wrap w-full gap-1 h-auto bg-transparent p-0">
-            <TabsTrigger value="main" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-blue-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-blue-700 bg-blue-50 text-blue-700 hover:bg-blue-100">
-              <WarehouseIcon className="h-3 w-3 mr-1.5 hidden sm:inline" /> Main
-            </TabsTrigger>
-            <TabsTrigger value="balance" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-indigo-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-indigo-700 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
-              <FileSpreadsheet className="h-3 w-3 mr-1.5 hidden sm:inline" /> Balance
-            </TabsTrigger>
-            <TabsTrigger value="deployments" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-emerald-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-emerald-700 bg-emerald-50 text-emerald-700 hover:bg-emerald-100">
-              <Truck className="h-3 w-3 mr-1.5 hidden sm:inline" /> Deploy
-            </TabsTrigger>
-            <TabsTrigger value="project" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-amber-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-amber-700 bg-amber-50 text-amber-700 hover:bg-amber-100">
-              <Building2 className="h-3 w-3 mr-1.5 hidden sm:inline" /> Project
-            </TabsTrigger>
-          </TabsList>
-
-          <div className="bg-muted/30 p-3 mt-4 border rounded-lg flex flex-wrap items-end gap-4 shrink-0">
-            <div className="space-y-1">
-              <Label className="text-xs">Filter by Category:</Label>
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-[200px] h-9 bg-background">
-                  <SelectValue placeholder="All Categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {uniqueCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            {activeTab === "project" && (
-              <div className="space-y-1">
-                <Label className="text-xs">Filter by Project:</Label>
-                <Select value={projectFilter} onValueChange={setProjectFilter}>
-                  <SelectTrigger className="w-[200px] h-9 bg-background">
-                    <SelectValue placeholder="All Projects" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Projects</SelectItem>
-                    {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            
-            {activeTab === "deployments" && (
-              <div className="space-y-1">
-                <Label className="text-xs">Filter by Project:</Label>
-                <Select value={projectFilter} onValueChange={setProjectFilter}>
-                  <SelectTrigger className="w-[200px] h-9 bg-background">
-                    <SelectValue placeholder="All Projects" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Projects</SelectItem>
-                    {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {activeTab !== "balance" && (
-              <div className="space-y-1">
-                <Label className="text-xs">Filter by Date:</Label>
-                <Input 
-                  type="date" 
-                  className="w-[200px] h-9 bg-background" 
-                  value={dateFilter} 
-                  onChange={(e) => setDateFilter(e.target.value)} 
-                />
-              </div>
-            )}
-            
-            {(categoryFilter !== "all" || projectFilter !== "all" || dateFilter) && (
-              <Button variant="ghost" size="sm" onClick={() => { setCategoryFilter("all"); setProjectFilter("all"); setDateFilter(""); }} className="text-muted-foreground h-9 ml-1">
-                Clear Filters
-              </Button>
-            )}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mt-2">
+            <TabsList className="shrink-0 flex flex-wrap w-full sm:w-auto gap-1 h-auto bg-transparent p-0">
+              <TabsTrigger value="main" className="flex-1 sm:flex-none min-w-[80px] h-9 text-xs data-[state=active]:bg-blue-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-blue-700 bg-blue-50 text-blue-700 hover:bg-blue-100">
+                <WarehouseIcon className="h-3 w-3 mr-1.5 hidden sm:inline" /> Main
+              </TabsTrigger>
+              <TabsTrigger value="balance" className="flex-1 sm:flex-none min-w-[80px] h-9 text-xs data-[state=active]:bg-indigo-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-indigo-700 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
+                <FileSpreadsheet className="h-3 w-3 mr-1.5 hidden sm:inline" /> Balance
+              </TabsTrigger>
+              <TabsTrigger value="deployments" className="flex-1 sm:flex-none min-w-[80px] h-9 text-xs data-[state=active]:bg-emerald-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-emerald-700 bg-emerald-50 text-emerald-700 hover:bg-emerald-100">
+                <Truck className="h-3 w-3 mr-1.5 hidden sm:inline" /> Deploy
+              </TabsTrigger>
+              <TabsTrigger value="project" className="flex-1 sm:flex-none min-w-[80px] h-9 text-xs data-[state=active]:bg-amber-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-amber-700 bg-amber-50 text-amber-700 hover:bg-amber-100">
+                <Building2 className="h-3 w-3 mr-1.5 hidden sm:inline" /> Project
+              </TabsTrigger>
+            </TabsList>
+            <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="shrink-0 h-9 w-full sm:w-auto">
+              <Filter className="h-4 w-4 mr-2" />
+              {showFilters ? "Hide Filters" : "Filters"}
+              {(categoryFilter !== "all" || projectFilter !== "all" || dateFilter) && (
+                <span className="ml-2 flex h-2 w-2 rounded-full bg-primary shadow-[0_0_4px_rgba(var(--primary),0.5)]"></span>
+              )}
+            </Button>
           </div>
+
+          {showFilters && (
+            <div className="bg-muted/30 p-3 mt-4 border rounded-lg flex flex-wrap items-end gap-4 shrink-0">
+              <div className="space-y-1">
+                <Label className="text-xs">Filter by Category:</Label>
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger className="w-[200px] h-9 bg-background">
+                    <SelectValue placeholder="All Categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {uniqueCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {activeTab === "project" && (
+                <div className="space-y-1">
+                  <Label className="text-xs">Filter by Project:</Label>
+                  <Select value={projectFilter} onValueChange={setProjectFilter}>
+                    <SelectTrigger className="w-[200px] h-9 bg-background">
+                      <SelectValue placeholder="All Projects" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Projects</SelectItem>
+                      {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              
+              {activeTab === "deployments" && (
+                <div className="space-y-1">
+                  <Label className="text-xs">Filter by Project:</Label>
+                  <Select value={projectFilter} onValueChange={setProjectFilter}>
+                    <SelectTrigger className="w-[200px] h-9 bg-background">
+                      <SelectValue placeholder="All Projects" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Projects</SelectItem>
+                      {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {activeTab !== "balance" && (
+                <div className="space-y-1">
+                  <Label className="text-xs">Filter by Date:</Label>
+                  <Input 
+                    type="date" 
+                    className="w-[200px] h-9 bg-background" 
+                    value={dateFilter} 
+                    onChange={(e) => setDateFilter(e.target.value)} 
+                  />
+                </div>
+              )}
+              
+              {(categoryFilter !== "all" || projectFilter !== "all" || dateFilter) && (
+                <Button variant="ghost" size="sm" onClick={() => { setCategoryFilter("all"); setProjectFilter("all"); setDateFilter(""); }} className="text-muted-foreground h-9 ml-1">
+                  Clear Filters
+                </Button>
+              )}
+            </div>
+          )}
 
           <TabsContent value="main" className="flex-1 mt-4 data-[state=active]:flex flex-col min-h-0">
             <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none bg-background">
@@ -664,9 +676,9 @@ export default function Warehouse() {
                       <TableHead className="font-bold text-foreground">Item Name</TableHead>
                       <TableHead className="font-bold text-foreground">Category</TableHead>
                       <TableHead className="font-bold text-foreground">Project</TableHead>
-                      <TableHead className="text-right font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 border-l">Total Received</TableHead>
+                      <TableHead className="text-right font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900">Total Received</TableHead>
                       <TableHead className="text-right font-bold text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30">Total Consumed</TableHead>
-                      <TableHead className="text-right font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30 border-r">Current Balance</TableHead>
+                      <TableHead className="text-right font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-900">Current Balance</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
