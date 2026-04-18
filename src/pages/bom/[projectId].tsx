@@ -552,12 +552,16 @@ export default function BillOfMaterials() {
     const selectedMaster = masterItems.find(m => m.name === materialName);
     
     if (selectedMaster) {
+      const knownUnits = ["Cu.m", "Sq.m", "Lin.m", "Pc", "Kg", "Box", "lot", "bags", "pails", "gal", "liters", "bd.ft", "sets", "pairs", "rolls", "Other"];
+      const unit = selectedMaster.unit || "";
+      const isKnown = knownUnits.includes(unit);
+
       setMaterialForm(prev => ({
         ...prev,
         name: selectedMaster.name,
         description: selectedMaster.name,
-        unit: selectedMaster.unit || "",
-        unit_selection: selectedMaster.unit || "",
+        unit: unit,
+        unit_selection: isKnown ? unit : (unit ? "Other" : ""),
         unit_cost: selectedMaster.default_cost ? Number(selectedMaster.default_cost).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ""
       }));
     } else {
