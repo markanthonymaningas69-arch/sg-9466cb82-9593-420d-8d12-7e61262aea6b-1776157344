@@ -132,13 +132,13 @@ export default function Subscription() {
 
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        // We will insert a brand new subscription record for the new billing cycle
+        // We will insert a brand new subscription record for the transaction
         const newSub = {
           user_id: session.user.id,
           plan: currentPlan,
           status: 'active',
           start_date: new Date().toISOString(),
-          amount: totalAmount,
+          amount: totalAmountDueToday,
           features: addOnQuantities
         };
         
@@ -170,16 +170,41 @@ export default function Subscription() {
 
   // Calculate Totals
   const isCurrentlyTrial = (currentPlan as string) === "trial" || isTrial;
-  const basePrice = isCurrentlyTrial ? 0 : (billingCycle === "monthly" ? currentPlanConfig.monthlyPrice : currentPlanConfig.annualPrice);
+  
+  // Check if the user already has an active subscription for the EXACT plan they are viewing
+  const hasActiveSamePlan = subscriptionDetails?.status === "active" && 
+                            subscriptionDetails?.plan === currentPlan && 
+                            !isCurrentlyTrial;
 
+  const basePrice = isCurrentlyTrial ? 0 : (billingCycle === "monthly" ? currentPlanConfig.monthlyPrice : currentPlanConfig.annualPrice);
+  
+  // Only charge base price if they are upgrading/changing plans or don't have an active one
+  const basePriceToCharge = hasActiveSamePlan ? 0 : basePrice;
+
+  // Total recurring cost of all add-ons
   const addOnsTotal = addOns.reduce((total, addon) => {
     const qty = addOnQuantities[addon.id] || 0;
     const price = billingCycle === "monthly" ? addon.monthlyPrice : addon.annualPrice;
     return total + (price * qty);
   }, 0);
 
-  const totalAmount = basePrice + addOnsTotal;
-  const totalAddonItems = Object.values(addOnQuantities).reduce((a, b) => a + b, 0);
+  // Math to strictly calculate only NEWLY added add-ons to charge today
+  const addOnsToChargeTotal = addOns.reduce((total, addon) => {
+    const currentQty = addOnQuantities[addon.id] || 0;
+    const previousQty = (subscriptionDetails?.features && subscriptionDetails.features[addon.id]) || 0;
+    const newQty = Math.max(0, currentQty - previousQty);
+    const price = billingCycle === "monthly" ? addon.monthlyPrice : addon.annualPrice;
+    return total + (price * newQty);
+  }, 0);
+
+  const totalAmountDueToday = basePriceToCharge + addOnsToChargeTotal;
+  const totalAddonItems = Object.values(addOnQuantities).reduce((a, b) => Number(a) + Number(b), 0);
+  
+  const newlyAddedItemsCount = addOns.reduce((total, addon) => {
+    const currentQty = addOnQuantities[addon.id] || 0;
+    const previousQty = (subscriptionDetails?.features && subscriptionDetails.features[addon.id]) || 0;
+    return total + Math.max(0, currentQty - previousQty);
+  }, 0);
 
   return (
     <Layout>
@@ -422,35 +447,43 @@ export default function Subscription() {
                 <h3 className="text-2xl font-bold tracking-tight">Order Summary</h3>
                 <div className="mt-2 space-y-1">
                   <div className="flex justify-between text-muted-foreground max-w-sm">
-                    <span>{currentPlanConfig.name} Plan ({billingCycle})</span>
-                    <span className="font-medium text-foreground">AED {basePrice}</span>
+                    <span>{currentPlanConfig.name} Plan ({billingCycle}) {hasActiveSamePlan && <Badge variant="outline" className="ml-2 text-[10px] bg-success/10 text-success border-success/20">Already Active</Badge>}</span>
+                    <span className="font-medium text-foreground">
+                      {hasActiveSamePlan ? "AED 0" : `AED ${basePriceToCharge}`}
+                    </span>
                   </div>
-                  {totalAddonItems > 0 && (
+                  {newlyAddedItemsCount > 0 && (
                     <div className="flex justify-between text-muted-foreground max-w-sm">
-                      <span>Add-ons ({totalAddonItems} configured)</span>
-                      <span className="font-medium text-foreground">AED {addOnsTotal}</span>
+                      <span>New Add-ons ({newlyAddedItemsCount} added)</span>
+                      <span className="font-medium text-foreground">AED {addOnsToChargeTotal}</span>
+                    </div>
+                  )}
+                  {totalAddonItems > 0 && newlyAddedItemsCount === 0 && (
+                    <div className="flex justify-between text-muted-foreground max-w-sm">
+                      <span>Add-ons ({totalAddonItems} active)</span>
+                      <span className="font-medium text-foreground">AED 0 (No changes)</span>
                     </div>
                   )}
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row items-center gap-6 w-full md:w-auto border-t md:border-t-0 pt-4 md:pt-0">
                 <div className="text-center md:text-right w-full md:w-auto">
-                  <div className="text-sm text-muted-foreground font-medium uppercase tracking-wider mb-1">Total Due</div>
-                  <div className="text-4xl font-bold text-primary tracking-tight">AED {totalAmount}</div>
+                  <div className="text-sm text-muted-foreground font-medium uppercase tracking-wider mb-1">Due Today</div>
+                  <div className="text-4xl font-bold text-primary tracking-tight">AED {totalAmountDueToday}</div>
                   <div className="text-sm font-medium text-muted-foreground mt-1">/{billingCycle === "monthly" ? "mo" : "yr"}</div>
                 </div>
                 <Button 
                   size="lg" 
                   className="h-16 px-8 text-lg font-bold w-full sm:w-auto shadow-md hover:shadow-lg transition-all"
                   onClick={handleCheckout}
-                  disabled={isCheckingOut}
+                  disabled={isCheckingOut || totalAmountDueToday === 0}
                 >
                   {isCheckingOut ? (
                     <Loader2 className="mr-2 h-6 w-6 animate-spin" />
                   ) : (
                     <ShoppingCart className="mr-2 h-6 w-6" />
                   )}
-                  {isCheckingOut ? "Processing..." : "Proceed to Checkout"}
+                  {isCheckingOut ? "Processing..." : "Confirm & Pay"}
                 </Button>
               </div>
             </CardContent>
