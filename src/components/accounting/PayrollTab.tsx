@@ -94,21 +94,24 @@ export function PayrollTab() {
     if (payrollData.length === 0) return;
     setIsSending(true);
     
+    // First, fetch existing vouchers to calculate the next voucher_number
+    const { data: existingVouchers } = await supabase.from('vouchers').select('id').eq('type', 'payment');
+    const nextNum = (existingVouchers?.length || 0) + 1;
+    const vNumber = `PV-${new Date().getFullYear()}-${String(nextNum).padStart(3, '0')}`;
+
     const projName = filters.projectId === "all" 
       ? "General / Multiple Projects" 
       : projects.find(p => p.id === filters.projectId)?.name || "Unknown Project";
 
-    const { data: userData } = await supabase.auth.getUser();
-
     const voucherPayload = {
+      voucher_number: vNumber,
       type: "payment",
       date: new Date().toISOString().split("T")[0],
       payee: `Payroll: ${projName}`,
-      particulars: `Automated Payroll Generation: ${filters.startDate} to ${filters.endDate} for ${projName}`,
+      description: `Automated Payroll Generation: ${filters.startDate} to ${filters.endDate} for ${projName}`,
       amount: totalPayrollCost,
       status: "pending",
-      project_id: filters.projectId === "all" ? null : filters.projectId,
-      created_by: userData?.user?.id
+      project_id: filters.projectId === "all" ? null : filters.projectId
     };
 
     const { error } = await accountingService.createVoucher(voucherPayload);
