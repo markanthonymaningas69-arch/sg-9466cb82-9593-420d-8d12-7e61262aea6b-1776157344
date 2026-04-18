@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Check, CreditCard, Calendar, FolderGit2, LayoutGrid, Minus, Plus, ShoppingCart, Loader2 } from "lucide-react";
+import { Check, CreditCard, Calendar, FolderGit2, LayoutGrid, Minus, Plus, ShoppingCart, Loader2, Users } from "lucide-react";
 import { useSettings } from "@/contexts/SettingsProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { plans, addOns, type PlanConfig } from "@/config/pricing";
@@ -138,7 +138,7 @@ export default function Subscription() {
       // Calculate final active features by merging active + cart
       const finalFeatures = { ...(subscriptionDetails?.features || {}) };
       for (const [id, newQty] of Object.entries(addOnQuantities)) {
-        finalFeatures[id] = (finalFeatures[id] || 0) + newQty;
+        finalFeatures[id] = Number(finalFeatures[id] || 0) + Number(newQty);
       }
       
       localStorage.setItem("app_subscription_features", JSON.stringify(finalFeatures));
@@ -196,18 +196,23 @@ export default function Subscription() {
 
   // Math to strictly calculate only NEWLY added add-ons to charge today
   const addOnsToChargeTotal = addOns.reduce((total, addon) => {
-    const newQty = addOnQuantities[addon.id] || 0;
+    const newQty = Number(addOnQuantities[addon.id] || 0);
     const price = billingCycle === "monthly" ? addon.monthlyPrice : addon.annualPrice;
     return total + (price * newQty);
   }, 0);
 
   const totalAmountDueToday = basePriceToCharge + addOnsToChargeTotal;
   
-  const totalAddonItems = addOns.reduce((total, addon) => {
-    return total + ((subscriptionDetails?.features && subscriptionDetails.features[addon.id]) || 0);
-  }, 0);
-  
+  const addOnUsersCount = subscriptionDetails?.features 
+    ? Number(Object.values(subscriptionDetails.features).reduce((a: any, b: any) => Number(a) + Number(b), 0))
+    : 0;
+    
+  const totalAddonItems = addOnUsersCount;
   const newlyAddedItemsCount = Object.values(addOnQuantities).reduce((a, b) => Number(a) + Number(b), 0);
+
+  // Total Independent Users Calculation
+  const baseUsersCount = currentPlan === 'starter' ? 3 : 8;
+  const totalUsersCount = baseUsersCount + addOnUsersCount;
 
   return (
     <Layout>
@@ -245,7 +250,7 @@ export default function Subscription() {
               </div>
             </div>
             <Separator />
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-4">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
                   <FolderGit2 className="h-5 w-5 text-primary" />
@@ -266,15 +271,22 @@ export default function Subscription() {
               </div>
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Users className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <div className="font-medium">{totalUsersCount} Total Users</div>
+                  <div className="text-sm text-muted-foreground">Active Independent Accounts</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
                   <Plus className="h-5 w-5 text-primary" />
                 </div>
                 <div>
                   <div className="font-medium">
-                    {subscriptionDetails?.features 
-                      ? Number(Object.values(subscriptionDetails.features).reduce((a: any, b: any) => Number(a) + Number(b), 0))
-                      : 0} Configured
+                    {addOnUsersCount} Configured
                   </div>
-                  <div className="text-sm text-muted-foreground">Module Add-ons</div>
+                  <div className="text-sm text-muted-foreground">Active Add-on Seats</div>
                 </div>
               </div>
             </div>
@@ -383,9 +395,9 @@ export default function Subscription() {
           </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {addOns.map((addon) => {
-              const newQty = addOnQuantities[addon.id] || 0;
-              const activeQty = (subscriptionDetails?.features && subscriptionDetails.features[addon.id]) || 0;
-              const limit = currentPlanConfig.addOnLimits?.[addon.id] || 0;
+              const newQty = Number(addOnQuantities[addon.id] || 0);
+              const activeQty = Number((subscriptionDetails?.features && subscriptionDetails.features[addon.id]) || 0);
+              const limit = Number(currentPlanConfig.addOnLimits?.[addon.id] || 0);
               const isUnavailable = limit === 0 || activeQty >= limit;
               const isSelected = newQty > 0;
               
