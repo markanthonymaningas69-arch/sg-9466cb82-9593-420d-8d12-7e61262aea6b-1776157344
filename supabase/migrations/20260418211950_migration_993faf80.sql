@@ -1,0 +1,1 @@
+ALTER TABLE company_settings ADD COLUMN auto_approve_materials BOOLEAN DEFAULT false;

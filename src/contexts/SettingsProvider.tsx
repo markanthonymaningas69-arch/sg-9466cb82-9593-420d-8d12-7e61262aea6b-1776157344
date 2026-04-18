@@ -13,6 +13,7 @@ export interface CompanySettings {
   website: string;
   logo: string;
   logo_url?: string;
+  auto_approve_materials?: boolean;
 }
 
 const defaultCompany: CompanySettings = {
@@ -20,7 +21,8 @@ const defaultCompany: CompanySettings = {
   address: "123 Builder Street, Construction City",
   taxId: "12-3456789",
   website: "www.theaxconstruction.com",
-  logo: ""
+  logo: "",
+  auto_approve_materials: false
 };
 
 interface SettingsContextType {
@@ -151,7 +153,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
               address: compSettings.address || "",
               taxId: compSettings.tax_id || "",
               website: compSettings.website || "",
-              logo: compSettings.logo || ""
+              logo: compSettings.logo || "",
+              auto_approve_materials: compSettings.auto_approve_materials || false
             });
           }
         }

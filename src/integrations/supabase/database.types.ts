@@ -496,6 +496,7 @@ export type Database = {
       company_settings: {
         Row: {
           address: string | null
+          auto_approve_materials: boolean | null
           created_at: string | null
           currency: string | null
           id: string
@@ -509,6 +510,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          auto_approve_materials?: boolean | null
           created_at?: string | null
           currency?: string | null
           id?: string
@@ -522,6 +524,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          auto_approve_materials?: boolean | null
           created_at?: string | null
           currency?: string | null
           id?: string

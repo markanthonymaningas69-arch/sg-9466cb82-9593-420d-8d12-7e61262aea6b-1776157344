@@ -177,6 +177,37 @@ export const siteService = {
     return { data, error };
   },
 
+  // Site Requests Management
+  async createSiteRequest(request: any) {
+    // Check auto-approve setting from the user's company profile
+    let autoApprove = false;
+    const { data: userProfile } = await supabase.auth.getUser();
+    
+    if (userProfile?.user?.id) {
+      const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', userProfile.user.id).single();
+      if (profile?.company_id) {
+        const { data: compSettings } = await supabase.from('company_settings').select('auto_approve_materials').eq('id', profile.company_id).single();
+        if (compSettings?.auto_approve_materials) {
+          autoApprove = true;
+        }
+      }
+    }
+
+    // Apply the automation status if enabled
+    const finalRequest = {
+      ...request,
+      status: autoApprove ? 'approved' : 'pending'
+    };
+
+    const { data, error } = await supabase
+      .from("site_requests")
+      .insert(finalRequest)
+      .select()
+      .single();
+      
+    return { data, error, autoApproved: autoApprove };
+  },
+
   async updateMaterialConsumption(id: string, updates: any) {
     const { data, error } = await supabase
       .from("material_consumption")
