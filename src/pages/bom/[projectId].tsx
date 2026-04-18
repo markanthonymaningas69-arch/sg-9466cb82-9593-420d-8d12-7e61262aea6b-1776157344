@@ -1159,7 +1159,20 @@ export default function BillOfMaterials() {
                                     <SelectValue placeholder="Select from catalog" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    {masterItems.map(item => (
+                                    {masterItems
+                                      .filter(item => {
+                                        const isLinked = item.associated_scopes && Array.isArray(item.associated_scopes) 
+                                          ? item.associated_scopes.includes(scope.name)
+                                          : false;
+                                        
+                                        const isAlreadyAdded = (scope.bom_materials || []).some(
+                                          m => (m.material_name === item.name || m.description === item.name) && 
+                                               (!editingMaterial || editingMaterial.id !== m.id)
+                                        );
+                                        
+                                        return isLinked && !isAlreadyAdded;
+                                      })
+                                      .map(item => (
                                       <SelectItem key={item.id} value={item.name}>{item.name}</SelectItem>
                                     ))}
                                     <SelectItem value="custom" className="text-primary font-medium border-t mt-1">
