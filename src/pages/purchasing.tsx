@@ -17,7 +17,34 @@ import { projectService } from "@/services/projectService";
 import { useSettings } from "@/contexts/SettingsProvider";
 import { cn } from "@/lib/utils";
 
-const STANDARD_UNITS = ["pcs", "bags", "kgs", "liters", "units", "set", "lot", "m", "sq.m", "cu.m", "length", "box", "roll"];
+const STANDARD_CATEGORIES = [
+  "Construction Materials",
+  "Equipments",
+  "Hand Tools",
+  "PPE",
+  "Tools"
+];
+
+const STANDARD_UNITS = [
+  "Bag",
+  "Bd.ft",
+  "Box",
+  "Cu.m",
+  "Gal",
+  "Kg",
+  "Length",
+  "Lin.m",
+  "Liter",
+  "Lot",
+  "M",
+  "Pail",
+  "Pair",
+  "Pc",
+  "Roll",
+  "Set",
+  "Sq.m",
+  "Unit"
+];
 
 export default function Purchasing() {
   const { formatCurrency, company, currency } = useSettings();
@@ -50,7 +77,7 @@ export default function Purchasing() {
     item_name: "",
     category: "Construction Materials",
     quantity: "",
-    unit: "pcs",
+    unit: "Pc",
     unit_cost: ""
   });
   
@@ -78,7 +105,7 @@ export default function Purchasing() {
     item_name: "",
     category: "Construction Materials",
     quantity: "",
-    unit: "pcs",
+    unit: "Pc",
     unit_cost: "",
     destination_type: "main_warehouse",
     project_id: "none"
@@ -97,12 +124,12 @@ export default function Purchasing() {
 
   const loadData = async () => {
     setLoading(true);
-    const [{ data: pData }, { data: projData }, { data: supData }, { data: vouchData }, { data: invData }] = await Promise.all([
+    const [{ data: pData }, { data: projData }, { data: supData }, { data: vouchData }, { data: masterData }] = await Promise.all([
       supabase.from("purchases").select(`*, projects(name)`).eq('is_archived', false).order('created_at', { ascending: false }),
       projectService.getAll(),
       supabase.from("suppliers").select("*").order("name"),
       supabase.from("vouchers").select("*").order("created_at", { ascending: false }),
-      supabase.from("inventory").select("name, category, unit").order("name")
+      projectService.getMasterItems()
     ]);
     
     const loadedPurchases = pData || [];
@@ -111,10 +138,10 @@ export default function Purchasing() {
     setSuppliers(supData || []);
     setVouchers(vouchData || []);
     
-    // Create unique catalog from inventory
+    // Create unique catalog from master items
     const uniqueItemsMap = new Map();
-    if (invData) {
-      invData.forEach(item => {
+    if (masterData) {
+      masterData.forEach(item => {
         if (!uniqueItemsMap.has(item.name.toLowerCase())) {
           uniqueItemsMap.set(item.name.toLowerCase(), item);
         }
@@ -148,7 +175,7 @@ export default function Purchasing() {
       item_name: "",
       category: "Construction Materials",
       quantity: "",
-      unit: "pcs",
+      unit: "Pc",
       unit_cost: ""
     });
   };
@@ -235,7 +262,7 @@ export default function Purchasing() {
         item_name: "",
         category: "Construction Materials",
         quantity: "",
-        unit: "pcs",
+        unit: "Pc",
         unit_cost: ""
       });
     } else {
@@ -571,10 +598,10 @@ export default function Purchasing() {
                         <Select value={currentItem.category} onValueChange={(val) => setCurrentItem({ ...currentItem, category: val })}>
                           <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="Construction Materials">Materials</SelectItem>
-                            <SelectItem value="Tools">Tools</SelectItem>
-                            <SelectItem value="Equipments">Equipments</SelectItem>
-                            <SelectItem value="PPE">PPE</SelectItem>
+                            {STANDARD_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                            {!STANDARD_CATEGORIES.includes(currentItem.category) && currentItem.category && (
+                              <SelectItem value={currentItem.category}>{currentItem.category}</SelectItem>
+                            )}
                           </SelectContent>
                         </Select>
                       </div>
@@ -588,6 +615,9 @@ export default function Purchasing() {
                           <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             {STANDARD_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                            {!STANDARD_UNITS.includes(currentItem.unit) && currentItem.unit && (
+                              <SelectItem value={currentItem.unit}>{currentItem.unit}</SelectItem>
+                            )}
                           </SelectContent>
                         </Select>
                       </div>
