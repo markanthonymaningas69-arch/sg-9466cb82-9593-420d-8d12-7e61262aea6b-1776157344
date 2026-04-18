@@ -17,7 +17,7 @@ function AppInner({ Component, pageProps }: AppProps) {
   const [authChecked, setAuthChecked] = useState<boolean>(false);
 
   useEffect(() => {
-    const publicPaths = ["/auth/login", "/auth/register", "/404"];
+    const publicPaths = ["/auth/login", "/auth/register", "/404", "/system-monitor"];
     const path = router.pathname;
 
     if (publicPaths.includes(path)) {
