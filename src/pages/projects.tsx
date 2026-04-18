@@ -61,8 +61,34 @@ export default function Projects() {
   const [masterScopeForm, setMasterScopeForm] = useState({ name: "" });
   const [editingMasterScopeId, setEditingMasterScopeId] = useState<string | null>(null);
 
-  const STANDARD_CATEGORIES = ["Construction Materials", "Tools", "Hand Tools", "Equipments", "PPE"];
-  const STANDARD_UNITS = ["pcs", "bags", "kgs", "liters", "units", "set", "lot", "m", "sq.m", "cu.m", "length", "box", "roll"];
+  const STANDARD_CATEGORIES = [
+    "Construction Materials",
+    "Equipments",
+    "Hand Tools",
+    "PPE",
+    "Tools"
+  ];
+  
+  const STANDARD_UNITS = [
+    "Bag",
+    "Bd.ft",
+    "Box",
+    "Cu.m",
+    "Gal",
+    "Kg",
+    "Length",
+    "Lin.m",
+    "Liter",
+    "Lot",
+    "M",
+    "Pail",
+    "Pair",
+    "Pc",
+    "Roll",
+    "Set",
+    "Sq.m",
+    "Unit"
+  ];
 
   useEffect(() => {
     loadProjects();
