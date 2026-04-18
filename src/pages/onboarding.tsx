@@ -17,7 +17,6 @@ export default function Onboarding() {
   
   const [fullName, setFullName] = useState("");
   const [inviteCode, setInviteCode] = useState("");
-  const [selectedModule, setSelectedModule] = useState("");
   
   const [joining, setJoining] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -64,10 +63,6 @@ export default function Onboarding() {
       toast({ title: "Required", description: "Please enter an invite code.", variant: "destructive" });
       return;
     }
-    if (!selectedModule) {
-      toast({ title: "Required", description: "Please select the module you need access to.", variant: "destructive" });
-      return;
-    }
 
     setJoining(true);
     try {
@@ -91,24 +86,27 @@ export default function Onboarding() {
         return;
       }
 
+      // The module is pre-determined by the GM who created the invite code
+      const assignedModule = invData.module;
+
       // Update their profile name first
       await supabase.from('profiles').update({ full_name: fullName.trim() }).eq('id', user.id);
 
-      // Use the secure backend function with their explicitly chosen module
+      // Use the secure backend function with the GM's explicitly chosen module
       const { error: rpcError } = await supabase.rpc('assign_user_module', {
         p_user_id: user.id,
-        p_module: selectedModule,
+        p_module: assignedModule,
         p_project_ids: invData.project_ids || [],
-        p_modules: [selectedModule]
+        p_modules: [assignedModule]
       });
 
       if (rpcError) {
         const { error: upsertError } = await supabase.from('profiles').upsert({
           id: user.id,
           full_name: fullName.trim(),
-          assigned_module: selectedModule,
+          assigned_module: assignedModule,
           assigned_project_ids: invData.project_ids || [],
-          assigned_modules: [selectedModule],
+          assigned_modules: [assignedModule],
           updated_at: new Date().toISOString()
         });
         if (upsertError) throw upsertError;
@@ -122,7 +120,7 @@ export default function Onboarding() {
 
       toast({
         title: "Success!",
-        description: `You have joined the workspace as ${selectedModule}.`,
+        description: `You have joined the workspace as ${assignedModule}.`,
       });
 
       // Use hard reload
@@ -244,7 +242,7 @@ export default function Onboarding() {
               </div>
               <CardTitle>Join a Company</CardTitle>
               <CardDescription>
-                Enter an invite code and select the module you need access to.
+                Enter an invite code provided by your General Manager to join their workspace.
               </CardDescription>
             </CardHeader>
             <CardContent className="flex-1">
@@ -260,26 +258,10 @@ export default function Onboarding() {
                     disabled={joining || creating}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Module Access *</Label>
-                  <Select value={selectedModule} onValueChange={setSelectedModule} disabled={joining || creating}>
-                    <SelectTrigger className="h-12 text-base">
-                      <SelectValue placeholder="Select your module..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Project Profile">Project Profile</SelectItem>
-                      <SelectItem value="Site Personnel">Site Personnel</SelectItem>
-                      <SelectItem value="Purchasing">Purchasing</SelectItem>
-                      <SelectItem value="Accounting">Accounting</SelectItem>
-                      <SelectItem value="Human Resources">Human Resources</SelectItem>
-                      <SelectItem value="Warehouse">Warehouse</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </form>
             </CardContent>
             <CardFooter>
-              <Button type="submit" form="join-form" disabled={!inviteCode.trim() || !selectedModule || !fullName.trim() || joining || creating} className="w-full h-12 text-lg">
+              <Button type="submit" form="join-form" disabled={!inviteCode.trim() || !fullName.trim() || joining || creating} className="w-full h-12 text-lg">
                 {joining ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
                 Join Workspace
                 {!joining && <ArrowRight className="ml-2 h-5 w-5" />}
