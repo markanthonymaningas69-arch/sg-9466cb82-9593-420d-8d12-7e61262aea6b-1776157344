@@ -947,161 +947,164 @@ export default function BillOfMaterials() {
           </>
         }
 
-        {scopes.map((scope, index) => {
-          const scopeKey = scope.id as string;
-          const isCollapsed = collapsedScopes[scopeKey] ?? false;
-          return (
-            <Card
-              key={scope.id}
-              className="text-foreground"
-            >
-              <CardHeader className={isCollapsed || reorderMode ? "py-2 px-4" : "pt-6 px-6 pb-3"}>
-                <div className="flex justify-between items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    {editingScopeId === scope.id ? (
-                      <>
-                        <Input
-                          value={editingScopeName}
-                          onChange={(e) => setEditingScopeName(e.target.value)}
-                          placeholder="Scope name"
-                          className="h-8 max-w-xs"
-                        />
+        {/* Hide all existing scopes and totals if the user is currently adding a new scope */}
+        {!showScopeInput && (
+          <>
+            {scopes.map((scope, index) => {
+              const scopeKey = scope.id as string;
+              const isCollapsed = collapsedScopes[scopeKey] ?? false;
+              return (
+                <Card
+                  key={scope.id}
+                  className="text-foreground"
+                >
+                  <CardHeader className={isCollapsed || reorderMode ? "py-2 px-4" : "pt-6 px-6 pb-3"}>
+                    <div className="flex justify-between items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        {editingScopeId === scope.id ? (
+                          <>
+                            <Input
+                              value={editingScopeName}
+                              onChange={(e) => setEditingScopeName(e.target.value)}
+                              placeholder="Scope name"
+                              className="h-8 max-w-xs"
+                            />
+                            <Button
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                              onClick={() => void handleSaveEditScope()}
+                            >
+                              Save
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-red-600 text-red-700 hover:bg-red-50"
+                              onClick={handleCancelEditScope}
+                            >
+                              Cancel
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <CardTitle className="text-xl">{scope.name}</CardTitle>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="text-green-700 hover:text-green-800"
+                              onClick={() => handleStartEditScope(scope)}
+                              disabled={reorderMode}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {reorderMode && (
+                          <div className="flex items-center bg-muted rounded-md mr-2">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8"
+                              disabled={index === 0}
+                              onClick={() => moveScope(index, 'up')}
+                            >
+                              <ArrowUp className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8"
+                              disabled={index === scopes.length - 1}
+                              onClick={() => moveScope(index, 'down')}
+                            >
+                              <ArrowDown className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
                         <Button
+                          variant="outline"
                           size="sm"
-                          className="bg-green-600 hover:bg-green-700 text-white"
-                          onClick={() => void handleSaveEditScope()}
+                          className="h-8 px-2 text-xs"
+                          onClick={() =>
+                            setCollapsedScopes((prev) => ({
+                              ...prev,
+                              [scopeKey]: !isCollapsed
+                            }))
+                          }
+                          disabled={reorderMode}
                         >
-                          Save
+                          {isCollapsed ? "Show content" : "Hide content"}
                         </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="text-red-600 hover:text-red-700"
+                          onClick={() => void handleDeleteScope(scope.id as string)}
+                          disabled={reorderMode}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  {!isCollapsed && !reorderMode && (
+                    <CardContent className="space-y-4 pt-3">
+                      <div className="flex justify-end gap-2 mb-2">
                         <Button
                           size="sm"
                           variant="outline"
-                          className="border-red-600 text-red-700 hover:bg-red-50"
-                          onClick={handleCancelEditScope}
+                          className="border-green-600 text-green-700 hover:bg-green-50 h-8 text-xs"
+                          onClick={() => {
+                            if (activeLaborScopeId === scope.id) {
+                              setActiveLaborScopeId(null);
+                              resetLaborForm();
+                            } else {
+                              setActiveLaborScopeId(scope.id as string);
+                              if (scope.bom_labor && scope.bom_labor.length > 0) {
+                                handleEditLabor(scope.bom_labor[0] as Labor);
+                              } else {
+                                resetLaborForm();
+                              }
+                            }
+                          }}
                         >
-                          Cancel
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <CardTitle className="text-xl">{scope.name}</CardTitle>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="text-green-700 hover:text-green-800"
-                          onClick={() => handleStartEditScope(scope)}
-                          disabled={reorderMode}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {reorderMode && (
-                      <div className="flex items-center bg-muted rounded-md mr-2">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8"
-                          disabled={index === 0}
-                          onClick={() => moveScope(index, 'up')}
-                        >
-                          <ArrowUp className="h-4 w-4" />
+                          <Pencil className="h-3 w-3 mr-2" />
+                          Add / Edit Labor
                         </Button>
                         <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8"
-                          disabled={index === scopes.length - 1}
-                          onClick={() => moveScope(index, 'down')}
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700 text-white h-8 text-xs"
+                          onClick={() => {
+                            setSelectedScopeId(scope.id as string);
+                            resetMaterialForm();
+                          }}
                         >
-                          <ArrowDown className="h-4 w-4" />
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Materials
                         </Button>
                       </div>
-                    )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 px-2 text-xs"
-                      onClick={() =>
-                        setCollapsedScopes((prev) => ({
-                          ...prev,
-                          [scopeKey]: !isCollapsed
-                        }))
-                      }
-                      disabled={reorderMode}
-                    >
-                      {isCollapsed ? "Show content" : "Hide content"}
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="text-red-600 hover:text-red-700"
-                      onClick={() => void handleDeleteScope(scope.id as string)}
-                      disabled={reorderMode}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              {!isCollapsed && !reorderMode && (
-                <CardContent className="space-y-4 pt-3">
-                  <div className="flex justify-end gap-2 mb-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-green-600 text-green-700 hover:bg-green-50 h-8 text-xs"
-                      onClick={() => {
-                        if (activeLaborScopeId === scope.id) {
-                          setActiveLaborScopeId(null);
-                          resetLaborForm();
-                        } else {
-                          setActiveLaborScopeId(scope.id as string);
-                          if (scope.bom_labor && scope.bom_labor.length > 0) {
-                            handleEditLabor(scope.bom_labor[0] as Labor);
-                          } else {
-                            resetLaborForm();
-                          }
-                        }
-                      }}
-                    >
-                      <Pencil className="h-3 w-3 mr-2" />
-                      Add / Edit Labor
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="bg-green-600 hover:bg-green-700 text-white h-8 text-xs"
-                      onClick={() => {
-                        setSelectedScopeId(scope.id as string);
-                        resetMaterialForm();
-                      }}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Materials
-                    </Button>
-                  </div>
 
-                  {(scope.bom_materials || []).length > 0 || selectedScopeId === scope.id ?
-            <div className="mt-2">
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="font-semibold text-lg">Materials</h3>
-                  </div>
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="h-8">
-                        <TableHead className="h-8 py-1">Material Description</TableHead>
-                        <TableHead className="w-40 text-right h-8 py-1">Qty</TableHead>
-                        <TableHead className="w-40 h-8 py-1">Unit</TableHead>
-                        <TableHead className="w-48 text-right h-8 py-1">Unit Cost</TableHead>
-                        <TableHead className="w-32 text-right h-8 py-1">Amount</TableHead>
-                        <TableHead className="w-28 text-right h-8 py-1" />
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {(scope.bom_materials || []).map((material) =>
-                  <TableRow key={material.id} className="h-8">
+                      {(scope.bom_materials || []).length > 0 || selectedScopeId === scope.id ?
+                <div className="mt-2">
+                      <div className="flex justify-between items-center mb-2">
+                        <h3 className="font-semibold text-lg">Materials</h3>
+                      </div>
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="h-8">
+                            <TableHead className="h-8 py-1">Material Description</TableHead>
+                            <TableHead className="w-40 text-right h-8 py-1">Qty</TableHead>
+                            <TableHead className="w-40 h-8 py-1">Unit</TableHead>
+                            <TableHead className="w-48 text-right h-8 py-1">Unit Cost</TableHead>
+                            <TableHead className="w-32 text-right h-8 py-1">Amount</TableHead>
+                            <TableHead className="w-28 text-right h-8 py-1" />
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {(scope.bom_materials || []).map((material) =>
+                      <TableRow key={material.id} className="h-8">
                           <TableCell className="py-1">
                             <div className="font-medium text-sm">
                               {material.description || material.material_name}
@@ -1144,7 +1147,7 @@ export default function BillOfMaterials() {
                             </div>
                           </TableCell>
                         </TableRow>
-                  )}
+                      )}
 
                       {selectedScopeId === scope.id &&
                   <TableRow className="h-8">
@@ -1330,362 +1333,364 @@ export default function BillOfMaterials() {
                     </TableBody>
                   </Table>
                 </div> :
-            null}
+                null}
 
-                  <div className="flex justify-between items-start pt-2 border-t mt-2">
-                    <div className="flex-1 pr-4">
-                      <div className="flex items-center mb-1">
-                        <h3 className="font-semibold text-sm">Labor Cost</h3>
-                      </div>
-
-                      {activeLaborScopeId === scope.id ? (
-                        <div className="mt-1">
-                          <div className="flex flex-wrap items-center gap-2 md:gap-3">
-                            <span className="text-[11px] font-medium">Method:</span>
-                            <div className="inline-flex rounded-md border border-green-600 bg-muted p-0.5">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant={
-                                  laborForm.calculation_method === "percentage" ? "default" : "ghost"
-                                }
-                                className={
-                                  laborForm.calculation_method === "percentage"
-                                    ? "bg-green-600 text-white hover:bg-green-700 h-6 text-xs"
-                                    : "text-green-700 hover:bg-transparent h-6 text-xs"
-                                }
-                                onClick={() =>
-                                  setLaborForm((prev) => ({
-                                    ...prev,
-                                    calculation_method: "percentage"
-                                  }))
-                                }
-                              >
-                                %
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant={
-                                  laborForm.calculation_method === "unit_cost" ? "default" : "ghost"
-                                }
-                                className={
-                                  laborForm.calculation_method === "unit_cost"
-                                    ? "bg-green-600 text-white hover:bg-green-700 h-6 text-xs"
-                                    : "text-green-700 hover:bg-transparent h-6 text-xs"
-                                }
-                                onClick={() =>
-                                  setLaborForm((prev) => ({
-                                    ...prev,
-                                    calculation_method: "unit_cost"
-                                  }))
-                                }
-                              >
-                                Unit
-                              </Button>
-                            </div>
-
-                            {laborForm.calculation_method === "percentage" ? (
-                              <>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  value={laborForm.percentage}
-                                  onChange={(e) =>
-                                    setLaborForm({ ...laborForm, percentage: e.target.value })
-                                  }
-                                  placeholder="%"
-                                  className="h-7 w-16 text-xs"
-                                />
-                              </>
-                            ) : (
-                              <>
-                                <Input
-                                  type="text"
-                                  value={laborForm.hours}
-                                  onChange={(e) =>
-                                    setLaborForm({ ...laborForm, hours: e.target.value.replace(/[^0-9.,]/g, '') })
-                                  }
-                                  onBlur={(e) => {
-                                    const val = e.target.value;
-                                    if (val) {
-                                      const num = parseFloat(val.replace(/,/g, ""));
-                                      if (!isNaN(num)) {
-                                        setLaborForm({ ...laborForm, hours: num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
-                                      }
-                                    }
-                                  }}
-                                  placeholder="Qty"
-                                  className="h-7 w-24 text-xs"
-                                />
-                                <Select
-                                  value={laborForm.unit_selection}
-                                  onValueChange={(value) =>
-                                    setLaborForm({
-                                      ...laborForm,
-                                      unit: value === "Other" ? "" : value,
-                                      unit_selection: value
-                                    })
-                                  }
-                                >
-                                  <SelectTrigger className="h-7 w-20 text-xs">
-                                    <SelectValue placeholder="Unit" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {["Cu.m", "Sq.m", "Lin.m", "Kg", "lot", "Other"].map((unitOption) => (
-                                      <SelectItem key={unitOption} value={unitOption} className="text-xs">
-                                        {unitOption === "Other" ? "Other" : unitOption}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                {laborForm.unit_selection === "Other" && (
-                                  <Input
-                                    placeholder="Unit"
-                                    value={laborForm.unit}
-                                    onChange={(e) =>
-                                      setLaborForm({
-                                        ...laborForm,
-                                        unit: e.target.value
-                                      })
-                                    }
-                                    className="h-7 w-20 text-xs"
-                                  />
-                                )}
-                                <Input
-                                  type="text"
-                                  value={laborForm.rate}
-                                  onChange={(e) =>
-                                    setLaborForm({ ...laborForm, rate: e.target.value.replace(/[^0-9.,]/g, '') })
-                                  }
-                                  onBlur={(e) => {
-                                    const val = e.target.value;
-                                    if (val) {
-                                      const num = parseFloat(val.replace(/,/g, ""));
-                                      if (!isNaN(num)) {
-                                        setLaborForm({ ...laborForm, rate: num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
-                                      }
-                                    }
-                                  }}
-                                  placeholder="$/u"
-                                  className="h-7 w-32 text-xs"
-                                />
-                              </>
-                            )}
-
-                            <div className="flex items-center gap-1">
-                              <Button
-                                size="sm"
-                                className="bg-green-600 hover:bg-green-700 text-white h-7 px-2 text-xs"
-                                onClick={() => void handleLaborSubmit(scope.id as string)}
-                              >
-                                Save
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 px-2 text-xs"
-                                onClick={() => {
-                                  setActiveLaborScopeId(null);
-                                  resetLaborForm();
-                                }}
-                              >
-                                Cancel
-                              </Button>
-                            </div>
+                      <div className="flex justify-between items-start pt-2 border-t mt-2">
+                        <div className="flex-1 pr-4">
+                          <div className="flex items-center mb-1">
+                            <h3 className="font-semibold text-sm">Labor Cost</h3>
                           </div>
-                        </div>
-                      ) : (
-                        <div className="mt-1">
-                          {scope.bom_labor && scope.bom_labor.length > 0 ? (
-                            <div className="flex flex-wrap items-center gap-2 md:gap-3 text-muted-foreground">
-                              {(() => {
-                                const laborEntry = scope.bom_labor[0] as Labor;
-                                const desc = laborEntry.description || "";
-                                const percentageMatch = desc.match(/(\d+(\.\d+)?)\s*%/);
-                                const isPercentage = !!percentageMatch;
 
-                                if (isPercentage) {
-                                  return (
-                                    <>
-                                      <span className="text-[11px] font-semibold text-green-700">
-                                        {percentageMatch[1]}% of Materials
-                                      </span>
-                                    </>
-                                  );
-                                } else {
-                                  return (
-                                    <>
-                                      <span className="text-[11px] font-semibold text-green-700">
-                                        {formatNumber(laborEntry.hours as number || 0)} {desc || "Units"} × {formatCurrency(laborEntry.hourly_rate as number || 0)}
-                                      </span>
-                                    </>
-                                  );
-                                }
-                              })()}
+                          {activeLaborScopeId === scope.id ? (
+                            <div className="mt-1">
+                              <div className="flex flex-wrap items-center gap-2 md:gap-3">
+                                <span className="text-[11px] font-medium">Method:</span>
+                                <div className="inline-flex rounded-md border border-green-600 bg-muted p-0.5">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={
+                                      laborForm.calculation_method === "percentage" ? "default" : "ghost"
+                                    }
+                                    className={
+                                      laborForm.calculation_method === "percentage"
+                                        ? "bg-green-600 text-white hover:bg-green-700 h-6 text-xs"
+                                        : "text-green-700 hover:bg-transparent h-6 text-xs"
+                                    }
+                                    onClick={() =>
+                                      setLaborForm((prev) => ({
+                                        ...prev,
+                                        calculation_method: "percentage"
+                                      }))
+                                    }
+                                  >
+                                    %
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={
+                                      laborForm.calculation_method === "unit_cost" ? "default" : "ghost"
+                                    }
+                                    className={
+                                      laborForm.calculation_method === "unit_cost"
+                                        ? "bg-green-600 text-white hover:bg-green-700 h-6 text-xs"
+                                        : "text-green-700 hover:bg-transparent h-6 text-xs"
+                                    }
+                                    onClick={() =>
+                                      setLaborForm((prev) => ({
+                                        ...prev,
+                                        calculation_method: "unit_cost"
+                                      }))
+                                    }
+                                  >
+                                    Unit
+                                  </Button>
+                                </div>
+
+                                {laborForm.calculation_method === "percentage" ? (
+                                  <>
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      value={laborForm.percentage}
+                                      onChange={(e) =>
+                                        setLaborForm({ ...laborForm, percentage: e.target.value })
+                                      }
+                                      placeholder="%"
+                                      className="h-7 w-16 text-xs"
+                                    />
+                                  </>
+                                ) : (
+                                  <>
+                                    <Input
+                                      type="text"
+                                      value={laborForm.hours}
+                                      onChange={(e) =>
+                                        setLaborForm({ ...laborForm, hours: e.target.value.replace(/[^0-9.,]/g, '') })
+                                      }
+                                      onBlur={(e) => {
+                                        const val = e.target.value;
+                                        if (val) {
+                                          const num = parseFloat(val.replace(/,/g, ""));
+                                          if (!isNaN(num)) {
+                                            setLaborForm({ ...laborForm, hours: num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
+                                          }
+                                        }
+                                      }}
+                                      placeholder="Qty"
+                                      className="h-7 w-24 text-xs"
+                                    />
+                                    <Select
+                                      value={laborForm.unit_selection}
+                                      onValueChange={(value) =>
+                                        setLaborForm({
+                                          ...laborForm,
+                                          unit: value === "Other" ? "" : value,
+                                          unit_selection: value
+                                        })
+                                      }
+                                    >
+                                      <SelectTrigger className="h-7 w-20 text-xs">
+                                        <SelectValue placeholder="Unit" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {["Cu.m", "Sq.m", "Lin.m", "Kg", "lot", "Other"].map((unitOption) => (
+                                          <SelectItem key={unitOption} value={unitOption} className="text-xs">
+                                            {unitOption === "Other" ? "Other" : unitOption}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    {laborForm.unit_selection === "Other" && (
+                                      <Input
+                                        placeholder="Unit"
+                                        value={laborForm.unit}
+                                        onChange={(e) =>
+                                          setLaborForm({
+                                            ...laborForm,
+                                            unit: e.target.value
+                                          })
+                                        }
+                                        className="h-7 w-20 text-xs"
+                                      />
+                                    )}
+                                    <Input
+                                      type="text"
+                                      value={laborForm.rate}
+                                      onChange={(e) =>
+                                        setLaborForm({ ...laborForm, rate: e.target.value.replace(/[^0-9.,]/g, '') })
+                                      }
+                                      onBlur={(e) => {
+                                        const val = e.target.value;
+                                        if (val) {
+                                          const num = parseFloat(val.replace(/,/g, ""));
+                                          if (!isNaN(num)) {
+                                            setLaborForm({ ...laborForm, rate: num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
+                                          }
+                                        }
+                                      }}
+                                      placeholder="$/u"
+                                      className="h-7 w-32 text-xs"
+                                    />
+                                  </>
+                                )}
+
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    size="sm"
+                                    className="bg-green-600 hover:bg-green-700 text-white h-7 px-2 text-xs"
+                                    onClick={() => void handleLaborSubmit(scope.id as string)}
+                                  >
+                                    Save
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 px-2 text-xs"
+                                    onClick={() => {
+                                      setActiveLaborScopeId(null);
+                                      resetLaborForm();
+                                    }}
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </div>
                             </div>
                           ) : (
-                            <div className="text-[11px] text-muted-foreground italic">
-                              No labor added yet.
+                            <div className="mt-1">
+                              {scope.bom_labor && scope.bom_labor.length > 0 ? (
+                                <div className="flex flex-wrap items-center gap-2 md:gap-3 text-muted-foreground">
+                                  {(() => {
+                                    const laborEntry = scope.bom_labor[0] as Labor;
+                                    const desc = laborEntry.description || "";
+                                    const percentageMatch = desc.match(/(\d+(\.\d+)?)\s*%/);
+                                    const isPercentage = !!percentageMatch;
+
+                                    if (isPercentage) {
+                                      return (
+                                        <>
+                                          <span className="text-[11px] font-semibold text-green-700">
+                                            {percentageMatch[1]}% of Materials
+                                          </span>
+                                        </>
+                                      );
+                                    } else {
+                                      return (
+                                        <>
+                                          <span className="text-[11px] font-semibold text-green-700">
+                                            {formatNumber(laborEntry.hours as number || 0)} {desc || "Units"} × {formatCurrency(laborEntry.hourly_rate as number || 0)}
+                                          </span>
+                                        </>
+                                      );
+                                    }
+                                  })()}
+                                </div>
+                              ) : (
+                                <div className="text-[11px] text-muted-foreground italic">
+                                  No labor added yet.
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
-                      )}
-                    </div>
 
-                    <div className="text-right text-sm space-y-1 bg-muted/30 p-2 rounded-md min-w-[200px]">
-                      <div className="flex justify-between items-center text-muted-foreground">
-                        <span>Materials:</span>
-                        <span className="font-semibold text-foreground">
-                          {formatCurrency(calculateScopeMaterialTotal(scope))}
-                        </span>
+                        <div className="text-right text-sm space-y-1 bg-muted/30 p-2 rounded-md min-w-[200px]">
+                          <div className="flex justify-between items-center text-muted-foreground">
+                            <span>Materials:</span>
+                            <span className="font-semibold text-foreground">
+                              {formatCurrency(calculateScopeMaterialTotal(scope))}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center text-muted-foreground">
+                            <span>Labor:</span>
+                            <span className="font-semibold text-foreground">
+                              {formatCurrency(calculateScopeLaborTotal(scope))}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center pt-1 mt-1 border-t border-border/50">
+                            <span className="font-semibold text-primary">Subtotal:</span>
+                            <span className="font-bold text-primary">
+                              {formatCurrency(calculateScopeDirectCost(scope))}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex justify-between items-center text-muted-foreground">
-                        <span>Labor:</span>
-                        <span className="font-semibold text-foreground">
-                          {formatCurrency(calculateScopeLaborTotal(scope))}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center pt-1 mt-1 border-t border-border/50">
-                        <span className="font-semibold text-primary">Subtotal:</span>
-                        <span className="font-bold text-primary">
-                          {formatCurrency(calculateScopeDirectCost(scope))}
-                        </span>
-                      </div>
+                    </CardContent>
+                  )}
+                </Card>
+              );
+            })}
+
+            {scopes.length > 0 &&
+            <Card className="bg-primary/5">
+                <CardContent className="pt-4">
+                  <div className="flex justify-between items-center">
+                    <h2 className="text-2xl font-bold">Total Direct Cost</h2>
+                    <div className="text-3xl font-bold text-primary">
+                      {formatCurrency(calculateTotalDirectCost())}
                     </div>
                   </div>
                 </CardContent>
-              )}
-            </Card>
-          );
-        })}
+              </Card>
+            }
 
-        {scopes.length > 0 &&
-        <Card className="bg-primary/5">
-            <CardContent className="pt-4">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold">Total Direct Cost</h2>
-                <div className="text-3xl font-bold text-primary">
-                  {formatCurrency(calculateTotalDirectCost())}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        }
+            {scopes.length > 0 && (
+              <Card className="mt-4">
+                <CardHeader className={indirectCollapsed ? "py-2 px-4 flex flex-row items-center justify-between space-y-0" : "pt-6 px-6 pb-3 flex flex-row items-center justify-between space-y-0"}>
+                  <CardTitle className="text-xl mt-0">Indirect Costs</CardTitle>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2 text-xs"
+                    onClick={() => setIndirectCollapsed(!indirectCollapsed)}
+                  >
+                    {indirectCollapsed ? "Show content" : "Hide content"}
+                  </Button>
+                </CardHeader>
+                {!indirectCollapsed && (
+                <CardContent className="space-y-4">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="h-8">
+                        <TableHead className="h-8 py-1 w-32">Type</TableHead>
+                        <TableHead className="text-right h-8 py-1 w-32">Value</TableHead>
+                        <TableHead className="text-right h-8 py-1 w-32">Amount</TableHead>
+                        <TableHead className="text-right h-8 py-1 w-24"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {indirectCostsList.map((cost) => (
+                        <TableRow key={cost.id} className="h-8">
+                          <TableCell className="py-1 font-medium text-sm">{cost.type}</TableCell>
+                          <TableCell className="text-right py-1 text-sm">
+                            {cost.type !== 'Others' ? `${cost.value}%` : formatCurrency(parseFloat(cost.value.replace(/,/g, "") || "0"))}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold py-1 text-sm text-muted-foreground">
+                            {formatCurrency(
+                              ['VAT', 'OCM', 'Profit', 'Tax'].includes(cost.type)
+                              ? calculateTotalDirectCost() * (parseFloat(cost.value.replace(/,/g, "") || "0") / 100)
+                              : parseFloat(cost.value.replace(/,/g, "") || "0")
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right py-1">
+                            <div className="flex justify-end gap-1">
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-green-600 hover:text-green-700" onClick={() => handleEditIndirect(cost)}>
+                                <Pencil className="w-3 h-3" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-red-600 hover:text-red-700" onClick={() => void handleDeleteIndirect(cost.id)}>
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
 
-        {scopes.length > 0 && (
-          <Card className="mt-4">
-            <CardHeader className={indirectCollapsed ? "py-2 px-4 flex flex-row items-center justify-between space-y-0" : "pt-6 px-6 pb-3 flex flex-row items-center justify-between space-y-0"}>
-              <CardTitle className="text-xl mt-0">Indirect Costs</CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 px-2 text-xs"
-                onClick={() => setIndirectCollapsed(!indirectCollapsed)}
-              >
-                {indirectCollapsed ? "Show content" : "Hide content"}
-              </Button>
-            </CardHeader>
-            {!indirectCollapsed && (
-            <CardContent className="space-y-4">
-              <Table>
-                <TableHeader>
-                  <TableRow className="h-8">
-                    <TableHead className="h-8 py-1 w-32">Type</TableHead>
-                    <TableHead className="text-right h-8 py-1 w-32">Value</TableHead>
-                    <TableHead className="text-right h-8 py-1 w-32">Amount</TableHead>
-                    <TableHead className="text-right h-8 py-1 w-24"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {indirectCostsList.map((cost) => (
-                    <TableRow key={cost.id} className="h-8">
-                      <TableCell className="py-1 font-medium text-sm">{cost.type}</TableCell>
-                      <TableCell className="text-right py-1 text-sm">
-                        {cost.type !== 'Others' ? `${cost.value}%` : formatCurrency(parseFloat(cost.value.replace(/,/g, "") || "0"))}
-                      </TableCell>
-                      <TableCell className="text-right font-semibold py-1 text-sm text-muted-foreground">
-                        {formatCurrency(
-                          ['VAT', 'OCM', 'Profit', 'Tax'].includes(cost.type)
-                          ? calculateTotalDirectCost() * (parseFloat(cost.value.replace(/,/g, "") || "0") / 100)
-                          : parseFloat(cost.value.replace(/,/g, "") || "0")
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right py-1">
-                        <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-green-600 hover:text-green-700" onClick={() => handleEditIndirect(cost)}>
-                            <Pencil className="w-3 h-3" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-red-600 hover:text-red-700" onClick={() => void handleDeleteIndirect(cost.id)}>
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                      <TableRow className="h-8 bg-muted/20">
+                        <TableCell className="py-1">
+                          <Select value={indirectRowForm.type} onValueChange={(val) => setIndirectRowForm({...indirectRowForm, type: val, description: val !== 'Others' ? '' : indirectRowForm.description})}>
+                            <SelectTrigger className="h-7 text-xs"><SelectValue/></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="VAT">VAT</SelectItem>
+                              <SelectItem value="Tax">Tax</SelectItem>
+                              <SelectItem value="OCM">OCM</SelectItem>
+                              <SelectItem value="Profit">Profit</SelectItem>
+                              <SelectItem value="Others">Others/Input</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell className="py-1 text-right">
+                          <Input 
+                            className="h-7 text-xs text-right w-full"
+                            placeholder={indirectRowForm.type !== 'Others' ? '%' : 'Amount'}
+                            value={indirectRowForm.value}
+                            onChange={e => setIndirectRowForm({...indirectRowForm, value: e.target.value.replace(/[^0-9.,]/g, '')})}
+                            onBlur={e => {
+                                const val = e.target.value;
+                                if (val) {
+                                  const num = parseFloat(val.replace(/,/g, ""));
+                                  if (!isNaN(num)) {
+                                    setIndirectRowForm({ ...indirectRowForm, value: num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
+                                  }
+                                }
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell className="text-right font-semibold py-1 text-sm text-muted-foreground">
+                            {formatCurrency(
+                              ['VAT', 'OCM', 'Profit', 'Tax'].includes(indirectRowForm.type)
+                              ? calculateTotalDirectCost() * (parseFloat(indirectRowForm.value.replace(/,/g, "") || "0") / 100)
+                              : parseFloat(indirectRowForm.value.replace(/,/g, "") || "0")
+                            )}
+                        </TableCell>
+                        <TableCell className="text-right py-1">
+                          <div className="flex justify-end gap-1">
+                            <Button size="sm" className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={() => void handleAddOrUpdateIndirect()}>
+                                {indirectRowForm.id ? 'Update' : 'Add'}
+                            </Button>
+                            {indirectRowForm.id && (
+                                <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-red-600 text-red-700 hover:bg-red-50" onClick={() => setIndirectRowForm({id: '', type: 'VAT', description: '', value: ''})}>Cancel</Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
 
-                  <TableRow className="h-8 bg-muted/20">
-                    <TableCell className="py-1">
-                      <Select value={indirectRowForm.type} onValueChange={(val) => setIndirectRowForm({...indirectRowForm, type: val, description: val !== 'Others' ? '' : indirectRowForm.description})}>
-                        <SelectTrigger className="h-7 text-xs"><SelectValue/></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="VAT">VAT</SelectItem>
-                          <SelectItem value="Tax">Tax</SelectItem>
-                          <SelectItem value="OCM">OCM</SelectItem>
-                          <SelectItem value="Profit">Profit</SelectItem>
-                          <SelectItem value="Others">Others/Input</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell className="py-1 text-right">
-                      <Input 
-                        className="h-7 text-xs text-right w-full"
-                        placeholder={indirectRowForm.type !== 'Others' ? '%' : 'Amount'}
-                        value={indirectRowForm.value}
-                        onChange={e => setIndirectRowForm({...indirectRowForm, value: e.target.value.replace(/[^0-9.,]/g, '')})}
-                        onBlur={e => {
-                            const val = e.target.value;
-                            if (val) {
-                              const num = parseFloat(val.replace(/,/g, ""));
-                              if (!isNaN(num)) {
-                                setIndirectRowForm({ ...indirectRowForm, value: num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
-                              }
-                            }
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell className="text-right font-semibold py-1 text-sm text-muted-foreground">
-                        {formatCurrency(
-                          ['VAT', 'OCM', 'Profit', 'Tax'].includes(indirectRowForm.type)
-                          ? calculateTotalDirectCost() * (parseFloat(indirectRowForm.value.replace(/,/g, "") || "0") / 100)
-                          : parseFloat(indirectRowForm.value.replace(/,/g, "") || "0")
-                        )}
-                    </TableCell>
-                    <TableCell className="text-right py-1">
-                      <div className="flex justify-end gap-1">
-                        <Button size="sm" className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={() => void handleAddOrUpdateIndirect()}>
-                            {indirectRowForm.id ? 'Update' : 'Add'}
-                        </Button>
-                        {indirectRowForm.id && (
-                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-red-600 text-red-700 hover:bg-red-50" onClick={() => setIndirectRowForm({id: '', type: 'VAT', description: '', value: ''})}>Cancel</Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-
-              <div className="pt-4 border-t">
-                <div className="flex justify-between items-center mb-4">
-                  <span className="text-lg font-semibold">Total Indirect Cost:</span>
-                  <span className="text-2xl font-bold">
-                    {formatCurrency(calculateIndirectCost())}
-                  </span>
-                </div>
-              </div>
-            </CardContent>
+                  <div className="pt-4 border-t">
+                    <div className="flex justify-between items-center mb-4">
+                      <span className="text-lg font-semibold">Total Indirect Cost:</span>
+                      <span className="text-2xl font-bold">
+                        {formatCurrency(calculateIndirectCost())}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+                )}
+              </Card>
             )}
-          </Card>
+          </>
         )}
 
         {scopes.length > 0 && (
