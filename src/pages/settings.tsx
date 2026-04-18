@@ -68,6 +68,7 @@ export default function Settings() {
 
   const [isGM, setIsGM] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>("appearance");
+  const [activeAddOns, setActiveAddOns] = useState<Record<string, number>>({});
 
   useEffect(() => {
     setLocalCompany(company);
@@ -87,6 +88,14 @@ export default function Settings() {
       }
     };
     checkGM();
+
+    // Load purchased add-ons from subscription
+    const savedAddOns = localStorage.getItem('app_subscription_features');
+    if (savedAddOns) {
+      try {
+        setActiveAddOns(JSON.parse(savedAddOns));
+      } catch(e) {}
+    }
   }, [company, companyId]);
 
   const loadProjects = async () => {
@@ -103,9 +112,19 @@ export default function Settings() {
     setTeamUsers(usrData || []);
   };
 
-  const planLimits: Record<string, number> = currentPlan === 'starter' 
+  // Base limits based purely on the plan type
+  const basePlanLimits: Record<string, number> = currentPlan === 'starter' 
     ? { 'Site Personnel': 1, 'Accounting': 1, 'Purchasing': 0, 'Human Resources': 0, 'Warehouse': 0 }
     : { 'Site Personnel': 3, 'Accounting': 1, 'Purchasing': 1, 'Human Resources': 1, 'Warehouse': 1 };
+
+  // Calculate true limits: Base Plan + Purchased Add-ons
+  const planLimits: Record<string, number> = {
+    'Site Personnel': basePlanLimits['Site Personnel'] + (activeAddOns['extra_site'] || 0),
+    'Accounting': basePlanLimits['Accounting'] + (activeAddOns['extra_acc'] || 0),
+    'Purchasing': basePlanLimits['Purchasing'] + (activeAddOns['purchasing'] || 0),
+    'Human Resources': basePlanLimits['Human Resources'], // Add-on not configured in billing yet
+    'Warehouse': basePlanLimits['Warehouse'] // Add-on not configured in billing yet
+  };
 
   const getUsageCount = (mod: string) => {
     const activeInvites = invites.filter(i => (i.modules && i.modules.includes(mod)) || i.module === mod).length;

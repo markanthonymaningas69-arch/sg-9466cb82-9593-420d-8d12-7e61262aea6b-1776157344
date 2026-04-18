@@ -48,6 +48,8 @@ export const plans: PlanConfig[] = [
       "1 Project Profile User Account",
       "3 Site Personnel User Account (can handle 6 Projects)",
       "1 Accounting User Account",
+      "1 Human Resources User Account",
+      "1 Warehouse User Account",
       "Support Feature Updates",
       "Add-ons Capabilities (2 Site Personnel, 2 Accounting, 5 Purchasing)"
     ],
