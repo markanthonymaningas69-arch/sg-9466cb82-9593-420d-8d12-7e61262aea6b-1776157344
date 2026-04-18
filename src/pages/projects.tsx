@@ -498,10 +498,10 @@ export default function Projects() {
 
           <Tabs defaultValue="items" className="w-full mt-4">
             <TabsList className="shrink-0 flex flex-wrap w-full gap-1 h-auto bg-transparent p-0 pb-4">
-              <TabsTrigger value="items" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-blue-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-blue-700 bg-blue-50 text-blue-700 hover:bg-blue-100">
+              <TabsTrigger value="items" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border border-transparent bg-muted/50 text-muted-foreground hover:bg-muted">
                 <Database className="h-3 w-3 mr-1.5 hidden sm:inline" /> Materials & Tools
               </TabsTrigger>
-              <TabsTrigger value="scopes" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-indigo-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-indigo-700 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
+              <TabsTrigger value="scopes" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border border-transparent bg-muted/50 text-muted-foreground hover:bg-muted">
                 <FileText className="h-3 w-3 mr-1.5 hidden sm:inline" /> Scopes of Work
               </TabsTrigger>
             </TabsList>
@@ -669,7 +669,7 @@ export default function Projects() {
                 >
                   <option value="" disabled hidden>Select Category...</option>
                   {STANDARD_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  <option value="others" className="text-blue-600 font-semibold bg-blue-50">Others (Type custom...)</option>
+                  <option value="others" className="text-primary font-semibold bg-primary/10">Others (Type custom...)</option>
                 </select>
               ) : (
                 <div className="flex gap-2">
@@ -703,7 +703,7 @@ export default function Projects() {
                 >
                   <option value="" disabled hidden>Select Unit...</option>
                   {STANDARD_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                  <option value="others" className="text-blue-600 font-semibold bg-blue-50">Others (Type custom...)</option>
+                  <option value="others" className="text-primary font-semibold bg-primary/10">Others (Type custom...)</option>
                 </select>
               ) : (
                 <div className="flex gap-2">
@@ -731,17 +731,17 @@ export default function Projects() {
                   <option value="" disabled hidden>Select a scope...</option>
                   {masterScopes.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
                 </select>
-                <Button type="button" onClick={handleAddScopeToItem} variant="secondary" className="px-3 shrink-0 bg-blue-100 hover:bg-blue-200 text-blue-700">
+                <Button type="button" onClick={handleAddScopeToItem} variant="secondary" className="px-3 shrink-0 bg-primary/10 hover:bg-primary/20 text-primary">
                   <Plus className="h-4 w-4" /> Add
                 </Button>
               </div>
               
               {masterForm.associated_scopes.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-3 p-3 bg-slate-50 border rounded-md min-h-[40px]">
+                <div className="flex flex-wrap gap-2 mt-3 p-3 bg-muted/50 border rounded-md min-h-[40px]">
                   {masterForm.associated_scopes.map(scope => (
-                    <Badge key={scope} variant="secondary" className="flex items-center gap-1 bg-white border shadow-sm px-2 py-1">
+                    <Badge key={scope} variant="secondary" className="flex items-center gap-1 bg-background border shadow-sm px-2 py-1">
                       {scope}
-                      <X className="h-3 w-3 ml-1 cursor-pointer text-slate-400 hover:text-red-500 transition-colors" onClick={() => handleRemoveScopeFromItem(scope)} />
+                      <X className="h-3 w-3 ml-1 cursor-pointer text-muted-foreground hover:text-destructive transition-colors" onClick={() => handleRemoveScopeFromItem(scope)} />
                     </Badge>
                   ))}
                 </div>

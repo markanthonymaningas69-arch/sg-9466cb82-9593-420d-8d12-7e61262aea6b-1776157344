@@ -525,7 +525,7 @@ export default function Warehouse() {
             <div className="space-y-1">
               <Label className="text-xs">Filter by Category:</Label>
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-[200px] h-9 bg-white dark:bg-background">
+                <SelectTrigger className="w-[200px] h-9 bg-background">
                   <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
@@ -539,7 +539,7 @@ export default function Warehouse() {
               <div className="space-y-1">
                 <Label className="text-xs">Filter by Project:</Label>
                 <Select value={projectFilter} onValueChange={setProjectFilter}>
-                  <SelectTrigger className="w-[200px] h-9 bg-white dark:bg-background">
+                  <SelectTrigger className="w-[200px] h-9 bg-background">
                     <SelectValue placeholder="All Projects" />
                   </SelectTrigger>
                   <SelectContent>
@@ -554,7 +554,7 @@ export default function Warehouse() {
               <div className="space-y-1">
                 <Label className="text-xs">Filter by Project:</Label>
                 <Select value={projectFilter} onValueChange={setProjectFilter}>
-                  <SelectTrigger className="w-[200px] h-9 bg-white dark:bg-background">
+                  <SelectTrigger className="w-[200px] h-9 bg-background">
                     <SelectValue placeholder="All Projects" />
                   </SelectTrigger>
                   <SelectContent>
@@ -570,7 +570,7 @@ export default function Warehouse() {
                 <Label className="text-xs">Filter by Date:</Label>
                 <Input 
                   type="date" 
-                  className="w-[200px] h-9 bg-white dark:bg-background" 
+                  className="w-[200px] h-9 bg-background" 
                   value={dateFilter} 
                   onChange={(e) => setDateFilter(e.target.value)} 
                 />
@@ -585,10 +585,10 @@ export default function Warehouse() {
           </div>
 
           <TabsContent value="main" className="flex-1 mt-4 data-[state=active]:flex flex-col min-h-0">
-            <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none">
-              <div className="overflow-y-auto rounded-md border h-full relative">
+            <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none bg-background">
+              <div className="overflow-y-auto rounded-md border h-full relative bg-background">
                 <Table>
-                  <TableHeader className="sticky top-0 bg-background z-10">
+                  <TableHeader className="sticky top-0 bg-muted z-10">
                     <TableRow>
                       <TableHead>Date</TableHead>
                       <TableHead>Item Name</TableHead>
@@ -656,17 +656,17 @@ export default function Warehouse() {
           </TabsContent>
 
           <TabsContent value="project" className="flex-1 mt-4 data-[state=active]:flex flex-col min-h-0">
-            <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none">
-              <div className="overflow-y-auto rounded-md border h-full relative bg-white">
+            <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none bg-background">
+              <div className="overflow-y-auto rounded-md border h-full relative bg-background">
                 <Table>
-                  <TableHeader className="sticky top-0 bg-gray-100 z-10 border-b">
+                  <TableHeader className="sticky top-0 bg-muted z-10 border-b">
                     <TableRow>
-                      <TableHead className="font-bold text-black">Item Name</TableHead>
-                      <TableHead className="font-bold text-black">Category</TableHead>
-                      <TableHead className="font-bold text-black">Project</TableHead>
-                      <TableHead className="text-right font-bold text-blue-700 bg-blue-50 border-l">Total Received</TableHead>
-                      <TableHead className="text-right font-bold text-orange-700 bg-orange-50">Total Consumed</TableHead>
-                      <TableHead className="text-right font-bold text-green-700 bg-green-50 border-r">Current Balance</TableHead>
+                      <TableHead className="font-bold text-foreground">Item Name</TableHead>
+                      <TableHead className="font-bold text-foreground">Category</TableHead>
+                      <TableHead className="font-bold text-foreground">Project</TableHead>
+                      <TableHead className="text-right font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 border-l">Total Received</TableHead>
+                      <TableHead className="text-right font-bold text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30">Total Consumed</TableHead>
+                      <TableHead className="text-right font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30 border-r">Current Balance</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -734,12 +734,12 @@ export default function Warehouse() {
 
                       return siteInventory.map((item: any, idx) => (
                         <TableRow key={idx} className="hover:bg-muted/50">
-                          <TableCell className="font-medium text-black">{item.name}</TableCell>
+                          <TableCell className="font-medium text-foreground">{item.name}</TableCell>
                           <TableCell><Badge variant="outline" className="text-xs">{item.category}</Badge></TableCell>
-                          <TableCell><Badge variant="secondary" className="font-semibold text-blue-700 bg-blue-50 border-blue-200">{item.project_name}</Badge></TableCell>
-                          <TableCell className="text-right font-semibold text-blue-700 bg-blue-50/30 border-l">{item.received} <span className="text-xs text-blue-400 font-normal">{item.unit}</span></TableCell>
-                          <TableCell className="text-right font-semibold text-orange-700 bg-orange-50/30">{item.consumed} <span className="text-xs text-orange-400 font-normal">{item.unit}</span></TableCell>
-                          <TableCell className={`text-right font-bold text-lg border-r ${item.balance < 0 ? 'text-red-600 bg-red-50/30' : 'text-green-700 bg-green-50/30'}`}>{item.balance} <span className={`text-xs font-normal ${item.balance < 0 ? 'text-red-400' : 'text-green-500'}`}>{item.unit}</span></TableCell>
+                          <TableCell><Badge variant="secondary" className="font-semibold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900">{item.project_name}</Badge></TableCell>
+                          <TableCell className="text-right font-semibold text-blue-700 dark:text-blue-400 bg-blue-50/30 dark:bg-blue-950/20 border-l">{item.received} <span className="text-xs text-blue-400 dark:text-blue-500 font-normal">{item.unit}</span></TableCell>
+                          <TableCell className="text-right font-semibold text-orange-700 dark:text-orange-400 bg-orange-50/30 dark:bg-orange-950/20">{item.consumed} <span className="text-xs text-orange-400 dark:text-orange-500 font-normal">{item.unit}</span></TableCell>
+                          <TableCell className={`text-right font-bold text-lg border-r ${item.balance < 0 ? 'text-red-600 dark:text-red-400 bg-red-50/30 dark:bg-red-950/20' : 'text-green-700 dark:text-green-400 bg-green-50/30 dark:bg-green-950/20'}`}>{item.balance} <span className={`text-xs font-normal ${item.balance < 0 ? 'text-red-400 dark:text-red-500' : 'text-green-500 dark:text-green-400'}`}>{item.unit}</span></TableCell>
                         </TableRow>
                       ));
                     })()}
@@ -750,10 +750,10 @@ export default function Warehouse() {
           </TabsContent>
 
           <TabsContent value="deployments" className="flex-1 mt-4 data-[state=active]:flex flex-col min-h-0">
-            <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none">
-              <div className="overflow-y-auto rounded-md border h-full relative bg-white">
+            <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none bg-background">
+              <div className="overflow-y-auto rounded-md border h-full relative bg-background">
                 <Table>
-                  <TableHeader className="sticky top-0 bg-gray-100 z-10 border-b">
+                  <TableHeader className="sticky top-0 bg-muted z-10 border-b">
                     <TableRow>
                       <TableHead>Date</TableHead>
                       <TableHead>Project</TableHead>
@@ -792,7 +792,7 @@ export default function Warehouse() {
                           <TableCell className="font-medium">{d.item_name}</TableCell>
                           <TableCell className="text-right font-semibold">{d.quantity} <span className="text-xs text-muted-foreground font-normal">{d.unit}</span></TableCell>
                           <TableCell>
-                            <Badge variant="outline" className={d.status === 'received' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-orange-50 text-orange-700 border-orange-200'}>
+                            <Badge variant="outline" className={d.status === 'received' ? 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900' : 'bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-900'}>
                               {d.status?.toUpperCase()}
                             </Badge>
                           </TableCell>
@@ -815,16 +815,16 @@ export default function Warehouse() {
           </TabsContent>
 
           <TabsContent value="balance" className="flex-1 mt-4 data-[state=active]:flex flex-col min-h-0">
-            <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none">
-              <div className="overflow-y-auto rounded-md border h-full relative bg-white">
+            <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none bg-background">
+              <div className="overflow-y-auto rounded-md border h-full relative bg-background">
                 <Table>
-                  <TableHeader className="sticky top-0 bg-gray-100 z-10 border-b">
+                  <TableHeader className="sticky top-0 bg-muted z-10 border-b">
                     <TableRow>
-                      <TableHead className="font-bold text-black">Item Name</TableHead>
-                      <TableHead className="font-bold text-black">Category</TableHead>
-                      <TableHead className="text-right font-bold text-black border-l bg-gray-50">Total Items (Restocked)</TableHead>
-                      <TableHead className="text-right font-bold text-blue-700 bg-blue-50">Total Deployed</TableHead>
-                      <TableHead className="text-right font-bold text-green-700 bg-green-50 border-r">Main Balance</TableHead>
+                      <TableHead className="font-bold text-foreground">Item Name</TableHead>
+                      <TableHead className="font-bold text-foreground">Category</TableHead>
+                      <TableHead className="text-right font-bold text-foreground border-l bg-muted/50">Total Items (Restocked)</TableHead>
+                      <TableHead className="text-right font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30">Total Deployed</TableHead>
+                      <TableHead className="text-right font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30 border-r">Main Balance</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -839,18 +839,18 @@ export default function Warehouse() {
                         const totalRestocked = item.mainQty + item.deployedQty;
                         return (
                           <TableRow key={idx} className="hover:bg-muted/50">
-                            <TableCell className="font-medium text-black">{item.name}</TableCell>
+                            <TableCell className="font-medium text-foreground">{item.name}</TableCell>
                             <TableCell>
                               <Badge variant="outline">{item.category}</Badge>
                             </TableCell>
-                            <TableCell className="text-right font-bold text-lg border-l bg-gray-50/50">
+                            <TableCell className="text-right font-bold text-lg border-l bg-muted/30">
                               {totalRestocked} <span className="text-xs text-muted-foreground font-normal">{item.unit}</span>
                             </TableCell>
-                            <TableCell className="text-right font-semibold text-blue-700 bg-blue-50/30">
-                              {item.deployedQty} <span className="text-xs text-blue-400 font-normal">{item.unit}</span>
+                            <TableCell className="text-right font-semibold text-blue-700 dark:text-blue-400 bg-blue-50/30 dark:bg-blue-950/20">
+                              {item.deployedQty} <span className="text-xs text-blue-400 dark:text-blue-500 font-normal">{item.unit}</span>
                             </TableCell>
-                            <TableCell className="text-right font-semibold text-green-700 bg-green-50/30 border-r">
-                              {item.mainQty} <span className="text-xs text-green-400 font-normal">{item.unit}</span>
+                            <TableCell className="text-right font-semibold text-green-700 dark:text-green-400 bg-green-50/30 dark:bg-green-950/20 border-r">
+                              {item.mainQty} <span className="text-xs text-green-400 dark:text-green-500 font-normal">{item.unit}</span>
                             </TableCell>
                           </TableRow>
                         );

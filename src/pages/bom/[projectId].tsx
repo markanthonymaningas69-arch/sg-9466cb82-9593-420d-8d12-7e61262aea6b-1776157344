@@ -863,15 +863,23 @@ export default function BillOfMaterials() {
                     className="flex-1" />
                 </div>
               </div>
-              <div className="flex justify-end mt-3">
+              <div className="flex justify-end mt-3 gap-2">
                 <Button
-                size="sm"
-                onClick={() => void handleSaveScopeInline()}
-                disabled={!newScopeName.trim()}
-                className="bg-green-600 hover:bg-green-700 text-white">
-                
+                  size="sm"
+                  onClick={() => void handleSaveScopeInline()}
+                  disabled={!newScopeName.trim()}
+                  className="bg-green-600 hover:bg-green-700 text-white">
+                  
                   <Plus className="h-4 w-4 mr-2" />
                   Add Scope of Work
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-red-600 dark:border-red-500 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
+                  onClick={handleCancelScopeInline}>
+                  
+                  Cancel
                 </Button>
               </div>
             </CardContent>
@@ -957,7 +965,7 @@ export default function BillOfMaterials() {
                     <Button
                   size="sm"
                   variant="outline"
-                  className="border-red-600 text-red-700 hover:bg-red-50"
+                  className="border-red-600 dark:border-red-500 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
                   onClick={handleCancelScopeInline}>
                   
                       Cancel
@@ -1001,7 +1009,7 @@ export default function BillOfMaterials() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="border-red-600 text-red-700 hover:bg-red-50"
+                              className="border-red-600 dark:border-red-500 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
                               onClick={handleCancelEditScope}
                             >
                               Cancel
@@ -1077,7 +1085,7 @@ export default function BillOfMaterials() {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="border-green-600 text-green-700 hover:bg-green-50 h-8 text-xs"
+                          className="border-green-600 dark:border-green-500 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/30 h-8 text-xs"
                           onClick={() => {
                             if (activeLaborScopeId === scope.id) {
                               setActiveLaborScopeId(null);
@@ -1343,7 +1351,7 @@ export default function BillOfMaterials() {
                               <Button
                           size="sm"
                           variant="outline"
-                          className="h-7 px-2 text-xs border-red-600 text-red-700 hover:bg-red-50"
+                          className="h-7 px-2 text-xs border-red-600 dark:border-red-500 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
                           onClick={() => {
                             resetMaterialForm();
                             setSelectedScopeId("");
@@ -1370,7 +1378,7 @@ export default function BillOfMaterials() {
                             <div className="mt-1">
                               <div className="flex flex-wrap items-center gap-2 md:gap-3">
                                 <span className="text-[11px] font-medium">Method:</span>
-                                <div className="inline-flex rounded-md border border-green-600 bg-muted p-0.5">
+                                <div className="inline-flex rounded-md border border-green-600 dark:border-green-500 bg-muted p-0.5">
                                   <Button
                                     type="button"
                                     size="sm"
@@ -1380,7 +1388,7 @@ export default function BillOfMaterials() {
                                     className={
                                       laborForm.calculation_method === "percentage"
                                         ? "bg-green-600 text-white hover:bg-green-700 h-6 text-xs"
-                                        : "text-green-700 hover:bg-transparent h-6 text-xs"
+                                        : "text-green-700 dark:text-green-400 hover:bg-transparent h-6 text-xs"
                                     }
                                     onClick={() =>
                                       setLaborForm((prev) => ({
@@ -1400,7 +1408,7 @@ export default function BillOfMaterials() {
                                     className={
                                       laborForm.calculation_method === "unit_cost"
                                         ? "bg-green-600 text-white hover:bg-green-700 h-6 text-xs"
-                                        : "text-green-700 hover:bg-transparent h-6 text-xs"
+                                        : "text-green-700 dark:text-green-400 hover:bg-transparent h-6 text-xs"
                                     }
                                     onClick={() =>
                                       setLaborForm((prev) => ({
@@ -1695,7 +1703,7 @@ export default function BillOfMaterials() {
                                 {indirectRowForm.id ? 'Update' : 'Add'}
                             </Button>
                             {indirectRowForm.id && (
-                                <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-red-600 text-red-700 hover:bg-red-50" onClick={() => setIndirectRowForm({id: '', type: 'VAT', description: '', value: ''})}>Cancel</Button>
+                                <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-red-600 dark:border-red-500 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30" onClick={() => setIndirectRowForm({id: '', type: 'VAT', description: '', value: ''})}>Cancel</Button>
                             )}
                           </div>
                         </TableCell>
