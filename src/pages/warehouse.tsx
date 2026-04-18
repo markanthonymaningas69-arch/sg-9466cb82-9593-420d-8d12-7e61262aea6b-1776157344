@@ -28,7 +28,26 @@ const STANDARD_CATEGORIES = [
   "PPE"
 ];
 
-const STANDARD_UNITS = ["pcs", "bags", "kgs", "liters", "units", "set", "lot", "m", "sq.m", "cu.m", "length", "box", "roll"];
+const STANDARD_UNITS = [
+  "Bag",
+  "Bd.ft",
+  "Box",
+  "Cu.m",
+  "Gal",
+  "Kg",
+  "Length",
+  "Lin.m",
+  "Liter",
+  "Lot",
+  "M",
+  "Pail",
+  "Pair",
+  "Pc",
+  "Roll",
+  "Set",
+  "Sq.m",
+  "Unit"
+];
 
 export default function Warehouse() {
   const { formatCurrency } = useSettings();

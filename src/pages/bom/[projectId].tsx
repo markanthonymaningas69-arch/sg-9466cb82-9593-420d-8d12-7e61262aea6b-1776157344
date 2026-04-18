@@ -552,7 +552,10 @@ export default function BillOfMaterials() {
     const selectedMaster = masterItems.find(m => m.name === materialName);
     
     if (selectedMaster) {
-      const knownUnits = ["Cu.m", "Sq.m", "Lin.m", "Pc", "Kg", "Box", "lot", "bags", "pails", "gal", "liters", "bd.ft", "sets", "pairs", "rolls", "Other"];
+      const knownUnits = [
+        "Bag", "Bd.ft", "Box", "Cu.m", "Gal", "Kg", "Length", "Lin.m", "Liter", 
+        "Lot", "M", "Pail", "Pair", "Pc", "Roll", "Set", "Sq.m", "Unit"
+      ];
       const unit = selectedMaster.unit || "";
       const isKnown = knownUnits.includes(unit);
 
@@ -637,7 +640,10 @@ export default function BillOfMaterials() {
 
   const handleEditMaterial = (material: Material) => {
     setSelectedScopeId(material.scope_id as string);
-    const knownUnits = ["Cu.m", "Sq.m", "Lin.m", "Pc", "Kg", "Box", "lot", "bags", "pails", "gal", "liters", "bd.ft", "sets", "pairs", "rolls", "Other"];
+    const knownUnits = [
+      "Bag", "Bd.ft", "Box", "Cu.m", "Gal", "Kg", "Length", "Lin.m", "Liter", 
+      "Lot", "M", "Pail", "Pair", "Pc", "Roll", "Set", "Sq.m", "Unit"
+    ];
     const unit = material.unit || "";
     const isKnown = knownUnits.includes(unit);
     
@@ -770,7 +776,7 @@ export default function BillOfMaterials() {
   };
 
   const handleEditLabor = (labor: Labor) => {
-    const knownUnits = ["Cu.m", "Sq.m", "Lin.m", "Kg", "lot"];
+    const knownUnits = ["Cu.m", "Kg", "Lin.m", "Lot", "Sq.m"];
     const desc = labor.description || "";
 
     const percentageMatch = desc.match(/(\d+(\.\d+)?)\s*%/);
@@ -1266,7 +1272,10 @@ export default function BillOfMaterials() {
                                   <SelectValue placeholder="Select unit" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {["Cu.m", "Sq.m", "Lin.m", "Pc", "Kg", "Box", "lot", "bags", "pails", "gal", "liters", "bd.ft", "sets", "pairs", "rolls", "Other"].map(
+                                  {[
+                                    "Bag", "Bd.ft", "Box", "Cu.m", "Gal", "Kg", "Length", "Lin.m", "Liter", 
+                                    "Lot", "M", "Pail", "Pair", "Pc", "Roll", "Set", "Sq.m", "Unit", "Other"
+                                  ].map(
                               (unitOption) =>
                               <SelectItem key={unitOption} value={unitOption} className="text-xs">
                                         {unitOption === "Other" ?
@@ -1451,7 +1460,7 @@ export default function BillOfMaterials() {
                                         <SelectValue placeholder="Unit" />
                                       </SelectTrigger>
                                       <SelectContent>
-                                        {["Cu.m", "Sq.m", "Lin.m", "Kg", "lot", "Other"].map((unitOption) => (
+                                        {["Cu.m", "Kg", "Lin.m", "Lot", "Sq.m", "Other"].map((unitOption) => (
                                           <SelectItem key={unitOption} value={unitOption} className="text-xs">
                                             {unitOption === "Other" ? "Other" : unitOption}
                                           </SelectItem>
