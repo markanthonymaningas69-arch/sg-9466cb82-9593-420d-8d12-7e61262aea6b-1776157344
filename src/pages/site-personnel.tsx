@@ -448,6 +448,29 @@ export default function SitePersonnel() {
     loadScopes();
   };
 
+  const syncScopePercentage = async (scopeId: string) => {
+    if (!scopeId) return;
+    
+    // Find the latest progress update for this scope chronologically
+    const { data } = await supabase
+      .from('bom_progress_updates')
+      .select('percentage_completed')
+      .eq('bom_scope_id', scopeId)
+      .order('update_date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    const latestPercentage = data && data.length > 0 ? data[0].percentage_completed : 0;
+    
+    // Update the master scope record which drives the SWA
+    await supabase
+      .from('bom_scope_of_work')
+      .update({ completion_percentage: latestPercentage })
+      .eq('id', scopeId);
+      
+    loadScopes();
+  };
+
   const handleMoveScope = async (index: number, direction: 'up' | 'down') => {
     if (direction === 'up' && index === 0) return;
     if (direction === 'down' && index === scopes.length - 1) return;
@@ -3534,7 +3557,10 @@ export default function SitePersonnel() {
                                         list[idx].update_date = e.target.value;
                                         setProgressUpdates(list);
                                       }}
-                                      onBlur={() => supabase.from('bom_progress_updates').update({ update_date: update.update_date }).eq('id', update.id)}
+                                      onBlur={async () => {
+                                        await supabase.from('bom_progress_updates').update({ update_date: update.update_date }).eq('id', update.id);
+                                        await syncScopePercentage(update.bom_scope_id);
+                                      }}
                                     />
                                   ) : (
                                     update.update_date
@@ -3544,7 +3570,8 @@ export default function SitePersonnel() {
                                   {isEditing ? (
                                     <Select
                                       value={update.bom_scope_id}
-                                      onValueChange={(val) => {
+                                      onValueChange={async (val) => {
+                                        const oldScopeId = update.bom_scope_id;
                                         const list = [...progressUpdates];
                                         const idx = list.findIndex(l => l.id === update.id);
                                         list[idx].bom_scope_id = val;
@@ -3553,7 +3580,11 @@ export default function SitePersonnel() {
                                           list[idx].bom_scope_of_work = { name: scope.name };
                                         }
                                         setProgressUpdates(list);
-                                        supabase.from('bom_progress_updates').update({ bom_scope_id: val }).eq('id', update.id);
+                                        await supabase.from('bom_progress_updates').update({ bom_scope_id: val }).eq('id', update.id);
+                                        
+                                        // Sync both the old and the new scope percentages
+                                        await syncScopePercentage(oldScopeId);
+                                        await syncScopePercentage(val);
                                       }}
                                     >
                                       <SelectTrigger className="h-8">
@@ -3585,7 +3616,10 @@ export default function SitePersonnel() {
                                           list[idx].percentage_completed = parseFloat(e.target.value) || 0;
                                           setProgressUpdates(list);
                                         }}
-                                        onBlur={() => supabase.from('bom_progress_updates').update({ percentage_completed: update.percentage_completed }).eq('id', update.id)}
+                                        onBlur={async () => {
+                                          await supabase.from('bom_progress_updates').update({ percentage_completed: update.percentage_completed }).eq('id', update.id);
+                                          await syncScopePercentage(update.bom_scope_id);
+                                        }}
                                       />
                                       <span className="text-sm">%</span>
                                     </div>
@@ -3631,8 +3665,9 @@ export default function SitePersonnel() {
                                       </Button>
                                       <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-50" onClick={async () => {
                                         if (confirm("Permanently delete this progress update?")) {
+                                          const scopeId = update.bom_scope_id;
                                           await supabase.from('bom_progress_updates').delete().eq('id', update.id);
-                                          loadScopes();
+                                          await syncScopePercentage(scopeId);
                                         }
                                       }} title="Delete">
                                         <Trash2 className="h-4 w-4" />
