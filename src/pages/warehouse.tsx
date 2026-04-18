@@ -22,10 +22,10 @@ type WarehouseItem = Database["public"]["Tables"]["inventory"]["Row"] & {
 
 const STANDARD_CATEGORIES = [
   "Construction Materials",
-  "Tools",
-  "Hand Tools",
   "Equipments",
-  "PPE"
+  "Hand Tools",
+  "PPE",
+  "Tools"
 ];
 
 const STANDARD_UNITS = [
@@ -362,7 +362,7 @@ export default function Warehouse() {
                       <Label htmlFor="unit">Unit *</Label>
                       {!isManualUnit ? (
                         <Select value={formData.unit} onValueChange={(val) => {
-                          if (val === "others") {
+                          if (val === "Other") {
                             setIsManualUnit(true);
                             setFormData({ ...formData, unit: "" });
                           } else {
@@ -372,7 +372,7 @@ export default function Warehouse() {
                           <SelectTrigger><SelectValue placeholder="Select unit" /></SelectTrigger>
                           <SelectContent>
                             {STANDARD_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                            <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
+                            <SelectItem value="Other" className="font-semibold text-blue-600">Other (Manual Input)</SelectItem>
                           </SelectContent>
                         </Select>
                       ) : (
