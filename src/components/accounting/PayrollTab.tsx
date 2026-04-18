@@ -8,11 +8,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useSettings } from "@/contexts/SettingsProvider";
 import { accountingService } from "@/services/accountingService";
 import { projectService } from "@/services/projectService";
-import { Calendar, Download, Filter } from "lucide-react";
+import { Calendar, Download, Filter, FileText, CheckCircle2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 export function PayrollTab() {
   const { formatCurrency } = useSettings();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const [projects, setProjects] = useState<any[]>([]);
   const [payrollData, setPayrollData] = useState<any[]>([]);
   
@@ -86,6 +90,42 @@ export function PayrollTab() {
     setLoading(false);
   };
 
+  const handleSendToVoucher = async () => {
+    if (payrollData.length === 0) return;
+    setIsSending(true);
+    
+    const projName = filters.projectId === "all" 
+      ? "General / Multiple Projects" 
+      : projects.find(p => p.id === filters.projectId)?.name || "Unknown Project";
+
+    const { data: userData } = await supabase.auth.getUser();
+
+    const voucherPayload = {
+      type: "payment",
+      date: new Date().toISOString().split("T")[0],
+      payee: `Payroll: ${projName}`,
+      particulars: `Automated Payroll Generation: ${filters.startDate} to ${filters.endDate} for ${projName}`,
+      amount: totalPayrollCost,
+      status: "pending",
+      project_id: filters.projectId === "all" ? null : filters.projectId,
+      created_by: userData?.user?.id
+    };
+
+    const { error } = await accountingService.createVoucher(voucherPayload);
+
+    setIsSending(false);
+
+    if (error) {
+      toast({ title: "Failed to create voucher", description: error.message, variant: "destructive" });
+    } else {
+      toast({ 
+        title: "Voucher Created!", 
+        description: `A pending payment voucher for ${formatCurrency(totalPayrollCost)} has been sent to Accounting.`,
+        className: "bg-emerald-600 text-white border-emerald-700" 
+      });
+    }
+  };
+
   const totalPayrollCost = payrollData.reduce((sum, emp) => sum + emp.totalPay, 0);
 
   return (
@@ -129,6 +169,23 @@ export function PayrollTab() {
           <div className="text-right">
             <div className="text-sm text-muted-foreground">Total Payroll Cost</div>
             <div className="text-2xl font-bold text-primary">{formatCurrency(totalPayrollCost)}</div>
+            {payrollData.length > 0 && (
+              <Button 
+                onClick={handleSendToVoucher} 
+                disabled={isSending}
+                size="sm" 
+                className="mt-2 w-full bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+              >
+                {isSending ? (
+                  "Sending..."
+                ) : (
+                  <>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Send to Vouchers
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
