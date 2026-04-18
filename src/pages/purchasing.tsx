@@ -540,67 +540,31 @@ export default function Purchasing() {
                     <div className="grid grid-cols-6 gap-3 items-end">
                       <div className="space-y-2 col-span-2 flex flex-col justify-end">
                         <Label className="text-xs">Item Name *</Label>
-                        <Popover open={itemPopoverOpen} onOpenChange={setItemPopoverOpen}>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              aria-expanded={itemPopoverOpen}
-                              className="w-full justify-between h-9 px-3 font-normal"
-                            >
-                              {currentItem.item_name ? currentItem.item_name : "Select or type item..."}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[300px] p-0" align="start">
-                            <Command>
-                              <CommandInput 
-                                placeholder="Search catalog or type new..." 
-                                value={currentItem.item_name}
-                                onValueChange={(val) => setCurrentItem({ ...currentItem, item_name: val })}
-                              />
-                              <CommandList>
-                                <CommandEmpty className="p-2 text-sm text-muted-foreground text-center">
-                                  "{currentItem.item_name}" not in catalog. <br/>
-                                  <Button 
-                                    variant="link" 
-                                    className="h-auto p-0 mt-1" 
-                                    onClick={() => {
-                                      setItemPopoverOpen(false);
-                                    }}
-                                  >
-                                    Use "{currentItem.item_name}" anyway
-                                  </Button>
-                                </CommandEmpty>
-                                <CommandGroup heading="Catalog Suggestions">
-                                  {catalogItems.map((item, i) => (
-                                    <CommandItem
-                                      key={i}
-                                      value={item.name}
-                                      onSelect={(currentValue) => {
-                                        setCurrentItem({ 
-                                          ...currentItem, 
-                                          item_name: item.name,
-                                          category: item.category || currentItem.category,
-                                          unit: item.unit || currentItem.unit
-                                        });
-                                        setItemPopoverOpen(false);
-                                      }}
-                                    >
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4",
-                                          currentItem.item_name.toLowerCase() === item.name.toLowerCase() ? "opacity-100" : "opacity-0"
-                                        )}
-                                      />
-                                      {item.name}
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
+                        <Input 
+                          list="catalog-items"
+                          value={currentItem.item_name}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const found = catalogItems.find(item => item.name === val);
+                            if (found) {
+                              setCurrentItem({
+                                ...currentItem,
+                                item_name: val,
+                                category: found.category || currentItem.category,
+                                unit: found.unit || currentItem.unit
+                              });
+                            } else {
+                              setCurrentItem({ ...currentItem, item_name: val });
+                            }
+                          }}
+                          className="h-9"
+                          placeholder="Type or select item..."
+                        />
+                        <datalist id="catalog-items">
+                          {catalogItems.map((item, i) => (
+                            <option key={i} value={item.name} />
+                          ))}
+                        </datalist>
                       </div>
                       <div className="space-y-2 col-span-1 flex flex-col justify-end">
                         <Label className="text-xs">Category</Label>
