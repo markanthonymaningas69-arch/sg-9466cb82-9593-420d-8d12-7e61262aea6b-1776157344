@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useSettings } from "@/contexts/SettingsProvider";
 import { accountingService } from "@/services/accountingService";
 import { projectService } from "@/services/projectService";
-import { Plus, ReceiptText, Printer, CheckCircle, Archive } from "lucide-react";
+import { Plus, ReceiptText, Printer, CheckCircle, Archive, Filter, FilterX } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -22,6 +22,11 @@ export function VouchersTab() {
   const [projects, setProjects] = useState<any[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterType, setFilterType] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterProject, setFilterProject] = useState("all");
 
   const [form, setForm] = useState({
     type: "payment",
@@ -222,6 +227,16 @@ export function VouchersTab() {
     return "JV";
   };
 
+  const filteredVouchers = vouchers.filter(v => {
+    if (filterType !== "all" && v.type !== filterType) return false;
+    if (filterStatus !== "all" && v.status !== filterStatus) return false;
+    if (filterProject !== "all") {
+      if (filterProject === "office" && v.project_id) return false;
+      if (filterProject !== "office" && v.project_id !== filterProject) return false;
+    }
+    return true;
+  });
+
   return (
     <Card className="mt-4 border-t-0 rounded-t-none shadow-none">
       <CardHeader className="flex flex-row items-center justify-between">
@@ -299,6 +314,73 @@ export function VouchersTab() {
         </Dialog>
       </CardHeader>
       <CardContent>
+        <div className="flex justify-end mb-4 shrink-0">
+          <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="h-9">
+            <Filter className="h-4 w-4 mr-2" />
+            {showFilters ? "Hide Filters" : "Filters"}
+            {(filterType !== "all" || filterStatus !== "all" || filterProject !== "all") && (
+              <span className="ml-2 flex h-2 w-2 rounded-full bg-primary shadow-[0_0_4px_rgba(var(--primary),0.5)]"></span>
+            )}
+          </Button>
+        </div>
+
+        {showFilters && (
+          <div className="bg-muted/30 p-3 mb-4 border rounded-lg flex flex-wrap gap-4 shrink-0">
+            <div className="space-y-1">
+              <Label className="text-xs">Type</Label>
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger className="w-[150px] h-8 text-xs bg-background"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="payment">Payment</SelectItem>
+                  <SelectItem value="receipt">Receipt</SelectItem>
+                  <SelectItem value="journal">Journal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Status</Label>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-[150px] h-8 text-xs bg-background"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="issued">Issued</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Project/Allocation</Label>
+              <Select value={filterProject} onValueChange={setFilterProject}>
+                <SelectTrigger className="w-[180px] h-8 text-xs bg-background"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Allocations</SelectItem>
+                  <SelectItem value="office" className="font-bold text-primary">🏢 Office / Overhead</SelectItem>
+                  {projects.map(p => <SelectItem key={p.id} value={p.id}>🏗️ {p.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            {(filterType !== "all" || filterStatus !== "all" || filterProject !== "all") && (
+              <div className="space-y-1 flex items-end pb-0.5">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 text-muted-foreground"
+                  onClick={() => {
+                    setFilterType("all");
+                    setFilterStatus("all");
+                    setFilterProject("all");
+                  }}
+                >
+                  <FilterX className="h-4 w-4 mr-2" />
+                  Clear
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="border rounded-md">
           <Table>
             <TableHeader className="bg-muted/50">
@@ -316,16 +398,16 @@ export function VouchersTab() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">Loading...</TableCell>
+                  <TableCell colSpan={8} className="text-center py-8">Loading...</TableCell>
                 </TableRow>
-              ) : vouchers.length === 0 ? (
+              ) : filteredVouchers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    No vouchers issued yet.
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    {vouchers.length === 0 ? "No vouchers issued yet." : "No vouchers match your filters."}
                   </TableCell>
                 </TableRow>
               ) : (
-                vouchers.map(v => (
+                filteredVouchers.map(v => (
                   <TableRow key={v.id}>
                     <TableCell className="whitespace-nowrap">{v.date}</TableCell>
                     <TableCell className="font-mono font-medium">{v.voucher_number}</TableCell>
