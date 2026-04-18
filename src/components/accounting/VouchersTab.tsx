@@ -97,6 +97,16 @@ export function VouchersTab() {
     }
   };
 
+  const handleApproveVoucher = async (v: any) => {
+    const { error } = await supabase.from('vouchers').update({ status: 'approved' }).eq('id', v.id);
+    if (!error) {
+      toast({ title: "Voucher Approved", description: "Voucher has been approved and is ready to be issued." });
+      loadData();
+    } else {
+      toast({ title: "Error", description: "Failed to approve voucher", variant: "destructive" });
+    }
+  };
+
   const handleArchive = async (v: any) => {
     if (confirm(`Are you sure you want to archive voucher ${v.voucher_number}?`)) {
       const { error } = await accountingService.archiveVoucher(v.id);
@@ -425,8 +435,12 @@ export function VouchersTab() {
                     </TableCell>
                     <TableCell>
                       <Badge 
-                        variant={v.status === 'approved' ? 'outline' : 'secondary'} 
-                        className={v.status === 'approved' ? 'bg-orange-50 text-orange-700 border-orange-200 capitalize' : 'capitalize'}
+                        variant={v.status === 'approved' ? 'outline' : v.status === 'pending' ? 'secondary' : 'default'} 
+                        className={
+                          v.status === 'approved' ? 'bg-blue-50 text-blue-700 border-blue-200 capitalize' : 
+                          v.status === 'pending' ? 'bg-orange-50 text-orange-700 hover:bg-orange-50 border-transparent capitalize' : 
+                          'bg-emerald-500 text-white capitalize'
+                        }
                       >
                         {v.status}
                       </Badge>
@@ -436,6 +450,11 @@ export function VouchersTab() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
+                        {v.status === 'pending' && (
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50" onClick={() => handleApproveVoucher(v)} title="Approve Voucher (GM Only)">
+                            <CheckCircle className="h-4 w-4" />
+                          </Button>
+                        )}
                         {v.status === 'approved' && (
                           <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50" onClick={() => handleIssueVoucher(v)} title="Mark as Issued">
                             <CheckCircle className="h-4 w-4" />
