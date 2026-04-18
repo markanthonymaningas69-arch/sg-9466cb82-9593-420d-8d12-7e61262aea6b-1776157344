@@ -232,7 +232,7 @@ export default function PricingPage() {
           </div>
 
           {/* Dynamic Order Summary Calculator */}
-          <div className="max-w-4xl mx-auto mt-16 sticky bottom-4 z-20">
+          <div className="max-w-4xl mx-auto mt-16 z-20">
             <Card className="border-primary shadow-2xl bg-card overflow-hidden ring-1 ring-primary/20">
               <div className="absolute top-0 left-0 w-2 h-full bg-primary" />
               <CardContent className="p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6">

@@ -414,7 +414,7 @@ export default function Subscription() {
         </div>
 
         {/* Dynamic Order Summary & Checkout */}
-        <div className="mt-8 border-t pt-8 sticky bottom-4 z-10">
+        <div className="mt-8 border-t pt-8 z-10">
           <Card className="border-primary/30 shadow-xl bg-card overflow-hidden">
             <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
             <CardContent className="p-6 flex flex-col md:flex-row items-center justify-between gap-6">
