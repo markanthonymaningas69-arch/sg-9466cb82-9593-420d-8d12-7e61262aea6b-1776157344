@@ -153,6 +153,7 @@ export default function SitePersonnel() {
   const [showProgressChart, setShowProgressChart] = useState(false);
   const [progressChartRange, setProgressChartRange] = useState("7");
   const [updateProgressDialogOpen, setUpdateProgressDialogOpen] = useState(false);
+  const [editingProgressId, setEditingProgressId] = useState<string | null>(null);
   const [progressForm, setProgressForm] = useState({
     bom_scope_id: "",
     percentage: 0,
@@ -3513,25 +3514,134 @@ export default function SitePersonnel() {
                               <TableHead className="w-32">Completion</TableHead>
                               <TableHead>Updated By</TableHead>
                               <TableHead>Notes</TableHead>
+                              <TableHead className="text-right w-24">Action</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {filteredUpdates.map((update) => (
+                            {filteredUpdates.map((update) => {
+                              const isEditing = editingProgressId === update.id;
+                              return (
                               <TableRow key={update.id}>
-                                <TableCell className="whitespace-nowrap">{update.update_date}</TableCell>
-                                <TableCell className="font-medium">{update.bom_scope_of_work?.name || "Unknown Scope"}</TableCell>
+                                <TableCell className="whitespace-nowrap">
+                                  {isEditing ? (
+                                    <Input
+                                      type="date"
+                                      value={update.update_date}
+                                      className="h-8 w-32"
+                                      onChange={(e) => {
+                                        const list = [...progressUpdates];
+                                        const idx = list.findIndex(l => l.id === update.id);
+                                        list[idx].update_date = e.target.value;
+                                        setProgressUpdates(list);
+                                      }}
+                                      onBlur={() => supabase.from('bom_progress_updates').update({ update_date: update.update_date }).eq('id', update.id)}
+                                    />
+                                  ) : (
+                                    update.update_date
+                                  )}
+                                </TableCell>
+                                <TableCell className="font-medium">
+                                  {isEditing ? (
+                                    <Select
+                                      value={update.bom_scope_id}
+                                      onValueChange={(val) => {
+                                        const list = [...progressUpdates];
+                                        const idx = list.findIndex(l => l.id === update.id);
+                                        list[idx].bom_scope_id = val;
+                                        const scope = scopes.find(s => s.id === val);
+                                        if (scope) {
+                                          list[idx].bom_scope_of_work = { name: scope.name };
+                                        }
+                                        setProgressUpdates(list);
+                                        supabase.from('bom_progress_updates').update({ bom_scope_id: val }).eq('id', update.id);
+                                      }}
+                                    >
+                                      <SelectTrigger className="h-8">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {scopes.map(s => (
+                                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  ) : (
+                                    update.bom_scope_of_work?.name || "Unknown Scope"
+                                  )}
+                                </TableCell>
                                 <TableCell>
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-16 bg-secondary rounded-full h-2 overflow-hidden">
-                                      <div className="bg-green-500 h-full" style={{ width: `${update.percentage_completed || 0}%` }} />
+                                  {isEditing ? (
+                                    <div className="flex items-center gap-2">
+                                      <Input
+                                        type="number"
+                                        step="0.1"
+                                        min="0"
+                                        max="100"
+                                        className="h-8 w-20"
+                                        value={update.percentage_completed}
+                                        onChange={(e) => {
+                                          const list = [...progressUpdates];
+                                          const idx = list.findIndex(l => l.id === update.id);
+                                          list[idx].percentage_completed = parseFloat(e.target.value) || 0;
+                                          setProgressUpdates(list);
+                                        }}
+                                        onBlur={() => supabase.from('bom_progress_updates').update({ percentage_completed: update.percentage_completed }).eq('id', update.id)}
+                                      />
+                                      <span className="text-sm">%</span>
                                     </div>
-                                    <span className="font-bold text-sm">{update.percentage_completed || 0}%</span>
-                                  </div>
+                                  ) : (
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-16 bg-secondary rounded-full h-2 overflow-hidden">
+                                        <div className="bg-green-500 h-full" style={{ width: `${update.percentage_completed || 0}%` }} />
+                                      </div>
+                                      <span className="font-bold text-sm">{update.percentage_completed || 0}%</span>
+                                    </div>
+                                  )}
                                 </TableCell>
                                 <TableCell>{update.updated_by}</TableCell>
-                                <TableCell className="text-sm text-muted-foreground">{update.notes || "-"}</TableCell>
+                                <TableCell className="text-sm text-muted-foreground">
+                                  {isEditing ? (
+                                    <Input
+                                      className="h-8"
+                                      value={update.notes || ""}
+                                      onChange={(e) => {
+                                        const list = [...progressUpdates];
+                                        const idx = list.findIndex(l => l.id === update.id);
+                                        list[idx].notes = e.target.value;
+                                        setProgressUpdates(list);
+                                      }}
+                                      onBlur={() => supabase.from('bom_progress_updates').update({ notes: update.notes }).eq('id', update.id)}
+                                    />
+                                  ) : (
+                                    update.notes || "-"
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {isEditing ? (
+                                    <Button variant="ghost" size="sm" onClick={() => {
+                                      setEditingProgressId(null);
+                                      loadScopes();
+                                    }}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex justify-end gap-1">
+                                      <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-500 hover:bg-blue-50" onClick={() => setEditingProgressId(update.id)}>
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                      <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-50" onClick={async () => {
+                                        if (confirm("Permanently delete this progress update?")) {
+                                          await supabase.from('bom_progress_updates').delete().eq('id', update.id);
+                                          loadScopes();
+                                        }
+                                      }} title="Delete">
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
                               </TableRow>
-                            ))}
+                            )})}
                           </TableBody>
                         </Table>
                       </div>
