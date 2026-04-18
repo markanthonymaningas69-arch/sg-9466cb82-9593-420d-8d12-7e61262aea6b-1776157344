@@ -183,6 +183,8 @@ export default function BillOfMaterials() {
     setMasterScopes(masterScopesData || []);
     setProject(projectData);
 
+    let returnedScopes: any[] = [];
+
     const { data: bomData, error } = await bomService.getByProjectId(id);
 
     if (error && (error as any).code === "PGRST116") {
@@ -203,6 +205,7 @@ export default function BillOfMaterials() {
       
       const sortedScopes = ((bomData as any).bom_scope_of_work || []).sort((a: any, b: any) => (a.order_number || 0) - (b.order_number || 0));
       setScopes(sortedScopes);
+      returnedScopes = sortedScopes;
       
       const rawIndirect = (bomData as any).bom_indirect_costs || [];
       setIndirectCosts(rawIndirect);
@@ -238,6 +241,7 @@ export default function BillOfMaterials() {
     }
 
     setLoading(false);
+    return returnedScopes;
   };
 
   const calculateScopeMaterialTotal = (scope: ScopeOfWork): number => {
@@ -450,7 +454,15 @@ export default function BillOfMaterials() {
     setShowScopeInput(false);
     setNewScopeName("");
     if (bom?.project_id) {
-      await loadData(bom.project_id as string);
+      const newScopes = await loadData(bom.project_id as string);
+      
+      // Auto-hide all scope contents so the user sees a clean high-level list
+      const allCollapsed: Record<string, boolean> = {};
+      if (newScopes) {
+        newScopes.forEach((s: any) => { allCollapsed[s.id as string] = true; });
+      }
+      setCollapsedScopes(allCollapsed);
+      setIndirectCollapsed(true);
     }
   };
 
