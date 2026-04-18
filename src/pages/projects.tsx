@@ -656,7 +656,7 @@ export default function Projects() {
               <Label className="font-semibold">Category <span className="text-red-500">*</span></Label>
               {!isManualMasterCategory ? (
                 <select
-                  className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background text-foreground px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                   value={masterForm.category || ""}
                   onChange={(e) => {
                     if (e.target.value === "others") {
@@ -667,8 +667,8 @@ export default function Projects() {
                     }
                   }}
                 >
-                  <option value="" disabled hidden>Select Category...</option>
-                  {STANDARD_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  <option value="" disabled hidden className="text-muted-foreground">Select Category...</option>
+                  {STANDARD_CATEGORIES.map(c => <option key={c} value={c} className="text-foreground bg-background">{c}</option>)}
                   <option value="others" className="text-primary font-semibold bg-primary/10">Others (Type custom...)</option>
                 </select>
               ) : (
@@ -690,7 +690,7 @@ export default function Projects() {
               <Label className="font-semibold">Default Unit <span className="text-red-500">*</span></Label>
               {!isManualMasterUnit ? (
                 <select
-                  className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background text-foreground px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                   value={masterForm.unit || ""}
                   onChange={(e) => {
                     if (e.target.value === "others") {
@@ -701,8 +701,8 @@ export default function Projects() {
                     }
                   }}
                 >
-                  <option value="" disabled hidden>Select Unit...</option>
-                  {STANDARD_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                  <option value="" disabled hidden className="text-muted-foreground">Select Unit...</option>
+                  {STANDARD_UNITS.map(u => <option key={u} value={u} className="text-foreground bg-background">{u}</option>)}
                   <option value="others" className="text-primary font-semibold bg-primary/10">Others (Type custom...)</option>
                 </select>
               ) : (
@@ -724,12 +724,12 @@ export default function Projects() {
               <Label className="font-semibold">Link to Scopes of Work (Optional)</Label>
               <div className="flex gap-2">
                 <select 
-                  className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background text-foreground px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                   value={currentScopeSelection || ""}
                   onChange={(e) => setCurrentScopeSelection(e.target.value)}
                 >
-                  <option value="" disabled hidden>Select a scope...</option>
-                  {masterScopes.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                  <option value="" disabled hidden className="text-muted-foreground">Select a scope...</option>
+                  {masterScopes.map(s => <option key={s.id} value={s.name} className="text-foreground bg-background">{s.name}</option>)}
                 </select>
                 <Button type="button" onClick={handleAddScopeToItem} variant="secondary" className="px-3 shrink-0 bg-primary/10 hover:bg-primary/20 text-primary">
                   <Plus className="h-4 w-4" /> Add
