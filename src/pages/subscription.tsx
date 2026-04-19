@@ -314,8 +314,27 @@ export default function Subscription() {
   const isCurrentlyTrial = (currentPlan as string) === "trial" || isTrial;
   const hasActiveSub = subscriptionDetails?.status === "active" && !isCurrentlyTrial && !isLocked;
   
-  const activeAmount = Number(subscriptionDetails?.amount) || 0;
-  const isActiveAnnual = activeAmount > 1000;
+  // Determine true cycle from history (if any past payment was >= 2870, they are likely annual)
+  const isActuallyAnnual = billingHistory.some(b => Number(b.amount) >= 2870) || (billingCycle === "annual" && hasActiveSub && Number(subscriptionDetails?.amount) > 1000);
+  const isActiveAnnual = isActuallyAnnual;
+
+  // Calculate True Recurring Total (Base + Add-ons)
+  const activePlanId = subscriptionDetails?.plan || currentPlan;
+  const activePlanObj = plans.find(p => p.id === activePlanId) || plans[0];
+  const activeBasePrice = isActiveAnnual ? activePlanObj.annualPrice : activePlanObj.monthlyPrice;
+
+  let activeAddonsTotal = 0;
+  if (subscriptionDetails?.features) {
+    Object.entries(subscriptionDetails.features).forEach(([id, qty]) => {
+      const addonInfo = addOns.find(a => a.id === id);
+      if (addonInfo && Number(qty) > 0) {
+        activeAddonsTotal += (isActiveAnnual ? addonInfo.annualPrice : addonInfo.monthlyPrice) * Number(qty);
+      }
+    });
+  }
+
+  const trueActiveAmount = hasActiveSub ? (activeBasePrice + activeAddonsTotal) : (billingCycle === "annual" ? activePlanObj.annualPrice : activePlanObj.monthlyPrice);
+
   const isSelectingSamePlanAndCycle = subscriptionDetails?.plan === selectedPlan && (billingCycle === "annual") === isActiveAnnual;
 
   const basePrice = selectedPlanConfig ? (billingCycle === "monthly" ? selectedPlanConfig.monthlyPrice : selectedPlanConfig.annualPrice) : 0;
@@ -336,7 +355,7 @@ export default function Subscription() {
       daysRemaining = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
       const totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) || 30;
       
-      const dailyRate = activeAmount / totalDays;
+      const dailyRate = trueActiveAmount / totalDays; // Use true value instead of last transaction
       proratedDiscount = Math.floor(daysRemaining * dailyRate);
       
       // Do not allow discount to exceed the new plan's cost
@@ -402,7 +421,7 @@ export default function Subscription() {
               </div>
               <div className="text-right">
                 <div className="text-3xl font-bold">
-                  AED {activeAmount || basePrice}
+                  AED {trueActiveAmount}
                 </div>
                 <p className="text-sm text-muted-foreground">per {isActiveAnnual ? "year" : "month"}</p>
               </div>
