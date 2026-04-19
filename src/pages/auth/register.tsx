@@ -77,7 +77,7 @@ export default function RegisterPage() {
         // Mark code as used
         await supabase.from('invite_codes').update({ status: 'used' }).eq('id', invData.id);
 
-        setSuccess(`Account created! Joined as ${primaryModule}. Redirecting...`);
+        setSuccess(`Account created! Joined with access to: ${allModules.join(', ')}. Redirecting...`);
         setTimeout(() => {
           router.push("/dashboard");
         }, 1500);

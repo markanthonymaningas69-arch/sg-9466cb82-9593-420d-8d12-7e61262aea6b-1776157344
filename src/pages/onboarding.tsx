@@ -88,26 +88,27 @@ export default function Onboarding() {
       }
 
       // The module is pre-determined by the GM who created the invite code
-      const assignedModule = invData.module;
+      const primaryModule = invData.modules && invData.modules.length > 0 ? invData.modules[0] : invData.module;
+      const allModules = invData.modules && invData.modules.length > 0 ? invData.modules : [invData.module];
 
       // Update their profile name first
       await supabase.from('profiles').update({ full_name: fullName.trim() }).eq('id', user.id);
 
-      // Use the secure backend function with the GM's explicitly chosen module
+      // Use the secure backend function with the GM's explicitly chosen modules
       const { error: rpcError } = await supabase.rpc('assign_user_module', {
         p_user_id: user.id,
-        p_module: assignedModule,
+        p_module: primaryModule,
         p_project_ids: invData.project_ids || [],
-        p_modules: [assignedModule]
+        p_modules: allModules
       });
 
       if (rpcError) {
         const { error: upsertError } = await supabase.from('profiles').upsert({
           id: user.id,
           full_name: fullName.trim(),
-          assigned_module: assignedModule,
+          assigned_module: primaryModule,
           assigned_project_ids: invData.project_ids || [],
-          assigned_modules: [assignedModule],
+          assigned_modules: allModules,
           updated_at: new Date().toISOString()
         });
         if (upsertError) throw upsertError;
@@ -121,7 +122,7 @@ export default function Onboarding() {
 
       toast({
         title: "Success!",
-        description: `You have joined the workspace as ${assignedModule}.`,
+        description: `You have joined the workspace with access to: ${allModules.join(', ')}.`,
       });
 
       // Use hard reload
