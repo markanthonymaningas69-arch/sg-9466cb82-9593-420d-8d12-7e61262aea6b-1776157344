@@ -763,9 +763,9 @@ export default function Settings() {
               </div>
 
               {selectedModules.includes("Site Personnel") && (
-                <div className="space-y-2 p-3 border rounded-md bg-muted/10">
-                  <Label>Restrict to Projects (Max {isStarter ? 2 : 'Unlimited'})</Label>
-                  <div className="flex flex-wrap gap-3 mt-2 max-h-40 overflow-y-auto">
+                <div className="space-y-2">
+                  <Label>Restrict to Projects (Max {currentPlan === 'starter' || currentPlan === 'trial' || isTrial ? 2 : 'Unlimited'})</Label>
+                  <div className="border rounded-md p-2 max-h-32 overflow-y-auto space-y-2 bg-background">
                     {projects.map(p => (
                       <div key={p.id} className="flex items-center space-x-2">
                         <Checkbox 
@@ -773,7 +773,7 @@ export default function Settings() {
                           checked={selectedProjects.includes(p.id)}
                           onCheckedChange={(checked) => {
                             if (checked) {
-                              if (isStarter && selectedProjects.length >= 2) {
+                              if ((currentPlan === 'starter' || currentPlan === 'trial' || isTrial) && selectedProjects.length >= 2) {
                                 toast({ title: "Limit Reached", description: "Starter/Trial plan allows a maximum of 2 projects per user.", variant: "destructive" });
                                 return;
                               }
@@ -783,7 +783,9 @@ export default function Settings() {
                             }
                           }}
                         />
-                        <Label htmlFor={`gen-proj-${p.id}`} className="cursor-pointer text-sm">{p.name}</Label>
+                        <label htmlFor={`gen-proj-${p.id}`} className="text-sm font-medium cursor-pointer">
+                          {p.name}
+                        </label>
                       </div>
                     ))}
                     {projects.length === 0 && <p className="text-xs text-muted-foreground">No projects found.</p>}
