@@ -488,10 +488,7 @@ export default function Settings() {
                                   Auto-renews with GM plan
                                 </div>
                               </div>
-                              <div className="flex flex-col gap-1 items-end">
-                                <Button size="sm" variant="outline" className="text-[10px] border-emerald-500 text-emerald-600 hover:bg-emerald-50 h-6 px-2" onClick={() => router.push('/subscription')}>
-                                  Renew Seat
-                                </Button>
+                              <div className="flex flex-col gap-1 items-end justify-center h-full">
                                 <div className="flex items-center gap-1">
                                   <Button size="icon" variant="ghost" onClick={() => {
                                     setEditingUser(u);
