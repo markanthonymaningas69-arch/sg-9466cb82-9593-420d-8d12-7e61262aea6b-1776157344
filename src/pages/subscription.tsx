@@ -525,7 +525,11 @@ export default function Subscription() {
                 <ul className="space-y-3">
                   {plan.features.map((feature, index) => (
                     <li key={index} className="flex items-start gap-2">
-                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      {!feature.startsWith('❌') ? (
+                        <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                      ) : (
+                        <div className="w-1" />
+                      )}
                       <span className="text-sm text-muted-foreground">{feature}</span>
                     </li>
                   ))}
