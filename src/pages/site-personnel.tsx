@@ -20,7 +20,7 @@ import { Plus, Pencil, Trash2, Archive, Users, Truck, ClipboardList, ArrowUp, Ar
 import { supabase } from "@/integrations/supabase/client";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer } from "recharts";
 import { toast } from "@/hooks/use-toast";
-import { useSettings } from "@/hooks/useSettings";
+import { useSettings } from "@/contexts/SettingsProvider";
 
 type Project = { id: string; name: string; location: string; status: string };
 type Personnel = { id: string; name: string; role: string; daily_rate: number; overtime_rate: number; created_source?: string; updated_source?: string };
