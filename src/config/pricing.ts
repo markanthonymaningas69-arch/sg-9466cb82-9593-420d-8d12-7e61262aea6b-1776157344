@@ -29,7 +29,6 @@ export const plans: PlanConfig[] = [
       "Up to 4 Projects in the System",
       "GM Module (Dashboard, Project Profile, Complete Accounting, Purchasing, Analytics)",
       "Included Seats: 1 Site Personnel, 1 Accounting, 1 Purchasing",
-      "0 Pre-active Add-on Seats",
       "Add-on Capabilities (Max 1 Extra Site Personnel)",
       "Support Feature Updates"
     ],
@@ -46,8 +45,7 @@ export const plans: PlanConfig[] = [
       "8 Total Users (1 GM + 7 Ready-to-assign independent seats)",
       "Up to 10 Projects in the System",
       "GM Module (Full Access to All Modules)",
-      "Included Seats: 5 Site Personnel, 1 Accounting, 1 Purchasing",
-      "0 Pre-active Add-on Seats",
+      "Included Seats: 3 Site Personnel, 1 Accounting, 1 Purchasing, 1 HR, 1 Warehouse",
       "Add-on Capabilities (Max: 2 Extra Site, 2 Extra Accounting, 5 Extra Purchasing)",
       "Support Feature Updates"
     ],
@@ -64,7 +62,6 @@ export const plans: PlanConfig[] = [
       "Up to 4 Projects in the System",
       "GM Module (Dashboard, Project Profile, Complete Accounting, Purchasing, Analytics)",
       "Included Seats: 1 Site Personnel, 1 Accounting, 1 Purchasing",
-      "0 Pre-active Add-on Seats",
       "Add-on Capabilities (Max 1 Extra Site Personnel)",
       "Support Feature Updates"
     ],

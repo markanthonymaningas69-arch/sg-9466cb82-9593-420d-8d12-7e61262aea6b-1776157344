@@ -123,13 +123,15 @@ export default function Settings() {
   // Base limits based purely on the plan type
   const basePlanLimits: Record<string, number> = isStarter
     ? { 'Site Personnel': 1, 'Accounting': 1, 'Purchasing': 1 }
-    : { 'Site Personnel': 5, 'Accounting': 1, 'Purchasing': 1 };
+    : { 'Site Personnel': 3, 'Accounting': 1, 'Purchasing': 1, 'Human Resources': 1, 'Warehouse': 1 };
 
   // Calculate true limits: Base Plan + Purchased Add-ons
   const planLimits: Record<string, number> = {
     'Site Personnel': basePlanLimits['Site Personnel'] + (activeAddOns['extra_site'] || 0),
     'Accounting': basePlanLimits['Accounting'] + (activeAddOns['extra_acc'] || 0),
-    'Purchasing': basePlanLimits['Purchasing'] + (activeAddOns['purchasing'] || 0)
+    'Purchasing': basePlanLimits['Purchasing'] + (activeAddOns['purchasing'] || 0),
+    'Human Resources': basePlanLimits['Human Resources'] || 0,
+    'Warehouse': basePlanLimits['Warehouse'] || 0
   };
 
   const getUsageCount = (mod: string) => {
@@ -409,7 +411,7 @@ export default function Settings() {
                   <strong className="text-primary mt-2 block font-medium bg-primary/5 p-2 rounded border border-primary/10">
                     {isStarter 
                       ? "Starter Inclusions: 3 Total Independent Seats (1 Site Personnel, 1 Accounting, 1 Purchasing)" 
-                      : "Professional Inclusions: 7 Total Independent Seats (5 Site Personnel, 1 Accounting, 1 Purchasing)"}
+                      : "Professional Inclusions: 7 Total Independent Seats (3 Site Personnel, 1 Accounting, 1 Purchasing, 1 HR, 1 Warehouse)"}
                   </strong>
                 </CardDescription>
               </CardHeader>
@@ -697,7 +699,7 @@ export default function Settings() {
               <div className="space-y-2">
                 <Label>Select Module(s) to Assign</Label>
                 <div className="flex flex-wrap gap-2">
-                  {['Site Personnel', 'Accounting', 'Purchasing'].map(mod => (
+                  {(isStarter ? ['Site Personnel', 'Accounting', 'Purchasing'] : ['Site Personnel', 'Accounting', 'Purchasing', 'Warehouse', 'Human Resources']).map(mod => (
                     <div key={mod} className="flex items-center space-x-2 border rounded-md p-2 bg-muted/20">
                       <Checkbox 
                         id={`gen-mod-${mod}`}
