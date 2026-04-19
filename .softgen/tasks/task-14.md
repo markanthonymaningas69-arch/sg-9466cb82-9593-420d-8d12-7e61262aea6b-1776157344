@@ -1,6 +1,6 @@
 ---
 title: Stripe Integration
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [billing, stripe, backend]
@@ -14,12 +14,12 @@ The user has a Stripe account and wants to connect the existing billing/subscrip
 Packages `@stripe/stripe-js` and `stripe` are already installed.
 
 ## Checklist
-- [ ] Add `stripe_customer_id` and `stripe_subscription_id` to the `subscriptions` table.
-- [ ] Create `src/pages/api/stripe/checkout.ts` to handle creating checkout sessions.
-- [ ] Create `src/pages/api/stripe/portal.ts` to handle creating billing portal sessions.
-- [ ] Create `src/pages/api/stripe/webhook.ts` to handle Stripe webhooks and update DB.
-- [ ] Update `src/pages/pricing.tsx` to redirect to the Stripe Checkout API endpoint.
-- [ ] Update `src/pages/subscription.tsx` to redirect to the Stripe Portal API endpoint.
+- [x] Add `stripe_customer_id` and `stripe_subscription_id` to the `subscriptions` table.
+- [x] Create `src/pages/api/stripe/checkout.ts` to handle creating checkout sessions.
+- [x] Create `src/pages/api/stripe/portal.ts` to handle creating billing portal sessions.
+- [x] Create `src/pages/api/stripe/webhook.ts` to handle Stripe webhooks and update DB.
+- [x] Update `src/pages/pricing.tsx` to redirect to the Stripe Checkout API endpoint.
+- [x] Update `src/pages/subscription.tsx` to redirect to the Stripe Portal API endpoint.
 
 ## Acceptance
 - The database schema supports Stripe references.

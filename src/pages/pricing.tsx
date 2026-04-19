@@ -4,13 +4,19 @@ import { PublicLayout } from "@/components/PublicLayout";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Minus, Plus, ShoppingCart } from "lucide-react";
+import { Check, Minus, Plus, ShoppingCart, Loader2 } from "lucide-react";
 import { plans, addOns, type PlanConfig } from "@/config/pricing";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { useRouter } from "next/router";
 
 export default function PricingPage() {
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
   const [selectedPlan, setSelectedPlan] = useState<string>("professional");
   const [addOnQuantities, setAddOnQuantities] = useState<Record<string, number>>({});
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const { toast } = useToast();
+  const router = useRouter();
 
   // Filter out the "trial" plan for the main pricing display
   const displayPlans = plans.filter(p => p.id !== "trial");
@@ -70,6 +76,45 @@ export default function PricingPage() {
 
   const totalAmount = basePrice + addOnsTotal;
   const totalAddonItems = Object.values(addOnQuantities).reduce((a, b) => a + b, 0);
+
+  const handleCheckout = async () => {
+    setIsCheckingOut(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.user) {
+        router.push(`/auth/register?plan=${selectedPlan}&cycle=${billingCycle}`);
+        return;
+      }
+      
+      const response = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          planId: selectedPlan,
+          billingCycle,
+          features: addOnQuantities,
+          userId: session.user.id,
+          email: session.user.email,
+          returnUrl: window.location.origin + '/subscription',
+        }),
+      });
+
+      const data = await response.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error(data.error || "Failed to create checkout session");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Checkout Error",
+        description: error.message || "An unexpected error occurred.",
+        variant: "destructive"
+      });
+      setIsCheckingOut(false);
+    }
+  };
 
   return (
     <PublicLayout 
@@ -272,15 +317,15 @@ export default function PricingPage() {
                     <div className="text-5xl font-black text-primary tracking-tighter">AED {totalAmount}</div>
                     <div className="text-sm font-semibold text-muted-foreground mt-1">/{billingCycle === "monthly" ? "month" : "year"}</div>
                   </div>
-                  <Link href="/auth/register" className="w-full">
-                    <Button 
-                      size="lg" 
-                      className="h-16 px-8 text-lg font-bold w-full shadow-md hover:shadow-lg transition-all"
-                    >
-                      <ShoppingCart className="mr-2 h-6 w-6" />
-                      Proceed to Checkout
-                    </Button>
-                  </Link>
+                  <Button 
+                    size="lg" 
+                    className="h-16 px-8 text-lg font-bold w-full shadow-md hover:shadow-lg transition-all"
+                    onClick={handleCheckout}
+                    disabled={isCheckingOut}
+                  >
+                    {isCheckingOut ? <Loader2 className="mr-2 h-6 w-6 animate-spin" /> : <ShoppingCart className="mr-2 h-6 w-6" />}
+                    {isCheckingOut ? "Processing..." : "Proceed to Checkout"}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
