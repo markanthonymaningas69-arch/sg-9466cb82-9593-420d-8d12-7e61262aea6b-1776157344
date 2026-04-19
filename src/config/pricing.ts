@@ -25,7 +25,7 @@ export const plans: PlanConfig[] = [
     monthlyPrice: 299,
     annualPrice: 2870,
     features: [
-      "3 Active Independent Users (1 GM, 1 Site Personnel, 1 Accounting/Purchasing combined)",
+      "3 Ready to assign independent users (1 GM, 1 Site Personnel, 1 Accounting/Purchasing combined)",
       "Up to 4 Projects in the System",
       "GM Module (Dashboard, Project Profile, Complete Accounting, Purchasing, Analytics)",
       "Site Personnel Account (Limited to 2 Projects)",
@@ -45,7 +45,7 @@ export const plans: PlanConfig[] = [
     annualPrice: 4790,
     popular: true,
     features: [
-      "8 Active Independent Users (1 GM, 3 Site Personnel, 1 Accounting, 1 Purchasing, 1 HR, 1 Warehouse)",
+      "8 Ready to assign independent users (1 GM, 3 Site Personnel, 1 Accounting, 1 Purchasing, 1 HR, 1 Warehouse)",
       "Up to 10 Projects in the System",
       "GM Module (Full Access to All Modules)",
       "Site Personnel Accounts (Limited to 2 Projects each)",
@@ -62,7 +62,7 @@ export const plans: PlanConfig[] = [
     monthlyPrice: 0,
     annualPrice: 0,
     features: [
-      "3 Active Independent Users (1 GM, 1 Site Personnel, 1 Accounting/Purchasing combined)",
+      "3 Ready to assign independent users (1 GM, 1 Site Personnel, 1 Accounting/Purchasing combined)",
       "Up to 4 Projects in the System",
       "GM Module (Dashboard, Project Profile, Complete Accounting, Purchasing, Analytics)",
       "Site Personnel Account (Limited to 2 Projects)",
