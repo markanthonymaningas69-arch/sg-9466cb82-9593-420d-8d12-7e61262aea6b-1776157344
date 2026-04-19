@@ -18,20 +18,24 @@ function AppInner({ Component, pageProps }: AppProps) {
   const [authChecked, setAuthChecked] = useState<boolean>(false);
 
   useEffect(() => {
-    const publicPaths = ["/auth/login", "/auth/register", "/404", "/system-monitor"];
+    // Define paths that do not require authentication
+    const publicPaths = ["/", "/auth/login", "/auth/register", "/404", "/system-monitor", "/pricing", "/about", "/privacy", "/terms"];
+    // Define paths that authenticated users should be instantly redirected away from
+    const redirectIfLoggedIn = ["/", "/auth/login", "/auth/register"];
+    
     const path = router.pathname;
-
-    if (publicPaths.includes(path)) {
-      setAuthChecked(true);
-      return;
-    }
-
     let isMounted = true;
 
     authService
       .getCurrentUser()
       .then((user) => {
-        if (!user && isMounted) {
+        if (!isMounted) return;
+
+        if (user && redirectIfLoggedIn.includes(path)) {
+          // If logged in and hitting the landing or login page, auto-redirect to dashboard
+          router.replace("/dashboard");
+        } else if (!user && !publicPaths.includes(path)) {
+          // If NOT logged in and trying to access a private page, kick to login
           router.replace("/auth/login");
         }
       })

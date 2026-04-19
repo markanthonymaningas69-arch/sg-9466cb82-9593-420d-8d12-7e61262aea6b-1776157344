@@ -87,25 +87,17 @@ export default function Onboarding() {
       const primaryModule = invData.modules && invData.modules.length > 0 ? invData.modules[0] : invData.module;
       const allModules = invData.modules && invData.modules.length > 0 ? invData.modules : [invData.module];
 
-      // Use the secure backend function with the GM's explicitly chosen modules
-      const { error: rpcError } = await supabase.rpc('assign_user_module', {
-        p_user_id: user.id,
-        p_module: primaryModule,
-        p_project_ids: invData.project_ids || [],
-        p_modules: allModules
-      });
+      // Update their profile directly with all necessary fields including company_id
+      const { error: updateError } = await supabase.from('profiles').update({
+        full_name: fullName.trim(),
+        assigned_module: primaryModule,
+        assigned_modules: allModules,
+        assigned_project_ids: invData.project_ids || [],
+        company_id: invData.company_id,
+        updated_at: new Date().toISOString()
+      }).eq('id', user.id);
 
-      if (rpcError) {
-        const { error: upsertError } = await supabase.from('profiles').upsert({
-          id: user.id,
-          full_name: fullName,
-          assigned_module: primaryModule,
-          assigned_project_ids: invData.project_ids || [],
-          assigned_modules: allModules,
-          updated_at: new Date().toISOString()
-        });
-        if (upsertError) throw upsertError;
-      }
+      if (updateError) throw updateError;
 
       // Mark code as used
       await supabase
