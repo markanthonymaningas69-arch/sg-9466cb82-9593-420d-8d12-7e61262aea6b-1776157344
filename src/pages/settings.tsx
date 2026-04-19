@@ -414,7 +414,14 @@ export default function Settings() {
             <Card>
               <CardHeader>
                 <CardTitle>Team Access & Modules</CardTitle>
-                <CardDescription>Manage your team's access. Included seats auto-renew with your plan. Add-on seats are managed separately.</CardDescription>
+                <CardDescription>
+                  Manage your team's access. Included seats auto-renew with your plan. Add-on seats are managed separately.
+                  <strong className="text-primary mt-2 block font-medium bg-primary/5 p-2 rounded border border-primary/10">
+                    {isStarter 
+                      ? "Starter / Trial Inclusions: 3 Total Independent Seats (2 Site Personnel, 1 Accounting/Purchasing combined)" 
+                      : "Professional Inclusions: 7 Total Independent Seats (5 Site Personnel, 1 Accounting, 1 Purchasing)"}
+                  </strong>
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-4 pb-2">
