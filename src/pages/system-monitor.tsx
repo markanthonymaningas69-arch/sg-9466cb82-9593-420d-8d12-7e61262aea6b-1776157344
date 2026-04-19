@@ -1,38 +1,81 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, DollarSign, Server, Package, ArrowUpRight, Loader2, ArrowLeft, Calendar, Filter } from "lucide-react";
+import { Users, DollarSign, Server, Package, ArrowUpRight, Loader2, ArrowLeft, Calendar, Filter, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ThemeSwitch } from "@/components/ThemeSwitch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 
 export default function SystemMonitor() {
   const router = useRouter();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>({ companies: [], subscriptions: [] });
   const [filterPlan, setFilterPlan] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [chartMonths, setChartMonths] = useState(6);
 
+  // Date Editing State
+  const [editSubOpen, setEditSubOpen] = useState(false);
+  const [editingSub, setEditingSub] = useState<any>(null);
+  const [newStartDate, setNewStartDate] = useState("");
+  const [newEndDate, setNewEndDate] = useState("");
+  const [isUpdatingDates, setIsUpdatingDates] = useState(false);
+
+  const fetchRealData = async () => {
+    try {
+      const { data: rpcData, error } = await supabase.rpc('get_super_admin_stats');
+      if (error) throw error;
+      
+      setData(rpcData || { companies: [], subscriptions: [] });
+    } catch (err) {
+      console.error("Error fetching super admin stats:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchRealData = async () => {
-      try {
-        const { data: rpcData, error } = await supabase.rpc('get_super_admin_stats');
-        if (error) throw error;
-        
-        setData(rpcData || { companies: [], subscriptions: [] });
-      } catch (err) {
-        console.error("Error fetching super admin stats:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
     fetchRealData();
   }, []);
+
+  const handleUpdateDates = async () => {
+    if (!editingSub?.sub_id) {
+      toast({ title: "Error", description: "No active subscription found for this company.", variant: "destructive" });
+      return;
+    }
+    setIsUpdatingDates(true);
+    try {
+      const { error } = await supabase.rpc('update_subscription_dates', {
+        p_sub_id: editingSub.sub_id,
+        p_start_date: newStartDate,
+        p_end_date: newEndDate
+      });
+      if (error) throw error;
+      
+      toast({ title: "Success", description: "Subscription dates updated successfully." });
+      setEditSubOpen(false);
+      fetchRealData();
+    } catch (err: any) {
+      toast({ title: "Update Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setIsUpdatingDates(false);
+    }
+  };
+
+  const openEditDates = (comp: any) => {
+    setEditingSub(comp);
+    setNewStartDate(comp.start_date || "");
+    setNewEndDate(comp.end_date || "");
+    setEditSubOpen(true);
+  };
 
   // Format AED Currency
   const formatAED = (amount: number) => {
@@ -399,12 +442,13 @@ export default function SystemMonitor() {
                     <TableHead className="text-foreground font-semibold">Subscription Date</TableHead>
                     <TableHead className="text-foreground font-semibold">Expiry Date</TableHead>
                     <TableHead className="text-right text-foreground font-semibold">Plan Amount</TableHead>
+                    <TableHead className="text-right text-foreground font-semibold">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredCompanies.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                         No companies found matching the selected filters.
                       </TableCell>
                     </TableRow>
@@ -444,6 +488,11 @@ export default function SystemMonitor() {
                           <TableCell className="text-right font-semibold text-foreground">
                             {formatAED(Number(comp.amount || 0))}
                           </TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="outline" size="sm" className="h-8 text-xs text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-100" onClick={() => openEditDates(comp)}>
+                              <Pencil className="h-3 w-3 mr-1" /> Edit Dates
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       );
                     })
@@ -453,6 +502,50 @@ export default function SystemMonitor() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Edit Subscription Dates Modal */}
+        <Dialog open={editSubOpen} onOpenChange={setEditSubOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Subscription Dates</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Company / General Manager</Label>
+                <Input value={editingSub?.name || 'Unknown'} disabled className="bg-muted" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Start Date</Label>
+                  <Input 
+                    type="date" 
+                    value={newStartDate} 
+                    onChange={(e) => setNewStartDate(e.target.value)} 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Expiry Date (End Date)</Label>
+                  <Input 
+                    type="date" 
+                    value={newEndDate} 
+                    onChange={(e) => setNewEndDate(e.target.value)} 
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded border border-border mt-2">
+                <strong>Tip:</strong> To instantly expire a user's subscription or trial and put them in Read-Only Mode, simply set the Expiry Date to yesterday.
+              </p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditSubOpen(false)}>Cancel</Button>
+              <Button onClick={handleUpdateDates} disabled={isUpdatingDates}>
+                {isUpdatingDates && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
       </main>
     </div>
   );
