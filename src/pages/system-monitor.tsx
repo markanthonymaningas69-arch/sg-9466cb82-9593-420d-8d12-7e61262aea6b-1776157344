@@ -34,7 +34,6 @@ export default function SystemMonitor() {
   const [addonUsers, setAddonUsers] = useState<any[]>([]);
   const [filterAddonCompany, setFilterAddonCompany] = useState("");
   const [filterAddonAssignment, setFilterAddonAssignment] = useState("all");
-  const [filterAddonType, setFilterAddonType] = useState("all");
   
   const [editAddonOpen, setEditAddonOpen] = useState(false);
   const [editingAddon, setEditingAddon] = useState<any>(null);
@@ -239,7 +238,7 @@ export default function SystemMonitor() {
     return true;
   });
 
-  const filteredAddonUsers = addonUsers.filter((u: any) => {
+  const baseFilteredUsers = addonUsers.filter((u: any) => {
     if (filterAddonAssignment !== "all") {
       const modules = u.assigned_modules || (u.assigned_module ? [u.assigned_module] : []);
       if (!modules.includes(filterAddonAssignment)) return false;
@@ -247,13 +246,57 @@ export default function SystemMonitor() {
     if (filterAddonCompany.trim() !== "") {
       if (!u.company_name?.toLowerCase().includes(filterAddonCompany.toLowerCase())) return false;
     }
-    if (filterAddonType !== "all") {
-      const isAddon = !!u.is_addon;
-      if (filterAddonType === "addon" && !isAddon) return false;
-      if (filterAddonType === "included" && isAddon) return false;
-    }
     return true;
   });
+
+  const filteredIncludedUsers = baseFilteredUsers.filter((u: any) => !u.is_addon);
+  const filteredAddonUsers = baseFilteredUsers.filter((u: any) => !!u.is_addon);
+
+  const renderUserRow = (u: any, i: number) => {
+    const startDate = u.start_date ? new Date(u.start_date).toLocaleDateString('en-GB') : '-';
+    const endDate = u.end_date ? new Date(u.end_date).toLocaleDateString('en-GB') : '-';
+    const daysUntilExpiry = u.end_date ? Math.ceil((new Date(u.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
+    const isExpiringSoon = daysUntilExpiry !== null && daysUntilExpiry <= 30 && daysUntilExpiry > 0;
+    const isExpired = daysUntilExpiry !== null && daysUntilExpiry <= 0;
+    const assignments = u.assigned_modules || (u.assigned_module ? [u.assigned_module] : []);
+
+    return (
+      <TableRow key={u.id || i} className="border-border transition-colors hover:bg-muted/30">
+        <TableCell className="font-medium text-foreground">{u.full_name || 'Unknown'}</TableCell>
+        <TableCell className="text-muted-foreground">{u.email || '-'}</TableCell>
+        <TableCell className="text-foreground font-medium">{u.company_name || '-'}</TableCell>
+        <TableCell>
+          <div className="flex flex-wrap gap-1">
+            {assignments.map((m: string) => (
+              <Badge key={m} variant="secondary" className="text-[10px] font-normal">{m}</Badge>
+            ))}
+          </div>
+        </TableCell>
+        <TableCell className="text-foreground">
+          <div className="flex items-center gap-1">
+            <Calendar className="h-3 w-3 text-muted-foreground" />
+            {startDate}
+          </div>
+        </TableCell>
+        <TableCell className="text-foreground">
+          <div className={`flex items-center gap-1 ${isExpired ? 'text-destructive font-bold' : isExpiringSoon ? 'text-orange-600 font-semibold' : ''}`}>
+            <Calendar className="h-3 w-3 text-muted-foreground" />
+            {endDate}
+            {isExpiringSoon && <span className="text-xs ml-1">({daysUntilExpiry}d)</span>}
+            {isExpired && <span className="text-[10px] ml-1 bg-destructive/10 text-destructive px-1.5 rounded">Expired</span>}
+          </div>
+        </TableCell>
+        <TableCell className="text-muted-foreground capitalize text-sm">
+          {u.gm_plan ? `${u.gm_plan} (${u.gm_billing_cycle || 'monthly'})` : 'No Active Plan'}
+        </TableCell>
+        <TableCell className="text-right">
+          <Button variant="outline" size="sm" className="h-8 text-xs text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-100" onClick={() => openEditAddonDates(u)}>
+            <Pencil className="h-3 w-3 mr-1" /> Edit Dates
+          </Button>
+        </TableCell>
+      </TableRow>
+    );
+  };
 
   if (loading) {
     return (
@@ -568,41 +611,36 @@ export default function SystemMonitor() {
           </CardContent>
         </Card>
 
-        {/* Add-on Users Table */}
-        <Card className="border-border bg-card shadow-sm mt-8">
+        {/* Independent Users Filters Container */}
+        <div className="flex flex-col md:flex-row items-center justify-between mt-10 mb-4 gap-4">
+          <h2 className="text-xl font-bold tracking-tight text-foreground">Independent Users Directory</h2>
+          <div className="flex items-center gap-4">
+            <Input 
+              placeholder="Search by Company..." 
+              value={filterAddonCompany} 
+              onChange={(e) => setFilterAddonCompany(e.target.value)}
+              className="w-48 h-9 bg-background"
+            />
+            <Select value={filterAddonAssignment} onValueChange={setFilterAddonAssignment}>
+              <SelectTrigger className="w-40 h-9 bg-background">
+                <SelectValue placeholder="Assignment" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Assignments</SelectItem>
+                <SelectItem value="Site Personnel">Site Personnel</SelectItem>
+                <SelectItem value="Accounting">Accounting</SelectItem>
+                <SelectItem value="Purchasing">Purchasing</SelectItem>
+                <SelectItem value="Warehouse">Warehouse</SelectItem>
+                <SelectItem value="HR">HR</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Included Users Table */}
+        <Card className="border-border bg-card shadow-sm mb-6">
           <CardHeader className="flex flex-row items-center justify-between border-b border-border pb-4">
-            <CardTitle className="text-foreground">Independent / Add-on Users</CardTitle>
-            <div className="flex items-center gap-4">
-              <Input 
-                placeholder="Search by Company..." 
-                value={filterAddonCompany} 
-                onChange={(e) => setFilterAddonCompany(e.target.value)}
-                className="w-48 h-9 bg-background"
-              />
-              <Select value={filterAddonType} onValueChange={setFilterAddonType}>
-                <SelectTrigger className="w-36 h-9 bg-background">
-                  <SelectValue placeholder="Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="included">Included</SelectItem>
-                  <SelectItem value="addon">Add-on</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={filterAddonAssignment} onValueChange={setFilterAddonAssignment}>
-                <SelectTrigger className="w-40 h-9 bg-background">
-                  <SelectValue placeholder="Assignment" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Assignments</SelectItem>
-                  <SelectItem value="Site Personnel">Site Personnel</SelectItem>
-                  <SelectItem value="Accounting">Accounting</SelectItem>
-                  <SelectItem value="Purchasing">Purchasing</SelectItem>
-                  <SelectItem value="Warehouse">Warehouse</SelectItem>
-                  <SelectItem value="HR">HR</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <CardTitle className="text-foreground">Included Independent Users</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -613,7 +651,42 @@ export default function SystemMonitor() {
                     <TableHead className="text-foreground font-semibold">Email</TableHead>
                     <TableHead className="text-foreground font-semibold">Tied Company</TableHead>
                     <TableHead className="text-foreground font-semibold">Assignment</TableHead>
-                    <TableHead className="text-foreground font-semibold">Type</TableHead>
+                    <TableHead className="text-foreground font-semibold">Start Date</TableHead>
+                    <TableHead className="text-foreground font-semibold">Expiry Date</TableHead>
+                    <TableHead className="text-foreground font-semibold">Plan & Cycle</TableHead>
+                    <TableHead className="text-right text-foreground font-semibold">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredIncludedUsers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        No included users found.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredIncludedUsers.map(renderUserRow)
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Add-on Users Table */}
+        <Card className="border-border bg-card shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between border-b border-border pb-4">
+            <CardTitle className="text-foreground">Add-ons Independent Users</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead className="text-foreground font-semibold">User Name</TableHead>
+                    <TableHead className="text-foreground font-semibold">Email</TableHead>
+                    <TableHead className="text-foreground font-semibold">Tied Company</TableHead>
+                    <TableHead className="text-foreground font-semibold">Assignment</TableHead>
                     <TableHead className="text-foreground font-semibold">Start Date</TableHead>
                     <TableHead className="text-foreground font-semibold">Expiry Date</TableHead>
                     <TableHead className="text-foreground font-semibold">Plan & Cycle</TableHead>
@@ -623,61 +696,12 @@ export default function SystemMonitor() {
                 <TableBody>
                   {filteredAddonUsers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                        No add-on users found matching filters.
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        No active add-on users found.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredAddonUsers.map((u: any, i: number) => {
-                      const startDate = u.start_date ? new Date(u.start_date).toLocaleDateString('en-GB') : '-';
-                      const endDate = u.end_date ? new Date(u.end_date).toLocaleDateString('en-GB') : '-';
-                      const daysUntilExpiry = u.end_date ? Math.ceil((new Date(u.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
-                      const isExpiringSoon = daysUntilExpiry !== null && daysUntilExpiry <= 30 && daysUntilExpiry > 0;
-                      const isExpired = daysUntilExpiry !== null && daysUntilExpiry <= 0;
-                      const assignments = u.assigned_modules || (u.assigned_module ? [u.assigned_module] : []);
-
-                      return (
-                        <TableRow key={u.id || i} className="border-border transition-colors hover:bg-muted/30">
-                          <TableCell className="font-medium text-foreground">{u.full_name || 'Unknown'}</TableCell>
-                          <TableCell className="text-muted-foreground">{u.email || '-'}</TableCell>
-                          <TableCell className="text-foreground font-medium">{u.company_name || '-'}</TableCell>
-                          <TableCell>
-                            <div className="flex flex-wrap gap-1">
-                              {assignments.map((m: string) => (
-                                <Badge key={m} variant="secondary" className="text-[10px] font-normal">{m}</Badge>
-                              ))}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className={u.is_addon ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-primary/5 text-primary border-primary/20"}>
-                              {u.is_addon ? 'Add-on' : 'Included'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-foreground">
-                            <div className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3 text-muted-foreground" />
-                              {startDate}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-foreground">
-                            <div className={`flex items-center gap-1 ${isExpired ? 'text-destructive font-bold' : isExpiringSoon ? 'text-orange-600 font-semibold' : ''}`}>
-                              <Calendar className="h-3 w-3 text-muted-foreground" />
-                              {endDate}
-                              {isExpiringSoon && <span className="text-xs ml-1">({daysUntilExpiry}d)</span>}
-                              {isExpired && <span className="text-[10px] ml-1 bg-destructive/10 text-destructive px-1.5 rounded">Expired</span>}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-muted-foreground capitalize text-sm">
-                            {u.gm_plan ? `${u.gm_plan} (${u.gm_billing_cycle || 'monthly'})` : 'No Active Plan'}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button variant="outline" size="sm" className="h-8 text-xs text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-100" onClick={() => openEditAddonDates(u)}>
-                              <Pencil className="h-3 w-3 mr-1" /> Edit Dates
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
+                    filteredAddonUsers.map(renderUserRow)
                   )}
                 </TableBody>
               </Table>
