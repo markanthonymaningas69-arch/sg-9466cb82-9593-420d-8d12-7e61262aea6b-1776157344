@@ -9,10 +9,12 @@ import { useSettings } from "@/contexts/SettingsProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { plans, addOns, type PlanConfig } from "@/config/pricing";
 import { useToast } from "@/hooks/use-toast";
+import { useRouter } from "next/router";
 
 export default function Subscription() {
   const { currentPlan, setCurrentPlan, isTrial, isLocked } = useSettings();
   const { toast } = useToast();
+  const router = useRouter();
   
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
   const [billingHistory, setBillingHistory] = useState<any[]>([]);
@@ -24,6 +26,7 @@ export default function Subscription() {
   const [addOnQuantities, setAddOnQuantities] = useState<Record<string, number>>({});
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [isManagingBilling, setIsManagingBilling] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   useEffect(() => {
     if (currentPlan && currentPlan !== 'trial') {
@@ -34,6 +37,59 @@ export default function Subscription() {
   useEffect(() => {
     loadBillingHistory();
   }, []);
+
+  useEffect(() => {
+    if (router.isReady) {
+      if (router.query.success === 'true' && router.query.session_id) {
+        verifyPayment(router.query.session_id as string);
+      } else if (router.query.canceled === 'true') {
+        toast({
+          title: "Checkout Canceled",
+          description: "Your payment process was not completed.",
+        });
+        // Clean URL
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+      }
+    }
+  }, [router.isReady, router.query]);
+
+  const verifyPayment = async (sessionId: string) => {
+    if (isVerifying) return;
+    setIsVerifying(true);
+    try {
+      const res = await fetch('/api/stripe/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast({
+          title: "Payment Successful!",
+          description: `Your account has been upgraded successfully.`,
+        });
+        // Force hard reload to reset SettingsProvider state and clear URL securely
+        window.location.href = '/subscription';
+      } else {
+        toast({
+          title: "Verification Failed",
+          description: data.error || "Could not verify payment.",
+          variant: "destructive"
+        });
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+        setIsVerifying(false);
+      }
+    } catch (e: any) {
+      toast({
+        title: "Error",
+        description: "Failed to reach verification server.",
+        variant: "destructive"
+      });
+      setIsVerifying(false);
+    }
+  }
 
   const loadBillingHistory = async () => {
     const { data: { session } } = await supabase.auth.getSession();
