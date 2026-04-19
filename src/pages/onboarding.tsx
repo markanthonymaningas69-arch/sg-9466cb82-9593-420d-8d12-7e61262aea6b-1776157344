@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/services/authService";
+import { plans } from "@/config/pricing";
 
 export default function Onboarding() {
   const router = useRouter();
@@ -169,9 +170,29 @@ export default function Onboarding() {
         if (upsertError) throw upsertError;
       }
 
+      // Generate a 7-day trial subscription for the new General Manager
+      const trialPlan = plans.find(p => p.id === 'trial');
+      const startDate = new Date();
+      const endDate = new Date();
+      endDate.setDate(startDate.getDate() + 7);
+
+      const { error: subError } = await supabase.from('subscriptions').insert({
+        user_id: user.id,
+        plan: 'trial',
+        status: 'active',
+        amount: 0,
+        start_date: startDate.toISOString().split('T')[0],
+        end_date: endDate.toISOString().split('T')[0],
+        features: trialPlan ? trialPlan.addOnLimits : {}
+      });
+
+      if (subError) {
+        console.warn("Failed to create trial subscription:", subError);
+      }
+
       toast({
         title: "Workspace Created",
-        description: "You are now the General Manager.",
+        description: "You are now the General Manager. Your 7-Day Trial has been activated.",
       });
 
       // Use hard reload to completely clear any cached auth/profile states in Next.js
