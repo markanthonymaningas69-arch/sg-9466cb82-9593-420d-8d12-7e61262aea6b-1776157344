@@ -34,6 +34,7 @@ export default function SystemMonitor() {
   const [addonUsers, setAddonUsers] = useState<any[]>([]);
   const [filterAddonCompany, setFilterAddonCompany] = useState("");
   const [filterAddonAssignment, setFilterAddonAssignment] = useState("all");
+  const [filterAddonType, setFilterAddonType] = useState("all");
   
   const [editAddonOpen, setEditAddonOpen] = useState(false);
   const [editingAddon, setEditingAddon] = useState<any>(null);
@@ -245,6 +246,11 @@ export default function SystemMonitor() {
     }
     if (filterAddonCompany.trim() !== "") {
       if (!u.company_name?.toLowerCase().includes(filterAddonCompany.toLowerCase())) return false;
+    }
+    if (filterAddonType !== "all") {
+      const isAddon = !!u.is_addon;
+      if (filterAddonType === "addon" && !isAddon) return false;
+      if (filterAddonType === "included" && isAddon) return false;
     }
     return true;
   });
@@ -566,6 +572,16 @@ export default function SystemMonitor() {
                 onChange={(e) => setFilterAddonCompany(e.target.value)}
                 className="w-48 h-9 bg-background"
               />
+              <Select value={filterAddonType} onValueChange={setFilterAddonType}>
+                <SelectTrigger className="w-36 h-9 bg-background">
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="included">Included</SelectItem>
+                  <SelectItem value="addon">Add-on</SelectItem>
+                </SelectContent>
+              </Select>
               <Select value={filterAddonAssignment} onValueChange={setFilterAddonAssignment}>
                 <SelectTrigger className="w-40 h-9 bg-background">
                   <SelectValue placeholder="Assignment" />
@@ -590,6 +606,7 @@ export default function SystemMonitor() {
                     <TableHead className="text-foreground font-semibold">Email</TableHead>
                     <TableHead className="text-foreground font-semibold">Tied Company</TableHead>
                     <TableHead className="text-foreground font-semibold">Assignment</TableHead>
+                    <TableHead className="text-foreground font-semibold">Type</TableHead>
                     <TableHead className="text-foreground font-semibold">Start Date</TableHead>
                     <TableHead className="text-foreground font-semibold">Expiry Date</TableHead>
                     <TableHead className="text-foreground font-semibold">Plan & Cycle</TableHead>
@@ -599,7 +616,7 @@ export default function SystemMonitor() {
                 <TableBody>
                   {filteredAddonUsers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                         No add-on users found matching filters.
                       </TableCell>
                     </TableRow>
@@ -623,6 +640,11 @@ export default function SystemMonitor() {
                                 <Badge key={m} variant="secondary" className="text-[10px] font-normal">{m}</Badge>
                               ))}
                             </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={u.is_addon ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-primary/5 text-primary border-primary/20"}>
+                              {u.is_addon ? 'Add-on' : 'Included'}
+                            </Badge>
                           </TableCell>
                           <TableCell className="text-foreground">
                             <div className="flex items-center gap-1">
