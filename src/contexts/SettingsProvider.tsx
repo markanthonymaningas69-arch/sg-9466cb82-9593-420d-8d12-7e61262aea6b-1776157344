@@ -71,16 +71,57 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setCompanyId(null);
 
       try {
-        // 1. Fetch Subscription Data directly from Supabase
+        // 1. Fetch Company Data to find the Owner
+        const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', userId).single();
+        let compId = profile?.company_id;
+
+        if (!compId) {
+          // If no company, create one (graceful fallback)
+          const { data: newComp, error: insertError } = await supabase.from('company_settings').insert({
+            user_id: userId,
+            name: "My Company"
+          }).select().single();
+
+          if (newComp) {
+            compId = newComp.id;
+            await supabase.from('profiles').update({ company_id: compId }).eq('id', userId);
+          } else if (insertError) {
+            console.error("Failed to create fallback company:", insertError);
+          }
+        }
+
+        let ownerId = userId;
+
+        if (compId) {
+          setCompanyId(compId);
+          const { data: compSettings } = await supabase.from('company_settings').select('*').eq('id', compId).single();
+          if (compSettings) {
+            if (compSettings.user_id) ownerId = compSettings.user_id; // Set owner to the company's creator (GM)
+            setCompanyState({
+              name: compSettings.name || "",
+              address: compSettings.address || "",
+              taxId: compSettings.tax_id || "",
+              website: compSettings.website || "",
+              logo: compSettings.logo || "",
+              auto_approve_materials: compSettings.auto_approve_materials || false
+            });
+          }
+        }
+
+        // 2. Fetch Subscription Data using the Company Owner's ID
         const { data: subs } = await supabase
           .from('subscriptions')
           .select('*')
-          .eq('user_id', userId)
+          .eq('user_id', ownerId)
           .order('created_at', { ascending: false });
 
         if (subs && subs.length > 0) {
           const sub = subs[0];
           setCurrentPlanState(sub.plan as PlanType);
+          
+          if (sub.features) {
+            localStorage.setItem('app_subscription_features', JSON.stringify(sub.features));
+          }
           
           if (sub.end_date) {
             const endDate = new Date(sub.end_date);
@@ -119,40 +160,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           setCurrentPlanState("trial");
           setIsLocked(false);
           setDaysRemaining(7);
-        }
-
-        // 2. Fetch Company Data
-        const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', userId).single();
-        let compId = profile?.company_id;
-
-        if (!compId) {
-          // If no company, create one (graceful fallback)
-          const { data: newComp, error: insertError } = await supabase.from('company_settings').insert({
-            user_id: userId,
-            name: "My Company"
-          }).select().single();
-
-          if (newComp) {
-            compId = newComp.id;
-            await supabase.from('profiles').update({ company_id: compId }).eq('id', userId);
-          } else if (insertError) {
-            console.error("Failed to create fallback company:", insertError);
-          }
-        }
-
-        if (compId) {
-          setCompanyId(compId);
-          const { data: compSettings } = await supabase.from('company_settings').select('*').eq('id', compId).single();
-          if (compSettings) {
-            setCompanyState({
-              name: compSettings.name || "",
-              address: compSettings.address || "",
-              taxId: compSettings.tax_id || "",
-              website: compSettings.website || "",
-              logo: compSettings.logo || "",
-              auto_approve_materials: compSettings.auto_approve_materials || false
-            });
-          }
         }
       } catch (err) {
         console.error("Error loading company/subscription data:", err);
