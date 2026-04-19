@@ -16,6 +16,7 @@ export default function Onboarding() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   
+  const [fullName, setFullName] = useState("");
   const [inviteCode, setInviteCode] = useState("");
   
   const [joining, setJoining] = useState(false);
