@@ -247,6 +247,7 @@ export function Layout({ children }: LayoutProps) {
 
   const handleApproveRequest = async (req: any, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isLocked) return;
     const { error } = await supabase.
     from('site_requests').
     update({ status: 'approved' }).
@@ -301,6 +302,7 @@ export function Layout({ children }: LayoutProps) {
 
   const handleRejectRequest = async (requestId: string, itemName: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isLocked) return;
     const { error } = await supabase.
     from('site_requests').
     update({ status: 'rejected' }).
@@ -324,6 +326,7 @@ export function Layout({ children }: LayoutProps) {
 
   const handleApproveLeave = async (id: string, name: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isLocked) return;
     const { error } = await supabase.from('leave_requests').update({ status: 'approved' }).eq('id', id);
     if (!error) {
       toast({ title: "Leave Approved", description: `Leave request for ${name} has been approved.` });
@@ -335,6 +338,7 @@ export function Layout({ children }: LayoutProps) {
 
   const handleRejectLeave = async (id: string, name: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isLocked) return;
     const { error } = await supabase.from('leave_requests').update({ status: 'rejected' }).eq('id', id);
     if (!error) {
       toast({ title: "Leave Rejected", description: `Leave request for ${name} has been rejected.`, variant: "destructive" });
@@ -346,6 +350,7 @@ export function Layout({ children }: LayoutProps) {
 
   const handleApproveCashAdvance = async (id: string, name: string, amount: number, advProject: string | null, reason: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isLocked) return;
     const { error } = await supabase.from('cash_advance_requests').update({ status: 'approved' }).eq('id', id);
     if (!error) {
       // Auto-generate voucher for cash advance
@@ -369,6 +374,7 @@ export function Layout({ children }: LayoutProps) {
 
   const handleRejectCashAdvance = async (id: string, name: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isLocked) return;
     const { error } = await supabase.from('cash_advance_requests').update({ status: 'rejected' }).eq('id', id);
     if (!error) {
       toast({ title: "Cash Advance Rejected", description: `${name}'s request rejected.`, variant: "destructive" });
@@ -380,6 +386,7 @@ export function Layout({ children }: LayoutProps) {
 
   const handleApprovePurchaseGM = async (purchase: any, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isLocked) return;
     const { error } = await supabase.from('purchases').update({ status: 'approved', voucher_number: 'Pending Issue' }).eq('id', purchase.id);
     
     if (!error) {
@@ -402,6 +409,7 @@ export function Layout({ children }: LayoutProps) {
 
   const handleRejectPurchaseGM = async (purchaseId: string, itemName: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isLocked) return;
     await supabase.from('purchases').update({ status: 'pending' }).eq('id', purchaseId);
     toast({ title: "PO Rejected", description: `${itemName} returned to Purchasing for revision.`, variant: "destructive" });
     loadPendingRequests();
@@ -796,11 +804,11 @@ export function Layout({ children }: LayoutProps) {
                               Cost: AED {(purchase.quantity * (purchase.unit_cost || 0)).toLocaleString()}
                             </span>
                             <div className="flex gap-2 w-full mt-1" onClick={(e) => e.stopPropagation()}>
-                              <Button size="sm" variant="default" className="flex-1 h-8 bg-green-600 hover:bg-green-700 text-white" onClick={(e) => handleApprovePurchaseGM(purchase, e)}>
+                              <Button size="sm" variant="default" disabled={isLocked} className="flex-1 h-8 bg-green-600 hover:bg-green-700 text-white" onClick={(e) => handleApprovePurchaseGM(purchase, e)}>
                                 <Check className="h-3 w-3 mr-1" />
                                 Approve
                               </Button>
-                              <Button size="sm" variant="destructive" className="flex-1 h-8" onClick={(e) => handleRejectPurchaseGM(purchase.id, purchase.item_name, e)}>
+                              <Button size="sm" variant="destructive" disabled={isLocked} className="flex-1 h-8" onClick={(e) => handleRejectPurchaseGM(purchase.id, purchase.item_name, e)}>
                                 <XCircle className="h-3 w-3 mr-1" />
                                 Reject
                               </Button>
@@ -865,7 +873,7 @@ export function Layout({ children }: LayoutProps) {
                         key={`pending-adv-${adv.id}`}
                         className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-muted"
                         onClick={() => {
-                          router.push('/accounting');
+                          router.push('/site-personnel?tab=advances');
                           setNotificationOpen(false);
                         }}>
                         
@@ -885,6 +893,7 @@ export function Layout({ children }: LayoutProps) {
                           <Button
                         size="sm"
                         variant="default"
+                        disabled={isLocked}
                         className="flex-1 h-8 bg-green-600 hover:bg-green-700 text-white"
                         onClick={(e) => handleApproveCashAdvance(adv.id, adv.personnel?.name, adv.amount, adv.project_id, adv.reason, e)}>
                         
@@ -894,6 +903,7 @@ export function Layout({ children }: LayoutProps) {
                           <Button
                         size="sm"
                         variant="destructive"
+                        disabled={isLocked}
                         className="flex-1 h-8"
                         onClick={(e) => handleRejectCashAdvance(adv.id, adv.personnel?.name, e)}>
                         
@@ -938,6 +948,7 @@ export function Layout({ children }: LayoutProps) {
                           <Button
                         size="sm"
                         variant="default"
+                        disabled={isLocked}
                         className="flex-1 h-8 bg-green-600 hover:bg-green-700 text-white"
                         onClick={(e) => handleApproveRequest(req, e)}>
                         
@@ -947,6 +958,7 @@ export function Layout({ children }: LayoutProps) {
                           <Button
                         size="sm"
                         variant="destructive"
+                        disabled={isLocked}
                         className="flex-1 h-8"
                         onClick={(e) => handleRejectRequest(req.id, req.item_name, e)}>
                         
@@ -987,6 +999,7 @@ export function Layout({ children }: LayoutProps) {
                           <Button
                         size="sm"
                         variant="default"
+                        disabled={isLocked}
                         className="flex-1 h-8 bg-green-600 hover:bg-green-700 text-white"
                         onClick={(e) => handleApproveLeave(leave.id, leave.personnel?.name, e)}>
                         
@@ -996,6 +1009,7 @@ export function Layout({ children }: LayoutProps) {
                           <Button
                         size="sm"
                         variant="destructive"
+                        disabled={isLocked}
                         className="flex-1 h-8"
                         onClick={(e) => handleRejectLeave(leave.id, leave.personnel?.name, e)}>
                         
@@ -1174,31 +1188,29 @@ export function Layout({ children }: LayoutProps) {
           </div>
         </header>
 
-        {/* Page content */}
-        <main className="p-6 relative min-h-[calc(100vh-4rem)]">
-          {isLocked && router.pathname !== '/subscription' && router.pathname !== '/account' && (
-            <div className="absolute inset-0 z-40 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center border rounded-lg m-6">
-              <div className="h-20 w-20 rounded-full bg-destructive/10 flex items-center justify-center mb-6">
-                <Lock className="h-10 w-10 text-destructive" />
+        {/* Persistent Read-Only Banner */}
+        {isLocked && router.pathname !== '/subscription' && (
+          <div className="bg-destructive/10 border-b border-destructive/20 px-6 py-3 flex items-center justify-between sticky top-16 z-20 backdrop-blur-sm">
+            <div className="flex items-center gap-3">
+              <Lock className="h-5 w-5 text-destructive shrink-0" />
+              <div>
+                <p className="text-sm font-bold text-destructive">
+                  {lockReason === "trial_expired" ? "Trial Expired - Read-Only Mode" : "Subscription Expired - Read-Only Mode"}
+                </p>
+                <p className="text-xs text-destructive/80 hidden sm:block">
+                  You can view your data, but adding, editing, or deleting is disabled until you upgrade.
+                </p>
               </div>
-              <h2 className="text-3xl font-heading font-bold mb-2">
-                {lockReason === "trial_expired" ? "Trial Expired" : "Subscription Expired"}
-              </h2>
-              <p className="text-muted-foreground max-w-md mb-8 text-lg">
-                {lockReason === "trial_expired" 
-                  ? "Your 7-day Professional trial has ended. All modules are currently locked and buttons have been disabled."
-                  : "Your active subscription has expired. All modules are currently locked and buttons have been disabled."}
-              </p>
-              <Button size="lg" onClick={() => router.push('/subscription')} className="text-lg px-8">
-                <CreditCard className="mr-2 h-5 w-5" />
-                Upgrade to Unlock
-              </Button>
             </div>
-          )}
-          
-          <div className={cn(isLocked && router.pathname !== '/subscription' && router.pathname !== '/account' && "pointer-events-none opacity-20 select-none blur-sm transition-all duration-300")}>
-            {children}
+            <Button size="sm" variant="destructive" onClick={() => router.push('/subscription')}>
+              Upgrade Now
+            </Button>
           </div>
+        )}
+
+        {/* Page content */}
+        <main className={cn("p-6 relative min-h-[calc(100vh-4rem)]", isLocked && "pt-4")}>
+          {children}
         </main>
       </div>
     </div>);
