@@ -41,7 +41,7 @@ import { cn } from "@/lib/utils";
 export default function Settings() {
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
-  const { currency, setCurrency, company, setCompany, currentPlan, themeColor, setThemeColor, companyId } = useSettings();
+  const { currency, setCurrency, company, setCompany, currentPlan, isTrial, themeColor, setThemeColor, companyId } = useSettings();
 
   const [localCompany, setLocalCompany] = useState(company);
   const [notifications, setNotifications] = useState({
