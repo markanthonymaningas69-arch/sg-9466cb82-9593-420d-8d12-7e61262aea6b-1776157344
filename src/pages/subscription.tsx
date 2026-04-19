@@ -18,7 +18,7 @@ export default function Subscription() {
   const [billingHistory, setBillingHistory] = useState<any[]>([]);
   const [subscriptionDetails, setSubscriptionDetails] = useState<any>(null);
   
-  const [selectedPlan, setSelectedPlan] = useState<string>("professional");
+  const [selectedPlan, setSelectedPlan] = useState<string>("");
   
   // Track exact quantity of each add-on
   const [addOnQuantities, setAddOnQuantities] = useState<Record<string, number>>({});
@@ -111,10 +111,10 @@ export default function Subscription() {
     return date.toLocaleDateString();
   };
 
-  const selectedPlanConfig = plans.find(p => p.id === selectedPlan) || plans.find(p => p.id === "professional")!;
+  const selectedPlanConfig = plans.find(p => p.id === selectedPlan);
 
   const updateAddOnQuantity = (id: string, delta: number) => {
-    const limit = selectedPlanConfig.addOnLimits?.[id] || 0;
+    const limit = selectedPlanConfig?.addOnLimits?.[id] || 0;
     const activeQty = (subscriptionDetails?.features && subscriptionDetails.features[id]) || 0;
     
     setAddOnQuantities(prev => {
@@ -259,7 +259,7 @@ export default function Subscription() {
   const isActiveAnnual = activeAmount > 1000;
   const isSelectingSamePlanAndCycle = subscriptionDetails?.plan === selectedPlan && (billingCycle === "annual") === isActiveAnnual;
 
-  const basePrice = billingCycle === "monthly" ? selectedPlanConfig.monthlyPrice : selectedPlanConfig.annualPrice;
+  const basePrice = selectedPlanConfig ? (billingCycle === "monthly" ? selectedPlanConfig.monthlyPrice : selectedPlanConfig.annualPrice) : 0;
   
   // Only charge base price if they are upgrading/changing plans or cycle, or don't have an active one
   const basePriceToCharge = (!hasActiveSub || !isSelectingSamePlanAndCycle) ? basePrice : 0;
@@ -500,8 +500,8 @@ export default function Subscription() {
             {addOns.map((addon) => {
               const newQty = Number(addOnQuantities[addon.id] || 0);
               const activeQty = Number((subscriptionDetails?.features && subscriptionDetails.features[addon.id]) || 0);
-              const limit = Number(selectedPlanConfig.addOnLimits?.[addon.id] || 0);
-              const isUnavailable = limit === 0 || activeQty >= limit;
+              const limit = Number(selectedPlanConfig?.addOnLimits?.[addon.id] || 0);
+              const isUnavailable = !selectedPlanConfig || limit === 0 || activeQty >= limit;
               const isSelected = newQty > 0;
               
               return (
@@ -509,7 +509,7 @@ export default function Subscription() {
                   <CardHeader className="pb-3">
                     <div className="flex justify-between items-start">
                       <CardTitle className="text-lg">{addon.name}</CardTitle>
-                      {isUnavailable && <Badge variant="secondary" className="text-[10px]">Max Reached</Badge>}
+                      {isUnavailable && <Badge variant="secondary" className="text-[10px]">{!selectedPlanConfig ? "Select Plan First" : "Max Reached"}</Badge>}
                     </div>
                     <CardDescription className="text-sm">{addon.description}</CardDescription>
                   </CardHeader>
@@ -566,10 +566,16 @@ export default function Subscription() {
                 <h3 className="text-2xl font-bold tracking-tight">Order Summary</h3>
                 <div className="mt-3 space-y-2">
                   <div className="flex justify-between text-muted-foreground max-w-sm">
-                    <span>{selectedPlanConfig.name} Plan ({billingCycle}) {isSelectingSamePlanAndCycle && <Badge variant="outline" className="ml-2 text-[10px] bg-success/10 text-success border-success/20">Already Active</Badge>}</span>
-                    <span className="font-medium text-foreground">
-                      {isSelectingSamePlanAndCycle ? "AED 0" : `AED ${basePriceToCharge}`}
-                    </span>
+                    {selectedPlanConfig ? (
+                      <>
+                        <span>{selectedPlanConfig.name} Plan ({billingCycle}) {isSelectingSamePlanAndCycle && <Badge variant="outline" className="ml-2 text-[10px] bg-success/10 text-success border-success/20">Already Active</Badge>}</span>
+                        <span className="font-medium text-foreground">
+                          {isSelectingSamePlanAndCycle ? "AED 0" : `AED ${basePriceToCharge}`}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-warning font-medium">Please select a plan from above to continue.</span>
+                    )}
                   </div>
                   
                   {/* List newly added add-ons individually */}
@@ -606,7 +612,7 @@ export default function Subscription() {
                   size="lg" 
                   className="h-16 px-8 text-lg font-bold w-full sm:w-auto shadow-md hover:shadow-lg transition-all"
                   onClick={handleCheckout}
-                  disabled={isCheckingOut || totalAmountDueToday === 0}
+                  disabled={isCheckingOut || !selectedPlan || (totalAmountDueToday === 0 && !isSelectingSamePlanAndCycle)}
                 >
                   {isCheckingOut ? (
                     <Loader2 className="mr-2 h-6 w-6 animate-spin" />

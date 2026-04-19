@@ -171,7 +171,6 @@ export default function Onboarding() {
       }
 
       // Generate a 7-day trial subscription for the new General Manager
-      const trialPlan = plans.find(p => p.id === 'trial');
       const startDate = new Date();
       const endDate = new Date();
       endDate.setDate(startDate.getDate() + 7);
@@ -183,7 +182,7 @@ export default function Onboarding() {
         amount: 0,
         start_date: startDate.toISOString().split('T')[0],
         end_date: endDate.toISOString().split('T')[0],
-        features: trialPlan ? trialPlan.addOnLimits : {}
+        features: {}
       });
 
       if (subError) {
