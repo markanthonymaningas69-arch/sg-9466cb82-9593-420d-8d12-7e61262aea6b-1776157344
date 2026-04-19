@@ -95,6 +95,7 @@ export default function Onboarding() {
         assigned_modules: allModules,
         assigned_project_ids: invData.project_ids || [],
         company_id: invData.company_id,
+        is_addon: invData.is_addon || false,
         updated_at: new Date().toISOString()
       });
 

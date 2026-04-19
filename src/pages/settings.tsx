@@ -155,46 +155,40 @@ export default function Settings() {
       return;
     }
 
-    for (const mod of selectedModules) {
-      if (isStarter && (mod === 'Accounting' || mod === 'Purchasing')) continue;
-
-      const limit = planLimits[mod] || 0;
-      const currentUsage = getUsageCount(mod);
-      
-      if (currentUsage >= limit) {
-        toast({
-          title: "Limit Reached",
-          description: `Your ${currentPlan} plan only allows ${limit} user(s) for ${mod}. Upgrade to add more.`,
-          variant: "destructive"
-        });
-        return;
-      }
-    }
+    // Determine if this code consumes an Add-on seat or an Included seat
+    let isAddon = false;
 
     if (isStarter && (selectedModules.includes('Accounting') || selectedModules.includes('Purchasing'))) {
-      const combinedLimit = 1 + (activeAddOns['extra_acc'] || 0) + (activeAddOns['purchasing'] || 0);
-      if (getCombinedAccPurchUsage() >= combinedLimit) {
-        toast({
-          title: "Limit Reached",
-          description: `Starter/Trial plan allows a combined total of ${combinedLimit} user(s) for Accounting/Purchasing.`,
-          variant: "destructive"
-        });
-        return;
+      const includedAccPurchUsage = invites.filter(i => !i.is_addon && (i.modules?.includes('Accounting') || i.modules?.includes('Purchasing') || i.module === 'Accounting' || i.module === 'Purchasing')).length + 
+                                    teamUsers.filter(u => !u.is_addon && (u.assigned_modules?.includes('Accounting') || u.assigned_modules?.includes('Purchasing') || u.assigned_module === 'Accounting' || u.assigned_module === 'Purchasing')).length;
+      if (includedAccPurchUsage >= 1) { // 1 is the combined base limit for Starter
+        isAddon = true;
       }
     }
 
-    if (selectedModules.includes("Site Personnel") && currentPlan === 'starter' && selectedProjects.length > 2) {
-      toast({ title: "Limit Reached", description: "Starter plan limits Site Personnel to a maximum of 2 projects.", variant: "destructive" });
-      return;
+    for (const mod of selectedModules) {
+      if (isStarter && (mod === 'Accounting' || mod === 'Purchasing')) continue;
+      
+      const baseLimit = basePlanLimits[mod] || 0;
+      const includedUsage = invites.filter(i => !i.is_addon && (i.modules?.includes(mod) || i.module === mod)).length + 
+                            teamUsers.filter(u => !u.is_addon && (u.assigned_modules?.includes(mod) || u.assigned_module === mod)).length;
+      
+      if (includedUsage >= baseLimit) {
+        isAddon = true;
+      }
     }
 
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const prefix = isAddon ? 'ADD-' : 'INC-';
+    const randomPart = Math.random().toString(36).substring(2, 7).toUpperCase();
+    const code = prefix + randomPart;
+
     const { error } = await supabase.from('invite_codes').insert({
       code,
       module: selectedModules[0],
       modules: selectedModules,
       project_ids: selectedModules.includes("Site Personnel") ? selectedProjects : [],
-      company_id: companyId
+      company_id: companyId,
+      is_addon: isAddon
     });
 
     if (error) {
@@ -388,154 +382,167 @@ export default function Settings() {
                 <CardDescription>Generate invite codes to grant specific module access based on your {currentPlan} plan limits.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="bg-muted/30 p-4 rounded-lg border space-y-4">
-                  <h3 className="font-semibold text-sm">Generate Invite Code</h3>
-                  <div className="flex items-end gap-4">
-                    <div className="space-y-2 flex-1">
-                      <Label>Assign Modules (Multiple allowed)</Label>
-                      <div className="border rounded-md p-2 max-h-32 overflow-y-auto space-y-2 bg-background">
-                        {Object.keys(planLimits).map(mod => {
-                          const isAccPurch = isStarter && (mod === 'Accounting' || mod === 'Purchasing');
-                          const combinedLimit = isStarter ? 1 + (activeAddOns['extra_acc'] || 0) + (activeAddOns['purchasing'] || 0) : 0;
-                          
-                          const disabled = isAccPurch ? combinedLimit === 0 : planLimits[mod] === 0;
-                          const usageText = isAccPurch 
-                            ? `Combined Acc/Purch: ${getCombinedAccPurchUsage()}/${combinedLimit} used`
-                            : `${getUsageCount(mod)}/${planLimits[mod]} used`;
-
-                          return (
-                            <div key={mod} className="flex items-center space-x-2">
-                              <Checkbox 
-                                id={`mod-${mod}`} 
-                                checked={selectedModules.includes(mod)}
-                                disabled={disabled}
-                                onCheckedChange={(checked) => {
-                                  if (checked) setSelectedModules([...selectedModules, mod]);
-                                  else setSelectedModules(selectedModules.filter(m => m !== mod));
-                                }}
-                              />
-                              <label htmlFor={`mod-${mod}`} className={cn("text-sm font-medium leading-none cursor-pointer", disabled && "opacity-50")}>
-                                {mod} <span className="text-xs text-muted-foreground">({usageText})</span>
-                              </label>
-                            </div>
-                          );
-                        })}
+                <div className="grid md:grid-cols-2 gap-6 pt-4 border-t">
+                  
+                  {/* INCLUDED COLUMN */}
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="h-8 w-8 rounded bg-primary/10 flex items-center justify-center">
+                        <Users className="h-4 w-4 text-primary" />
                       </div>
+                      <h3 className="font-semibold text-lg">Independent User (Included)</h3>
                     </div>
-                    {selectedModules.includes("Site Personnel") && (
-                      <div className="space-y-2 flex-1">
-                        <Label>Restrict to Projects (Max {currentPlan === 'starter' || currentPlan === 'trial' || isTrial ? 2 : 'Unlimited'})</Label>
-                        <div className="border rounded-md p-2 max-h-32 overflow-y-auto space-y-2 bg-background">
-                          {projects.map(p => (
-                            <div key={p.id} className="flex items-center space-x-2">
-                              <Checkbox 
-                                id={`proj-${p.id}`} 
-                                checked={selectedProjects.includes(p.id)}
-                                onCheckedChange={(checked) => {
-                                  if (checked) {
-                                    if ((currentPlan === 'starter' || currentPlan === 'trial' || isTrial) && selectedProjects.length >= 2) {
-                                      toast({ title: "Limit Reached", description: "Starter/Trial plan allows a maximum of 2 projects per user.", variant: "destructive" });
-                                      return;
-                                    }
-                                    setSelectedProjects([...selectedProjects, p.id]);
-                                  } else {
-                                    setSelectedProjects(selectedProjects.filter(id => id !== p.id));
-                                  }
-                                }}
-                              />
-                              <label htmlFor={`proj-${p.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
-                                {p.name}
-                              </label>
+
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Active Invite Codes</h4>
+                      {invites.filter(i => !i.is_addon).length === 0 ? (
+                        <p className="text-xs text-muted-foreground bg-muted/20 p-3 rounded-md border border-dashed">No active included invite codes.</p>
+                      ) : (
+                        <div className="border rounded-md divide-y">
+                          {invites.filter(i => !i.is_addon).map(inv => (
+                            <div key={inv.id} className="flex items-center justify-between p-3 bg-white">
+                              <div>
+                                <div className="font-mono font-bold text-sm tracking-widest text-primary">{inv.code}</div>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {(inv.modules && inv.modules.length > 0 ? inv.modules : [inv.module]).map((m: string) => (
+                                    <Badge key={m} variant="secondary" className="text-[10px]">{m}</Badge>
+                                  ))}
+                                </div>
+                              </div>
+                              <Button size="icon" variant="ghost" onClick={() => handleDeleteCode(inv.id)} className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8">
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
                             </div>
                           ))}
-                          {projects.length === 0 && <p className="text-xs text-muted-foreground">No projects found.</p>}
                         </div>
-                      </div>
-                    )}
-                    <Button onClick={handleGenerateCode} className="bg-primary">
-                      <Key className="w-4 h-4 mr-2" /> Generate Code
-                    </Button>
-                  </div>
-                  {planLimits[selectedModules[0]] === 0 && (
-                    <p className="text-xs text-destructive">Your current plan does not include access to the {selectedModules[0]} module.</p>
-                  )}
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-sm">Active Invite Codes</h3>
-                  {invites.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No active invite codes.</p>
-                  ) : (
-                    <div className="border rounded-md divide-y">
-                      {invites.map(inv => (
-                        <div key={inv.id} className="flex items-center justify-between p-3 bg-white">
-                          <div>
-                            <div className="font-mono font-bold text-lg tracking-widest text-primary">{inv.code}</div>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {(inv.modules && inv.modules.length > 0 ? inv.modules : [inv.module]).map((m: string) => (
-                                <Badge key={m} variant="secondary" className="text-[10px]">{m}</Badge>
-                              ))}
-                            </div>
-                          </div>
-                          <Button size="icon" variant="ghost" onClick={() => handleDeleteCode(inv.id)} className="text-red-500 hover:text-red-700 hover:bg-red-50">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      ))}
+                      )}
                     </div>
-                  )}
-                </div>
 
-                <div className="space-y-4 pt-4 border-t">
-                  <h3 className="font-semibold text-sm">Active Team Members</h3>
-                  {teamUsers.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No team members joined yet.</p>
-                  ) : (
-                    <div className="border rounded-md divide-y">
-                      {teamUsers.map(u => (
-                        <div key={u.id} className="flex items-center justify-between p-3 bg-white">
-                          <div>
-                            <div className="font-medium">{u.email || u.full_name || 'User'}</div>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {(u.assigned_modules && u.assigned_modules.length > 0 ? u.assigned_modules : [u.assigned_module]).map((m: string) => (
-                                <Badge key={m} variant="outline" className="text-[10px]">{m}</Badge>
-                              ))}
-                            </div>
-                            {(u.assigned_modules?.includes("Site Personnel") || u.assigned_module === "Site Personnel") && u.assigned_project_ids?.length > 0 && (
-                              <div className="text-xs text-muted-foreground mt-1">
-                                <strong className="text-foreground">Projects:</strong> {projects.filter(p => (u.assigned_project_ids || []).includes(p.id)).map(p => p.name).join(", ")}
-                                <span className="ml-2 text-[10px] bg-muted px-1.5 py-0.5 rounded">Changes: {u.project_change_count || 0}/5</span>
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Active Team Members</h4>
+                      {teamUsers.filter(u => !u.is_addon).length === 0 ? (
+                        <p className="text-xs text-muted-foreground bg-muted/20 p-3 rounded-md border border-dashed">No included team members yet.</p>
+                      ) : (
+                        <div className="border rounded-md divide-y">
+                          {teamUsers.filter(u => !u.is_addon).map(u => (
+                            <div key={u.id} className="flex items-center justify-between p-3 bg-white">
+                              <div>
+                                <div className="font-medium text-sm">{u.email || u.full_name || 'User'}</div>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {(u.assigned_modules && u.assigned_modules.length > 0 ? u.assigned_modules : [u.assigned_module]).map((m: string) => (
+                                    <Badge key={m} variant="outline" className="text-[10px]">{m}</Badge>
+                                  ))}
+                                </div>
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  Auto-renews with GM plan
+                                </div>
                               </div>
-                            )}
-                            <div className="text-xs text-muted-foreground mt-1">
-                              <strong className="text-foreground">Seat Expiry:</strong> {u.subscription_end_date ? new Date(u.subscription_end_date).toLocaleDateString() : "Syncs with GM Plan"}
-                              {u.subscription_end_date && new Date(u.subscription_end_date) < new Date() && (
-                                <Badge variant="destructive" className="ml-2 text-[10px]">Expired</Badge>
-                              )}
+                              <div className="flex flex-col gap-1 items-end">
+                                <Button size="sm" variant="outline" className="text-[10px] border-emerald-500 text-emerald-600 hover:bg-emerald-50 h-6 px-2" onClick={() => router.push('/subscription')}>
+                                  Renew Seat
+                                </Button>
+                                <div className="flex items-center gap-1">
+                                  <Button size="icon" variant="ghost" onClick={() => {
+                                    setEditingUser(u);
+                                    setEditModules(u.assigned_modules && u.assigned_modules.length > 0 ? u.assigned_modules : [u.assigned_module]);
+                                    setEditProjects(u.assigned_project_ids || []);
+                                    setEditExpiryDate(u.subscription_end_date || "");
+                                  }} className="h-6 w-6">
+                                    <Edit className="w-3 h-3 text-muted-foreground" />
+                                  </Button>
+                                  <Button size="icon" variant="ghost" onClick={() => setDeletingUser(u)} className="text-red-500 hover:text-red-700 hover:bg-red-50 h-6 w-6">
+                                    <UserX className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            {u.subscription_end_date && new Date(u.subscription_end_date) < new Date() && (
-                              <Button size="sm" variant="outline" className="text-xs border-primary text-primary hover:bg-primary/10 h-8 mr-2 px-2" onClick={() => router.push('/subscription')}>
-                                Renew Seat
-                              </Button>
-                            )}
-                            <Button size="icon" variant="ghost" onClick={() => {
-                              setEditingUser(u);
-                              setEditModules(u.assigned_modules && u.assigned_modules.length > 0 ? u.assigned_modules : [u.assigned_module]);
-                              setEditProjects(u.assigned_project_ids || []);
-                              setEditExpiryDate(u.subscription_end_date || "");
-                            }}>
-                              <Edit className="w-4 h-4 text-muted-foreground" />
-                            </Button>
-                            <Button size="icon" variant="ghost" onClick={() => setDeletingUser(u)} className="text-red-500 hover:text-red-700 hover:bg-red-50">
-                              <UserX className="w-4 h-4" />
-                            </Button>
-                          </div>
+                          ))}
                         </div>
-                      ))}
+                      )}
                     </div>
-                  )}
+                  </div>
+
+                  {/* ADD-ON COLUMN */}
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="h-8 w-8 rounded bg-emerald-100 flex items-center justify-center">
+                        <DollarSign className="h-4 w-4 text-emerald-600" />
+                      </div>
+                      <h3 className="font-semibold text-lg">Independent User (Add-ons)</h3>
+                    </div>
+
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Active Invite Codes</h4>
+                      {invites.filter(i => i.is_addon).length === 0 ? (
+                        <p className="text-xs text-muted-foreground bg-muted/20 p-3 rounded-md border border-dashed">No active add-on invite codes.</p>
+                      ) : (
+                        <div className="border rounded-md divide-y">
+                          {invites.filter(i => i.is_addon).map(inv => (
+                            <div key={inv.id} className="flex items-center justify-between p-3 bg-white">
+                              <div>
+                                <div className="font-mono font-bold text-sm tracking-widest text-emerald-600">{inv.code}</div>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {(inv.modules && inv.modules.length > 0 ? inv.modules : [inv.module]).map((m: string) => (
+                                    <Badge key={m} variant="secondary" className="text-[10px]">{m}</Badge>
+                                  ))}
+                                </div>
+                              </div>
+                              <Button size="icon" variant="ghost" onClick={() => handleDeleteCode(inv.id)} className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8">
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Active Team Members</h4>
+                      {teamUsers.filter(u => u.is_addon).length === 0 ? (
+                        <p className="text-xs text-muted-foreground bg-muted/20 p-3 rounded-md border border-dashed">No add-on team members yet.</p>
+                      ) : (
+                        <div className="border rounded-md divide-y">
+                          {teamUsers.filter(u => u.is_addon).map(u => (
+                            <div key={u.id} className="flex items-center justify-between p-3 bg-white">
+                              <div>
+                                <div className="font-medium text-sm">{u.email || u.full_name || 'User'}</div>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {(u.assigned_modules && u.assigned_modules.length > 0 ? u.assigned_modules : [u.assigned_module]).map((m: string) => (
+                                    <Badge key={m} variant="outline" className="text-[10px]">{m}</Badge>
+                                  ))}
+                                </div>
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  <strong className="text-foreground">Expiry:</strong> {u.subscription_end_date ? new Date(u.subscription_end_date).toLocaleDateString() : "Unset"}
+                                  {u.subscription_end_date && new Date(u.subscription_end_date) < new Date() && (
+                                    <Badge variant="destructive" className="ml-2 text-[10px]">Expired</Badge>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex flex-col gap-1 items-end">
+                                <Button size="sm" variant="outline" className="text-[10px] border-emerald-500 text-emerald-600 hover:bg-emerald-50 h-6 px-2" onClick={() => router.push('/subscription')}>
+                                  Renew Seat
+                                </Button>
+                                <div className="flex items-center gap-1">
+                                  <Button size="icon" variant="ghost" onClick={() => {
+                                    setEditingUser(u);
+                                    setEditModules(u.assigned_modules && u.assigned_modules.length > 0 ? u.assigned_modules : [u.assigned_module]);
+                                    setEditProjects(u.assigned_project_ids || []);
+                                    setEditExpiryDate(u.subscription_end_date || "");
+                                  }} className="h-6 w-6">
+                                    <Edit className="w-3 h-3 text-muted-foreground" />
+                                  </Button>
+                                  <Button size="icon" variant="ghost" onClick={() => setDeletingUser(u)} className="text-red-500 hover:text-red-700 hover:bg-red-50 h-6 w-6">
+                                    <UserX className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                 </div>
               </CardContent>
             </Card>
