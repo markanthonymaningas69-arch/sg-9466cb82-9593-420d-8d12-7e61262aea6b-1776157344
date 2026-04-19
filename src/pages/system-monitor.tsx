@@ -13,6 +13,36 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { plans, addOns } from "@/config/pricing";
+
+const getTrueSubscriptionAmount = (sub: any) => {
+  if (!sub) return 0;
+  const planName = (sub.plan || '').toLowerCase();
+  const rawAmount = Number(sub.amount) || 0;
+  const isAnnual = planName.includes('annual') || rawAmount > 1000;
+  
+  let basePlanId = 'trial';
+  if (planName.includes('professional') || (rawAmount >= 1000 && !planName.includes('starter'))) {
+    basePlanId = 'professional';
+  } else if (planName.includes('starter') || (rawAmount > 0 && rawAmount < 1000)) {
+    basePlanId = 'starter';
+  }
+  
+  const basePlanObj = plans.find(p => p.id === basePlanId) || plans[0];
+  const basePrice = isAnnual ? basePlanObj.annualPrice : basePlanObj.monthlyPrice;
+  
+  let addonsTotal = 0;
+  if (sub.features && typeof sub.features === 'object') {
+    Object.entries(sub.features).forEach(([id, qty]) => {
+      const addonInfo = addOns.find(a => a.id === id);
+      if (addonInfo && Number(qty) > 0) {
+        addonsTotal += (isAnnual ? addonInfo.annualPrice : addonInfo.monthlyPrice) * Number(qty);
+      }
+    });
+  }
+  
+  return basePrice + addonsTotal;
+};
 
 export default function SystemMonitor() {
   const router = useRouter();
@@ -148,23 +178,24 @@ export default function SystemMonitor() {
       if (sub.status !== 'active' && sub.status !== 'trialing') return;
       
       const planName = (sub.plan || '').toLowerCase();
-      const amount = Number(sub.amount) || 0;
-      const isAnnual = planName.includes('annual') || amount > 1000;
+      const rawAmount = Number(sub.amount) || 0;
+      const isAnnual = planName.includes('annual') || rawAmount > 1000;
 
       // Extract Base Plan price specifically (ignore Add-on bundled costs)
       let baseAmount = 0;
-      if (planName.includes('starter') || (!planName.includes('professional') && amount < 1000 && amount > 0)) {
+      if (planName.includes('starter') || (!planName.includes('professional') && rawAmount < 1000 && rawAmount > 0)) {
         baseAmount = isAnnual ? 2870 : 299;
         if (isAnnual) { starterAnnual++; starterAnnualAmount += baseAmount; }
         else { starterMonthly++; starterMonthlyAmount += baseAmount; }
-      } else if (planName.includes('professional') || amount >= 1000) {
+      } else if (planName.includes('professional') || rawAmount >= 1000) {
         baseAmount = isAnnual ? 4790 : 499;
         if (isAnnual) { proAnnual++; proAnnualAmount += baseAmount; }
         else { proMonthly++; proMonthlyAmount += baseAmount; }
       }
 
       // Total MRR correctly calculates the entire real revenue including add-ons
-      totalMRR += isAnnual ? (amount / 12) : amount;
+      const trueAmount = getTrueSubscriptionAmount(sub);
+      totalMRR += isAnnual ? (trueAmount / 12) : trueAmount;
     });
 
     return {
@@ -199,9 +230,10 @@ export default function SystemMonitor() {
         
         // If subscription was active during this month, add it to the MRR
         if (subStart <= monthEnd && subEnd >= targetMonth) {
-          const amount = Number(sub.amount) || 0;
-          const isAnnual = (sub.plan || '').toLowerCase().includes('annual') || amount > 1000;
-          mrr += isAnnual ? amount / 12 : amount;
+          const rawAmount = Number(sub.amount) || 0;
+          const isAnnual = (sub.plan || '').toLowerCase().includes('annual') || rawAmount > 1000;
+          const trueAmount = getTrueSubscriptionAmount(sub);
+          mrr += isAnnual ? trueAmount / 12 : trueAmount;
         }
       });
       
@@ -541,6 +573,9 @@ export default function SystemMonitor() {
                       const daysUntilExpiry = comp.end_date ? Math.ceil((new Date(comp.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
                       const isExpiringSoon = daysUntilExpiry !== null && daysUntilExpiry <= 30 && daysUntilExpiry > 0;
                       
+                      const activeSub = subscriptions.find((s: any) => s.user_id === comp.user_id && (s.status === 'active' || s.status === 'trialing'));
+                      const displayAmount = activeSub ? getTrueSubscriptionAmount(activeSub) : Number(comp.amount || 0);
+
                       return (
                         <TableRow key={comp.id || i} className="border-border transition-colors hover:bg-muted/30">
                           <TableCell className="font-medium text-foreground">{comp.name || 'Unnamed Company'}</TableCell>
@@ -568,7 +603,7 @@ export default function SystemMonitor() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right font-semibold text-foreground">
-                            {formatAED(Number(comp.amount || 0))}
+                            {formatAED(displayAmount)}
                           </TableCell>
                           <TableCell className="text-right">
                             <Button 
