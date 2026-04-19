@@ -20,7 +20,7 @@ type Project = SupabaseDatabase["public"]["Tables"]["projects"]["Row"];
 
 export default function Projects() {
   const router = useRouter();
-  const { formatCurrency } = useSettings();
+  const { formatCurrency, isLocked } = useSettings();
   const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -335,7 +335,7 @@ export default function Projects() {
             </Button>
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
-                <Button onClick={resetForm}>
+                <Button onClick={resetForm} disabled={isLocked}>
                   <Plus className="h-4 w-4 mr-2" />
                   New Project
                 </Button>
@@ -470,10 +470,10 @@ export default function Projects() {
                         >
                           <FileText className="h-3.5 w-3.5 mr-1" /> Add/Edit BOM
                         </Button>
-                        <Button size="icon" variant="outline" className="h-8 w-8 text-amber-600 border-amber-200 hover:bg-amber-50" onClick={() => handleEdit(project)}>
+                        <Button size="icon" variant="outline" className="h-8 w-8 text-amber-600 border-amber-200 hover:bg-amber-50" onClick={() => handleEdit(project)} disabled={isLocked}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
-                        <Button size="icon" variant="outline" className="h-8 w-8 text-orange-600 border-orange-200 hover:bg-orange-50" onClick={() => handleDelete(project.id)} title="Archive">
+                        <Button size="icon" variant="outline" className="h-8 w-8 text-orange-600 border-orange-200 hover:bg-orange-50" onClick={() => handleDelete(project.id)} title="Archive" disabled={isLocked}>
                           <Archive className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -514,7 +514,7 @@ export default function Projects() {
                 </div>
                 <Dialog open={newItemDialogOpen} onOpenChange={setNewItemDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button onClick={() => setIsItemModalOpen(true)}>
+                    <Button onClick={() => setIsItemModalOpen(true)} disabled={isLocked}>
                       <Plus className="h-4 w-4 mr-2" />
                       Add New Item
                     </Button>
@@ -555,10 +555,10 @@ export default function Projects() {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-1">
-                                <Button variant="ghost" size="icon" onClick={() => handleEditMasterItem(item)}>
+                                <Button variant="ghost" size="icon" onClick={() => handleEditMasterItem(item)} disabled={isLocked}>
                                   <Pencil className="h-4 w-4" />
                                 </Button>
-                                <Button variant="ghost" size="icon" className="text-red-600" onClick={() => handleDeleteMasterItem(item.id)}>
+                                <Button variant="ghost" size="icon" className="text-red-600" onClick={() => handleDeleteMasterItem(item.id)} disabled={isLocked}>
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               </div>
@@ -574,7 +574,7 @@ export default function Projects() {
 
             <TabsContent value="scopes" className="space-y-4">
               <div className="flex justify-end">
-                <Button onClick={() => setIsScopeModalOpen(true)}>
+                <Button onClick={() => setIsScopeModalOpen(true)} disabled={isLocked}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Scope
                 </Button>
@@ -606,10 +606,10 @@ export default function Projects() {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-1">
-                                <Button variant="ghost" size="icon" onClick={() => handleEditMasterScope(scope)}>
+                                <Button variant="ghost" size="icon" onClick={() => handleEditMasterScope(scope)} disabled={isLocked}>
                                   <Pencil className="h-4 w-4" />
                                 </Button>
-                                <Button variant="ghost" size="icon" className="text-red-600" onClick={() => handleDeleteMasterScope(scope.id)}>
+                                <Button variant="ghost" size="icon" className="text-red-600" onClick={() => handleDeleteMasterScope(scope.id)} disabled={isLocked}>
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               </div>

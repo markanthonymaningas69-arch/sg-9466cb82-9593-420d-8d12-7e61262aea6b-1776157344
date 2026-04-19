@@ -1,6 +1,6 @@
 ---
 title: Read-Only Mode - Projects & BOM
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [projects, bom, read-only]
@@ -12,9 +12,9 @@ position: 16
 Enforce `isLocked` read-only state on Projects and BOM.
 
 ## Checklist
-- [ ] Disable "New Project" button in projects.tsx
-- [ ] Disable edit/delete actions on project cards
-- [ ] Disable "Add Item", "Import", "Edit", "Delete" in bom/[projectId].tsx
+- [x] Disable "New Project" button in projects.tsx
+- [x] Disable edit/delete actions on project cards
+- [x] Disable "Add Item", "Import", "Edit", "Delete" in bom/[projectId].tsx
 
 ## Acceptance
 - Expired users can view project details and BOM but cannot modify them.

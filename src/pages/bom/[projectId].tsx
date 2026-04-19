@@ -39,7 +39,7 @@ type LaborCalculationMethod = "percentage" | "unit_cost";
 // Scope cards use default neutral background (no custom colors).
 
 export default function BillOfMaterials() {
-  const { formatCurrency, formatNumber } = useSettings();
+  const { formatCurrency, formatNumber, isLocked } = useSettings();
   const router = useRouter();
   const { projectId } = router.query;
 
@@ -867,7 +867,7 @@ export default function BillOfMaterials() {
                 <Button
                   size="sm"
                   onClick={() => void handleSaveScopeInline()}
-                  disabled={!newScopeName.trim()}
+                  disabled={!newScopeName.trim() || isLocked}
                   className="bg-green-600 hover:bg-green-700 text-white">
                   
                   <Plus className="h-4 w-4 mr-2" />
@@ -900,6 +900,7 @@ export default function BillOfMaterials() {
                     size="sm"
                     className="bg-green-600 hover:bg-green-700 text-white"
                     onClick={() => void handleSaveOrder()}
+                    disabled={isLocked}
                   >
                     Save Order
                   </Button>
@@ -908,6 +909,7 @@ export default function BillOfMaterials() {
                     size="sm"
                     variant="outline"
                     onClick={handleToggleReorder}
+                    disabled={isLocked}
                   >
                     Reorder Scopes
                   </Button>
@@ -915,6 +917,7 @@ export default function BillOfMaterials() {
                 <Button
               size="sm"
               onClick={handleAddScopeClick}
+              disabled={isLocked}
               style={{ lineHeight: "1" }}
               className="bg-green-600 hover:bg-green-700 text-white">
               
@@ -956,7 +959,7 @@ export default function BillOfMaterials() {
                     <Button
                   size="sm"
                   onClick={() => void handleSaveScopeInline()}
-                  disabled={!newScopeName.trim()}
+                  disabled={!newScopeName.trim() || isLocked}
                   className="bg-green-600 hover:bg-green-700 text-white">
                   
                       <Plus className="h-4 w-4 mr-2" />
@@ -1023,7 +1026,7 @@ export default function BillOfMaterials() {
                               variant="ghost"
                               className="text-green-700 hover:text-green-800"
                               onClick={() => handleStartEditScope(scope)}
-                              disabled={reorderMode}
+                              disabled={reorderMode || isLocked}
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
@@ -1063,7 +1066,7 @@ export default function BillOfMaterials() {
                               [scopeKey]: !isCollapsed
                             }))
                           }
-                          disabled={reorderMode}
+                          disabled={reorderMode || isLocked}
                         >
                           {isCollapsed ? "Show content" : "Hide content"}
                         </Button>
@@ -1072,7 +1075,7 @@ export default function BillOfMaterials() {
                           variant="ghost"
                           className="text-red-600 hover:text-red-700"
                           onClick={() => void handleDeleteScope(scope.id as string)}
-                          disabled={reorderMode}
+                          disabled={reorderMode || isLocked}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -1086,6 +1089,7 @@ export default function BillOfMaterials() {
                           size="sm"
                           variant="outline"
                           className="border-green-600 dark:border-green-500 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/30 h-8 text-xs"
+                          disabled={isLocked}
                           onClick={() => {
                             if (activeLaborScopeId === scope.id) {
                               setActiveLaborScopeId(null);
@@ -1106,6 +1110,7 @@ export default function BillOfMaterials() {
                         <Button
                           size="sm"
                           className="bg-green-600 hover:bg-green-700 text-white h-8 text-xs"
+                          disabled={isLocked}
                           onClick={() => {
                             setSelectedScopeId(scope.id as string);
                             resetMaterialForm();
@@ -1162,7 +1167,8 @@ export default function BillOfMaterials() {
                           size="icon"
                           variant="ghost"
                           className="h-6 w-6 text-green-600 hover:text-green-700"
-                          onClick={() => handleEditMaterial(material)}>
+                          onClick={() => handleEditMaterial(material)}
+                          disabled={isLocked}>
                           
                                 <Pencil className="h-3 w-3" />
                               </Button>
@@ -1170,7 +1176,8 @@ export default function BillOfMaterials() {
                           size="icon"
                           variant="ghost"
                           className="h-6 w-6 text-red-600 hover:text-red-700"
-                          onClick={() => void handleDeleteMaterial(material.id as string)}>
+                          onClick={() => void handleDeleteMaterial(material.id as string)}
+                          disabled={isLocked}>
                           
                                 <Trash2 className="h-3 w-3" />
                               </Button>
@@ -1344,7 +1351,8 @@ export default function BillOfMaterials() {
                               <Button
                           size="sm"
                           className="bg-green-600 hover:bg-green-700 text-white h-7 px-2 text-xs"
-                          onClick={() => void handleMaterialSubmitInline()}>
+                          onClick={() => void handleMaterialSubmitInline()}
+                          disabled={isLocked}>
                           
                                 {editingMaterial ? "Update" : "Add"}
                               </Button>
@@ -1514,6 +1522,7 @@ export default function BillOfMaterials() {
                                     size="sm"
                                     className="bg-green-600 hover:bg-green-700 text-white h-7 px-2 text-xs"
                                     onClick={() => void handleLaborSubmit(scope.id as string)}
+                                    disabled={isLocked}
                                   >
                                     Save
                                   </Button>
@@ -1525,6 +1534,7 @@ export default function BillOfMaterials() {
                                       setActiveLaborScopeId(null);
                                       resetLaborForm();
                                     }}
+                                    disabled={isLocked}
                                   >
                                     Cancel
                                   </Button>
@@ -1649,10 +1659,10 @@ export default function BillOfMaterials() {
                           </TableCell>
                           <TableCell className="text-right py-1">
                             <div className="flex justify-end gap-1">
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-green-600 hover:text-green-700" onClick={() => handleEditIndirect(cost)}>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-green-600 hover:text-green-700" onClick={() => handleEditIndirect(cost)} disabled={isLocked}>
                                 <Pencil className="w-3 h-3" />
                               </Button>
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-red-600 hover:text-red-700" onClick={() => void handleDeleteIndirect(cost.id)}>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-red-600 hover:text-red-700" onClick={() => void handleDeleteIndirect(cost.id)} disabled={isLocked}>
                                 <Trash2 className="w-3 h-3" />
                               </Button>
                             </div>
@@ -1699,11 +1709,11 @@ export default function BillOfMaterials() {
                         </TableCell>
                         <TableCell className="text-right py-1">
                           <div className="flex justify-end gap-1">
-                            <Button size="sm" className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={() => void handleAddOrUpdateIndirect()}>
+                            <Button size="sm" className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={() => void handleAddOrUpdateIndirect()} disabled={isLocked}>
                                 {indirectRowForm.id ? 'Update' : 'Add'}
                             </Button>
                             {indirectRowForm.id && (
-                                <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-red-600 dark:border-red-500 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30" onClick={() => setIndirectRowForm({id: '', type: 'VAT', description: '', value: ''})}>Cancel</Button>
+                                <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-red-600 dark:border-red-500 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30" onClick={() => setIndirectRowForm({id: '', type: 'VAT', description: '', value: ''})} disabled={isLocked}>Cancel</Button>
                             )}
                           </div>
                         </TableCell>
