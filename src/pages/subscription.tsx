@@ -18,10 +18,18 @@ export default function Subscription() {
   const [billingHistory, setBillingHistory] = useState<any[]>([]);
   const [subscriptionDetails, setSubscriptionDetails] = useState<any>(null);
   
+  const [selectedPlan, setSelectedPlan] = useState<string>("professional");
+  
   // Track exact quantity of each add-on
   const [addOnQuantities, setAddOnQuantities] = useState<Record<string, number>>({});
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [isManagingBilling, setIsManagingBilling] = useState(false);
+
+  useEffect(() => {
+    if (currentPlan && currentPlan !== 'trial') {
+      setSelectedPlan(currentPlan);
+    }
+  }, [currentPlan]);
 
   useEffect(() => {
     loadBillingHistory();
@@ -103,10 +111,10 @@ export default function Subscription() {
     return date.toLocaleDateString();
   };
 
-  const currentPlanConfig = plans.find(p => p.id === currentPlan) || plans[0];
+  const selectedPlanConfig = plans.find(p => p.id === selectedPlan) || plans.find(p => p.id === "professional")!;
 
   const updateAddOnQuantity = (id: string, delta: number) => {
-    const limit = currentPlanConfig.addOnLimits?.[id] || 0;
+    const limit = selectedPlanConfig.addOnLimits?.[id] || 0;
     const activeQty = (subscriptionDetails?.features && subscriptionDetails.features[id]) || 0;
     
     setAddOnQuantities(prev => {
@@ -129,10 +137,15 @@ export default function Subscription() {
 
   const handleUpgrade = async (planId: string) => {
     if (planId === "trial") return;
-    setCurrentPlan(planId as "starter" | "professional");
+    setSelectedPlan(planId);
+    
+    setTimeout(() => {
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }, 100);
+    
     toast({
       title: "Plan Selected",
-      description: `You have selected the ${planId} plan. Please review your prorated summary and proceed to checkout.`,
+      description: `You have selected the ${planId} plan. Please review your summary below and proceed to checkout.`,
     });
   };
 
@@ -161,7 +174,7 @@ export default function Subscription() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          planId: currentPlan,
+          planId: selectedPlan,
           billingCycle,
           features: finalFeatures,
           userId: session.user.id,
@@ -225,9 +238,9 @@ export default function Subscription() {
   
   const activeAmount = Number(subscriptionDetails?.amount) || 0;
   const isActiveAnnual = activeAmount > 1000;
-  const isSelectingSamePlanAndCycle = subscriptionDetails?.plan === currentPlan && (billingCycle === "annual") === isActiveAnnual;
+  const isSelectingSamePlanAndCycle = subscriptionDetails?.plan === selectedPlan && (billingCycle === "annual") === isActiveAnnual;
 
-  const basePrice = isCurrentlyTrial ? 0 : (billingCycle === "monthly" ? currentPlanConfig.monthlyPrice : currentPlanConfig.annualPrice);
+  const basePrice = billingCycle === "monthly" ? selectedPlanConfig.monthlyPrice : selectedPlanConfig.annualPrice;
   
   // Only charge base price if they are upgrading/changing plans or cycle, or don't have an active one
   const basePriceToCharge = (!hasActiveSub || !isSelectingSamePlanAndCycle) ? basePrice : 0;
@@ -404,15 +417,20 @@ export default function Subscription() {
 
         <div className="grid gap-6 md:grid-cols-3">
           {plans.map((plan) => (
-            <Card key={plan.id} className={`relative flex flex-col ${plan.id === currentPlan && !isTrial ? "border-primary shadow-md ring-1 ring-primary/20" : ""} ${plan.popular ? "border-primary/60 shadow-sm" : ""}`}>
-              {plan.popular && plan.id !== currentPlan && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+            <Card key={plan.id} className={`relative flex flex-col ${plan.id === selectedPlan ? "border-primary shadow-md ring-2 ring-primary ring-offset-1 z-10" : "border-border shadow-sm"} ${plan.popular ? "border-primary/60" : ""}`}>
+              {plan.popular && plan.id !== selectedPlan && plan.id !== currentPlan && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20">
                   <Badge className="bg-primary text-primary-foreground">Most Popular</Badge>
                 </div>
               )}
               {plan.id === currentPlan && !isTrial && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20">
                   <Badge className="bg-success text-success-foreground">Current Plan</Badge>
+                </div>
+              )}
+              {plan.id === selectedPlan && plan.id !== currentPlan && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20">
+                  <Badge className="bg-foreground text-background">Selected to Buy</Badge>
                 </div>
               )}
               <CardHeader>
@@ -441,13 +459,13 @@ export default function Subscription() {
               <CardFooter>
                 <Button
                   className="w-full font-semibold"
-                  variant={plan.id === currentPlan && !isTrial ? "secondary" : "default"}
-                  disabled={plan.id === "trial" || (plan.id === currentPlan && !isTrial)}
+                  variant={plan.id === selectedPlan ? "secondary" : "default"}
+                  disabled={plan.id === "trial"}
                   onClick={() => handleUpgrade(plan.id)}
                 >
                   {plan.id === "trial" 
                     ? (isTrial ? (isLocked ? "Expired" : "Active Trial") : "Trial Used") 
-                    : (plan.id === currentPlan && !isTrial ? "Selected" : "Select Plan")}
+                    : (plan.id === selectedPlan ? "Selected" : "Select Plan")}
                 </Button>
               </CardFooter>
             </Card>
@@ -463,7 +481,7 @@ export default function Subscription() {
             {addOns.map((addon) => {
               const newQty = Number(addOnQuantities[addon.id] || 0);
               const activeQty = Number((subscriptionDetails?.features && subscriptionDetails.features[addon.id]) || 0);
-              const limit = Number(currentPlanConfig.addOnLimits?.[addon.id] || 0);
+              const limit = Number(selectedPlanConfig.addOnLimits?.[addon.id] || 0);
               const isUnavailable = limit === 0 || activeQty >= limit;
               const isSelected = newQty > 0;
               
@@ -529,7 +547,7 @@ export default function Subscription() {
                 <h3 className="text-2xl font-bold tracking-tight">Order Summary</h3>
                 <div className="mt-3 space-y-2">
                   <div className="flex justify-between text-muted-foreground max-w-sm">
-                    <span>{currentPlanConfig.name} Plan ({billingCycle}) {isSelectingSamePlanAndCycle && <Badge variant="outline" className="ml-2 text-[10px] bg-success/10 text-success border-success/20">Already Active</Badge>}</span>
+                    <span>{selectedPlanConfig.name} Plan ({billingCycle}) {isSelectingSamePlanAndCycle && <Badge variant="outline" className="ml-2 text-[10px] bg-success/10 text-success border-success/20">Already Active</Badge>}</span>
                     <span className="font-medium text-foreground">
                       {isSelectingSamePlanAndCycle ? "AED 0" : `AED ${basePriceToCharge}`}
                     </span>
