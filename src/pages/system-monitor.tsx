@@ -21,7 +21,6 @@ export default function SystemMonitor() {
   const [data, setData] = useState<any>({ companies: [], subscriptions: [] });
   const [filterPlan, setFilterPlan] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
-  const [chartMonths, setChartMonths] = useState(6);
 
   // Date Editing State
   const [editSubOpen, setEditSubOpen] = useState(false);
@@ -174,30 +173,37 @@ export default function SystemMonitor() {
   }, [subscriptions]);
 
   const chartData = useMemo(() => {
-    const months: Record<string, number> = {};
+    const result = [];
     const today = new Date();
     
-    for (let i = chartMonths - 1; i >= 0; i--) {
-      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-      const monthStr = d.toLocaleString('default', { month: 'short', year: '2-digit' });
-      months[monthStr] = 0;
+    // Generate precise MRR for the last 12 months
+    for (let i = 11; i >= 0; i--) {
+      const targetMonth = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const monthEnd = new Date(today.getFullYear(), today.getMonth() - i + 1, 0); // Last day of month
+      const monthStr = targetMonth.toLocaleString('default', { month: 'short', year: '2-digit' });
+      
+      let mrr = 0;
+      
+      subscriptions.forEach((sub: any) => {
+        if (sub.status !== 'active' && sub.status !== 'trialing') return;
+        if (!sub.start_date) return;
+        
+        const subStart = new Date(sub.start_date);
+        const subEnd = sub.end_date ? new Date(sub.end_date) : new Date(8640000000000000); // Far future if no end date
+        
+        // If subscription was active during this month, add it to the MRR
+        if (subStart <= monthEnd && subEnd >= targetMonth) {
+          const amount = Number(sub.amount) || 0;
+          const isAnnual = (sub.plan || '').toLowerCase().includes('annual') || amount > 1000;
+          mrr += isAnnual ? amount / 12 : amount;
+        }
+      });
+      
+      result.push({ name: monthStr, value: mrr });
     }
-
-    subscriptions.forEach((sub: any) => {
-      if (!sub.start_date) return;
-      const subDate = new Date(sub.start_date);
-      const monthStr = subDate.toLocaleString('default', { month: 'short', year: '2-digit' });
-      if (months[monthStr] !== undefined) {
-        months[monthStr] += Number(sub.amount) || 0;
-      }
-    });
-
-    let accumulated = 0;
-    return Object.entries(months).map(([name, val]) => {
-      accumulated += val;
-      return { name, value: accumulated };
-    });
-  }, [subscriptions, chartMonths]);
+    
+    return result;
+  }, [subscriptions]);
 
   const maxChartValue = Math.max(...chartData.map(d => d.value), 1000);
 
@@ -425,37 +431,27 @@ export default function SystemMonitor() {
             </CardContent>
           </Card>
 
-          <Card className="col-span-4 border-border bg-card shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-foreground">Accumulated Monthly Revenue</CardTitle>
-              <Select value={chartMonths.toString()} onValueChange={(v) => setChartMonths(Number(v))}>
-                <SelectTrigger className="w-[120px] bg-background">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="3">3 Months</SelectItem>
-                  <SelectItem value="6">6 Months</SelectItem>
-                  <SelectItem value="12">12 Months</SelectItem>
-                  <SelectItem value="24">24 Months</SelectItem>
-                </SelectContent>
-              </Select>
+          <Card className="col-span-4 border-border bg-card shadow-sm flex flex-col">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-foreground">Monthly Recurring Revenue (MRR)</CardTitle>
+              <Badge variant="outline" className="text-muted-foreground bg-muted/50 font-normal">Last 12 Months</Badge>
             </CardHeader>
-            <CardContent>
-              <div className="h-[250px] w-full flex items-end justify-between gap-2 pt-8">
+            <CardContent className="flex-1 flex flex-col justify-end pt-6">
+              <div className="h-[250px] w-full flex items-end justify-between gap-2">
                 {chartData.map((data, i) => {
                   const heightPercentage = maxChartValue > 0 ? (data.value / maxChartValue) * 100 : 0;
                   return (
-                    <div key={i} className="relative flex flex-col items-center flex-1 group">
-                      <div className="absolute -top-10 opacity-0 group-hover:opacity-100 transition-opacity bg-popover text-popover-foreground text-xs rounded py-1 px-2 pointer-events-none whitespace-nowrap shadow-md border border-border z-10">
+                    <div key={i} className="relative flex flex-col items-center flex-1 group h-full justify-end">
+                      <div className="absolute -top-8 opacity-0 group-hover:opacity-100 transition-opacity bg-popover text-popover-foreground text-xs rounded py-1 px-2 pointer-events-none whitespace-nowrap shadow-md border border-border z-10">
                         {formatAED(data.value)}
                       </div>
                       
                       <div 
-                        className="w-full bg-primary/80 hover:bg-primary rounded-t-sm transition-all duration-300"
-                        style={{ height: `${Math.max(heightPercentage, 2)}%` }}
+                        className="w-full bg-primary/80 hover:bg-primary rounded-t-sm transition-all duration-300 min-h-[4px]"
+                        style={{ height: `${heightPercentage}%` }}
                       ></div>
                       
-                      <span className="text-xs text-muted-foreground mt-2 font-medium">{data.name}</span>
+                      <span className="text-[10px] text-muted-foreground mt-2 font-medium whitespace-nowrap">{data.name}</span>
                     </div>
                   );
                 })}
