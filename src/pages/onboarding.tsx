@@ -228,11 +228,11 @@ export default function Onboarding() {
                 <div className="space-y-2">
                   <Label>Invite Code *</Label>
                   <Input 
-                    placeholder="Enter 6-character code" 
+                    placeholder="e.g. INC-XXXXX or ADD-XXXXX" 
                     value={inviteCode}
                     onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
                     className="text-lg tracking-widest uppercase font-mono text-center"
-                    maxLength={8}
+                    maxLength={9}
                     disabled={joining || creating}
                   />
                 </div>
