@@ -235,6 +235,7 @@ export default function Subscription() {
           features: finalFeatures, // Total features sent to metadata for DB update
           featuresToCharge: addOnQuantities, // Only the newly added seats for Stripe billing
           chargeBasePlan: basePriceToCharge > 0, // Explicit flag to skip base plan charge if already active
+          proratedDiscount: proratedDiscount, // Send the unused balance credit to Stripe
           userId: session.user.id,
           email: session.user.email,
           returnUrl: window.location.origin + '/subscription',

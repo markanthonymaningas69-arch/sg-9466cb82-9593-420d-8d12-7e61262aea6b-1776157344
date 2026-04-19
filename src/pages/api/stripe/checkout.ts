@@ -8,7 +8,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { planId, billingCycle, features, featuresToCharge, chargeBasePlan, userId, email, returnUrl } = req.body;
+    const { planId, billingCycle, features, featuresToCharge, chargeBasePlan, proratedDiscount, userId, email, returnUrl } = req.body;
 
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
@@ -66,7 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: "Cart is empty. No new items to charge." });
     }
 
-    const session = await stripe.checkout.sessions.create({
+    const sessionConfig: any = {
       payment_method_types: ["card"],
       line_items: lineItems,
       mode: "subscription",
@@ -80,7 +80,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         billingCycle,
         features: JSON.stringify(features || {}),
       },
-    });
+    };
+
+    // Apply Prorated Discount as a one-time dynamic Stripe coupon
+    if (proratedDiscount && proratedDiscount > 0) {
+      const coupon = await stripe.coupons.create({
+        amount_off: Math.round(proratedDiscount * 100), // AED in fils
+        currency: "aed",
+        duration: "once",
+        name: "Unused Plan Balance Credit",
+      });
+      sessionConfig.discounts = [{ coupon: coupon.id }];
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionConfig);
 
     res.status(200).json({ sessionId: session.id, url: session.url });
   } catch (err: any) {
