@@ -26,12 +26,15 @@ export const plans: PlanConfig[] = [
     annualPrice: 2870,
     features: [
       "Up to 4 Projects in the System",
-      "GM module (Dashboard, Project Profile, Site Personnel, Accounting, Analytics)",
+      "GM module (Dashboard, Project Profile, Site Personnel, Complete Accounting Module, Analytics)",
       "1 Project Profile User Account",
       "1 Site Personnel User Account (can handle 2 Projects)",
-      "1 Accounting User Account",
+      "1 Accounting User Account (Full Access)",
       "1 Site Personnel Add-ons Capability (can handle 2 Projects)",
-      "Support Feature Updates"
+      "Support Feature Updates",
+      "❌ No Purchasing Module",
+      "❌ No HR Module",
+      "❌ No Warehouse Module"
     ],
     addOnLimits: { extra_site: 1, extra_acc: 0, purchasing: 0 }
   },
@@ -44,10 +47,10 @@ export const plans: PlanConfig[] = [
     popular: true,
     features: [
       "Up to 10 Projects in the System",
-      "GM module (Dashboard, Project Profile, Site Personnel, Purchasing, Accounting, HR, Warehouse, Analytics)",
+      "GM module (Dashboard, Project Profile, Site Personnel, Purchasing, Complete Accounting Module, HR, Warehouse, Analytics)",
       "1 Project Profile User Account",
       "3 Site Personnel User Account (can handle 6 Projects)",
-      "1 Accounting User Account",
+      "1 Accounting User Account (Full Access)",
       "1 Human Resources User Account",
       "1 Warehouse User Account",
       "Support Feature Updates",
@@ -63,12 +66,15 @@ export const plans: PlanConfig[] = [
     annualPrice: 0,
     features: [
       "Up to 4 Projects in the System",
-      "GM module (Dashboard, Project Profile, Site Personnel, Accounting, Analytics)",
+      "GM module (Dashboard, Project Profile, Site Personnel, Complete Accounting Module, Analytics)",
       "1 Project Profile User Account",
       "1 Site Personnel User Account (can handle 2 Projects)",
-      "1 Accounting User Account",
+      "1 Accounting User Account (Full Access)",
       "1 Site Personnel Add-ons Capability (can handle 2 Projects)",
-      "Support Feature Updates"
+      "Support Feature Updates",
+      "❌ No Purchasing Module",
+      "❌ No HR Module",
+      "❌ No Warehouse Module"
     ],
     addOnLimits: { extra_site: 1, extra_acc: 0, purchasing: 0 }
   }
