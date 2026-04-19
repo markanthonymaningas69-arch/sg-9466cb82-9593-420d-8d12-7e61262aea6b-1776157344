@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Check, CreditCard, Calendar, FolderGit2, LayoutGrid, Minus, Plus, ShoppingCart, Loader2, Users } from "lucide-react";
+import { Check, CreditCard, Calendar, FolderGit2, LayoutGrid, Minus, Plus, ShoppingCart, Loader2, Users, ExternalLink } from "lucide-react";
 import { useSettings } from "@/contexts/SettingsProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { plans, addOns, type PlanConfig } from "@/config/pricing";
@@ -21,6 +21,7 @@ export default function Subscription() {
   // Track exact quantity of each add-on
   const [addOnQuantities, setAddOnQuantities] = useState<Record<string, number>>({});
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [isManagingBilling, setIsManagingBilling] = useState(false);
 
   useEffect(() => {
     loadBillingHistory();
@@ -138,64 +139,84 @@ export default function Subscription() {
   const handleCheckout = async () => {
     setIsCheckingOut(true);
     
-    // Simulate payment processing delay
-    setTimeout(async () => {
-      localStorage.setItem("app_is_paid", "true");
-      
-      const now = new Date();
-      const expiresAt = new Date(now);
-      if (billingCycle === "monthly") {
-        expiresAt.setMonth(expiresAt.getMonth() + 1);
-      } else {
-        expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        toast({
+          title: "Error",
+          description: "You must be logged in to checkout.",
+          variant: "destructive"
+        });
+        setIsCheckingOut(false);
+        return;
       }
-      localStorage.setItem("app_subscription_expires_at", expiresAt.toISOString());
-      
+
       // Calculate final active features by merging active + cart
       const finalFeatures = { ...(subscriptionDetails?.features || {}) };
       for (const [id, newQty] of Object.entries(addOnQuantities)) {
         finalFeatures[id] = Number(finalFeatures[id] || 0) + Number(newQty);
       }
-      
-      localStorage.setItem("app_subscription_features", JSON.stringify(finalFeatures));
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        // Insert brand new subscription record with explicitly saved end_date
-        const newSub = {
-          user_id: session.user.id,
-          plan: currentPlan,
-          status: 'active',
-          start_date: now.toISOString(),
-          end_date: expiresAt.toISOString(),
-          amount: totalAmountDueToday, 
-          features: finalFeatures
-        };
-        
-        const { error } = await supabase.from('subscriptions').insert(newSub);
-        
-        if (error) {
-          console.error("Checkout database error:", error);
-          toast({
-            title: "Database Error",
-            description: error.message || "Failed to save to subscriptions table.",
-            variant: "destructive"
-          });
-          setIsCheckingOut(false);
-          return;
-        }
-        
-        toast({
-          title: "Payment Successful",
-          description: "Your subscription and add-ons have been successfully updated.",
-        });
-        
-        // Use window.location.href to force a full hard reload and clear all states
-        window.location.href = '/subscription';
+      const response = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          planId: currentPlan,
+          billingCycle,
+          features: finalFeatures,
+          userId: session.user.id,
+          email: session.user.email,
+          returnUrl: window.location.origin + '/subscription',
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.url) {
+        window.location.href = data.url; // Redirect to Stripe Checkout
       } else {
-        setIsCheckingOut(false);
+        throw new Error(data.error || "Failed to create checkout session");
       }
-    }, 1500);
+    } catch (error: any) {
+      console.error("Checkout Error:", error);
+      toast({
+        title: "Checkout Error",
+        description: error.message || "An unexpected error occurred. Check if Stripe keys are set.",
+        variant: "destructive"
+      });
+      setIsCheckingOut(false);
+    }
+  };
+
+  const handleManageBilling = async () => {
+    setIsManagingBilling(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) throw new Error("Not logged in");
+      
+      const response = await fetch('/api/stripe/portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: session.user.id,
+          returnUrl: window.location.origin + '/subscription',
+        }),
+      });
+
+      const data = await response.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error(data.error || "Failed to access billing portal. No Stripe customer found.");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+      setIsManagingBilling(false);
+    }
   };
 
   // --- PRORATION & TOTALS CALCULATION ---
@@ -254,9 +275,17 @@ export default function Subscription() {
   return (
     <Layout>
       <div className="space-y-8 pb-12">
-        <div>
-          <h1 className="text-3xl font-heading font-bold">Subscription & Billing</h1>
-          <p className="text-muted-foreground mt-1">Manage your plan, add-ons, and payment methods.</p>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-heading font-bold">Subscription & Billing</h1>
+            <p className="text-muted-foreground mt-1">Manage your plan, add-ons, and payment methods.</p>
+          </div>
+          {subscriptionDetails?.stripe_customer_id && (
+            <Button variant="outline" onClick={handleManageBilling} disabled={isManagingBilling}>
+              {isManagingBilling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ExternalLink className="mr-2 h-4 w-4" />}
+              Manage Billing Settings
+            </Button>
+          )}
         </div>
 
         <Card className="bg-card/50">
