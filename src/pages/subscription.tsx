@@ -232,7 +232,9 @@ export default function Subscription() {
         body: JSON.stringify({
           planId: selectedPlan,
           billingCycle,
-          features: finalFeatures,
+          features: finalFeatures, // Total features sent to metadata for DB update
+          featuresToCharge: addOnQuantities, // Only the newly added seats for Stripe billing
+          chargeBasePlan: basePriceToCharge > 0, // Explicit flag to skip base plan charge if already active
           userId: session.user.id,
           email: session.user.email,
           returnUrl: window.location.origin + '/subscription',
@@ -539,13 +541,13 @@ export default function Subscription() {
               <CardFooter>
                 <Button
                   className="w-full font-semibold"
-                  variant={plan.id === selectedPlan ? "secondary" : "default"}
+                  variant={plan.id === currentPlan && !isTrial && !isLocked ? "default" : (plan.id === selectedPlan ? "secondary" : "outline")}
                   disabled={plan.id === "trial"}
                   onClick={() => handleUpgrade(plan.id)}
                 >
                   {plan.id === "trial" 
                     ? (isTrial ? (isLocked ? "Expired" : "Active Trial") : "Trial Used") 
-                    : (plan.id === selectedPlan ? "Selected" : "Select Plan")}
+                    : (plan.id === currentPlan && !isTrial && !isLocked ? "Active" : (plan.id === selectedPlan ? "Selected" : "Select Plan"))}
                 </Button>
               </CardFooter>
             </Card>
