@@ -263,10 +263,14 @@ export default function Settings() {
     });
   };
 
-  const includedUsage = invites.filter(i => !i.is_addon).length + teamUsers.filter(u => !u.is_addon).length;
+  const includedUsage = 
+    invites.filter(i => !i.is_addon).reduce((acc, i) => acc + (i.modules?.length || (i.module ? 1 : 0)), 0) + 
+    teamUsers.filter(u => !u.is_addon).reduce((acc, u) => acc + (u.assigned_modules?.length || (u.assigned_module ? 1 : 0)), 0);
   const includedLimit = isStarter ? 3 : 7; 
   
-  const addonUsage = invites.filter(i => i.is_addon).length + teamUsers.filter(u => u.is_addon).length;
+  const addonUsage = 
+    invites.filter(i => i.is_addon).reduce((acc, i) => acc + (i.modules?.length || (i.module ? 1 : 0)), 0) + 
+    teamUsers.filter(u => u.is_addon).reduce((acc, u) => acc + (u.assigned_modules?.length || (u.assigned_module ? 1 : 0)), 0);
   const addonLimit = Object.values(activeAddOns).reduce((a, b) => Number(a) + Number(b), 0);
 
   return (
