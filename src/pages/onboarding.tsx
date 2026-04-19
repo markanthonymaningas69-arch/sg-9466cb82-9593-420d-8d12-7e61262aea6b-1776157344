@@ -87,15 +87,16 @@ export default function Onboarding() {
       const primaryModule = invData.modules && invData.modules.length > 0 ? invData.modules[0] : invData.module;
       const allModules = invData.modules && invData.modules.length > 0 ? invData.modules : [invData.module];
 
-      // Update their profile directly with all necessary fields including company_id
-      const { error: updateError } = await supabase.from('profiles').update({
+      // Update their profile directly with all necessary fields including company_id using upsert
+      const { error: updateError } = await supabase.from('profiles').upsert({
+        id: user.id,
         full_name: fullName.trim(),
         assigned_module: primaryModule,
         assigned_modules: allModules,
         assigned_project_ids: invData.project_ids || [],
         company_id: invData.company_id,
         updated_at: new Date().toISOString()
-      }).eq('id', user.id);
+      });
 
       if (updateError) throw updateError;
 

@@ -41,11 +41,12 @@ export default function RegisterPage() {
     }
 
     if (user) {
-      // Set the user's full name and send to onboarding
-      await supabase.from('profiles').update({ 
+      // Set the user's full name and send to onboarding using upsert to guarantee row creation
+      await supabase.from('profiles').upsert({ 
+        id: user.id,
         full_name: fullName,
         assigned_module: null
-      }).eq('id', user.id);
+      });
       
       setSuccess("Account created successfully. Redirecting to workspace setup...");
       setTimeout(() => {
