@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/contexts/ThemeProvider";
 import { useSettings } from "@/contexts/SettingsProvider";
 import { supabase } from "@/integrations/supabase/client";
+import { useRouter } from "next/router";
 import { 
   Building2, 
   Bell, 
@@ -39,6 +40,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 export default function Settings() {
+  const router = useRouter();
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
   const { currency, setCurrency, company, setCompany, currentPlan, isTrial, themeColor, setThemeColor, companyId } = useSettings();
@@ -507,9 +509,17 @@ export default function Settings() {
                             )}
                             <div className="text-xs text-muted-foreground mt-1">
                               <strong className="text-foreground">Seat Expiry:</strong> {u.subscription_end_date ? new Date(u.subscription_end_date).toLocaleDateString() : "Syncs with GM Plan"}
+                              {u.subscription_end_date && new Date(u.subscription_end_date) < new Date() && (
+                                <Badge variant="destructive" className="ml-2 text-[10px]">Expired</Badge>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center gap-1">
+                            {u.subscription_end_date && new Date(u.subscription_end_date) < new Date() && (
+                              <Button size="sm" variant="outline" className="text-xs border-primary text-primary hover:bg-primary/10 h-8 mr-2 px-2" onClick={() => router.push('/subscription')}>
+                                Renew Seat
+                              </Button>
+                            )}
                             <Button size="icon" variant="ghost" onClick={() => {
                               setEditingUser(u);
                               setEditModules(u.assigned_modules && u.assigned_modules.length > 0 ? u.assigned_modules : [u.assigned_module]);

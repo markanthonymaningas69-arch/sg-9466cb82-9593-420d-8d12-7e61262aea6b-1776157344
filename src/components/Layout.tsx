@@ -1198,13 +1198,17 @@ export function Layout({ children }: LayoutProps) {
                   {lockReason === "trial_expired" ? "Trial Expired - Read-Only Mode" : "Subscription Expired - Read-Only Mode"}
                 </p>
                 <p className="text-xs text-destructive/80 hidden sm:block">
-                  You can view your data, but adding, editing, or deleting is disabled until you upgrade.
+                  {assignedModules.includes("GM") 
+                    ? "You can view your data, but adding, editing, or deleting is disabled until you upgrade."
+                    : "You can view your data, but adding, editing, or deleting is disabled until your General Manager renews your access."}
                 </p>
               </div>
             </div>
-            <Button size="sm" variant="destructive" onClick={() => router.push('/subscription')}>
-              Upgrade Now
-            </Button>
+            {assignedModules.includes("GM") && (
+              <Button size="sm" variant="destructive" onClick={() => router.push('/subscription')}>
+                Upgrade Now
+              </Button>
+            )}
           </div>
         )}
 
