@@ -121,7 +121,7 @@ export default function Settings() {
 
   // Base limits based purely on the plan type
   const basePlanLimits: Record<string, number> = isStarter
-    ? { 'Site Personnel': 2, 'Accounting': 1, 'Purchasing': 1 }
+    ? { 'Site Personnel': 1, 'Accounting': 1, 'Purchasing': 1 }
     : { 'Site Personnel': 5, 'Accounting': 1, 'Purchasing': 1 };
 
   // Calculate true limits: Base Plan + Purchased Add-ons
@@ -135,24 +135,6 @@ export default function Settings() {
     const activeInvites = invites.filter(i => (i.modules && i.modules.includes(mod)) || i.module === mod).length;
     const activeUsers = teamUsers.filter(u => (u.assigned_modules && u.assigned_modules.includes(mod)) || u.assigned_module === mod).length;
     return activeInvites + activeUsers;
-  };
-
-  const getCombinedAccPurchUsage = () => {
-    const activeInvites = invites.filter(i => {
-      const mods = i.modules || [i.module];
-      return mods.includes('Accounting') || mods.includes('Purchasing');
-    }).length;
-    const activeUsers = teamUsers.filter(u => {
-      const mods = u.assigned_modules || [u.assigned_module];
-      return mods.includes('Accounting') || mods.includes('Purchasing');
-    }).length;
-    return activeInvites + activeUsers;
-  };
-
-  const getSpecificUsage = (isAddon: boolean, mods: string[]) => {
-    const invCount = invites.filter(i => !!i.is_addon === isAddon && mods.some(m => (i.modules || [i.module]).includes(m))).length;
-    const usrCount = teamUsers.filter(u => !!u.is_addon === isAddon && mods.some(m => (u.assigned_modules || [u.assigned_module]).includes(m))).length;
-    return invCount + usrCount;
   };
 
   const handleGenerateSpecificCode = async () => {
@@ -171,19 +153,11 @@ export default function Settings() {
     // Check limits based on type
     if (!isAddon) {
        for (const mod of selectedModules) {
-         if (isStarter && (mod === 'Accounting' || mod === 'Purchasing')) {
-           const usage = getSpecificUsage(false, ['Accounting', 'Purchasing']);
-           if (usage >= 1) {
-              toast({ title: "Limit Reached", description: "Included limit reached for Accounting/Purchasing (1 max combined on Starter).", variant: "destructive" });
-              return;
-           }
-         } else {
-           const limit = basePlanLimits[mod] || 0;
-           const usage = getSpecificUsage(false, [mod]);
-           if (usage >= limit) {
-              toast({ title: "Limit Reached", description: `Included base limit reached for ${mod}.`, variant: "destructive" });
-              return;
-           }
+         const limit = basePlanLimits[mod] || 0;
+         const usage = getSpecificUsage(false, [mod]);
+         if (usage >= limit) {
+            toast({ title: "Limit Reached", description: `Included base limit reached for ${mod}.`, variant: "destructive" });
+            return;
          }
        }
     } else {
@@ -418,64 +392,13 @@ export default function Settings() {
                   Manage your team's access. Included seats auto-renew with your plan. Add-on seats are managed separately.
                   <strong className="text-primary mt-2 block font-medium bg-primary/5 p-2 rounded border border-primary/10">
                     {isStarter 
-                      ? "Starter / Trial Inclusions: 3 Total Independent Seats (2 Site Personnel, 1 Accounting/Purchasing combined)" 
+                      ? "Starter / Trial Inclusions: 3 Total Independent Seats (1 Site Personnel, 1 Accounting, 1 Purchasing)" 
                       : "Professional Inclusions: 7 Total Independent Seats (5 Site Personnel, 1 Accounting, 1 Purchasing)"}
                   </strong>
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="space-y-4 pb-2">
-                  <div className="space-y-2">
-                    <Label>Select Module(s) to Assign</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {['Site Personnel', 'Accounting', 'Purchasing', 'Warehouse', 'Human Resources'].map(mod => (
-                        <div key={mod} className="flex items-center space-x-2 border rounded-md p-2 bg-muted/20">
-                          <Checkbox 
-                            id={`mod-${mod}`}
-                            checked={selectedModules.includes(mod)}
-                            onCheckedChange={(checked) => {
-                              if (checked) setSelectedModules([...selectedModules, mod]);
-                              else setSelectedModules(selectedModules.filter(m => m !== mod));
-                            }}
-                          />
-                          <Label htmlFor={`mod-${mod}`} className="cursor-pointer text-sm font-medium">{mod}</Label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {selectedModules.includes("Site Personnel") && (
-                    <div className="space-y-2 p-3 border rounded-md bg-muted/10">
-                      <Label>Restrict to Projects (Max {isStarter ? 2 : 'Unlimited'})</Label>
-                      <div className="flex flex-wrap gap-3 mt-2 max-h-40 overflow-y-auto">
-                        {projects.map(p => (
-                          <div key={p.id} className="flex items-center space-x-2">
-                            <Checkbox 
-                              id={`proj-${p.id}`}
-                              checked={selectedProjects.includes(p.id)}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  if (isStarter && selectedProjects.length >= 2) {
-                                    toast({ title: "Limit Reached", description: "Starter/Trial plan allows a maximum of 2 projects per user.", variant: "destructive" });
-                                    return;
-                                  }
-                                  setSelectedProjects([...selectedProjects, p.id]);
-                                } else {
-                                  setSelectedProjects(selectedProjects.filter(id => id !== p.id));
-                                }
-                              }}
-                            />
-                            <Label htmlFor={`proj-${p.id}`} className="cursor-pointer text-sm">{p.name}</Label>
-                          </div>
-                        ))}
-                        {projects.length === 0 && <p className="text-xs text-muted-foreground">No projects found.</p>}
-                      </div>
-                    </div>
-                  )}
-
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-6 pt-4 border-t">
+                <div className="grid md:grid-cols-2 gap-6 pt-2">
                   
                   {/* INCLUDED COLUMN */}
                   <div className="space-y-6">
@@ -813,10 +736,7 @@ export default function Settings() {
                 <Label>Assigned Modules</Label>
                 <div className="border rounded-md p-2 max-h-32 overflow-y-auto space-y-2 bg-background">
                   {Object.keys(planLimits).map(mod => {
-                    const isAccPurch = isStarter && (mod === 'Accounting' || mod === 'Purchasing');
-                    const combinedLimit = isStarter ? 1 + (activeAddOns['extra_acc'] || 0) + (activeAddOns['purchasing'] || 0) : 0;
-                    
-                    const disabled = isAccPurch ? combinedLimit === 0 : planLimits[mod] === 0;
+                    const disabled = planLimits[mod] === 0;
                     
                     return (
                       <div key={mod} className="flex items-center space-x-2">
@@ -886,25 +806,6 @@ export default function Settings() {
                   if (editModules.length === 0) {
                     toast({ title: "Error", description: "Select at least one module.", variant: "destructive" });
                     return;
-                  }
-
-                  if (isStarter && (editModules.includes('Accounting') || editModules.includes('Purchasing'))) {
-                    const hadAccPurch = editingUser.assigned_modules?.includes('Accounting') || 
-                                        editingUser.assigned_modules?.includes('Purchasing') || 
-                                        editingUser.assigned_module === 'Accounting' || 
-                                        editingUser.assigned_module === 'Purchasing';
-                    
-                    if (!hadAccPurch) {
-                      const combinedLimit = 1 + (activeAddOns['extra_acc'] || 0) + (activeAddOns['purchasing'] || 0);
-                      if (getCombinedAccPurchUsage() >= combinedLimit) {
-                        toast({ 
-                          title: "Limit Reached", 
-                          description: `Starter/Trial plan allows a combined total of ${combinedLimit} user(s) for Accounting/Purchasing.`, 
-                          variant: "destructive" 
-                        });
-                        return;
-                      }
-                    }
                   }
 
                   const isSitePersonnel = editModules.includes("Site Personnel");
