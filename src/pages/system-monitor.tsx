@@ -64,16 +64,16 @@ export default function SystemMonitor() {
   }, []);
 
   const handleUpdateDates = async () => {
-    if (!editingSub?.sub_id) {
-      toast({ title: "Error", description: "No active subscription found for this company.", variant: "destructive" });
+    if (!editingSub?.user_id) {
+      toast({ title: "Error", description: "No user found for this company.", variant: "destructive" });
       return;
     }
     setIsUpdatingDates(true);
     try {
-      const { error } = await supabase.rpc('update_subscription_dates', {
-        p_sub_id: editingSub.sub_id,
-        p_start_date: newStartDate,
-        p_end_date: newEndDate
+      const { error } = await supabase.rpc('update_gm_dates', {
+        p_user_id: editingSub.user_id,
+        p_start_date: newStartDate || null,
+        p_end_date: newEndDate || null
       });
       if (error) throw error;
       
@@ -132,36 +132,11 @@ export default function SystemMonitor() {
   const subscriptions = data.subscriptions || [];
 
   const totalGMs = companies.length;
-
-  // Compute add-ons breakdown
-  const addonsMetrics = useMemo(() => {
-    const breakdown = {
-      site_personnel: { count: 0, amount: 0 },
-      accounting: { count: 0, amount: 0 },
-      purchasing: { count: 0, amount: 0 }
-    };
-
-    companies.forEach((comp: any) => {
-      const addons = comp.addons_breakdown || {};
-      if (addons.site_personnel) {
-        breakdown.site_personnel.count += addons.site_personnel.count || 0;
-        breakdown.site_personnel.amount += addons.site_personnel.amount || 0;
-      }
-      if (addons.accounting) {
-        breakdown.accounting.count += addons.accounting.count || 0;
-        breakdown.accounting.amount += addons.accounting.amount || 0;
-      }
-      if (addons.purchasing) {
-        breakdown.purchasing.count += addons.purchasing.count || 0;
-        breakdown.purchasing.amount += addons.purchasing.amount || 0;
-      }
-    });
-
-    const totalCount = breakdown.site_personnel.count + breakdown.accounting.count + breakdown.purchasing.count;
-    const totalAmount = breakdown.site_personnel.amount + breakdown.accounting.amount + breakdown.purchasing.amount;
-
-    return { ...breakdown, totalCount, totalAmount };
-  }, [companies]);
+  const totalTrueAddons = addonUsers.filter((u: any) => !!u.is_addon).length;
+  
+  const siteCount = addonUsers.filter((u: any) => u.assigned_modules?.includes('Site Personnel') || u.assigned_module?.includes('Site Personnel')).length;
+  const accCount = addonUsers.filter((u: any) => u.assigned_modules?.includes('Accounting') || u.assigned_module?.includes('Accounting')).length;
+  const purCount = addonUsers.filter((u: any) => u.assigned_modules?.includes('Purchasing') || u.assigned_module?.includes('Purchasing')).length;
 
   const subMetrics = useMemo(() => {
     let starterMonthly = 0, starterAnnual = 0;
@@ -290,9 +265,13 @@ export default function SystemMonitor() {
           {u.gm_plan ? `${u.gm_plan} (${u.gm_billing_cycle || 'monthly'})` : 'No Active Plan'}
         </TableCell>
         <TableCell className="text-right">
-          <Button variant="outline" size="sm" className="h-8 text-xs text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-100" onClick={() => openEditAddonDates(u)}>
-            <Pencil className="h-3 w-3 mr-1" /> Edit Dates
-          </Button>
+          {u.is_addon ? (
+            <Button variant="outline" size="sm" className="h-8 text-xs text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-100" onClick={() => openEditAddonDates(u)}>
+              <Pencil className="h-3 w-3 mr-1" /> Edit Dates
+            </Button>
+          ) : (
+            <span className="text-xs text-muted-foreground italic px-2">Tied to GM</span>
+          )}
         </TableCell>
       </TableRow>
     );
@@ -344,8 +323,8 @@ export default function SystemMonitor() {
               <Package className="h-4 w-4 text-emerald-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{addonsMetrics.totalCount}</div>
-              <p className="text-xs text-muted-foreground mt-1">{formatAED(addonsMetrics.totalAmount)} revenue</p>
+              <div className="text-3xl font-bold">{totalTrueAddons}</div>
+              <p className="text-xs text-muted-foreground mt-1">Paid extra seats</p>
             </CardContent>
           </Card>
 
@@ -425,19 +404,19 @@ export default function SystemMonitor() {
                   <div className="flex items-center justify-between p-2 bg-muted/50 rounded">
                     <span className="text-muted-foreground">Site Personnel</span>
                     <div className="text-right">
-                      <div className="font-bold text-foreground">{addonsMetrics.site_personnel.count} active</div>
+                      <div className="font-bold text-foreground">{siteCount} active</div>
                     </div>
                   </div>
                   <div className="flex items-center justify-between p-2 bg-muted/50 rounded">
                     <span className="text-muted-foreground">Accounting</span>
                     <div className="text-right">
-                      <div className="font-bold text-foreground">{addonsMetrics.accounting.count} active</div>
+                      <div className="font-bold text-foreground">{accCount} active</div>
                     </div>
                   </div>
                   <div className="flex items-center justify-between p-2 bg-muted/50 rounded">
                     <span className="text-muted-foreground">Purchasing</span>
                     <div className="text-right">
-                      <div className="font-bold text-foreground">{addonsMetrics.purchasing.count} active</div>
+                      <div className="font-bold text-foreground">{purCount} active</div>
                     </div>
                   </div>
                 </div>
@@ -595,8 +574,6 @@ export default function SystemMonitor() {
                               size="sm" 
                               className="h-8 text-xs text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-100" 
                               onClick={() => openEditDates(comp)}
-                              disabled={!comp.sub_id}
-                              title={!comp.sub_id ? "Trial dates are fixed to 7 days from signup" : "Edit subscription dates"}
                             >
                               <Pencil className="h-3 w-3 mr-1" /> Edit Dates
                             </Button>

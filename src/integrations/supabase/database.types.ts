@@ -1779,6 +1779,10 @@ export type Database = {
         Args: { p_end_date: string; p_profile_id: string; p_start_date: string }
         Returns: undefined
       }
+      update_gm_dates: {
+        Args: { p_end_date: string; p_start_date: string; p_user_id: string }
+        Returns: undefined
+      }
       update_subscription_dates: {
         Args: { p_end_date: string; p_start_date: string; p_sub_id: string }
         Returns: undefined
