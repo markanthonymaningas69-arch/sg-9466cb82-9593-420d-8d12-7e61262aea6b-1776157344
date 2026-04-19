@@ -547,7 +547,14 @@ export default function SystemMonitor() {
                             {formatAED(Number(comp.amount || 0))}
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button variant="outline" size="sm" className="h-8 text-xs text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-100" onClick={() => openEditDates(comp)}>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="h-8 text-xs text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-100" 
+                              onClick={() => openEditDates(comp)}
+                              disabled={!comp.sub_id}
+                              title={!comp.sub_id ? "Trial dates are fixed to 7 days from signup" : "Edit subscription dates"}
+                            >
                               <Pencil className="h-3 w-3 mr-1" /> Edit Dates
                             </Button>
                           </TableCell>
