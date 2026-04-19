@@ -112,9 +112,11 @@ export default function Settings() {
     setTeamUsers(usrData || []);
   };
 
+  const isStarter = currentPlan === 'starter' || currentPlan === 'trial' || isTrial;
+
   // Base limits based purely on the plan type
-  const basePlanLimits: Record<string, number> = (currentPlan === 'starter' || currentPlan === 'trial' || isTrial)
-    ? { 'Site Personnel': 1, 'Accounting': 1, 'Purchasing': 0, 'Human Resources': 0, 'Warehouse': 0 }
+  const basePlanLimits: Record<string, number> = isStarter
+    ? { 'Site Personnel': 1, 'Accounting': 1, 'Purchasing': 1, 'Human Resources': 0, 'Warehouse': 0 }
     : { 'Site Personnel': 3, 'Accounting': 1, 'Purchasing': 1, 'Human Resources': 1, 'Warehouse': 1 };
 
   // Calculate true limits: Base Plan + Purchased Add-ons
@@ -132,6 +134,18 @@ export default function Settings() {
     return activeInvites + activeUsers;
   };
 
+  const getCombinedAccPurchUsage = () => {
+    const activeInvites = invites.filter(i => {
+      const mods = i.modules || [i.module];
+      return mods.includes('Accounting') || mods.includes('Purchasing');
+    }).length;
+    const activeUsers = teamUsers.filter(u => {
+      const mods = u.assigned_modules || [u.assigned_module];
+      return mods.includes('Accounting') || mods.includes('Purchasing');
+    }).length;
+    return activeInvites + activeUsers;
+  };
+
   const handleGenerateCode = async () => {
     if (selectedModules.length === 0) {
       toast({ title: "Error", description: "Select at least one module.", variant: "destructive" });
@@ -139,6 +153,8 @@ export default function Settings() {
     }
 
     for (const mod of selectedModules) {
+      if (isStarter && (mod === 'Accounting' || mod === 'Purchasing')) continue;
+
       const limit = planLimits[mod] || 0;
       const currentUsage = getUsageCount(mod);
       
@@ -146,6 +162,18 @@ export default function Settings() {
         toast({
           title: "Limit Reached",
           description: `Your ${currentPlan} plan only allows ${limit} user(s) for ${mod}. Upgrade to add more.`,
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
+    if (isStarter && (selectedModules.includes('Accounting') || selectedModules.includes('Purchasing'))) {
+      const combinedLimit = 1 + (activeAddOns['extra_acc'] || 0) + (activeAddOns['purchasing'] || 0);
+      if (getCombinedAccPurchUsage() >= combinedLimit) {
+        toast({
+          title: "Limit Reached",
+          description: `Starter/Trial plan allows a combined total of ${combinedLimit} user(s) for Accounting/Purchasing.`,
           variant: "destructive"
         });
         return;
@@ -364,7 +392,14 @@ export default function Settings() {
                       <Label>Assign Modules (Multiple allowed)</Label>
                       <div className="border rounded-md p-2 max-h-32 overflow-y-auto space-y-2 bg-background">
                         {Object.keys(planLimits).map(mod => {
-                          const disabled = planLimits[mod] === 0;
+                          const isAccPurch = isStarter && (mod === 'Accounting' || mod === 'Purchasing');
+                          const combinedLimit = isStarter ? 1 + (activeAddOns['extra_acc'] || 0) + (activeAddOns['purchasing'] || 0) : 0;
+                          
+                          const disabled = isAccPurch ? combinedLimit === 0 : planLimits[mod] === 0;
+                          const usageText = isAccPurch 
+                            ? `Combined Acc/Purch: ${getCombinedAccPurchUsage()}/${combinedLimit} used`
+                            : `${getUsageCount(mod)}/${planLimits[mod]} used`;
+
                           return (
                             <div key={mod} className="flex items-center space-x-2">
                               <Checkbox 
@@ -377,7 +412,7 @@ export default function Settings() {
                                 }}
                               />
                               <label htmlFor={`mod-${mod}`} className={cn("text-sm font-medium leading-none cursor-pointer", disabled && "opacity-50")}>
-                                {mod} <span className="text-xs text-muted-foreground">({getUsageCount(mod)}/{planLimits[mod]} used)</span>
+                                {mod} <span className="text-xs text-muted-foreground">({usageText})</span>
                               </label>
                             </div>
                           );
@@ -570,7 +605,11 @@ export default function Settings() {
                 <Label>Assigned Modules</Label>
                 <div className="border rounded-md p-2 max-h-32 overflow-y-auto space-y-2 bg-background">
                   {Object.keys(planLimits).map(mod => {
-                    const disabled = planLimits[mod] === 0;
+                    const isAccPurch = isStarter && (mod === 'Accounting' || mod === 'Purchasing');
+                    const combinedLimit = isStarter ? 1 + (activeAddOns['extra_acc'] || 0) + (activeAddOns['purchasing'] || 0) : 0;
+                    
+                    const disabled = isAccPurch ? combinedLimit === 0 : planLimits[mod] === 0;
+                    
                     return (
                       <div key={mod} className="flex items-center space-x-2">
                         <Checkbox 
@@ -629,6 +668,25 @@ export default function Settings() {
                   if (editModules.length === 0) {
                     toast({ title: "Error", description: "Select at least one module.", variant: "destructive" });
                     return;
+                  }
+
+                  if (isStarter && (editModules.includes('Accounting') || editModules.includes('Purchasing'))) {
+                    const hadAccPurch = editingUser.assigned_modules?.includes('Accounting') || 
+                                        editingUser.assigned_modules?.includes('Purchasing') || 
+                                        editingUser.assigned_module === 'Accounting' || 
+                                        editingUser.assigned_module === 'Purchasing';
+                    
+                    if (!hadAccPurch) {
+                      const combinedLimit = 1 + (activeAddOns['extra_acc'] || 0) + (activeAddOns['purchasing'] || 0);
+                      if (getCombinedAccPurchUsage() >= combinedLimit) {
+                        toast({ 
+                          title: "Limit Reached", 
+                          description: `Starter/Trial plan allows a combined total of ${combinedLimit} user(s) for Accounting/Purchasing.`, 
+                          variant: "destructive" 
+                        });
+                        return;
+                      }
+                    }
                   }
 
                   const isSitePersonnel = editModules.includes("Site Personnel");
