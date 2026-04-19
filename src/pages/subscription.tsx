@@ -374,6 +374,17 @@ export default function Subscription() {
 
   const totalAmountDueToday = Math.max(0, basePriceToCharge - proratedDiscount) + addOnsToChargeTotal;
   
+  // Calculate expiry date for newly added items
+  let newItemsExpiryDate = '';
+  if (hasActiveSub && isSelectingSamePlanAndCycle && subscriptionDetails?.end_date && !isLocked) {
+    newItemsExpiryDate = new Date(subscriptionDetails.end_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  } else {
+    const d = new Date();
+    if (billingCycle === 'monthly') d.setMonth(d.getMonth() + 1);
+    else d.setFullYear(d.getFullYear() + 1);
+    newItemsExpiryDate = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  }
+  
   // User count calculations
   const addOnUsersCount = subscriptionDetails?.features 
     ? Number(Object.values(subscriptionDetails.features).reduce((a: any, b: any) => Number(a) + Number(b), 0))
@@ -629,8 +640,13 @@ export default function Subscription() {
                       </Button>
                     </div>
                     {isSelected && (
-                      <div className="w-full text-center text-sm font-medium text-primary">
-                        Subtotal: AED {(billingCycle === "monthly" ? addon.monthlyPrice : addon.annualPrice) * newQty}
+                      <div className="w-full text-center flex flex-col items-center mt-1">
+                        <span className="text-sm font-medium text-primary">
+                          Subtotal: AED {(billingCycle === "monthly" ? addon.monthlyPrice : addon.annualPrice) * newQty}
+                        </span>
+                        <span className="text-[10px] font-medium text-muted-foreground mt-0.5">
+                          Valid until {newItemsExpiryDate}
+                        </span>
                       </div>
                     )}
                   </CardFooter>
@@ -673,9 +689,12 @@ export default function Subscription() {
                     
                     const price = billingCycle === "monthly" ? addon.monthlyPrice : addon.annualPrice;
                     return (
-                      <div key={`new-${addon.id}`} className="flex justify-between text-muted-foreground max-w-sm pl-2 border-l-2 border-primary/20 ml-1">
-                        <span className="text-sm">+ {newQty}x {addon.name}</span>
-                        <span className="font-medium text-foreground text-sm">AED {price * newQty}</span>
+                      <div key={`new-${addon.id}`} className="flex flex-col text-muted-foreground max-w-sm pl-2 border-l-2 border-primary/20 ml-1">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm">+ {newQty}x {addon.name}</span>
+                          <span className="font-medium text-foreground text-sm">AED {price * newQty}</span>
+                        </div>
+                        <span className="text-[10px] mt-0.5">Valid until {newItemsExpiryDate}</span>
                       </div>
                     );
                   })}
