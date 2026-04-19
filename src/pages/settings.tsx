@@ -137,6 +137,12 @@ export default function Settings() {
     return activeInvites + activeUsers;
   };
 
+  const getSpecificUsage = (isAddon: boolean, mods: string[]) => {
+    const invCount = invites.filter(i => !!i.is_addon === isAddon && mods.some(m => (i.modules || [i.module]).includes(m))).length;
+    const usrCount = teamUsers.filter(u => !!u.is_addon === isAddon && mods.some(m => (u.assigned_modules || [u.assigned_module]).includes(m))).length;
+    return invCount + usrCount;
+  };
+
   const handleGenerateSpecificCode = async () => {
     if (selectedModules.length === 0) {
       toast({ title: "Error", description: "Select at least one module.", variant: "destructive" });
