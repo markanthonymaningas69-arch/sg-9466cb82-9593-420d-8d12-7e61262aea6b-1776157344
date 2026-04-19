@@ -408,7 +408,7 @@ export default function Settings() {
                   Manage your team's access. Included seats auto-renew with your plan. Add-on seats are managed separately.
                   <strong className="text-primary mt-2 block font-medium bg-primary/5 p-2 rounded border border-primary/10">
                     {isStarter 
-                      ? "Starter / Trial Inclusions: 3 Total Independent Seats (1 Site Personnel, 1 Accounting, 1 Purchasing)" 
+                      ? "Starter Inclusions: 3 Total Independent Seats (1 Site Personnel, 1 Accounting, 1 Purchasing)" 
                       : "Professional Inclusions: 7 Total Independent Seats (5 Site Personnel, 1 Accounting, 1 Purchasing)"}
                   </strong>
                 </CardDescription>
