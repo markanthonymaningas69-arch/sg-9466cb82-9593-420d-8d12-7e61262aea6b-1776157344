@@ -7,6 +7,7 @@ import { SettingsProvider } from "@/contexts/SettingsProvider";
 import { Toaster } from "@/components/ui/toaster";
 import { authService } from "@/services/authService";
 import { Inter, Outfit, Playfair_Display } from "next/font/google";
+import { supabase } from "@/integrations/supabase/client";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 const outfit = Outfit({ subsets: ["latin"], variable: "--font-sans" });
@@ -44,6 +45,31 @@ function AppInner({ Component, pageProps }: AppProps) {
       isMounted = false;
     };
   }, [router.pathname, router]);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      const activeUserId = localStorage.getItem('app_active_user_id');
+      
+      if (session?.user) {
+        if (activeUserId && activeUserId !== session.user.id) {
+          // Another account logged in from a different tab. Force reload to clear state and sync.
+          window.location.reload();
+        } else {
+          localStorage.setItem('app_active_user_id', session.user.id);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        localStorage.removeItem('app_active_user_id');
+        const publicPaths = ["/auth/login", "/auth/register", "/404", "/system-monitor", "/pricing"];
+        if (!publicPaths.includes(window.location.pathname)) {
+          window.location.href = '/auth/login';
+        }
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   if (!authChecked) {
     return (
