@@ -291,7 +291,7 @@ export default function Subscription() {
         <Card className="bg-card/50">
           <CardHeader>
             <CardTitle>Current Plan Status</CardTitle>
-            <CardDescription>You are currently on the {isTrial ? "Professional Trial" : (currentPlan === "starter" ? "Starter" : "Professional")} plan</CardDescription>
+            <CardDescription>You are currently on the {isTrial ? "7-Day Trial" : (currentPlan === "starter" ? "Starter" : "Professional")} plan</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">

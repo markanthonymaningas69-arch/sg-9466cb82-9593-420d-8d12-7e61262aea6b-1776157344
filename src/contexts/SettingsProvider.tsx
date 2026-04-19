@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 type CurrencyType = "USD" | "EUR" | "GBP" | "JPY" | "PHP" | "AUD" | "CAD" | "SGD" | "AED" | "INR";
 const SUPPORTED_CURRENCIES = ["USD", "EUR", "GBP", "JPY", "PHP", "AUD", "CAD", "SGD", "AED", "INR"];
-type PlanType = "starter" | "professional";
+type PlanType = "trial" | "starter" | "professional";
 type ThemeColor = "blue" | "green" | "orange" | "rose" | "violet";
 
 export interface CompanySettings {
@@ -48,7 +48,7 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [currency, setCurrencyState] = useState<CurrencyType>("AED");
   const [company, setCompanyState] = useState<CompanySettings>(defaultCompany);
-  const [currentPlan, setCurrentPlanState] = useState<PlanType>("professional");
+  const [currentPlan, setCurrentPlanState] = useState<PlanType>("trial");
   const [isLocked, setIsLocked] = useState<boolean>(false);
   const [lockReason, setLockReason] = useState<"trial_expired" | "subscription_expired" | "none">("none");
   const [isTrial, setIsTrial] = useState<boolean>(true);
@@ -64,61 +64,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const savedColor = localStorage.getItem("app_theme_color") as ThemeColor;
     if (savedColor) setThemeColorState(savedColor);
 
-    const savedPlan = localStorage.getItem("app_plan") as PlanType;
-    if (savedPlan && ["starter", "professional"].includes(savedPlan)) {
-      setCurrentPlanState(savedPlan);
-    }
-
-    // Trial logic based on company creation date
-    let companyCreated = localStorage.getItem("app_created_at");
-    if (!companyCreated) {
-      companyCreated = new Date().toISOString();
-      localStorage.setItem("app_created_at", companyCreated);
-    }
-
-    const createdDate = new Date(companyCreated);
-    const currentDate = new Date();
-    
-    // Check for paid subscription
-    const isPaid = localStorage.getItem("app_is_paid") === "true";
-    const expiresAtStr = localStorage.getItem("app_subscription_expires_at");
-    
-    if (isPaid) {
-      setIsTrial(false);
-      setDaysRemaining(0);
-      
-      if (expiresAtStr) {
-        const expiresAt = new Date(expiresAtStr);
-        if (currentDate > expiresAt) {
-          setIsLocked(true);
-          setLockReason("subscription_expired");
-        } else {
-          setIsLocked(false);
-          setLockReason("none");
-        }
-      } else {
-        // Fallback for previously active plans
-        setIsLocked(false);
-        setLockReason("none");
-      }
-    } else {
-      // Trial logic
-      setIsTrial(true);
-      const diffTime = Math.abs(currentDate.getTime() - createdDate.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
-      const remaining = Math.max(0, 7 - diffDays);
-      setDaysRemaining(remaining);
-      
-      if (diffDays > 7) {
-        setIsLocked(true);
-        setLockReason("trial_expired");
-      } else {
-        setIsLocked(false);
-        setLockReason("none");
-      }
-    }
-
     // Function to load company data securely from DB
     const loadCompanyFromDb = async (userId: string) => {
       // IMMEDIATELY clear state to prevent memory leaks from previous user in SPA
@@ -126,6 +71,57 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       setCompanyId(null);
 
       try {
+        // 1. Fetch Subscription Data directly from Supabase
+        const { data: subs } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
+
+        if (subs && subs.length > 0) {
+          const sub = subs[0];
+          setCurrentPlanState(sub.plan as PlanType);
+          
+          if (sub.end_date) {
+            const endDate = new Date(sub.end_date);
+            const now = new Date();
+            const isExpired = now > endDate;
+
+            if (sub.plan === 'trial') {
+              setIsTrial(true);
+              const diffTime = endDate.getTime() - now.getTime();
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              setDaysRemaining(Math.max(0, diffDays));
+              
+              if (isExpired) {
+                setIsLocked(true);
+                setLockReason("trial_expired");
+              } else {
+                setIsLocked(false);
+                setLockReason("none");
+              }
+            } else {
+              setIsTrial(false);
+              setDaysRemaining(0);
+              
+              if (isExpired) {
+                setIsLocked(true);
+                setLockReason("subscription_expired");
+              } else {
+                setIsLocked(false);
+                setLockReason("none");
+              }
+            }
+          }
+        } else {
+          // Default fallback if no record is found
+          setIsTrial(true);
+          setCurrentPlanState("trial");
+          setIsLocked(false);
+          setDaysRemaining(7);
+        }
+
+        // 2. Fetch Company Data
         const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', userId).single();
         let compId = profile?.company_id;
 
@@ -159,7 +155,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           }
         }
       } catch (err) {
-        console.error("Error loading company data:", err);
+        console.error("Error loading company/subscription data:", err);
       }
     };
 
@@ -168,9 +164,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       if (session?.user) {
         loadCompanyFromDb(session.user.id);
       } else {
-        // Completely wipe company state on logout
+        // Completely wipe state on logout
         setCompanyState(defaultCompany);
         setCompanyId(null);
+        setCurrentPlanState("trial");
+        setIsTrial(true);
+        setIsLocked(false);
       }
     });
 
@@ -200,12 +199,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   const setCompany = (newCompany: CompanySettings) => {
     setCompanyState(newCompany);
-    // REMOVED localStorage saving here to enforce strict multi-tenant isolation
   };
 
   const setCurrentPlan = (plan: PlanType) => {
     setCurrentPlanState(plan);
-    localStorage.setItem("app_plan", plan);
   };
 
   const setThemeColor = (color: ThemeColor) => {
