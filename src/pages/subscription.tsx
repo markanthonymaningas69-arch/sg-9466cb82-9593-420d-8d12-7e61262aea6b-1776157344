@@ -309,7 +309,7 @@ export default function Subscription() {
 
   // --- PRORATION & TOTALS CALCULATION ---
   const isCurrentlyTrial = (currentPlan as string) === "trial" || isTrial;
-  const hasActiveSub = subscriptionDetails?.status === "active" && !isCurrentlyTrial;
+  const hasActiveSub = subscriptionDetails?.status === "active" && !isCurrentlyTrial && !isLocked;
   
   const activeAmount = Number(subscriptionDetails?.amount) || 0;
   const isActiveAnnual = activeAmount > 1000;
@@ -317,14 +317,14 @@ export default function Subscription() {
 
   const basePrice = selectedPlanConfig ? (billingCycle === "monthly" ? selectedPlanConfig.monthlyPrice : selectedPlanConfig.annualPrice) : 0;
   
-  // Only charge base price if they are upgrading/changing plans or cycle, or don't have an active one
-  const basePriceToCharge = (!hasActiveSub || !isSelectingSamePlanAndCycle) ? basePrice : 0;
+  // Only charge base price if they are upgrading/changing plans or cycle, or don't have an active one, or if it's expired (locked)
+  const basePriceToCharge = (!hasActiveSub || !isSelectingSamePlanAndCycle || isLocked) ? basePrice : 0;
 
   let proratedDiscount = 0;
   let daysRemaining = 0;
 
   // If they have an active sub, are choosing a different plan/cycle, and are paying a new base price
-  if (hasActiveSub && !isSelectingSamePlanAndCycle && subscriptionDetails?.end_date && basePriceToCharge > 0) {
+  if (hasActiveSub && !isSelectingSamePlanAndCycle && subscriptionDetails?.end_date && basePriceToCharge > 0 && !isLocked) {
     const end = new Date(subscriptionDetails.end_date);
     const start = new Date(subscriptionDetails.start_date);
     const now = new Date();
@@ -629,9 +629,13 @@ export default function Subscription() {
                   <div className="flex justify-between text-muted-foreground max-w-sm">
                     {selectedPlanConfig ? (
                       <>
-                        <span>{selectedPlanConfig.name} Plan ({billingCycle}) {isSelectingSamePlanAndCycle && <Badge variant="outline" className="ml-2 text-[10px] bg-success/10 text-success border-success/20">Already Active</Badge>}</span>
+                        <span>
+                          {selectedPlanConfig.name} Plan ({billingCycle}) 
+                          {isSelectingSamePlanAndCycle && !isLocked && <Badge variant="outline" className="ml-2 text-[10px] bg-success/10 text-success border-success/20">Already Active</Badge>}
+                          {isSelectingSamePlanAndCycle && isLocked && <Badge variant="outline" className="ml-2 text-[10px] bg-warning/10 text-warning border-warning/20">Renewal</Badge>}
+                        </span>
                         <span className="font-medium text-foreground">
-                          {isSelectingSamePlanAndCycle ? "AED 0" : `AED ${basePriceToCharge}`}
+                          {isSelectingSamePlanAndCycle && !isLocked ? "AED 0" : `AED ${basePriceToCharge}`}
                         </span>
                       </>
                     ) : (
