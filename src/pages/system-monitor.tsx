@@ -51,7 +51,7 @@ export default function SystemMonitor() {
       const { data: addonsData, error: addonsError } = await supabase.rpc('get_super_admin_addon_users');
       if (addonsError) throw addonsError;
       
-      setAddonUsers(addonsData || []);
+      setAddonUsers((addonsData as any[]) || []);
     } catch (err) {
       console.error("Error fetching super admin stats:", err);
     } finally {
