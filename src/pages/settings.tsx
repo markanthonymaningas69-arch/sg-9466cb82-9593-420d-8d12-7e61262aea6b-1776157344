@@ -121,16 +121,14 @@ export default function Settings() {
 
   // Base limits based purely on the plan type
   const basePlanLimits: Record<string, number> = isStarter
-    ? { 'Site Personnel': 1, 'Accounting': 1, 'Purchasing': 1, 'Human Resources': 0, 'Warehouse': 0 }
-    : { 'Site Personnel': 3, 'Accounting': 1, 'Purchasing': 1, 'Human Resources': 1, 'Warehouse': 1 };
+    ? { 'Site Personnel': 2, 'Accounting': 1, 'Purchasing': 1 }
+    : { 'Site Personnel': 5, 'Accounting': 1, 'Purchasing': 1 };
 
   // Calculate true limits: Base Plan + Purchased Add-ons
   const planLimits: Record<string, number> = {
     'Site Personnel': basePlanLimits['Site Personnel'] + (activeAddOns['extra_site'] || 0),
     'Accounting': basePlanLimits['Accounting'] + (activeAddOns['extra_acc'] || 0),
-    'Purchasing': basePlanLimits['Purchasing'] + (activeAddOns['purchasing'] || 0),
-    'Human Resources': basePlanLimits['Human Resources'], // Add-on not configured in billing yet
-    'Warehouse': basePlanLimits['Warehouse'] // Add-on not configured in billing yet
+    'Purchasing': basePlanLimits['Purchasing'] + (activeAddOns['purchasing'] || 0)
   };
 
   const getUsageCount = (mod: string) => {
@@ -280,7 +278,7 @@ export default function Settings() {
   };
 
   const includedUsage = invites.filter(i => !i.is_addon).length + teamUsers.filter(u => !u.is_addon).length;
-  const includedLimit = isStarter ? 2 : 7; 
+  const includedLimit = isStarter ? 3 : 7; 
   
   const addonUsage = invites.filter(i => i.is_addon).length + teamUsers.filter(u => u.is_addon).length;
   const addonLimit = Object.values(activeAddOns).reduce((a, b) => Number(a) + Number(b), 0);
@@ -743,7 +741,7 @@ export default function Settings() {
               <div className="space-y-2">
                 <Label>Select Module(s) to Assign</Label>
                 <div className="flex flex-wrap gap-2">
-                  {['Site Personnel', 'Accounting', 'Purchasing', 'Warehouse', 'Human Resources'].map(mod => (
+                  {['Site Personnel', 'Accounting', 'Purchasing'].map(mod => (
                     <div key={mod} className="flex items-center space-x-2 border rounded-md p-2 bg-muted/20">
                       <Checkbox 
                         id={`gen-mod-${mod}`}
@@ -760,9 +758,9 @@ export default function Settings() {
               </div>
 
               {selectedModules.includes("Site Personnel") && (
-                <div className="space-y-2 p-3 border rounded-md bg-muted/10">
-                  <Label>Restrict to Projects (Max {isStarter ? 2 : 'Unlimited'})</Label>
-                  <div className="flex flex-wrap gap-3 mt-2 max-h-40 overflow-y-auto">
+                <div className="space-y-2">
+                  <Label>Restrict to Projects (Max {currentPlan === 'starter' || currentPlan === 'trial' || isTrial ? 2 : 'Unlimited'})</Label>
+                  <div className="border rounded-md p-2 max-h-32 overflow-y-auto space-y-2 bg-background">
                     {projects.map(p => (
                       <div key={p.id} className="flex items-center space-x-2">
                         <Checkbox 
@@ -770,7 +768,7 @@ export default function Settings() {
                           checked={selectedProjects.includes(p.id)}
                           onCheckedChange={(checked) => {
                             if (checked) {
-                              if (isStarter && selectedProjects.length >= 2) {
+                              if ((currentPlan === 'starter' || currentPlan === 'trial' || isTrial) && selectedProjects.length >= 2) {
                                 toast({ title: "Limit Reached", description: "Starter/Trial plan allows a maximum of 2 projects per user.", variant: "destructive" });
                                 return;
                               }
@@ -780,7 +778,9 @@ export default function Settings() {
                             }
                           }}
                         />
-                        <Label htmlFor={`proj-${p.id}`} className="cursor-pointer text-sm">{p.name}</Label>
+                        <Label htmlFor={`proj-${p.id}`} className="text-sm font-medium cursor-pointer">
+                          {p.name}
+                        </Label>
                       </div>
                     ))}
                     {projects.length === 0 && <p className="text-xs text-muted-foreground">No projects found.</p>}

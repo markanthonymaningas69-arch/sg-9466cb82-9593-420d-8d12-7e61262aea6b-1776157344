@@ -25,15 +25,13 @@ export const plans: PlanConfig[] = [
     monthlyPrice: 299,
     annualPrice: 2870,
     features: [
-      "3 Ready to assign independent users (1 GM, 1 Site Personnel, 1 Accounting/Purchasing combined)",
+      "4 Total Users (1 GM + 3 Ready-to-assign independent seats)",
       "Up to 4 Projects in the System",
       "GM Module (Dashboard, Project Profile, Complete Accounting, Purchasing, Analytics)",
-      "Site Personnel Account (Limited to 2 Projects)",
+      "Included Seats: 2 Site Personnel, 1 Accounting/Purchasing combined",
       "0 Pre-active Add-on Seats",
       "Add-on Capabilities (Max 1 Extra Site Personnel)",
-      "Support Feature Updates",
-      "❌ No HR Module",
-      "❌ No Warehouse Module"
+      "Support Feature Updates"
     ],
     addOnLimits: { extra_site: 1, extra_acc: 0, purchasing: 0 }
   },
@@ -45,10 +43,10 @@ export const plans: PlanConfig[] = [
     annualPrice: 4790,
     popular: true,
     features: [
-      "8 Ready to assign independent users (1 GM, 3 Site Personnel, 1 Accounting, 1 Purchasing, 1 HR, 1 Warehouse)",
+      "8 Total Users (1 GM + 7 Ready-to-assign independent seats)",
       "Up to 10 Projects in the System",
       "GM Module (Full Access to All Modules)",
-      "Site Personnel Accounts (Limited to 2 Projects each)",
+      "Included Seats: 5 Site Personnel, 1 Accounting, 1 Purchasing",
       "0 Pre-active Add-on Seats",
       "Add-on Capabilities (Max: 2 Extra Site, 2 Extra Accounting, 5 Extra Purchasing)",
       "Support Feature Updates"
@@ -62,15 +60,13 @@ export const plans: PlanConfig[] = [
     monthlyPrice: 0,
     annualPrice: 0,
     features: [
-      "3 Ready to assign independent users (1 GM, 1 Site Personnel, 1 Accounting/Purchasing combined)",
+      "4 Total Users (1 GM + 3 Ready-to-assign independent seats)",
       "Up to 4 Projects in the System",
       "GM Module (Dashboard, Project Profile, Complete Accounting, Purchasing, Analytics)",
-      "Site Personnel Account (Limited to 2 Projects)",
+      "Included Seats: 2 Site Personnel, 1 Accounting/Purchasing combined",
       "0 Pre-active Add-on Seats",
       "Add-on Capabilities (Max 1 Extra Site Personnel)",
-      "Support Feature Updates",
-      "❌ No HR Module",
-      "❌ No Warehouse Module"
+      "Support Feature Updates"
     ],
     addOnLimits: { extra_site: 1, extra_acc: 0, purchasing: 0 }
   }
