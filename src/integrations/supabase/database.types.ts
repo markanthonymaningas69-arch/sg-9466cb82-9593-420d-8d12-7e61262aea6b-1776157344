@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -1760,6 +1760,10 @@ export type Database = {
           p_subscription_id: string
           p_user_id: string
         }
+        Returns: undefined
+      }
+      update_subscription_dates: {
+        Args: { p_end_date: string; p_start_date: string; p_sub_id: string }
         Returns: undefined
       }
     }
