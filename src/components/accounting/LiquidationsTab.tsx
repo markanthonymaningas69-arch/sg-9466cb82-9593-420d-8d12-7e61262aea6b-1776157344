@@ -17,7 +17,7 @@ import { Plus, Receipt, CheckCircle, Clock, Trash2, Pencil, Filter } from "lucid
 import { toast } from "@/hooks/use-toast";
 
 export function LiquidationsTab() {
-  const { formatCurrency } = useSettings();
+  const { formatCurrency, isLocked } = useSettings();
   const [liquidations, setLiquidations] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [personnel, setPersonnel] = useState<any[]>([]);
@@ -178,7 +178,7 @@ export function LiquidationsTab() {
             }
           }}>
             <DialogTrigger asChild>
-              <Button>
+              <Button disabled={isLocked}>
                 <Plus className="h-4 w-4 mr-2" />
                 Log
               </Button>
@@ -345,17 +345,17 @@ export function LiquidationsTab() {
                             <CheckCircle className="h-3 w-3 mr-1" /> Cleared
                           </Badge>
                         ) : (
-                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleApprove(liq.id)}>
+                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleApprove(liq.id)} disabled={isLocked}>
                             <Clock className="h-3 w-3 mr-1" /> Approve
                           </Button>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => openEdit(liq)}>
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(liq)} disabled={isLocked}>
                             <Pencil className="h-4 w-4 text-blue-600" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDelete(liq.id)}>
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(liq.id)} disabled={isLocked}>
                             <Trash2 className="h-4 w-4 text-red-600" />
                           </Button>
                         </div>

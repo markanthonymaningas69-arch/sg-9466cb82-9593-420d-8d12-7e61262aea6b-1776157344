@@ -50,7 +50,7 @@ const STANDARD_UNITS = [
 ];
 
 export default function Warehouse() {
-  const { formatCurrency } = useSettings();
+  const { formatCurrency, isLocked } = useSettings();
   const [items, setItems] = useState<WarehouseItem[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [masterItems, setMasterItems] = useState<any[]>([]);
@@ -274,7 +274,7 @@ export default function Warehouse() {
           {activeTab === "main" && (
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
-                <Button onClick={resetForm}>
+                <Button onClick={resetForm} disabled={isLocked}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Item
                 </Button>
@@ -643,17 +643,17 @@ export default function Warehouse() {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
-                              <Button size="sm" variant="default" className="bg-blue-600 hover:bg-blue-700" onClick={() => {
+                              <Button size="sm" variant="default" className="bg-blue-600 hover:bg-blue-700" disabled={isLocked} onClick={() => {
                                 setDeployingItem(item);
                                 setDeployForm({ project_id: "", quantity: 1 });
                                 setDeployDialogOpen(true);
                               }}>
                                 Deploy
                               </Button>
-                              <Button size="sm" variant="ghost" onClick={() => handleEdit(item)}>
+                              <Button size="sm" variant="ghost" onClick={() => handleEdit(item)} disabled={isLocked}>
                                 <Pencil className="h-4 w-4" />
                               </Button>
-                              <Button size="sm" variant="ghost" onClick={() => handleDelete(item.id)} title="Archive">
+                              <Button size="sm" variant="ghost" onClick={() => handleDelete(item.id)} title="Archive" disabled={isLocked}>
                                 <Archive className="h-4 w-4 text-orange-600" />
                               </Button>
                             </div>
@@ -809,7 +809,7 @@ export default function Warehouse() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button size="sm" variant="ghost" onClick={() => {
+                            <Button size="sm" variant="ghost" disabled={isLocked} onClick={() => {
                               setEditingDeployment(d);
                               setDeploymentForm({ quantity: d.quantity });
                               setDeploymentDialogOpen(true);

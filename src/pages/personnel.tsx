@@ -22,7 +22,7 @@ type Personnel = Database["public"]["Tables"]["personnel"]["Row"];
 type Project = Database["public"]["Tables"]["projects"]["Row"];
 
 export default function Personnel() {
-  const { currency } = useSettings();
+  const { currency, isLocked } = useSettings();
   const [workerFilter, setWorkerFilter] = useState<"office" | "construction">("construction");
   const [activeTab, setActiveTab] = useState("personnel");
 
@@ -397,7 +397,7 @@ export default function Personnel() {
             <div className="flex justify-end">
               <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button onClick={resetForm}>
+                  <Button onClick={resetForm} disabled={isLocked}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Personnel
                   </Button>
@@ -652,10 +652,10 @@ export default function Personnel() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            <Button size="icon" variant="ghost" onClick={() => handleEdit(person)}>
+                            <Button size="icon" variant="ghost" onClick={() => handleEdit(person)} disabled={isLocked}>
                               <Pencil className="h-4 w-4" />
                             </Button>
-                            <Button size="icon" variant="ghost" onClick={() => handleDelete(person.id)} title="Archive">
+                            <Button size="icon" variant="ghost" onClick={() => handleDelete(person.id)} title="Archive" disabled={isLocked}>
                               <Archive className="h-4 w-4 text-orange-600" />
                             </Button>
                           </div>
@@ -784,7 +784,7 @@ export default function Personnel() {
             <div className="flex justify-end">
               <Dialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button onClick={resetLeaveForm}>
+                  <Button onClick={resetLeaveForm} disabled={isLocked}>
                     <Plus className="h-4 w-4 mr-2" />
                     New Leave Request
                   </Button>
@@ -898,7 +898,7 @@ export default function Personnel() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button size="icon" variant="ghost" onClick={() => handleDeleteLeave(leave.id)} title="Archive">
+                          <Button size="icon" variant="ghost" onClick={() => handleDeleteLeave(leave.id)} title="Archive" disabled={isLocked}>
                             <Archive className="h-4 w-4 text-orange-600" />
                           </Button>
                         </TableCell>
@@ -922,7 +922,7 @@ export default function Personnel() {
               <div className="flex justify-end">
                 <Dialog open={visaDialogOpen} onOpenChange={setVisaDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button onClick={resetVisaForm}>
+                    <Button onClick={resetVisaForm} disabled={isLocked}>
                       <Plus className="h-4 w-4 mr-2" />
                       Add Document Record
                     </Button>
@@ -1086,7 +1086,7 @@ export default function Personnel() {
                             </TableCell>
                             <TableCell className="text-right">
                               {minDays <= 30 && record.status !== 'noted' && (
-                                <Button size="sm" variant="outline" className="h-7 border-orange-200 text-orange-700 bg-orange-50 hover:bg-orange-100" onClick={() => handleCheckVisa(record.id)}>
+                                <Button size="sm" variant="outline" className="h-7 border-orange-200 text-orange-700 bg-orange-50 hover:bg-orange-100" onClick={() => handleCheckVisa(record.id)} disabled={isLocked}>
                                   <Check className="h-3 w-3 mr-1" /> Check
                                 </Button>
                               )}

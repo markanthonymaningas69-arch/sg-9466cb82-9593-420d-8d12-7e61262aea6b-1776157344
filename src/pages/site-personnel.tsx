@@ -20,6 +20,7 @@ import { Plus, Pencil, Trash2, Archive, Users, Truck, ClipboardList, ArrowUp, Ar
 import { supabase } from "@/integrations/supabase/client";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer } from "recharts";
 import { toast } from "@/hooks/use-toast";
+import { useSettings } from "@/hooks/useSettings";
 
 type Project = { id: string; name: string; location: string; status: string };
 type Personnel = { id: string; name: string; role: string; daily_rate: number; overtime_rate: number; created_source?: string; updated_source?: string };
@@ -33,6 +34,7 @@ type CashAdvance = { id: string; personnel_id: string; project_id: string; amoun
 const STANDARD_ROLES = ["Admin", "Carpenter", "Electrician", "Helper", "Mason", "Plumber", "Skilled", "Steelman", "Tile Mason", "Welder"];
 
 export default function SitePersonnel() {
+  const { isLocked } = useSettings();
   const [projects, setProjects] = useState<Project[]>([]);
   const [personnel, setPersonnel] = useState<Personnel[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>("");
@@ -1413,7 +1415,7 @@ export default function SitePersonnel() {
                     <div className="flex gap-2">
                       <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
                         <DialogTrigger asChild>
-                          <Button disabled={!attendanceDate}>
+                          <Button disabled={!attendanceDate || isLocked}>
                             <Plus className="h-4 w-4 mr-2" />
                             Add Manpower from List
                           </Button>
@@ -1430,7 +1432,7 @@ export default function SitePersonnel() {
                               <div className="space-y-4 mt-4">
                                 <div className="flex justify-between items-center border-b pb-4">
                                   <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
-                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0}>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
                                     Add All Missing
                                   </Button>
                                 </div>
@@ -1448,7 +1450,7 @@ export default function SitePersonnel() {
                                         <TableCell className="font-medium">{p.name}</TableCell>
                                         <TableCell>{p.role}</TableCell>
                                         <TableCell className="text-right">
-                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)}>
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
                                             Add
                                           </Button>
                                         </TableCell>
@@ -1502,7 +1504,7 @@ export default function SitePersonnel() {
                               </div>
                             </div>
                             {!isEditMode ? (
-                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }}>
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
                                 <Pencil className="h-4 w-4 mr-2" />
                                 Edit Roll Call
                               </Button>
@@ -1800,7 +1802,7 @@ export default function SitePersonnel() {
                     </div>
                     <Dialog open={deliveryDialogOpen} onOpenChange={setDeliveryDialogOpen}>
                       <DialogTrigger asChild>
-                        <Button onClick={() => { resetDeliveryForm(); setDeliveryDialogOpen(true); }}>
+                        <Button onClick={() => { resetDeliveryForm(); setDeliveryDialogOpen(true); }} disabled={isLocked}>
                           <Plus className="h-4 w-4 mr-2" />
                           New Delivery
                         </Button>
@@ -2076,19 +2078,19 @@ export default function SitePersonnel() {
                                     <TableCell className="text-right">
                                       <div className="flex justify-end gap-1">
                                         {delivery.status === 'pending' && (
-                                          <Button size="sm" variant="outline" className="h-8 text-xs border-green-600 text-green-700 hover:bg-green-50 mr-1" onClick={(e) => handleMarkReceived(delivery.id, e)}>
+                                          <Button size="sm" variant="outline" className="h-8 text-xs border-green-600 text-green-700 hover:bg-green-50 mr-1" onClick={(e) => handleMarkReceived(delivery.id, e)} disabled={isLocked}>
                                             <Check className="h-3 w-3 mr-1" /> Receive
                                           </Button>
                                         )}
                                         {!(delivery.notes && delivery.notes.includes('From PO:')) && (
                                           <>
-                                            <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-500 hover:bg-blue-50" onClick={(e) => {
+                                            <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-500 hover:bg-blue-50" disabled={isLocked} onClick={(e) => {
                                               e.stopPropagation();
                                               openEditDelivery(delivery);
                                             }}>
                                               <Pencil className="h-4 w-4" />
                                             </Button>
-                                            <Button size="icon" variant="ghost" className="h-8 w-8 text-orange-600 hover:bg-orange-50" onClick={async (e) => {
+                                            <Button size="icon" variant="ghost" className="h-8 w-8 text-orange-600 hover:bg-orange-50" disabled={isLocked} onClick={async (e) => {
                                               e.stopPropagation();
                                               if(confirm("Archive this delivery?")) {
                                                 await siteService.deleteDelivery(delivery.id);
@@ -2301,7 +2303,7 @@ export default function SitePersonnel() {
                     </div>
                     <Dialog open={consumptionDialogOpen} onOpenChange={setConsumptionDialogOpen}>
                       <DialogTrigger asChild>
-                        <Button>
+                        <Button disabled={isLocked}>
                           <Plus className="h-4 w-4 mr-2" />
                           Log Usage
                         </Button>
@@ -2658,12 +2660,12 @@ export default function SitePersonnel() {
                               <TableCell>{row.recorded_by || "-"}</TableCell>
                               <TableCell className="text-right">
                                 {isEditing ? (
-                                  <Button variant="ghost" size="sm" onClick={() => setEditingConsumptionId(null)}>
+                                  <Button variant="ghost" size="sm" onClick={() => setEditingConsumptionId(null)} disabled={isLocked}>
                                     <Check className="h-4 w-4 text-green-500" />
                                   </Button>
                                 ) : (
                                   <div className="flex justify-end gap-2">
-                                    <Button size="sm" variant="ghost" onClick={() => setEditingConsumptionId(row.id)}>
+                                    <Button size="sm" variant="ghost" onClick={() => setEditingConsumptionId(row.id)} disabled={isLocked}>
                                       <Pencil className="h-4 w-4 text-blue-500" />
                                     </Button>
                                     <Button size="sm" variant="ghost" onClick={async () => {
@@ -2671,7 +2673,7 @@ export default function SitePersonnel() {
                                         await siteService.deleteMaterialConsumption(row.id);
                                         loadConsumptions();
                                       }
-                                    }} title="Archive">
+                                    }} title="Archive" disabled={isLocked}>
                                       <Archive className="h-4 w-4 text-orange-600" />
                                     </Button>
                                   </div>
@@ -2748,7 +2750,7 @@ export default function SitePersonnel() {
                                             await siteService.deleteMaterialConsumption(record.id);
                                             loadConsumptions();
                                           }
-                                        }} title="Archive">
+                                        }} title="Archive" disabled={isLocked}>
                                           <Archive className="h-4 w-4 text-orange-600" />
                                         </Button>
                                       </TableCell>
@@ -2806,19 +2808,19 @@ export default function SitePersonnel() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 overflow-x-auto pb-2 shrink-0 hide-scrollbar w-full">
-                      <Button size="sm" onClick={() => openRequestDialog('Materials', 'MR')} variant="default" className="bg-blue-600 hover:bg-blue-700 text-white shrink-0 h-8 text-xs px-2.5">
+                      <Button size="sm" onClick={() => openRequestDialog('Materials', 'MR')} disabled={isLocked} variant="default" className="bg-blue-600 hover:bg-blue-700 text-white shrink-0 h-8 text-xs px-2.5">
                         <ShoppingCart className="h-3 w-3 mr-1.5" />
                         Material Request
                       </Button>
-                      <Button size="sm" onClick={() => openRequestDialog('Tools & Equipments', 'TE')} variant="outline" className="border-orange-500 text-orange-600 hover:bg-orange-50 shrink-0 h-8 text-xs px-2.5">
+                      <Button size="sm" onClick={() => openRequestDialog('Tools & Equipments', 'TE')} disabled={isLocked} variant="outline" className="border-orange-500 text-orange-600 hover:bg-orange-50 shrink-0 h-8 text-xs px-2.5">
                         <Wrench className="h-3 w-3 mr-1.5" />
                         Tools & Equipments
                       </Button>
-                      <Button size="sm" onClick={() => openRequestDialog('Petty Cash', 'PC')} variant="outline" className="border-teal-600 text-teal-700 hover:bg-teal-50 shrink-0 h-8 text-xs px-2.5">
+                      <Button size="sm" onClick={() => openRequestDialog('Petty Cash', 'PC')} disabled={isLocked} variant="outline" className="border-teal-600 text-teal-700 hover:bg-teal-50 shrink-0 h-8 text-xs px-2.5">
                         <Banknote className="h-3 w-3 mr-1.5" />
                         Petty Cash
                       </Button>
-                      <Button size="sm" onClick={() => openRequestDialog('Cash Advance', 'CA')} variant="outline" className="border-green-600 text-green-700 hover:bg-green-50 shrink-0 h-8 text-xs px-2.5">
+                      <Button size="sm" onClick={() => openRequestDialog('Cash Advance', 'CA')} disabled={isLocked} variant="outline" className="border-green-600 text-green-700 hover:bg-green-50 shrink-0 h-8 text-xs px-2.5">
                         <Banknote className="h-3 w-3 mr-1.5" />
                         Cash Advance
                       </Button>
@@ -3207,7 +3209,7 @@ export default function SitePersonnel() {
                                   <TableCell className="text-right">
                                     <div className="flex justify-end gap-1">
                                       {group.status === 'pending' && (
-                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={(e) => handleApproveRequest(group, e)} title="Approve Request">
+                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={(e) => handleApproveRequest(group, e)} title="Approve Request" disabled={isLocked}>
                                           <CheckCircle2 className="h-4 w-4" />
                                         </Button>
                                       )}
@@ -3227,7 +3229,7 @@ export default function SitePersonnel() {
                                             supabase.from('site_requests').update({ is_archived: true }).in('id', ids).then(() => loadRequests());
                                           }
                                         }
-                                      }} title="Archive">
+                                      }} title="Archive" disabled={isLocked}>
                                         <Archive className="h-4 w-4" />
                                       </Button>
                                     </div>
@@ -3399,7 +3401,7 @@ export default function SitePersonnel() {
                       </div>
                       <Dialog open={updateProgressDialogOpen} onOpenChange={setUpdateProgressDialogOpen}>
                         <DialogTrigger asChild>
-                          <Button className="bg-green-600 hover:bg-green-700 text-white h-9">
+                          <Button className="bg-green-600 hover:bg-green-700 text-white h-9" disabled={isLocked}>
                             <Plus className="h-4 w-4 mr-2" /> Update Progress
                           </Button>
                         </DialogTrigger>
@@ -3655,15 +3657,15 @@ export default function SitePersonnel() {
                                     <Button variant="ghost" size="sm" onClick={() => {
                                       setEditingProgressId(null);
                                       loadScopes();
-                                    }}>
+                                    }} disabled={isLocked}>
                                       <Check className="h-4 w-4 text-green-500" />
                                     </Button>
                                   ) : (
                                     <div className="flex justify-end gap-1">
-                                      <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-500 hover:bg-blue-50" onClick={() => setEditingProgressId(update.id)}>
+                                      <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-500 hover:bg-blue-50" onClick={() => setEditingProgressId(update.id)} disabled={isLocked}>
                                         <Pencil className="h-4 w-4" />
                                       </Button>
-                                      <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-50" onClick={async () => {
+                                      <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-50" disabled={isLocked} onClick={async () => {
                                         if (confirm("Permanently delete this progress update?")) {
                                           const scopeId = update.bom_scope_id;
                                           await supabase.from('bom_progress_updates').delete().eq('id', update.id);

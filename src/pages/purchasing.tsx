@@ -47,7 +47,7 @@ const STANDARD_UNITS = [
 ];
 
 export default function Purchasing() {
-  const { formatCurrency, company, currency } = useSettings();
+  const { formatCurrency, company, currency, isLocked } = useSettings();
   const [purchases, setPurchases] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
@@ -416,7 +416,7 @@ export default function Purchasing() {
           <div className="flex items-center gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline">
+                <Button variant="outline" disabled={isLocked}>
                   <Building2 className="h-4 w-4 mr-2" />
                   Suppliers
                 </Button>
@@ -506,7 +506,7 @@ export default function Purchasing() {
 
             <Dialog open={dialogOpen} onOpenChange={handleOpenChange}>
               <DialogTrigger asChild>
-                <Button>
+                <Button disabled={isLocked}>
                   <Plus className="h-4 w-4 mr-2" />
                   New Purchase Order
                 </Button>
@@ -827,14 +827,14 @@ export default function Purchasing() {
                             <Button variant="outline" size="sm" className="h-8 text-xs bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100" onClick={() => {
                               setGmSubmitForm({ ...p, unit_cost: p.unit_cost || '' });
                               setGmSubmitDialogOpen(true);
-                            }}>
+                            }} disabled={isLocked}>
                               Price & Submit
                             </Button>
                           )}
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" onClick={() => handlePrint(p)} title="Print PO">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" onClick={() => handlePrint(p)} title="Print PO" disabled={isLocked}>
                             <Printer className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50" onClick={() => handleArchive(p.id)} title="Archive">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50" onClick={() => handleArchive(p.id)} title="Archive" disabled={isLocked}>
                             <Archive className="h-4 w-4" />
                           </Button>
                         </div>
