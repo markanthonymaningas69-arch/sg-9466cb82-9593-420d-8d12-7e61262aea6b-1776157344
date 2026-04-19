@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ThemeSwitch } from "@/components/ThemeSwitch";
+import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -29,12 +30,28 @@ export default function SystemMonitor() {
   const [newEndDate, setNewEndDate] = useState("");
   const [isUpdatingDates, setIsUpdatingDates] = useState(false);
 
+  // Add-on Users State
+  const [addonUsers, setAddonUsers] = useState<any[]>([]);
+  const [filterAddonCompany, setFilterAddonCompany] = useState("");
+  const [filterAddonAssignment, setFilterAddonAssignment] = useState("all");
+  
+  const [editAddonOpen, setEditAddonOpen] = useState(false);
+  const [editingAddon, setEditingAddon] = useState<any>(null);
+  const [newAddonStartDate, setNewAddonStartDate] = useState("");
+  const [newAddonEndDate, setNewAddonEndDate] = useState("");
+  const [isUpdatingAddonDates, setIsUpdatingAddonDates] = useState(false);
+
   const fetchRealData = async () => {
     try {
       const { data: rpcData, error } = await supabase.rpc('get_super_admin_stats');
       if (error) throw error;
       
       setData(rpcData || { companies: [], subscriptions: [] });
+
+      const { data: addonsData, error: addonsError } = await supabase.rpc('get_super_admin_addon_users');
+      if (addonsError) throw addonsError;
+      
+      setAddonUsers(addonsData || []);
     } catch (err) {
       console.error("Error fetching super admin stats:", err);
     } finally {
@@ -75,6 +92,34 @@ export default function SystemMonitor() {
     setNewStartDate(comp.start_date || "");
     setNewEndDate(comp.end_date || "");
     setEditSubOpen(true);
+  };
+
+  const handleUpdateAddonDates = async () => {
+    if (!editingAddon?.id) return;
+    setIsUpdatingAddonDates(true);
+    try {
+      const { error } = await supabase.rpc('update_addon_user_dates', {
+        p_profile_id: editingAddon.id,
+        p_start_date: newAddonStartDate || null,
+        p_end_date: newAddonEndDate || null
+      });
+      if (error) throw error;
+      
+      toast({ title: "Success", description: "Add-on user dates updated successfully." });
+      setEditAddonOpen(false);
+      fetchRealData();
+    } catch (err: any) {
+      toast({ title: "Update Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setIsUpdatingAddonDates(false);
+    }
+  };
+
+  const openEditAddonDates = (user: any) => {
+    setEditingAddon(user);
+    setNewAddonStartDate(user.start_date || "");
+    setNewAddonEndDate(user.end_date || "");
+    setEditAddonOpen(true);
   };
 
   // Format AED Currency
@@ -189,6 +234,17 @@ export default function SystemMonitor() {
       if (!expiryDate) return false;
       const daysUntilExpiry = Math.ceil((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
       if (daysUntilExpiry > 30) return false;
+    }
+    return true;
+  });
+
+  const filteredAddonUsers = addonUsers.filter((u: any) => {
+    if (filterAddonAssignment !== "all") {
+      const modules = u.assigned_modules || (u.assigned_module ? [u.assigned_module] : []);
+      if (!modules.includes(filterAddonAssignment)) return false;
+    }
+    if (filterAddonCompany.trim() !== "") {
+      if (!u.company_name?.toLowerCase().includes(filterAddonCompany.toLowerCase())) return false;
     }
     return true;
   });
@@ -503,6 +559,107 @@ export default function SystemMonitor() {
           </CardContent>
         </Card>
 
+        {/* Add-on Users Table */}
+        <Card className="border-border bg-card shadow-sm mt-8">
+          <CardHeader className="flex flex-row items-center justify-between border-b border-border pb-4">
+            <CardTitle className="text-foreground">Independent / Add-on Users</CardTitle>
+            <div className="flex items-center gap-4">
+              <Input 
+                placeholder="Search by Company..." 
+                value={filterAddonCompany} 
+                onChange={(e) => setFilterAddonCompany(e.target.value)}
+                className="w-48 h-9 bg-background"
+              />
+              <Select value={filterAddonAssignment} onValueChange={setFilterAddonAssignment}>
+                <SelectTrigger className="w-40 h-9 bg-background">
+                  <SelectValue placeholder="Assignment" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Assignments</SelectItem>
+                  <SelectItem value="Site Personnel">Site Personnel</SelectItem>
+                  <SelectItem value="Accounting">Accounting</SelectItem>
+                  <SelectItem value="Purchasing">Purchasing</SelectItem>
+                  <SelectItem value="Warehouse">Warehouse</SelectItem>
+                  <SelectItem value="HR">HR</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead className="text-foreground font-semibold">User Name</TableHead>
+                    <TableHead className="text-foreground font-semibold">Email</TableHead>
+                    <TableHead className="text-foreground font-semibold">Tied Company</TableHead>
+                    <TableHead className="text-foreground font-semibold">Assignment</TableHead>
+                    <TableHead className="text-foreground font-semibold">Start Date</TableHead>
+                    <TableHead className="text-foreground font-semibold">Expiry Date</TableHead>
+                    <TableHead className="text-foreground font-semibold">Plan & Cycle</TableHead>
+                    <TableHead className="text-right text-foreground font-semibold">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredAddonUsers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        No add-on users found matching filters.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredAddonUsers.map((u: any, i: number) => {
+                      const startDate = u.start_date ? new Date(u.start_date).toLocaleDateString('en-GB') : '-';
+                      const endDate = u.end_date ? new Date(u.end_date).toLocaleDateString('en-GB') : '-';
+                      const daysUntilExpiry = u.end_date ? Math.ceil((new Date(u.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
+                      const isExpiringSoon = daysUntilExpiry !== null && daysUntilExpiry <= 30 && daysUntilExpiry > 0;
+                      const isExpired = daysUntilExpiry !== null && daysUntilExpiry <= 0;
+                      const assignments = u.assigned_modules || (u.assigned_module ? [u.assigned_module] : []);
+
+                      return (
+                        <TableRow key={u.id || i} className="border-border transition-colors hover:bg-muted/30">
+                          <TableCell className="font-medium text-foreground">{u.full_name || 'Unknown'}</TableCell>
+                          <TableCell className="text-muted-foreground">{u.email || '-'}</TableCell>
+                          <TableCell className="text-foreground font-medium">{u.company_name || '-'}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {assignments.map((m: string) => (
+                                <Badge key={m} variant="secondary" className="text-[10px] font-normal">{m}</Badge>
+                              ))}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-foreground">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3 text-muted-foreground" />
+                              {startDate}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-foreground">
+                            <div className={`flex items-center gap-1 ${isExpired ? 'text-destructive font-bold' : isExpiringSoon ? 'text-orange-600 font-semibold' : ''}`}>
+                              <Calendar className="h-3 w-3 text-muted-foreground" />
+                              {endDate}
+                              {isExpiringSoon && <span className="text-xs ml-1">({daysUntilExpiry}d)</span>}
+                              {isExpired && <span className="text-[10px] ml-1 bg-destructive/10 text-destructive px-1.5 rounded">Expired</span>}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground capitalize text-sm">
+                            {u.gm_plan ? `${u.gm_plan} (${u.gm_billing_cycle || 'monthly'})` : 'No Active Plan'}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="outline" size="sm" className="h-8 text-xs text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-100" onClick={() => openEditAddonDates(u)}>
+                              <Pencil className="h-3 w-3 mr-1" /> Edit Dates
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Edit Subscription Dates Modal */}
         <Dialog open={editSubOpen} onOpenChange={setEditSubOpen}>
           <DialogContent>
@@ -540,6 +697,55 @@ export default function SystemMonitor() {
               <Button variant="outline" onClick={() => setEditSubOpen(false)}>Cancel</Button>
               <Button onClick={handleUpdateDates} disabled={isUpdatingDates}>
                 {isUpdatingDates && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Add-on User Dates Modal */}
+        <Dialog open={editAddonOpen} onOpenChange={setEditAddonOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Add-on User Dates</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>User Name</Label>
+                  <Input value={editingAddon?.full_name || 'Unknown'} disabled className="bg-muted" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Tied Company</Label>
+                  <Input value={editingAddon?.company_name || 'Unknown'} disabled className="bg-muted" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Start Date</Label>
+                  <Input 
+                    type="date" 
+                    value={newAddonStartDate} 
+                    onChange={(e) => setNewAddonStartDate(e.target.value)} 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Expiry Date (End Date)</Label>
+                  <Input 
+                    type="date" 
+                    value={newAddonEndDate} 
+                    onChange={(e) => setNewAddonEndDate(e.target.value)} 
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded border border-border mt-2">
+                <strong>Tip:</strong> If you leave the Expiry Date empty, the user will inherit the GM's billing cycle end date. Setting a specific date here will explicitly override it. Set to yesterday to instantly restrict their access.
+              </p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditAddonOpen(false)}>Cancel</Button>
+              <Button onClick={handleUpdateAddonDates} disabled={isUpdatingAddonDates}>
+                {isUpdatingAddonDates && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save Changes
               </Button>
             </DialogFooter>
