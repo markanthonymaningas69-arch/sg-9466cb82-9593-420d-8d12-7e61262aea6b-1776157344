@@ -35,7 +35,8 @@ import {
   Edit,
   UserX,
   Check,
-  Plus
+  Plus,
+  Copy
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -206,6 +207,11 @@ export default function Settings() {
       loadTeamData();
       setGenerateDialogType(null);
     }
+  };
+
+  const handleCopyCode = (code: string) => {
+    navigator.clipboard.writeText(code);
+    toast({ title: "Copied!", description: "Invite code copied to clipboard." });
   };
 
   const handleDeleteCode = async (id: string) => {
@@ -436,7 +442,12 @@ export default function Settings() {
                           {invites.filter(i => !i.is_addon).map(inv => (
                             <div key={inv.id} className="flex items-center justify-between p-3 bg-white">
                               <div>
-                                <div className="font-mono font-bold text-sm tracking-widest text-primary">{inv.code}</div>
+                                <div className="flex items-center gap-2">
+                                  <div className="font-mono font-bold text-sm tracking-widest text-primary">{inv.code}</div>
+                                  <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={() => handleCopyCode(inv.code)}>
+                                    <Copy className="h-3 w-3" />
+                                  </Button>
+                                </div>
                                 <div className="flex flex-wrap gap-1 mt-1">
                                   {(inv.modules && inv.modules.length > 0 ? inv.modules : [inv.module]).map((m: string) => (
                                     <Badge key={m} variant="secondary" className="text-[10px]">{m}</Badge>
@@ -526,7 +537,12 @@ export default function Settings() {
                           {invites.filter(i => i.is_addon).map(inv => (
                             <div key={inv.id} className="flex items-center justify-between p-3 bg-white">
                               <div>
-                                <div className="font-mono font-bold text-sm tracking-widest text-emerald-600">{inv.code}</div>
+                                <div className="flex items-center gap-2">
+                                  <div className="font-mono font-bold text-sm tracking-widest text-emerald-600">{inv.code}</div>
+                                  <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-emerald-600" onClick={() => handleCopyCode(inv.code)}>
+                                    <Copy className="h-3 w-3" />
+                                  </Button>
+                                </div>
                                 <div className="flex flex-wrap gap-1 mt-1">
                                   {(inv.modules && inv.modules.length > 0 ? inv.modules : [inv.module]).map((m: string) => (
                                     <Badge key={m} variant="secondary" className="text-[10px]">{m}</Badge>
