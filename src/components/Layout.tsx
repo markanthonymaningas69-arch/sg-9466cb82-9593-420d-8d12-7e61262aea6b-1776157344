@@ -474,7 +474,9 @@ export function Layout({ children }: LayoutProps) {
             <ul className="space-y-1 px-3">
               {navigation.filter((item) => {
                 if (assignedModules.includes("GM")) {
-                  return !(currentPlan === "starter" && item.name === "Human Resources");
+                  const isRestrictedPlan = currentPlan === "starter" || currentPlan === "trial" || isTrial;
+                  const isRestrictedModule = item.name === "Human Resources" || item.name === "Warehouse";
+                  return !(isRestrictedPlan && isRestrictedModule);
                 }
                 return assignedModules.includes(item.name);
               }).map((item) => {
