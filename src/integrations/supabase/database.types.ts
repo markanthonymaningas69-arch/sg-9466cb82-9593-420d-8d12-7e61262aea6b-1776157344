@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -1748,6 +1748,20 @@ export type Database = {
           }
       auth_company_id: { Args: never; Returns: string }
       get_super_admin_stats: { Args: never; Returns: Json }
+      process_stripe_subscription: {
+        Args: {
+          p_amount: number
+          p_customer_id: string
+          p_end_date: string
+          p_features: Json
+          p_plan: string
+          p_start_date: string
+          p_status: string
+          p_subscription_id: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

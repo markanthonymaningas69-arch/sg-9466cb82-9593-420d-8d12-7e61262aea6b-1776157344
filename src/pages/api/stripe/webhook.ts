@@ -55,17 +55,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
           const features = metadata.features ? JSON.parse(metadata.features) : {};
 
-          await supabaseAdmin.from("subscriptions").insert({
-            user_id: userId,
-            stripe_customer_id: session.customer as string,
-            stripe_subscription_id: session.subscription as string,
-            plan: metadata.planId || 'starter',
-            status: "active",
-            start_date: now.toISOString(),
-            end_date: expiresAt.toISOString(),
-            amount: (session.amount_total || 0) / 100,
-            features: features,
+          const { error } = await supabaseAdmin.rpc('process_stripe_subscription', {
+            p_user_id: userId,
+            p_customer_id: session.customer as string || '',
+            p_subscription_id: session.subscription as string || '',
+            p_plan: metadata.planId || 'starter',
+            p_status: 'active',
+            p_start_date: now.toISOString().split('T')[0],
+            p_end_date: expiresAt.toISOString().split('T')[0],
+            p_amount: (session.amount_total || 0) / 100,
+            p_features: features
           });
+
+          if (error) {
+            console.error("Webhook DB Insert Error:", error);
+          }
         }
         break;
       }
