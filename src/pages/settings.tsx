@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/contexts/ThemeProvider";
@@ -34,7 +34,8 @@ import {
   Trash2,
   Edit,
   UserX,
-  Check
+  Check,
+  Plus
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -72,6 +73,7 @@ export default function Settings() {
   const [isGM, setIsGM] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>("appearance");
   const [activeAddOns, setActiveAddOns] = useState<Record<string, number>>({});
+  const [generateDialogType, setGenerateDialogType] = useState<'included' | 'addon' | null>(null);
 
   useEffect(() => {
     setLocalCompany(company);
@@ -149,33 +151,61 @@ export default function Settings() {
     return activeInvites + activeUsers;
   };
 
-  const handleGenerateCode = async () => {
+  const getSpecificUsage = (isAddon: boolean, mods: string[]) => {
+    const invCount = invites.filter(i => !!i.is_addon === isAddon && mods.some(m => (i.modules || [i.module]).includes(m))).length;
+    const usrCount = teamUsers.filter(u => !!u.is_addon === isAddon && mods.some(m => (u.assigned_modules || [u.assigned_module]).includes(m))).length;
+    return invCount + usrCount;
+  };
+
+  const handleGenerateSpecificCode = async () => {
     if (selectedModules.length === 0) {
       toast({ title: "Error", description: "Select at least one module.", variant: "destructive" });
       return;
     }
 
-    // Determine if this code consumes an Add-on seat or an Included seat
-    let isAddon = false;
+    const isAddon = generateDialogType === 'addon';
 
-    if (isStarter && (selectedModules.includes('Accounting') || selectedModules.includes('Purchasing'))) {
-      const includedAccPurchUsage = invites.filter(i => !i.is_addon && (i.modules?.includes('Accounting') || i.modules?.includes('Purchasing') || i.module === 'Accounting' || i.module === 'Purchasing')).length + 
-                                    teamUsers.filter(u => !u.is_addon && (u.assigned_modules?.includes('Accounting') || u.assigned_modules?.includes('Purchasing') || u.assigned_module === 'Accounting' || u.assigned_module === 'Purchasing')).length;
-      if (includedAccPurchUsage >= 1) { // 1 is the combined base limit for Starter
-        isAddon = true;
-      }
+    if (selectedModules.includes("Site Personnel") && isStarter && selectedProjects.length > 2) {
+      toast({ title: "Limit Reached", description: "Starter plan limits Site Personnel to a maximum of 2 projects.", variant: "destructive" });
+      return;
     }
 
-    for (const mod of selectedModules) {
-      if (isStarter && (mod === 'Accounting' || mod === 'Purchasing')) continue;
-      
-      const baseLimit = basePlanLimits[mod] || 0;
-      const includedUsage = invites.filter(i => !i.is_addon && (i.modules?.includes(mod) || i.module === mod)).length + 
-                            teamUsers.filter(u => !u.is_addon && (u.assigned_modules?.includes(mod) || u.assigned_module === mod)).length;
-      
-      if (includedUsage >= baseLimit) {
-        isAddon = true;
-      }
+    // Check limits based on type
+    if (!isAddon) {
+       for (const mod of selectedModules) {
+         if (isStarter && (mod === 'Accounting' || mod === 'Purchasing')) {
+           const usage = getSpecificUsage(false, ['Accounting', 'Purchasing']);
+           if (usage >= 1) {
+              toast({ title: "Limit Reached", description: "Included limit reached for Accounting/Purchasing (1 max combined on Starter).", variant: "destructive" });
+              return;
+           }
+         } else {
+           const limit = basePlanLimits[mod] || 0;
+           const usage = getSpecificUsage(false, [mod]);
+           if (usage >= limit) {
+              toast({ title: "Limit Reached", description: `Included base limit reached for ${mod}.`, variant: "destructive" });
+              return;
+           }
+         }
+       }
+    } else {
+       for (const mod of selectedModules) {
+         let addonPurchased = 0;
+         if (mod === 'Site Personnel') addonPurchased = activeAddOns['extra_site'] || 0;
+         else if (mod === 'Accounting') addonPurchased = activeAddOns['extra_acc'] || 0;
+         else if (mod === 'Purchasing') addonPurchased = activeAddOns['purchasing'] || 0;
+         else addonPurchased = 0;
+
+         const usage = getSpecificUsage(true, [mod]);
+         if (usage >= addonPurchased) {
+            toast({ 
+              title: "Limit Reached", 
+              description: `Add-on limit reached for ${mod}. Please purchase more seats in the Subscription tab.`, 
+              variant: "destructive" 
+            });
+            return;
+         }
+       }
     }
 
     const prefix = isAddon ? 'ADD-' : 'INC-';
@@ -194,8 +224,9 @@ export default function Settings() {
     if (error) {
       toast({ title: "Error", description: "Failed to generate code.", variant: "destructive" });
     } else {
-      toast({ title: "Code Generated", description: `Invite code ${code} created for ${selectedModules.join(", ")}.` });
+      toast({ title: "Code Generated", description: `Invite code ${code} created.` });
       loadTeamData();
+      setGenerateDialogType(null);
     }
   };
 
@@ -247,6 +278,12 @@ export default function Settings() {
       description: `Global currency has been set to ${val}.`,
     });
   };
+
+  const includedUsage = invites.filter(i => !i.is_addon).length + teamUsers.filter(u => !u.is_addon).length;
+  const includedLimit = isStarter ? 2 : 7; 
+  
+  const addonUsage = invites.filter(i => i.is_addon).length + teamUsers.filter(u => u.is_addon).length;
+  const addonLimit = Object.values(activeAddOns).reduce((a, b) => Number(a) + Number(b), 0);
 
   return (
     <Layout>
@@ -379,7 +416,7 @@ export default function Settings() {
             <Card>
               <CardHeader>
                 <CardTitle>Team Access & Modules</CardTitle>
-                <CardDescription>Generate invite codes to grant specific module access based on your {currentPlan} plan limits.</CardDescription>
+                <CardDescription>Manage your team's access. Included seats auto-renew with your plan. Add-on seats are managed separately.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-4 pb-2">
@@ -436,15 +473,27 @@ export default function Settings() {
                   </Button>
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-6 pt-4 border-t">
+                <div className="grid md:grid-cols-2 gap-6 pt-2">
                   
                   {/* INCLUDED COLUMN */}
                   <div className="space-y-6">
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="h-8 w-8 rounded bg-primary/10 flex items-center justify-center">
-                        <Users className="h-4 w-4 text-primary" />
+                    <div className="flex items-center justify-between mb-4 border-b pb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded bg-primary/10 flex items-center justify-center shrink-0">
+                          <Users className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-lg">Included Users</h3>
+                          <p className="text-xs text-muted-foreground">{includedUsage} of {includedLimit} base seats used</p>
+                        </div>
                       </div>
-                      <h3 className="font-semibold text-lg">Independent User (Included)</h3>
+                      <Button size="sm" onClick={() => {
+                        setSelectedModules([]);
+                        setSelectedProjects([]);
+                        setGenerateDialogType('included');
+                      }}>
+                        <Plus className="h-4 w-4 mr-1" /> Code
+                      </Button>
                     </div>
 
                     <div className="space-y-3">
@@ -518,11 +567,23 @@ export default function Settings() {
 
                   {/* ADD-ON COLUMN */}
                   <div className="space-y-6">
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="h-8 w-8 rounded bg-emerald-100 flex items-center justify-center">
-                        <DollarSign className="h-4 w-4 text-emerald-600" />
+                    <div className="flex items-center justify-between mb-4 border-b pb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded bg-emerald-100 flex items-center justify-center shrink-0">
+                          <DollarSign className="h-5 w-5 text-emerald-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-lg">Add-on Users</h3>
+                          <p className="text-xs text-muted-foreground">{addonUsage} of {addonLimit} extra seats used</p>
+                        </div>
                       </div>
-                      <h3 className="font-semibold text-lg">Independent User (Add-ons)</h3>
+                      <Button size="sm" variant="outline" className="border-emerald-500 text-emerald-600 hover:bg-emerald-50" onClick={() => {
+                        setSelectedModules([]);
+                        setSelectedProjects([]);
+                        setGenerateDialogType('addon');
+                      }}>
+                        <Plus className="h-4 w-4 mr-1" /> Code
+                      </Button>
                     </div>
 
                     <div className="space-y-3">
@@ -669,6 +730,73 @@ export default function Settings() {
           </TabsContent>
           
         </Tabs>
+
+        {/* Generate Code Dialog */}
+        <Dialog open={!!generateDialogType} onOpenChange={(open) => !open && setGenerateDialogType(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Generate {generateDialogType === 'addon' ? 'Add-on' : 'Included'} Invite Code</DialogTitle>
+              <DialogDescription>
+                {generateDialogType === 'addon' 
+                  ? "Select modules for an extra purchased add-on seat." 
+                  : "Select modules using your base plan limits."}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Select Module(s) to Assign</Label>
+                <div className="flex flex-wrap gap-2">
+                  {['Site Personnel', 'Accounting', 'Purchasing', 'Warehouse', 'Human Resources'].map(mod => (
+                    <div key={mod} className="flex items-center space-x-2 border rounded-md p-2 bg-muted/20">
+                      <Checkbox 
+                        id={`gen-mod-${mod}`}
+                        checked={selectedModules.includes(mod)}
+                        onCheckedChange={(checked) => {
+                          if (checked) setSelectedModules([...selectedModules, mod]);
+                          else setSelectedModules(selectedModules.filter(m => m !== mod));
+                        }}
+                      />
+                      <Label htmlFor={`gen-mod-${mod}`} className="cursor-pointer text-sm font-medium">{mod}</Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {selectedModules.includes("Site Personnel") && (
+                <div className="space-y-2 p-3 border rounded-md bg-muted/10">
+                  <Label>Restrict to Projects (Max {isStarter ? 2 : 'Unlimited'})</Label>
+                  <div className="flex flex-wrap gap-3 mt-2 max-h-40 overflow-y-auto">
+                    {projects.map(p => (
+                      <div key={p.id} className="flex items-center space-x-2">
+                        <Checkbox 
+                          id={`gen-proj-${p.id}`}
+                          checked={selectedProjects.includes(p.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              if (isStarter && selectedProjects.length >= 2) {
+                                toast({ title: "Limit Reached", description: "Starter/Trial plan allows a maximum of 2 projects per user.", variant: "destructive" });
+                                return;
+                              }
+                              setSelectedProjects([...selectedProjects, p.id]);
+                            } else {
+                              setSelectedProjects(selectedProjects.filter(id => id !== p.id));
+                            }
+                          }}
+                        />
+                        <Label htmlFor={`gen-proj-${p.id}`} className="cursor-pointer text-sm">{p.name}</Label>
+                      </div>
+                    ))}
+                    {projects.length === 0 && <p className="text-xs text-muted-foreground">No projects found.</p>}
+                  </div>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setGenerateDialogType(null)}>Cancel</Button>
+              <Button onClick={handleGenerateSpecificCode}>Generate Code</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Edit User Access Dialog */}
         <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>
