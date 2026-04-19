@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -1235,6 +1235,7 @@ export type Database = {
           id: string
           project_change_count: number | null
           subscription_end_date: string | null
+          subscription_start_date: string | null
           updated_at: string | null
         }
         Insert: {
@@ -1250,6 +1251,7 @@ export type Database = {
           id: string
           project_change_count?: number | null
           subscription_end_date?: string | null
+          subscription_start_date?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -1265,6 +1267,7 @@ export type Database = {
           id?: string
           project_change_count?: number | null
           subscription_end_date?: string | null
+          subscription_start_date?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -1750,6 +1753,7 @@ export type Database = {
             Returns: undefined
           }
       auth_company_id: { Args: never; Returns: string }
+      get_super_admin_addon_users: { Args: never; Returns: Json }
       get_super_admin_stats: { Args: never; Returns: Json }
       process_stripe_subscription: {
         Args: {
@@ -1763,6 +1767,10 @@ export type Database = {
           p_subscription_id: string
           p_user_id: string
         }
+        Returns: undefined
+      }
+      update_addon_user_dates: {
+        Args: { p_end_date: string; p_profile_id: string; p_start_date: string }
         Returns: undefined
       }
       update_subscription_dates: {
