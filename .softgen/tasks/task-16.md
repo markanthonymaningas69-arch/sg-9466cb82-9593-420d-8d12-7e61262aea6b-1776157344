@@ -1,6 +1,6 @@
 ---
 title: Read-Only Mode - Projects & BOM
-status: todo
+status: in_progress
 priority: high
 type: feature
 tags: [projects, bom, read-only]
