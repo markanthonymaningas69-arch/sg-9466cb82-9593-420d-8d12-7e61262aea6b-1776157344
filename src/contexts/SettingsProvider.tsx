@@ -72,7 +72,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
       try {
         // 1. Fetch Company Data to find the Owner
-        const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', userId).single();
+        const { data: profile } = await supabase.from('profiles').select('company_id, subscription_end_date').eq('id', userId).single();
         let compId = profile?.company_id;
 
         if (!compId) {
@@ -123,8 +123,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             localStorage.setItem('app_subscription_features', JSON.stringify(sub.features));
           }
           
-          if (sub.end_date) {
-            const endDate = new Date(sub.end_date);
+          if (sub.end_date || profile?.subscription_end_date) {
+            const endDateStr = profile?.subscription_end_date || sub.end_date;
+            const endDate = new Date(endDateStr);
             const now = new Date();
             const isExpired = now > endDate;
 

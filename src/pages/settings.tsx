@@ -62,6 +62,7 @@ export default function Settings() {
   const [editingUser, setEditingUser] = useState<any>(null);
   const [editModules, setEditModules] = useState<string[]>([]);
   const [editProjects, setEditProjects] = useState<string[]>([]);
+  const [editExpiryDate, setEditExpiryDate] = useState<string>("");
   
   // Delete User State
   const [deletingUser, setDeletingUser] = useState<any>(null);
@@ -504,12 +505,16 @@ export default function Settings() {
                                 <span className="ml-2 text-[10px] bg-muted px-1.5 py-0.5 rounded">Changes: {u.project_change_count || 0}/5</span>
                               </div>
                             )}
+                            <div className="text-xs text-muted-foreground mt-1">
+                              <strong className="text-foreground">Seat Expiry:</strong> {u.subscription_end_date ? new Date(u.subscription_end_date).toLocaleDateString() : "Syncs with GM Plan"}
+                            </div>
                           </div>
                           <div className="flex items-center gap-1">
                             <Button size="icon" variant="ghost" onClick={() => {
                               setEditingUser(u);
                               setEditModules(u.assigned_modules && u.assigned_modules.length > 0 ? u.assigned_modules : [u.assigned_module]);
                               setEditProjects(u.assigned_project_ids || []);
+                              setEditExpiryDate(u.subscription_end_date || "");
                             }}>
                               <Edit className="w-4 h-4 text-muted-foreground" />
                             </Button>
@@ -660,6 +665,16 @@ export default function Settings() {
                   </div>
                 </div>
               )}
+
+              <div className="space-y-2 pt-2 border-t mt-4">
+                <Label>Custom Expiry Date (Add-on Seats)</Label>
+                <Input 
+                  type="date" 
+                  value={editExpiryDate} 
+                  onChange={(e) => setEditExpiryDate(e.target.value)} 
+                />
+                <p className="text-xs text-muted-foreground">Leave blank to synchronize with the GM's main billing cycle. Set a date to decouple this specific user.</p>
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setEditingUser(null)}>Cancel</Button>
@@ -707,7 +722,8 @@ export default function Settings() {
                   const updates: any = {
                     assigned_module: editModules[0],
                     assigned_modules: editModules,
-                    assigned_project_ids: isSitePersonnel ? editProjects : []
+                    assigned_project_ids: isSitePersonnel ? editProjects : [],
+                    subscription_end_date: editExpiryDate || null
                   };
 
                   if (isProjectChanged) {
