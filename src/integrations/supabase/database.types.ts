@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -684,6 +684,7 @@ export type Database = {
           company_id: string | null
           created_at: string | null
           id: string
+          is_addon: boolean | null
           module: string
           modules: string[] | null
           project_id: string | null
@@ -695,6 +696,7 @@ export type Database = {
           company_id?: string | null
           created_at?: string | null
           id?: string
+          is_addon?: boolean | null
           module: string
           modules?: string[] | null
           project_id?: string | null
@@ -706,6 +708,7 @@ export type Database = {
           company_id?: string | null
           created_at?: string | null
           id?: string
+          is_addon?: boolean | null
           module?: string
           modules?: string[] | null
           project_id?: string | null
@@ -1233,6 +1236,7 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          is_addon: boolean | null
           project_change_count: number | null
           subscription_end_date: string | null
           subscription_start_date: string | null
@@ -1249,6 +1253,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id: string
+          is_addon?: boolean | null
           project_change_count?: number | null
           subscription_end_date?: string | null
           subscription_start_date?: string | null
@@ -1265,6 +1270,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          is_addon?: boolean | null
           project_change_count?: number | null
           subscription_end_date?: string | null
           subscription_start_date?: string | null
