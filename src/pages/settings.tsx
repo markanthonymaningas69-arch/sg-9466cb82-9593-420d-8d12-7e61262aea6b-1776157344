@@ -113,7 +113,7 @@ export default function Settings() {
   };
 
   // Base limits based purely on the plan type
-  const basePlanLimits: Record<string, number> = currentPlan === 'starter' 
+  const basePlanLimits: Record<string, number> = (currentPlan === 'starter' || currentPlan === 'trial' || isTrial)
     ? { 'Site Personnel': 1, 'Accounting': 1, 'Purchasing': 0, 'Human Resources': 0, 'Warehouse': 0 }
     : { 'Site Personnel': 3, 'Accounting': 1, 'Purchasing': 1, 'Human Resources': 1, 'Warehouse': 1 };
 
@@ -386,7 +386,7 @@ export default function Settings() {
                     </div>
                     {selectedModules.includes("Site Personnel") && (
                       <div className="space-y-2 flex-1">
-                        <Label>Restrict to Projects (Max {currentPlan === 'starter' ? 2 : 'Unlimited'})</Label>
+                        <Label>Restrict to Projects (Max {currentPlan === 'starter' || currentPlan === 'trial' || isTrial ? 2 : 'Unlimited'})</Label>
                         <div className="border rounded-md p-2 max-h-32 overflow-y-auto space-y-2 bg-background">
                           {projects.map(p => (
                             <div key={p.id} className="flex items-center space-x-2">
@@ -395,8 +395,8 @@ export default function Settings() {
                                 checked={selectedProjects.includes(p.id)}
                                 onCheckedChange={(checked) => {
                                   if (checked) {
-                                    if (currentPlan === 'starter' && selectedProjects.length >= 2) {
-                                      toast({ title: "Limit Reached", description: "Starter plan allows a maximum of 2 projects per user.", variant: "destructive" });
+                                    if ((currentPlan === 'starter' || currentPlan === 'trial' || isTrial) && selectedProjects.length >= 2) {
+                                      toast({ title: "Limit Reached", description: "Starter/Trial plan allows a maximum of 2 projects per user.", variant: "destructive" });
                                       return;
                                     }
                                     setSelectedProjects([...selectedProjects, p.id]);
@@ -593,7 +593,7 @@ export default function Settings() {
 
               {editModules.includes("Site Personnel") && (
                 <div className="space-y-2">
-                  <Label>Restrict to Projects (Max {currentPlan === 'starter' ? 2 : 'Unlimited'})</Label>
+                  <Label>Restrict to Projects (Max {currentPlan === 'starter' || currentPlan === 'trial' || isTrial ? 2 : 'Unlimited'})</Label>
                   <div className="border rounded-md p-2 max-h-32 overflow-y-auto space-y-2 bg-background">
                     {projects.map(p => (
                       <div key={p.id} className="flex items-center space-x-2">
@@ -602,8 +602,8 @@ export default function Settings() {
                           checked={editProjects.includes(p.id)}
                           onCheckedChange={(checked) => {
                             if (checked) {
-                              if (currentPlan === 'starter' && editProjects.length >= 2) {
-                                toast({ title: "Limit Reached", description: "Starter plan allows a maximum of 2 projects per user.", variant: "destructive" });
+                              if ((currentPlan === 'starter' || currentPlan === 'trial' || isTrial) && editProjects.length >= 2) {
+                                toast({ title: "Limit Reached", description: "Starter/Trial plan allows a maximum of 2 projects per user.", variant: "destructive" });
                                 return;
                               }
                               setEditProjects([...editProjects, p.id]);
