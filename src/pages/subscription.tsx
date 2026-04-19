@@ -186,7 +186,17 @@ export default function Subscription() {
       const data = await response.json();
       
       if (data.url) {
-        window.location.href = data.url; // Redirect to Stripe Checkout
+        // Stripe blocks iframes (like our preview). Open in new tab if in iframe.
+        if (window.self !== window.top) {
+          window.open(data.url, '_blank');
+          setIsCheckingOut(false);
+          toast({
+            title: "Checkout Opened",
+            description: "Stripe Checkout has opened securely in a new tab.",
+          });
+        } else {
+          window.location.href = data.url; // Normal redirect for production
+        }
       } else {
         throw new Error(data.error || "Failed to create checkout session");
       }
@@ -218,7 +228,16 @@ export default function Subscription() {
 
       const data = await response.json();
       if (data.url) {
-        window.location.href = data.url;
+        if (window.self !== window.top) {
+          window.open(data.url, '_blank');
+          setIsManagingBilling(false);
+          toast({
+            title: "Portal Opened",
+            description: "Stripe Billing Portal has opened securely in a new tab.",
+          });
+        } else {
+          window.location.href = data.url;
+        }
       } else {
         throw new Error(data.error || "Failed to access billing portal. No Stripe customer found.");
       }
