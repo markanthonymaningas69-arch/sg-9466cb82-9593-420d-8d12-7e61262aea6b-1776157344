@@ -448,8 +448,8 @@ export default function SystemMonitor() {
                   const heightPercentage = maxChartValue > 0 ? (data.value / maxChartValue) * 100 : 0;
                   return (
                     <div key={i} className="relative flex flex-col items-center flex-1 group h-full justify-end">
-                      <div className="absolute -top-8 opacity-0 group-hover:opacity-100 transition-opacity bg-popover text-popover-foreground text-xs rounded py-1 px-2 pointer-events-none whitespace-nowrap shadow-md border border-border z-10">
-                        {formatAED(data.value)}
+                      <div className="absolute -top-6 text-[10px] font-semibold text-muted-foreground whitespace-nowrap z-10 group-hover:text-foreground transition-colors">
+                        {data.value > 0 ? `AED ${Math.round(data.value).toLocaleString()}` : ''}
                       </div>
                       
                       <div 
