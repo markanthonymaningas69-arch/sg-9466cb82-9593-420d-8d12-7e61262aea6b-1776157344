@@ -80,17 +80,17 @@ export default function Settings() {
       loadTeamData();
       loadProjects();
     }
-    
-    const checkGM = () => {
-      const saved = localStorage.getItem('app_assigned_modules');
-      if (saved) {
-        const mods = JSON.parse(saved);
-        const gm = mods.includes('GM');
-        setIsGM(gm);
-        if (gm) setActiveTab("company");
-      }
-    };
-    checkGM();
+  }, [company, companyId]);
+
+  useEffect(() => {
+    // Run only once on mount to prevent tab bouncing
+    const saved = localStorage.getItem('app_assigned_modules');
+    if (saved) {
+      const mods = JSON.parse(saved);
+      const gm = mods.includes('GM');
+      setIsGM(gm);
+      if (gm) setActiveTab("company");
+    }
 
     // Load purchased add-ons from subscription
     const savedAddOns = localStorage.getItem('app_subscription_features');
@@ -99,7 +99,7 @@ export default function Settings() {
         setActiveAddOns(JSON.parse(savedAddOns));
       } catch(e) {}
     }
-  }, [company, companyId]);
+  }, []);
 
   const loadProjects = async () => {
     const { data } = await supabase.from('projects').select('id, name').order('name');
@@ -382,6 +382,60 @@ export default function Settings() {
                 <CardDescription>Generate invite codes to grant specific module access based on your {currentPlan} plan limits.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                <div className="space-y-4 pb-2">
+                  <div className="space-y-2">
+                    <Label>Select Module(s) to Assign</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {['Site Personnel', 'Accounting', 'Purchasing', 'Warehouse', 'Human Resources'].map(mod => (
+                        <div key={mod} className="flex items-center space-x-2 border rounded-md p-2 bg-muted/20">
+                          <Checkbox 
+                            id={`mod-${mod}`}
+                            checked={selectedModules.includes(mod)}
+                            onCheckedChange={(checked) => {
+                              if (checked) setSelectedModules([...selectedModules, mod]);
+                              else setSelectedModules(selectedModules.filter(m => m !== mod));
+                            }}
+                          />
+                          <Label htmlFor={`mod-${mod}`} className="cursor-pointer text-sm font-medium">{mod}</Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {selectedModules.includes("Site Personnel") && (
+                    <div className="space-y-2 p-3 border rounded-md bg-muted/10">
+                      <Label>Restrict to Projects (Max {isStarter ? 2 : 'Unlimited'})</Label>
+                      <div className="flex flex-wrap gap-3 mt-2">
+                        {projects.map(p => (
+                          <div key={p.id} className="flex items-center space-x-2">
+                            <Checkbox 
+                              id={`proj-${p.id}`}
+                              checked={selectedProjects.includes(p.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  if (isStarter && selectedProjects.length >= 2) {
+                                    toast({ title: "Limit Reached", description: "Starter/Trial plan allows a maximum of 2 projects per user.", variant: "destructive" });
+                                    return;
+                                  }
+                                  setSelectedProjects([...selectedProjects, p.id]);
+                                } else {
+                                  setSelectedProjects(selectedProjects.filter(id => id !== p.id));
+                                }
+                              }}
+                            />
+                            <Label htmlFor={`proj-${p.id}`} className="cursor-pointer text-sm">{p.name}</Label>
+                          </div>
+                        ))}
+                        {projects.length === 0 && <p className="text-xs text-muted-foreground">No projects found.</p>}
+                      </div>
+                    </div>
+                  )}
+
+                  <Button onClick={handleGenerateCode} className="w-full sm:w-auto">
+                    Generate Invite Code
+                  </Button>
+                </div>
+
                 <div className="grid md:grid-cols-2 gap-6 pt-4 border-t">
                   
                   {/* INCLUDED COLUMN */}
