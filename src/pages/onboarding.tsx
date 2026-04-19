@@ -16,7 +16,6 @@ export default function Onboarding() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   
-  const [fullName, setFullName] = useState("");
   const [inviteCode, setInviteCode] = useState("");
   
   const [joining, setJoining] = useState(false);
@@ -56,10 +55,6 @@ export default function Onboarding() {
 
   const handleJoinCompany = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName.trim()) {
-      toast({ title: "Required", description: "Please enter your full name in Step 1.", variant: "destructive" });
-      return;
-    }
     if (!inviteCode.trim()) {
       toast({ title: "Required", description: "Please enter an invite code.", variant: "destructive" });
       return;
@@ -91,9 +86,6 @@ export default function Onboarding() {
       const primaryModule = invData.modules && invData.modules.length > 0 ? invData.modules[0] : invData.module;
       const allModules = invData.modules && invData.modules.length > 0 ? invData.modules : [invData.module];
 
-      // Update their profile name first
-      await supabase.from('profiles').update({ full_name: fullName.trim() }).eq('id', user.id);
-
       // Use the secure backend function with the GM's explicitly chosen modules
       const { error: rpcError } = await supabase.rpc('assign_user_module', {
         p_user_id: user.id,
@@ -105,7 +97,7 @@ export default function Onboarding() {
       if (rpcError) {
         const { error: upsertError } = await supabase.from('profiles').upsert({
           id: user.id,
-          full_name: fullName.trim(),
+          full_name: fullName,
           assigned_module: primaryModule,
           assigned_project_ids: invData.project_ids || [],
           assigned_modules: allModules,
@@ -139,19 +131,11 @@ export default function Onboarding() {
   };
 
   const handleCreateCompany = async () => {
-    if (!fullName.trim()) {
-      toast({ title: "Required", description: "Please enter your full name in Step 1.", variant: "destructive" });
-      return;
-    }
-
     setCreating(true);
     try {
       // Get fresh user just in case state is stale
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) throw new Error("Not authenticated");
-
-      // Update their profile name first
-      await supabase.from('profiles').update({ full_name: fullName.trim() }).eq('id', user.id);
 
       // Use the secure backend function
       const { error: rpcError } = await supabase.rpc('assign_user_module', {
@@ -164,7 +148,7 @@ export default function Onboarding() {
         // Fallback to direct upsert if RPC fails for any reason
         const { error: upsertError } = await supabase.from('profiles').upsert({
           id: user.id,
-          full_name: fullName.trim(),
+          full_name: fullName,
           assigned_module: 'GM',
           updated_at: new Date().toISOString()
         });
@@ -228,33 +212,11 @@ export default function Onboarding() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary text-primary-foreground mb-4 font-bold text-2xl">
             TX
           </div>
-          <h1 className="text-3xl font-heading font-bold">Welcome to Thea-X</h1>
-          <p className="text-muted-foreground mt-2 text-lg">Complete your profile to access your workspace.</p>
+          <h1 className="text-3xl font-heading font-bold">Welcome to Thea-X, {fullName.split(' ')[0]}!</h1>
+          <p className="text-muted-foreground mt-2 text-lg">Choose how you want to set up your workspace.</p>
         </div>
 
-        {/* Step 1: Account Details */}
-        <Card className="border-2 border-primary/20 shadow-md">
-          <CardHeader className="pb-4">
-            <CardTitle>Step 1: Account Details</CardTitle>
-            <CardDescription>Please confirm your name before selecting a workspace.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 max-w-md">
-              <Label>Full Name *</Label>
-              <Input 
-                placeholder="e.g. John Doe" 
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                disabled={joining || creating}
-                className="font-medium"
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        <h2 className="text-xl font-bold px-1 pt-4">Step 2: Choose Workspace Access</h2>
-        
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-2 gap-6 mt-4">
           {/* Join Company Card */}
           <Card className="relative overflow-hidden border-2 hover:border-primary/50 transition-colors flex flex-col">
             <CardHeader>
@@ -282,7 +244,7 @@ export default function Onboarding() {
               </form>
             </CardContent>
             <CardFooter>
-              <Button type="submit" form="join-form" disabled={!inviteCode.trim() || !fullName.trim() || joining || creating} className="w-full h-12 text-lg">
+              <Button type="submit" form="join-form" disabled={!inviteCode.trim() || joining || creating} className="w-full h-12 text-lg">
                 {joining ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
                 Join Workspace
                 {!joining && <ArrowRight className="ml-2 h-5 w-5" />}
@@ -309,7 +271,7 @@ export default function Onboarding() {
             <CardFooter>
               <Button 
                 onClick={handleCreateCompany}
-                disabled={!fullName.trim() || joining || creating}
+                disabled={joining || creating}
                 className="w-full h-12 text-lg bg-green-600 hover:bg-green-700 text-white"
               >
                 {creating ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
