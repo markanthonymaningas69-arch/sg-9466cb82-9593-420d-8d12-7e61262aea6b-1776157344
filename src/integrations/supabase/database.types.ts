@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -502,6 +502,7 @@ export type Database = {
           id: string
           logo: string | null
           name: string
+          stripe_customer_id: string | null
           tax_id: string | null
           theme_color: string | null
           updated_at: string | null
@@ -516,6 +517,7 @@ export type Database = {
           id?: string
           logo?: string | null
           name?: string
+          stripe_customer_id?: string | null
           tax_id?: string | null
           theme_color?: string | null
           updated_at?: string | null
@@ -530,6 +532,7 @@ export type Database = {
           id?: string
           logo?: string | null
           name?: string
+          stripe_customer_id?: string | null
           tax_id?: string | null
           theme_color?: string | null
           updated_at?: string | null
@@ -1575,6 +1578,8 @@ export type Database = {
           plan: string
           start_date: string
           status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
           user_id: string | null
         }
         Insert: {
@@ -1586,6 +1591,8 @@ export type Database = {
           plan: string
           start_date: string
           status: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           user_id?: string | null
         }
         Update: {
@@ -1597,6 +1604,8 @@ export type Database = {
           plan?: string
           start_date?: string
           status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           user_id?: string | null
         }
         Relationships: [
