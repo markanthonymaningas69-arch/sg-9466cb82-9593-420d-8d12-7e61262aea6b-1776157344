@@ -18,7 +18,7 @@ import { toast } from "@/hooks/use-toast";
 type EntryType = "debit" | "credit";
 
 export function JournalOpEx() {
-  const { formatCurrency } = useSettings();
+  const { formatCurrency, isLocked } = useSettings();
   const [entries, setEntries] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -133,7 +133,7 @@ export function JournalOpEx() {
             }
           }}>
             <DialogTrigger asChild>
-              <Button>
+              <Button disabled={isLocked}>
                 <Plus className="h-4 w-4 mr-2" />
                 New Entry
               </Button>
@@ -300,10 +300,10 @@ export function JournalOpEx() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(entry)}>
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(entry)} disabled={isLocked}>
                           <Pencil className="h-4 w-4 text-blue-600" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(entry.id)}>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(entry.id)} disabled={isLocked}>
                           <Trash2 className="h-4 w-4 text-red-600" />
                         </Button>
                       </div>

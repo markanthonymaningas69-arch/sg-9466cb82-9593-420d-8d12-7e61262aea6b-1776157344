@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 export function PayrollTab() {
-  const { formatCurrency } = useSettings();
+  const { formatCurrency, isLocked } = useSettings();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -175,7 +175,7 @@ export function PayrollTab() {
             {payrollData.length > 0 && (
               <Button 
                 onClick={handleSendToVoucher} 
-                disabled={isSending}
+                disabled={isSending || isLocked}
                 size="sm" 
                 className="mt-2 w-full bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
               >

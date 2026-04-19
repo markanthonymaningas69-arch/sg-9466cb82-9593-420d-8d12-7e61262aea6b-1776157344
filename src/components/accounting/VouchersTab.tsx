@@ -16,7 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 export function VouchersTab() {
-  const { formatCurrency, company, currency } = useSettings();
+  const { formatCurrency, company, currency, isLocked } = useSettings();
   const { toast } = useToast();
   const [vouchers, setVouchers] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
@@ -256,7 +256,7 @@ export function VouchersTab() {
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button disabled={isLocked}>
               <Plus className="h-4 w-4 mr-2" />
               Issue Voucher
             </Button>
@@ -451,19 +451,19 @@ export function VouchersTab() {
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         {v.status === 'pending' && (
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50" onClick={() => handleApproveVoucher(v)} title="Approve Voucher (GM Only)">
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50" onClick={() => handleApproveVoucher(v)} title="Approve Voucher (GM Only)" disabled={isLocked}>
                             <CheckCircle className="h-4 w-4" />
                           </Button>
                         )}
                         {v.status === 'approved' && (
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50" onClick={() => handleIssueVoucher(v)} title="Mark as Issued">
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50" onClick={() => handleIssueVoucher(v)} title="Mark as Issued" disabled={isLocked}>
                             <CheckCircle className="h-4 w-4" />
                           </Button>
                         )}
                         <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" onClick={() => handlePrint(v)} title="Print to PDF">
                           <Printer className="h-4 w-4" />
                         </Button>
-                        <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-500 hover:text-slate-700 hover:bg-slate-100" onClick={() => handleArchive(v)} title="Archive Voucher">
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-500 hover:text-slate-700 hover:bg-slate-100" onClick={() => handleArchive(v)} title="Archive Voucher" disabled={isLocked}>
                           <Archive className="h-4 w-4" />
                         </Button>
                       </div>
