@@ -142,6 +142,7 @@ export default function SystemMonitor() {
     let proMonthly = 0, proAnnual = 0;
     let starterMonthlyAmount = 0, starterAnnualAmount = 0;
     let proMonthlyAmount = 0, proAnnualAmount = 0;
+    let totalMRR = 0;
 
     subscriptions.forEach((sub: any) => {
       if (sub.status !== 'active' && sub.status !== 'trialing') return;
@@ -150,16 +151,21 @@ export default function SystemMonitor() {
       const amount = Number(sub.amount) || 0;
       const isAnnual = planName.includes('annual') || amount > 1000;
 
-      if (planName.includes('starter') || (!planName.includes('professional') && amount < 1000)) {
-        if (isAnnual) { starterAnnual++; starterAnnualAmount += amount; }
-        else { starterMonthly++; starterMonthlyAmount += amount; }
-      } else {
-        if (isAnnual) { proAnnual++; proAnnualAmount += amount; }
-        else { proMonthly++; proMonthlyAmount += amount; }
+      // Extract Base Plan price specifically (ignore Add-on bundled costs)
+      let baseAmount = 0;
+      if (planName.includes('starter') || (!planName.includes('professional') && amount < 1000 && amount > 0)) {
+        baseAmount = isAnnual ? 2870 : 299;
+        if (isAnnual) { starterAnnual++; starterAnnualAmount += baseAmount; }
+        else { starterMonthly++; starterMonthlyAmount += baseAmount; }
+      } else if (planName.includes('professional') || amount >= 1000) {
+        baseAmount = isAnnual ? 4790 : 499;
+        if (isAnnual) { proAnnual++; proAnnualAmount += baseAmount; }
+        else { proMonthly++; proMonthlyAmount += baseAmount; }
       }
-    });
 
-    const totalMRR = starterMonthlyAmount + proMonthlyAmount + ((starterAnnualAmount + proAnnualAmount) / 12);
+      // Total MRR correctly calculates the entire real revenue including add-ons
+      totalMRR += isAnnual ? (amount / 12) : amount;
+    });
 
     return {
       starterMonthly, starterAnnual, starterMonthlyAmount, starterAnnualAmount,
