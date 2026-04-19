@@ -370,29 +370,25 @@ export default function SystemMonitor() {
 
               <div className="space-y-2 pt-4 border-t">
                 <div className="flex items-center justify-between font-semibold text-foreground mb-3">
-                  <span>Active Add-ons Breakdown</span>
-                  <span>{formatAED(addonsMetrics.totalAmount)}</span>
+                  <span>Active Independent Users</span>
                 </div>
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center justify-between p-2 bg-muted/50 rounded">
                     <span className="text-muted-foreground">Site Personnel</span>
                     <div className="text-right">
                       <div className="font-bold text-foreground">{addonsMetrics.site_personnel.count} active</div>
-                      <div className="text-xs text-primary">{formatAED(addonsMetrics.site_personnel.amount)}</div>
                     </div>
                   </div>
                   <div className="flex items-center justify-between p-2 bg-muted/50 rounded">
                     <span className="text-muted-foreground">Accounting</span>
                     <div className="text-right">
                       <div className="font-bold text-foreground">{addonsMetrics.accounting.count} active</div>
-                      <div className="text-xs text-primary">{formatAED(addonsMetrics.accounting.amount)}</div>
                     </div>
                   </div>
                   <div className="flex items-center justify-between p-2 bg-muted/50 rounded">
                     <span className="text-muted-foreground">Purchasing</span>
                     <div className="text-right">
                       <div className="font-bold text-foreground">{addonsMetrics.purchasing.count} active</div>
-                      <div className="text-xs text-primary">{formatAED(addonsMetrics.purchasing.amount)}</div>
                     </div>
                   </div>
                 </div>
