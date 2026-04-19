@@ -26,13 +26,12 @@ export const plans: PlanConfig[] = [
     annualPrice: 2870,
     features: [
       "Up to 4 Projects in the System",
-      "GM module (Dashboard, Project Profile, Site Personnel, Complete Accounting Module, Analytics)",
+      "GM module (Dashboard, Project Profile, Site Personnel, Purchasing, Complete Accounting Module, Analytics)",
       "1 Project Profile User Account",
       "1 Site Personnel User Account (can handle 2 Projects)",
-      "1 Accounting User Account (Full Access)",
+      "1 Combined Accounting-Purchasing User Account",
       "Add-ons Capability (1 Site Personnel-Can handle 2Projects)",
       "Support Feature Updates",
-      "❌ No Purchasing Module",
       "❌ No HR Module",
       "❌ No Warehouse Module"
     ],
@@ -66,13 +65,12 @@ export const plans: PlanConfig[] = [
     annualPrice: 0,
     features: [
       "Up to 4 Projects in the System",
-      "GM module (Dashboard, Project Profile, Site Personnel, Complete Accounting Module, Analytics)",
+      "GM module (Dashboard, Project Profile, Site Personnel, Purchasing, Complete Accounting Module, Analytics)",
       "1 Project Profile User Account",
       "1 Site Personnel User Account (can handle 2 Projects)",
-      "1 Accounting User Account (Full Access)",
+      "1 Combined Accounting-Purchasing User Account",
       "Add-ons Capability (1 Site Personnel-Can handle 2Projects)",
       "Support Feature Updates",
-      "❌ No Purchasing Module",
       "❌ No HR Module",
       "❌ No Warehouse Module"
     ],
