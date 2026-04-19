@@ -48,16 +48,31 @@ export default function Subscription() {
         .order('created_at', { ascending: false });
         
       if (data && data.length > 0) {
-        setBillingHistory(data);
-        setSubscriptionDetails(data[0]);
+        const sub = data[0];
         
-        if (data[0].features) {
-          localStorage.setItem("app_subscription_features", JSON.stringify(data[0].features));
+        // Normalize missing end_date for older records
+        if (!sub.end_date && sub.start_date) {
+          const d = new Date(sub.start_date);
+          if (sub.amount > 1000) d.setFullYear(d.getFullYear() + 1);
+          else d.setMonth(d.getMonth() + 1);
+          sub.end_date = d.toISOString();
+        }
+
+        setBillingHistory(data);
+        setSubscriptionDetails(sub);
+        
+        if (sub.features) {
+          localStorage.setItem("app_subscription_features", JSON.stringify(sub.features));
         }
       } else {
         // Fallback for new accounts
+        const now = new Date();
+        const end = new Date(now);
+        end.setMonth(end.getMonth() + 1);
+        
         setSubscriptionDetails({
-          start_date: new Date().toISOString(),
+          start_date: now.toISOString(),
+          end_date: end.toISOString(),
           status: "active",
           amount: currentPlan === 'starter' ? 299 : 499
         });
@@ -75,7 +90,8 @@ export default function Subscription() {
     return monthlyCost - annualCost;
   };
 
-  const getExpirationDate = (dateStr?: string) => {
+  const getExpirationDate = (dateStr?: string, endStr?: string) => {
+    if (endStr) return new Date(endStr).toLocaleDateString();
     if (!dateStr) return 'N/A';
     const date = new Date(dateStr);
     if (billingCycle === 'monthly') {
@@ -115,7 +131,7 @@ export default function Subscription() {
     setCurrentPlan(planId as "starter" | "professional");
     toast({
       title: "Plan Selected",
-      description: `You have selected the ${planId} plan. Please proceed to checkout to confirm.`,
+      description: `You have selected the ${planId} plan. Please review your prorated summary and proceed to checkout.`,
     });
   };
 
@@ -145,13 +161,14 @@ export default function Subscription() {
 
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        // We will insert a brand new subscription record for the transaction
+        // Insert brand new subscription record with explicitly saved end_date
         const newSub = {
           user_id: session.user.id,
           plan: currentPlan,
           status: 'active',
-          start_date: new Date().toISOString(),
-          amount: totalAmountDueToday,
+          start_date: now.toISOString(),
+          end_date: expiresAt.toISOString(),
+          amount: totalAmountDueToday, 
           features: finalFeatures
         };
         
@@ -181,18 +198,41 @@ export default function Subscription() {
     }, 1500);
   };
 
-  // Calculate Totals
+  // --- PRORATION & TOTALS CALCULATION ---
   const isCurrentlyTrial = (currentPlan as string) === "trial" || isTrial;
+  const hasActiveSub = subscriptionDetails?.status === "active" && !isCurrentlyTrial;
   
-  // Check if the user already has an active subscription for the EXACT plan they are viewing
-  const hasActiveSamePlan = subscriptionDetails?.status === "active" && 
-                            subscriptionDetails?.plan === currentPlan && 
-                            !isCurrentlyTrial;
+  const activeAmount = Number(subscriptionDetails?.amount) || 0;
+  const isActiveAnnual = activeAmount > 1000;
+  const isSelectingSamePlanAndCycle = subscriptionDetails?.plan === currentPlan && (billingCycle === "annual") === isActiveAnnual;
 
   const basePrice = isCurrentlyTrial ? 0 : (billingCycle === "monthly" ? currentPlanConfig.monthlyPrice : currentPlanConfig.annualPrice);
   
-  // Only charge base price if they are upgrading/changing plans or don't have an active one
-  const basePriceToCharge = hasActiveSamePlan ? 0 : basePrice;
+  // Only charge base price if they are upgrading/changing plans or cycle, or don't have an active one
+  const basePriceToCharge = (!hasActiveSub || !isSelectingSamePlanAndCycle) ? basePrice : 0;
+
+  let proratedDiscount = 0;
+  let daysRemaining = 0;
+
+  // If they have an active sub, are choosing a different plan/cycle, and are paying a new base price
+  if (hasActiveSub && !isSelectingSamePlanAndCycle && subscriptionDetails?.end_date && basePriceToCharge > 0) {
+    const end = new Date(subscriptionDetails.end_date);
+    const start = new Date(subscriptionDetails.start_date);
+    const now = new Date();
+    
+    if (end > now) {
+      daysRemaining = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      const totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) || 30;
+      
+      const dailyRate = activeAmount / totalDays;
+      proratedDiscount = Math.floor(daysRemaining * dailyRate);
+      
+      // Do not allow discount to exceed the new plan's cost
+      if (proratedDiscount > basePriceToCharge) {
+        proratedDiscount = basePriceToCharge;
+      }
+    }
+  }
 
   // Math to strictly calculate only NEWLY added add-ons to charge today
   const addOnsToChargeTotal = addOns.reduce((total, addon) => {
@@ -201,16 +241,13 @@ export default function Subscription() {
     return total + (price * newQty);
   }, 0);
 
-  const totalAmountDueToday = basePriceToCharge + addOnsToChargeTotal;
+  const totalAmountDueToday = Math.max(0, basePriceToCharge - proratedDiscount) + addOnsToChargeTotal;
   
+  // User count calculations
   const addOnUsersCount = subscriptionDetails?.features 
     ? Number(Object.values(subscriptionDetails.features).reduce((a: any, b: any) => Number(a) + Number(b), 0))
     : 0;
     
-  const totalAddonItems = addOnUsersCount;
-  const newlyAddedItemsCount = Object.values(addOnQuantities).reduce((a, b) => Number(a) + Number(b), 0);
-
-  // Total Independent Users Calculation
   const baseUsersCount = currentPlan === 'starter' ? 3 : 8;
   const totalUsersCount = baseUsersCount + addOnUsersCount;
 
@@ -238,15 +275,15 @@ export default function Subscription() {
                   <span>Since: {subscriptionDetails?.start_date ? new Date(subscriptionDetails.start_date).toLocaleDateString() : 'N/A'}</span>
                   <span>•</span>
                   <span className={isLocked ? "text-destructive font-medium" : "text-primary font-medium"}>
-                    Expires: {getExpirationDate(subscriptionDetails?.start_date)}
+                    Expires: {getExpirationDate(subscriptionDetails?.start_date, subscriptionDetails?.end_date)}
                   </span>
                 </p>
               </div>
               <div className="text-right">
                 <div className="text-3xl font-bold">
-                  AED {basePrice}
+                  AED {activeAmount || basePrice}
                 </div>
-                <p className="text-sm text-muted-foreground">per {billingCycle === "monthly" ? "month" : "year"}</p>
+                <p className="text-sm text-muted-foreground">per {isActiveAnnual ? "year" : "month"}</p>
               </div>
             </div>
             <Separator />
@@ -461,11 +498,11 @@ export default function Subscription() {
             <CardContent className="p-6 flex flex-col md:flex-row items-center justify-between gap-6">
               <div className="flex-1 w-full">
                 <h3 className="text-2xl font-bold tracking-tight">Order Summary</h3>
-                <div className="mt-2 space-y-1">
+                <div className="mt-3 space-y-2">
                   <div className="flex justify-between text-muted-foreground max-w-sm">
-                    <span>{currentPlanConfig.name} Plan ({billingCycle}) {hasActiveSamePlan && <Badge variant="outline" className="ml-2 text-[10px] bg-success/10 text-success border-success/20">Already Active</Badge>}</span>
+                    <span>{currentPlanConfig.name} Plan ({billingCycle}) {isSelectingSamePlanAndCycle && <Badge variant="outline" className="ml-2 text-[10px] bg-success/10 text-success border-success/20">Already Active</Badge>}</span>
                     <span className="font-medium text-foreground">
-                      {hasActiveSamePlan ? "AED 0" : `AED ${basePriceToCharge}`}
+                      {isSelectingSamePlanAndCycle ? "AED 0" : `AED ${basePriceToCharge}`}
                     </span>
                   </div>
                   
@@ -483,6 +520,14 @@ export default function Subscription() {
                       </div>
                     );
                   })}
+
+                  {/* Show Prorated Discount if applicable */}
+                  {proratedDiscount > 0 && (
+                    <div className="flex justify-between text-success max-w-sm mt-2 pt-2 border-t border-success/20">
+                      <span className="font-medium">Unused Balance Credit ({daysRemaining} days)</span>
+                      <span className="font-bold">- AED {proratedDiscount}</span>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row items-center gap-6 w-full md:w-auto border-t md:border-t-0 pt-4 md:pt-0">
