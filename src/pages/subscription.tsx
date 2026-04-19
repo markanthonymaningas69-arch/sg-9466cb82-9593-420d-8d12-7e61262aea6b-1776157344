@@ -357,7 +357,8 @@ export default function Subscription() {
     ? Number(Object.values(subscriptionDetails.features).reduce((a: any, b: any) => Number(a) + Number(b), 0))
     : 0;
     
-  const baseUsersCount = currentPlan === 'starter' ? 3 : 8;
+  const isStarterTier = currentPlan === 'starter' || currentPlan === 'trial' || isTrial;
+  const baseUsersCount = isStarterTier ? 3 : 8;
   const totalUsersCount = baseUsersCount + addOnUsersCount;
 
   return (
@@ -410,7 +411,7 @@ export default function Subscription() {
                   <FolderGit2 className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <div className="font-medium">{currentPlan === 'starter' ? 'Up to 4' : 'Up to 10'}</div>
+                  <div className="font-medium">{isStarterTier ? 'Up to 4' : 'Up to 10'}</div>
                   <div className="text-sm text-muted-foreground">Total Projects</div>
                 </div>
               </div>
@@ -419,7 +420,7 @@ export default function Subscription() {
                   <LayoutGrid className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <div className="font-medium">{currentPlan === 'starter' ? '5 Modules' : 'All 8 Modules'}</div>
+                  <div className="font-medium">{isStarterTier ? '5 Modules' : 'All 8 Modules'}</div>
                   <div className="text-sm text-muted-foreground">Included System Access</div>
                 </div>
               </div>
@@ -429,7 +430,7 @@ export default function Subscription() {
                 </div>
                 <div>
                   <div className="font-medium">{totalUsersCount} Total Users</div>
-                  <div className="text-sm text-muted-foreground">Active Independent Accounts</div>
+                  <div className="text-sm text-muted-foreground">Ready to assign independent users</div>
                 </div>
               </div>
               <div className="flex items-center gap-3">
