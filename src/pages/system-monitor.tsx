@@ -160,19 +160,18 @@ export default function SystemMonitor() {
       const isAnnual = planName.includes('annual') || rawAmount > 1000;
 
       // Extract Base Plan price specifically (ignore Add-on bundled costs)
-      let baseAmount = 0;
+      const baseAmount = 0;
+      const trueAmount = getTrueSubscriptionAmount(sub);
+      
       if (planName.includes('starter') || (!planName.includes('professional') && rawAmount < 1000 && rawAmount > 0)) {
-        baseAmount = isAnnual ? 2870 : 299;
-        if (isAnnual) { starterAnnual++; starterAnnualAmount += baseAmount; }
-        else { starterMonthly++; starterMonthlyAmount += baseAmount; }
+        if (isAnnual) { starterAnnual++; starterAnnualAmount += trueAmount; }
+        else { starterMonthly++; starterMonthlyAmount += trueAmount; }
       } else if (planName.includes('professional') || rawAmount >= 1000) {
-        baseAmount = isAnnual ? 4790 : 499;
-        if (isAnnual) { proAnnual++; proAnnualAmount += baseAmount; }
-        else { proMonthly++; proMonthlyAmount += baseAmount; }
+        if (isAnnual) { proAnnual++; proAnnualAmount += trueAmount; }
+        else { proMonthly++; proMonthlyAmount += trueAmount; }
       }
 
       // Total MRR correctly calculates the entire real revenue including add-ons
-      const trueAmount = getTrueSubscriptionAmount(sub);
       totalMRR += isAnnual ? (trueAmount / 12) : trueAmount;
     });
 
