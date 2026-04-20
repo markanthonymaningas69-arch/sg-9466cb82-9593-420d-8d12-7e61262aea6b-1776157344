@@ -175,19 +175,21 @@ export default function SystemMonitor() {
         }
       });
 
-      const baseMRR = isAnnual ? (trueAmount / 12) : trueAmount;
-      const totalCompanyMRR = baseMRR + addonRevenueMonthly;
-      const totalCompanyCycleAmount = isAnnual ? trueAmount + (addonRevenueMonthly * 12) : trueAmount + addonRevenueMonthly;
+      // trueAmount already includes the add-ons (Stripe totals it to 348)
+      const totalCompanyMRR = isAnnual ? (trueAmount / 12) : trueAmount;
+      
+      // To get the Base Plan amount (299), we subtract the add-ons from the total
+      const basePlanAmount = isAnnual ? trueAmount - (addonRevenueMonthly * 12) : trueAmount - addonRevenueMonthly;
 
-      // Total MRR correctly calculates the entire real revenue including add-ons
+      // Total MRR correctly calculates the entire real revenue
       totalMRR += totalCompanyMRR;
       
       if (planName.includes('starter') || (!planName.includes('professional') && rawAmount < 1000 && rawAmount > 0)) {
-        if (isAnnual) { starterAnnual++; starterAnnualAmount += totalCompanyCycleAmount; }
-        else { starterMonthly++; starterMonthlyAmount += totalCompanyCycleAmount; }
+        if (isAnnual) { starterAnnual++; starterAnnualAmount += basePlanAmount; }
+        else { starterMonthly++; starterMonthlyAmount += basePlanAmount; }
       } else if (planName.includes('professional') || rawAmount >= 1000) {
-        if (isAnnual) { proAnnual++; proAnnualAmount += totalCompanyCycleAmount; }
-        else { proMonthly++; proMonthlyAmount += totalCompanyCycleAmount; }
+        if (isAnnual) { proAnnual++; proAnnualAmount += basePlanAmount; }
+        else { proMonthly++; proMonthlyAmount += basePlanAmount; }
       }
     });
 
@@ -226,26 +228,10 @@ export default function SystemMonitor() {
           const rawAmount = Number(sub.amount) || 0;
           const isAnnual = (sub.plan || '').toLowerCase().includes('annual') || rawAmount > 1000;
           const trueAmount = getTrueSubscriptionAmount(sub);
-          const baseMRR = isAnnual ? trueAmount / 12 : trueAmount;
           
-          let mrr = baseMRR;
-
-          // Add active Add-on revenue historically
-          const comp = companies.find((c: any) => c.user_id === sub.user_id);
-          addonUsers.forEach((u: any) => {
-             if (u.is_addon && comp && u.company_id === comp.id && u.start_date) {
-               const uStart = new Date(u.start_date);
-               const uEnd = u.end_date ? new Date(u.end_date) : new Date(8640000000000000);
-               if (uStart <= monthEnd && uEnd >= targetMonth) {
-                  const mod = u.assigned_modules?.[0] || u.assigned_module;
-                  if (mod === 'Site Personnel') mrr += 49;
-                  else if (mod === 'Accounting') mrr += 39;
-                  else if (mod === 'Purchasing') mrr += 29;
-               }
-             }
-          });
-
-          totalMonthlyMRR += mrr;
+          // trueAmount already includes add-ons
+          const totalCompanyMRR = isAnnual ? trueAmount / 12 : trueAmount;
+          totalMonthlyMRR += totalCompanyMRR;
         }
       });
       
@@ -599,7 +585,8 @@ export default function SystemMonitor() {
                       });
                       
                       const isAnnual = (comp.plan || '').toLowerCase().includes('annual') || baseDisplayAmount > 1000;
-                      const finalDisplayAmount = baseDisplayAmount + (isAnnual ? addonRevenueMonthly * 12 : addonRevenueMonthly);
+                      // baseDisplayAmount already includes addons. Subtract them to show the pure base plan amount.
+                      const basePlanDisplayAmount = isAnnual ? baseDisplayAmount - (addonRevenueMonthly * 12) : baseDisplayAmount - addonRevenueMonthly;
 
                       return (
                         <TableRow key={comp.id || i} className="border-border transition-colors hover:bg-muted/30">
@@ -628,7 +615,7 @@ export default function SystemMonitor() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right font-semibold text-foreground">
-                            {formatAED(finalDisplayAmount)}
+                            {formatAED(basePlanDisplayAmount)}
                           </TableCell>
                           <TableCell className="text-right">
                             <Button 
