@@ -734,7 +734,15 @@ export default function Subscription() {
 
         {/* Existing Billing History below */}
         <div className="mt-12 space-y-6">
-          <h2 className="text-2xl font-bold font-heading">Payment History</h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <h2 className="text-2xl font-bold font-heading">Payment History</h2>
+            {subscriptionDetails?.stripe_customer_id && (
+              <Button variant="outline" onClick={handleManageBilling} disabled={isManagingBilling} className="w-full sm:w-auto">
+                {isManagingBilling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ExternalLink className="mr-2 h-4 w-4" />}
+                Manage Billing Settings
+              </Button>
+            )}
+          </div>
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -743,38 +751,40 @@ export default function Subscription() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {billingHistory.length > 0 ? billingHistory.map((bill, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/30 transition-colors">
-                    <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <CreditCard className="h-5 w-5 text-primary" />
+              <div className="max-h-[420px] overflow-y-auto pr-2">
+                <div className="space-y-4">
+                  {billingHistory.length > 0 ? billingHistory.map((bill, index) => (
+                    <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/30 transition-colors">
+                      <div className="flex items-center gap-4">
+                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <CreditCard className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <div className="font-semibold capitalize">{bill.plan} Plan</div>
+                          <div className="text-sm text-muted-foreground">
+                            {new Date(bill.start_date).toLocaleDateString("en-US", { 
+                              month: "long", 
+                              day: "numeric", 
+                              year: "numeric" 
+                            })}
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="font-semibold capitalize">{bill.plan} Plan</div>
-                        <div className="text-sm text-muted-foreground">
-                          {new Date(bill.start_date).toLocaleDateString("en-US", { 
-                            month: "long", 
-                            day: "numeric", 
-                            year: "numeric" 
-                          })}
+                      <div className="text-right flex items-center gap-4">
+                        <div>
+                          <div className="font-bold text-lg">AED {bill.amount}</div>
+                          <Badge variant="outline" className="text-success capitalize mt-1">
+                            {bill.status}
+                          </Badge>
                         </div>
                       </div>
                     </div>
-                    <div className="text-right flex items-center gap-4">
-                      <div>
-                        <div className="font-bold text-lg">AED {bill.amount}</div>
-                        <Badge variant="outline" className="text-success capitalize mt-1">
-                          {bill.status}
-                        </Badge>
-                      </div>
+                  )) : (
+                    <div className="text-center py-8 text-muted-foreground bg-muted/20 rounded-lg border border-dashed">
+                      No billing history available yet.
                     </div>
-                  </div>
-                )) : (
-                  <div className="text-center py-8 text-muted-foreground bg-muted/20 rounded-lg border border-dashed">
-                    No billing history available yet.
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
