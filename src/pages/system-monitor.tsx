@@ -186,7 +186,7 @@ export default function SystemMonitor() {
           };
 
           if (f.extra_site) addSeat('Site Personnel', Number(f.extra_site));
-          if (f.accounting) addSeat('Accounting', Number(f.accounting));
+          if (f.extra_acc || f.accounting) addSeat('Accounting', Number(f.extra_acc || f.accounting));
           if (f.purchasing) addSeat('Purchasing', Number(f.purchasing));
         }
       });
@@ -757,9 +757,9 @@ export default function SystemMonitor() {
             <CardTitle className="text-foreground">Included Independent Users</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-[400px] overflow-y-auto relative">
               <Table>
-                <TableHeader className="bg-muted/50">
+                <TableHeader className="bg-muted/50 sticky top-0 z-10 shadow-sm">
                   <TableRow className="border-border hover:bg-transparent">
                     <TableHead className="text-foreground font-semibold">User Name</TableHead>
                     <TableHead className="text-foreground font-semibold">Email</TableHead>
@@ -793,9 +793,9 @@ export default function SystemMonitor() {
             <CardTitle className="text-foreground">Add-ons Independent Users</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-[400px] overflow-y-auto relative">
               <Table>
-                <TableHeader className="bg-muted/50">
+                <TableHeader className="bg-muted/50 sticky top-0 z-10 shadow-sm">
                   <TableRow className="border-border hover:bg-transparent">
                     <TableHead className="text-foreground font-semibold">User Name</TableHead>
                     <TableHead className="text-foreground font-semibold">Email</TableHead>
