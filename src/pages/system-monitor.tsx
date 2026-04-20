@@ -236,6 +236,10 @@ export default function SystemMonitor() {
   const accCount = allAddonUsers.filter((u: any) => u.assigned_modules?.includes('Accounting') || u.assigned_module?.includes('Accounting')).length;
   const purCount = allAddonUsers.filter((u: any) => u.assigned_modules?.includes('Purchasing') || u.assigned_module?.includes('Purchasing')).length;
 
+  const addonSiteCount = allAddonUsers.filter((u: any) => !!u.is_addon && (u.assigned_modules?.includes('Site Personnel') || u.assigned_module?.includes('Site Personnel'))).length;
+  const addonAccCount = allAddonUsers.filter((u: any) => !!u.is_addon && (u.assigned_modules?.includes('Accounting') || u.assigned_module?.includes('Accounting'))).length;
+  const addonPurCount = allAddonUsers.filter((u: any) => !!u.is_addon && (u.assigned_modules?.includes('Purchasing') || u.assigned_module?.includes('Purchasing'))).length;
+
   const subMetrics = useMemo(() => {
     let starterMonthly = 0, starterAnnual = 0;
     let proMonthly = 0, proAnnual = 0;
@@ -474,7 +478,31 @@ export default function SystemMonitor() {
                   +{formatAED(subMetrics.totalAddonMRR)}
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Paid extra seats & pending</p>
+              <p className="text-xs text-muted-foreground mt-1 mb-2">Paid extra seats & pending</p>
+              
+              <div className="space-y-1.5 pt-3 border-t">
+                {addonSiteCount > 0 && (
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>{addonSiteCount} Site Personnel</span>
+                    <span className="font-medium text-emerald-600">+{formatAED(addonSiteCount * 49)}</span>
+                  </div>
+                )}
+                {addonAccCount > 0 && (
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>{addonAccCount} Accounting</span>
+                    <span className="font-medium text-emerald-600">+{formatAED(addonAccCount * 39)}</span>
+                  </div>
+                )}
+                {addonPurCount > 0 && (
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>{addonPurCount} Purchasing</span>
+                    <span className="font-medium text-emerald-600">+{formatAED(addonPurCount * 29)}</span>
+                  </div>
+                )}
+                {totalTrueAddons === 0 && (
+                  <div className="text-xs text-muted-foreground italic">No active add-ons</div>
+                )}
+              </div>
             </CardContent>
           </Card>
 
