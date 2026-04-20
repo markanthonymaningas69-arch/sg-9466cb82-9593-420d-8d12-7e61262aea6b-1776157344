@@ -588,14 +588,16 @@ export default function Settings() {
                                   Renew Seat
                                 </Button>
                                 <div className="flex items-center gap-1">
-                                  <Button size="icon" variant="ghost" onClick={() => {
-                                    setEditingUser(u);
-                                    setEditModules(u.assigned_modules && u.assigned_modules.length > 0 ? u.assigned_modules : [u.assigned_module]);
-                                    setEditProjects(u.assigned_project_ids || []);
-                                    setEditExpiryDate(u.subscription_end_date || "");
-                                  }} className="h-6 w-6">
-                                    <Edit className="w-3 h-3 text-muted-foreground" />
-                                  </Button>
+                                  {!isStarter && (
+                                    <Button size="icon" variant="ghost" onClick={() => {
+                                      setEditingUser(u);
+                                      setEditModules(u.assigned_modules && u.assigned_modules.length > 0 ? u.assigned_modules : [u.assigned_module]);
+                                      setEditProjects(u.assigned_project_ids || []);
+                                      setEditExpiryDate(u.subscription_end_date || "");
+                                    }} className="h-6 w-6">
+                                      <Edit className="w-3 h-3 text-muted-foreground" />
+                                    </Button>
+                                  )}
                                   <Button size="icon" variant="ghost" onClick={() => setDeletingUser(u)} className="text-red-500 hover:text-red-700 hover:bg-red-50 h-6 w-6">
                                     <UserX className="w-3 h-3" />
                                   </Button>
