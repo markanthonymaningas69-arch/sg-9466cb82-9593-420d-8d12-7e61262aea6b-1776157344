@@ -162,17 +162,32 @@ export default function SystemMonitor() {
       // Extract Base Plan price specifically (ignore Add-on bundled costs)
       const baseAmount = 0;
       const trueAmount = getTrueSubscriptionAmount(sub);
-      
-      if (planName.includes('starter') || (!planName.includes('professional') && rawAmount < 1000 && rawAmount > 0)) {
-        if (isAnnual) { starterAnnual++; starterAnnualAmount += trueAmount; }
-        else { starterMonthly++; starterMonthlyAmount += trueAmount; }
-      } else if (planName.includes('professional') || rawAmount >= 1000) {
-        if (isAnnual) { proAnnual++; proAnnualAmount += trueAmount; }
-        else { proMonthly++; proMonthlyAmount += trueAmount; }
-      }
+
+      // Dynamically calculate revenue from all active Add-on users tied to this GM
+      let addonRevenueMonthly = 0;
+      addonUsers.forEach((u: any) => {
+        if (u.is_addon && u.company_id === sub.user_id) {
+          const mod = u.assigned_modules?.[0] || u.assigned_module;
+          if (mod === 'Site Personnel') addonRevenueMonthly += 49;
+          else if (mod === 'Accounting') addonRevenueMonthly += 39;
+          else if (mod === 'Purchasing') addonRevenueMonthly += 29;
+        }
+      });
+
+      const baseMRR = isAnnual ? (trueAmount / 12) : trueAmount;
+      const totalCompanyMRR = baseMRR + addonRevenueMonthly;
+      const totalCompanyCycleAmount = isAnnual ? trueAmount + (addonRevenueMonthly * 12) : trueAmount + addonRevenueMonthly;
 
       // Total MRR correctly calculates the entire real revenue including add-ons
-      totalMRR += isAnnual ? (trueAmount / 12) : trueAmount;
+      totalMRR += totalCompanyMRR;
+      
+      if (planName.includes('starter') || (!planName.includes('professional') && rawAmount < 1000 && rawAmount > 0)) {
+        if (isAnnual) { starterAnnual++; starterAnnualAmount += totalCompanyCycleAmount; }
+        else { starterMonthly++; starterMonthlyAmount += totalCompanyCycleAmount; }
+      } else if (planName.includes('professional') || rawAmount >= 1000) {
+        if (isAnnual) { proAnnual++; proAnnualAmount += totalCompanyCycleAmount; }
+        else { proMonthly++; proMonthlyAmount += totalCompanyCycleAmount; }
+      }
     });
 
     return {
@@ -184,7 +199,7 @@ export default function SystemMonitor() {
       starterTotalAmount: starterMonthlyAmount + starterAnnualAmount,
       proTotalAmount: proMonthlyAmount + proAnnualAmount
     };
-  }, [subscriptions]);
+  }, [subscriptions, addonUsers]);
 
   const chartData = useMemo(() => {
     const result = [];
@@ -196,7 +211,7 @@ export default function SystemMonitor() {
       const monthEnd = new Date(today.getFullYear(), today.getMonth() - i + 1, 0); // Last day of month
       const monthStr = targetMonth.toLocaleString('default', { month: 'short', year: '2-digit' });
       
-      let mrr = 0;
+      let totalMonthlyMRR = 0;
       
       subscriptions.forEach((sub: any) => {
         if (sub.status !== 'active' && sub.status !== 'trialing') return;
@@ -210,15 +225,33 @@ export default function SystemMonitor() {
           const rawAmount = Number(sub.amount) || 0;
           const isAnnual = (sub.plan || '').toLowerCase().includes('annual') || rawAmount > 1000;
           const trueAmount = getTrueSubscriptionAmount(sub);
-          mrr += isAnnual ? trueAmount / 12 : trueAmount;
+          const baseMRR = isAnnual ? trueAmount / 12 : trueAmount;
+          
+          let mrr = baseMRR;
+
+          // Add active Add-on revenue historically
+          addonUsers.forEach((u: any) => {
+             if (u.is_addon && u.company_id === sub.user_id && u.start_date) {
+               const uStart = new Date(u.start_date);
+               const uEnd = u.end_date ? new Date(u.end_date) : new Date(8640000000000000);
+               if (uStart <= monthEnd && uEnd >= targetMonth) {
+                  const mod = u.assigned_modules?.[0] || u.assigned_module;
+                  if (mod === 'Site Personnel') mrr += 49;
+                  else if (mod === 'Accounting') mrr += 39;
+                  else if (mod === 'Purchasing') mrr += 29;
+               }
+             }
+          });
+
+          totalMonthlyMRR += mrr;
         }
       });
       
-      result.push({ name: monthStr, value: mrr });
+      result.push({ name: monthStr, value: totalMonthlyMRR });
     }
     
     return result;
-  }, [subscriptions]);
+  }, [subscriptions, addonUsers]);
 
   const maxChartValue = Math.max(...chartData.map(d => d.value), 1000);
 
@@ -551,7 +584,20 @@ export default function SystemMonitor() {
                       const isExpiringSoon = daysUntilExpiry !== null && daysUntilExpiry <= 30 && daysUntilExpiry > 0;
                       
                       const activeSub = subscriptions.find((s: any) => s.user_id === comp.user_id && (s.status === 'active' || s.status === 'trialing'));
-                      const displayAmount = activeSub ? getTrueSubscriptionAmount(activeSub) : Number(comp.amount || 0);
+                      const baseDisplayAmount = activeSub ? getTrueSubscriptionAmount(activeSub) : Number(comp.amount || 0);
+
+                      let addonRevenueMonthly = 0;
+                      addonUsers.forEach((u: any) => {
+                        if (u.is_addon && u.company_id === comp.user_id) {
+                          const mod = u.assigned_modules?.[0] || u.assigned_module;
+                          if (mod === 'Site Personnel') addonRevenueMonthly += 49;
+                          else if (mod === 'Accounting') addonRevenueMonthly += 39;
+                          else if (mod === 'Purchasing') addonRevenueMonthly += 29;
+                        }
+                      });
+                      
+                      const isAnnual = (comp.plan || '').toLowerCase().includes('annual') || baseDisplayAmount > 1000;
+                      const finalDisplayAmount = baseDisplayAmount + (isAnnual ? addonRevenueMonthly * 12 : addonRevenueMonthly);
 
                       return (
                         <TableRow key={comp.id || i} className="border-border transition-colors hover:bg-muted/30">
@@ -580,7 +626,7 @@ export default function SystemMonitor() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right font-semibold text-foreground">
-                            {formatAED(displayAmount)}
+                            {formatAED(finalDisplayAmount)}
                           </TableCell>
                           <TableCell className="text-right">
                             <Button 
