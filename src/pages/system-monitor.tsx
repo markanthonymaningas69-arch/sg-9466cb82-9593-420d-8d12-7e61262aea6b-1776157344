@@ -165,8 +165,9 @@ export default function SystemMonitor() {
 
       // Dynamically calculate revenue from all active Add-on users tied to this GM
       let addonRevenueMonthly = 0;
+      const comp = companies.find((c: any) => c.user_id === sub.user_id);
       addonUsers.forEach((u: any) => {
-        if (u.is_addon && u.company_id === sub.user_id) {
+        if (u.is_addon && comp && u.company_id === comp.id) {
           const mod = u.assigned_modules?.[0] || u.assigned_module;
           if (mod === 'Site Personnel') addonRevenueMonthly += 49;
           else if (mod === 'Accounting') addonRevenueMonthly += 39;
@@ -230,8 +231,9 @@ export default function SystemMonitor() {
           let mrr = baseMRR;
 
           // Add active Add-on revenue historically
+          const comp = companies.find((c: any) => c.user_id === sub.user_id);
           addonUsers.forEach((u: any) => {
-             if (u.is_addon && u.company_id === sub.user_id && u.start_date) {
+             if (u.is_addon && comp && u.company_id === comp.id && u.start_date) {
                const uStart = new Date(u.start_date);
                const uEnd = u.end_date ? new Date(u.end_date) : new Date(8640000000000000);
                if (uStart <= monthEnd && uEnd >= targetMonth) {
@@ -588,7 +590,7 @@ export default function SystemMonitor() {
 
                       let addonRevenueMonthly = 0;
                       addonUsers.forEach((u: any) => {
-                        if (u.is_addon && u.company_id === comp.user_id) {
+                        if (u.is_addon && u.company_id === comp.id) {
                           const mod = u.assigned_modules?.[0] || u.assigned_module;
                           if (mod === 'Site Personnel') addonRevenueMonthly += 49;
                           else if (mod === 'Accounting') addonRevenueMonthly += 39;
