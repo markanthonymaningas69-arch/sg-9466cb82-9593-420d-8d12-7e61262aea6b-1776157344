@@ -15,11 +15,14 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { plans, addOns } from "@/config/pricing";
 
-const getTrueSubscriptionAmount = (sub: any) => {
-  if (!sub) return 0;
-  // Stripe already calculates the exact total (Base Plan + Add-ons)
-  // Returning the exact billed amount guarantees 100% MRR accuracy.
-  return Number(sub.amount) || 0;
+// Calculate exact base plan cost based on plan name, ignoring prorated Stripe invoices
+const getBasePlanAmount = (planName: string) => {
+  const plan = (planName || '').toLowerCase();
+  if (plan.includes('professional') && plan.includes('annual')) return 4790;
+  if (plan.includes('starter') && plan.includes('annual')) return 2870;
+  if (plan.includes('professional')) return 499;
+  if (plan.includes('starter')) return 299;
+  return 0; // Trial or unknown
 };
 
 export default function SystemMonitor() {
@@ -156,14 +159,12 @@ export default function SystemMonitor() {
       if (sub.status !== 'active' && sub.status !== 'trialing') return;
       
       const planName = (sub.plan || '').toLowerCase();
-      const rawAmount = Number(sub.amount) || 0;
-      const isAnnual = planName.includes('annual') || rawAmount > 1000;
+      const isAnnual = planName.includes('annual');
 
-      // Extract Base Plan price specifically (ignore Add-on bundled costs)
-      const baseAmount = 0;
-      const trueAmount = getTrueSubscriptionAmount(sub);
+      // 1. Get exact base plan amount from the plan name
+      const basePlanAmount = getBasePlanAmount(planName);
 
-      // Dynamically calculate revenue from all active Add-on users tied to this GM
+      // 2. Dynamically calculate revenue from all active Add-on users tied to this GM
       let addonRevenueMonthly = 0;
       const comp = companies.find((c: any) => c.user_id === sub.user_id);
       addonUsers.forEach((u: any) => {
@@ -175,19 +176,17 @@ export default function SystemMonitor() {
         }
       });
 
-      // trueAmount already includes the add-ons (Stripe totals it to 348)
-      const totalCompanyMRR = isAnnual ? (trueAmount / 12) : trueAmount;
+      // 3. True MRR calculation (Base Plan MRR + Add-ons MRR)
+      const basePlanMRR = isAnnual ? (basePlanAmount / 12) : basePlanAmount;
+      const totalCompanyMRR = basePlanMRR + addonRevenueMonthly;
       
-      // To get the Base Plan amount (299), we subtract the add-ons from the total
-      const basePlanAmount = isAnnual ? trueAmount - (addonRevenueMonthly * 12) : trueAmount - addonRevenueMonthly;
-
-      // Total MRR correctly calculates the entire real revenue
+      // Add to Total MRR
       totalMRR += totalCompanyMRR;
       
-      if (planName.includes('starter') || (!planName.includes('professional') && rawAmount < 1000 && rawAmount > 0)) {
+      if (planName.includes('starter')) {
         if (isAnnual) { starterAnnual++; starterAnnualAmount += basePlanAmount; }
         else { starterMonthly++; starterMonthlyAmount += basePlanAmount; }
-      } else if (planName.includes('professional') || rawAmount >= 1000) {
+      } else if (planName.includes('professional')) {
         if (isAnnual) { proAnnual++; proAnnualAmount += basePlanAmount; }
         else { proMonthly++; proMonthlyAmount += basePlanAmount; }
       }
@@ -225,13 +224,29 @@ export default function SystemMonitor() {
         
         // If subscription was active during this month, add it to the MRR
         if (subStart <= monthEnd && subEnd >= targetMonth) {
-          const rawAmount = Number(sub.amount) || 0;
-          const isAnnual = (sub.plan || '').toLowerCase().includes('annual') || rawAmount > 1000;
-          const trueAmount = getTrueSubscriptionAmount(sub);
+          const planName = (sub.plan || '').toLowerCase();
+          const isAnnual = planName.includes('annual');
+          const basePlanAmount = getBasePlanAmount(planName);
+          const baseMRR = isAnnual ? basePlanAmount / 12 : basePlanAmount;
           
-          // trueAmount already includes add-ons
-          const totalCompanyMRR = isAnnual ? trueAmount / 12 : trueAmount;
-          totalMonthlyMRR += totalCompanyMRR;
+          let mrr = baseMRR;
+
+          // Add active Add-on revenue historically
+          const comp = companies.find((c: any) => c.user_id === sub.user_id);
+          addonUsers.forEach((u: any) => {
+             if (u.is_addon && comp && u.company_id === comp.id && u.start_date) {
+                const uStart = new Date(u.start_date);
+                const uEnd = u.end_date ? new Date(u.end_date) : new Date(8640000000000000);
+                if (uStart <= monthEnd && uEnd >= targetMonth) {
+                  const mod = u.assigned_modules?.[0] || u.assigned_module;
+                  if (mod === 'Site Personnel') mrr += 49;
+                  else if (mod === 'Accounting') mrr += 39;
+                  else if (mod === 'Purchasing') mrr += 29;
+                }
+             }
+          });
+          
+          totalMonthlyMRR += mrr;
         }
       });
       
@@ -571,22 +586,8 @@ export default function SystemMonitor() {
                       const daysUntilExpiry = comp.end_date ? Math.ceil((new Date(comp.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
                       const isExpiringSoon = daysUntilExpiry !== null && daysUntilExpiry <= 30 && daysUntilExpiry > 0;
                       
-                      const activeSub = subscriptions.find((s: any) => s.user_id === comp.user_id && (s.status === 'active' || s.status === 'trialing'));
-                      const baseDisplayAmount = activeSub ? getTrueSubscriptionAmount(activeSub) : Number(comp.amount || 0);
-
-                      let addonRevenueMonthly = 0;
-                      addonUsers.forEach((u: any) => {
-                        if (u.is_addon && u.company_id === comp.id) {
-                          const mod = u.assigned_modules?.[0] || u.assigned_module;
-                          if (mod === 'Site Personnel') addonRevenueMonthly += 49;
-                          else if (mod === 'Accounting') addonRevenueMonthly += 39;
-                          else if (mod === 'Purchasing') addonRevenueMonthly += 29;
-                        }
-                      });
-                      
-                      const isAnnual = (comp.plan || '').toLowerCase().includes('annual') || baseDisplayAmount > 1000;
-                      // baseDisplayAmount already includes addons. Subtract them to show the pure base plan amount.
-                      const basePlanDisplayAmount = isAnnual ? baseDisplayAmount - (addonRevenueMonthly * 12) : baseDisplayAmount - addonRevenueMonthly;
+                      const planName = (comp.plan || '').toLowerCase();
+                      const basePlanDisplayAmount = getBasePlanAmount(planName);
 
                       return (
                         <TableRow key={comp.id || i} className="border-border transition-colors hover:bg-muted/30">
