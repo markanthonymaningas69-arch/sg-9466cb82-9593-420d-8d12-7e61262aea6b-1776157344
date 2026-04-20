@@ -280,6 +280,7 @@ export default function SystemMonitor() {
       starterMonthly, starterAnnual, starterMonthlyAmount, starterAnnualAmount,
       proMonthly, proAnnual, proMonthlyAmount, proAnnualAmount,
       totalMRR,
+      totalAddonMRR,
       starterTotal: starterMonthly + starterAnnual,
       proTotal: proMonthly + proAnnual,
       starterTotalAmount: starterMonthlyAmount + starterAnnualAmount,
@@ -467,8 +468,13 @@ export default function SystemMonitor() {
               <Package className="h-4 w-4 text-emerald-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{totalTrueAddons}</div>
-              <p className="text-xs text-muted-foreground mt-1">Paid extra seats</p>
+              <div className="flex items-baseline gap-2">
+                <div className="text-3xl font-bold">{totalTrueAddons}</div>
+                <div className="text-sm font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                  +{formatAED(subMetrics.totalAddonMRR)}
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Paid extra seats & pending</p>
             </CardContent>
           </Card>
 
