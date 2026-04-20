@@ -148,31 +148,6 @@ export default function SystemMonitor() {
     companies.forEach((comp: any) => {
       const compSubs = subscriptions.filter((s: any) => s.user_id === comp.user_id && (s.status === 'active' || s.status === 'trialing'));
       
-      const purchased = {
-        'Site Personnel': 0,
-        'Accounting': 0,
-        'Purchasing': 0
-      };
-
-      let earliestStartDate = compSubs[0]?.start_date;
-      const latestEndDate = compSubs[0]?.end_date;
-      const subPlan = compSubs[0]?.plan;
-
-      compSubs.forEach((s: any) => {
-        if (s.features) {
-          let f: any = {};
-          try {
-            f = typeof s.features === 'string' ? JSON.parse(s.features) : s.features;
-          } catch(e) {}
-          if (f.extra_site) purchased['Site Personnel'] += Number(f.extra_site);
-          if (f.accounting) purchased['Accounting'] += Number(f.accounting);
-          if (f.purchasing) purchased['Purchasing'] += Number(f.purchasing);
-        }
-        if (s.start_date && (!earliestStartDate || new Date(s.start_date) < new Date(earliestStartDate))) {
-          earliestStartDate = s.start_date;
-        }
-      });
-
       const assignedCounts = {
         'Site Personnel': 0,
         'Accounting': 0,
@@ -188,25 +163,66 @@ export default function SystemMonitor() {
         }
       });
 
-      // Generate Unassigned "Pending" placeholders
-      Object.keys(purchased).forEach(mod => {
-        const unassCount = purchased[mod as keyof typeof purchased] - assignedCounts[mod as keyof typeof assignedCounts];
-        for (let i = 0; i < unassCount; i++) {
-          unassigned.push({
-            id: `unassigned-${comp.id}-${mod}-${i}`,
-            full_name: 'Pending Assignment',
-            email: 'Waiting for invite...',
-            company_name: comp.name,
-            company_id: comp.id,
-            is_addon: true,
-            is_unassigned: true,
-            assigned_modules: [mod],
-            assigned_module: mod,
-            start_date: earliestStartDate,
-            end_date: latestEndDate,
-            gm_plan: subPlan
-          });
+      // Collect all purchased seats from all active subscriptions
+      const purchasedSeats: any[] = [];
+
+      compSubs.forEach((s: any) => {
+        if (s.features) {
+          let f: any = {};
+          try {
+            f = typeof s.features === 'string' ? JSON.parse(s.features) : s.features;
+          } catch(e) {}
+          
+          const addSeat = (mod: string, count: number) => {
+            for (let i = 0; i < count; i++) {
+              purchasedSeats.push({
+                module: mod,
+                start_date: s.start_date,
+                end_date: s.end_date,
+                gm_plan: s.plan,
+                sub_id: s.id || Math.random().toString(36).substr(2, 9)
+              });
+            }
+          };
+
+          if (f.extra_site) addSeat('Site Personnel', Number(f.extra_site));
+          if (f.accounting) addSeat('Accounting', Number(f.accounting));
+          if (f.purchasing) addSeat('Purchasing', Number(f.purchasing));
         }
+      });
+
+      // Sort purchased seats by start_date ascending (oldest first)
+      purchasedSeats.sort((a, b) => {
+        const dateA = a.start_date ? new Date(a.start_date).getTime() : 0;
+        const dateB = b.start_date ? new Date(b.start_date).getTime() : 0;
+        return dateA - dateB;
+      });
+
+      // Consume seats using assigned counts (so assigned users conceptually map to the oldest purchases)
+      const remainingSeats = purchasedSeats.filter(seat => {
+        if (assignedCounts[seat.module as keyof typeof assignedCounts] > 0) {
+          assignedCounts[seat.module as keyof typeof assignedCounts]--;
+          return false; // seat is consumed by an assigned user
+        }
+        return true; // seat remains unassigned
+      });
+
+      // Create placeholders for remaining unassigned seats with exact purchase dates
+      remainingSeats.forEach((seat, index) => {
+        unassigned.push({
+          id: `unassigned-${comp.id}-${seat.module}-${index}-${seat.sub_id}`,
+          full_name: 'Pending Assignment',
+          email: 'Waiting for invite...',
+          company_name: comp.name,
+          company_id: comp.id,
+          is_addon: true,
+          is_unassigned: true,
+          assigned_modules: [seat.module],
+          assigned_module: seat.module,
+          start_date: seat.start_date, // This accurately reflects the actual purchase date
+          end_date: seat.end_date,
+          gm_plan: seat.gm_plan
+        });
       });
     });
 
