@@ -17,31 +17,9 @@ import { plans, addOns } from "@/config/pricing";
 
 const getTrueSubscriptionAmount = (sub: any) => {
   if (!sub) return 0;
-  const planName = (sub.plan || '').toLowerCase();
-  const rawAmount = Number(sub.amount) || 0;
-  const isAnnual = planName.includes('annual') || rawAmount > 1000;
-  
-  let basePlanId = 'trial';
-  if (planName.includes('professional') || (rawAmount >= 1000 && !planName.includes('starter'))) {
-    basePlanId = 'professional';
-  } else if (planName.includes('starter') || (rawAmount > 0 && rawAmount < 1000)) {
-    basePlanId = 'starter';
-  }
-  
-  const basePlanObj = plans.find(p => p.id === basePlanId) || plans[0];
-  const basePrice = isAnnual ? basePlanObj.annualPrice : basePlanObj.monthlyPrice;
-  
-  let addonsTotal = 0;
-  if (sub.features && typeof sub.features === 'object') {
-    Object.entries(sub.features).forEach(([id, qty]) => {
-      const addonInfo = addOns.find(a => a.id === id);
-      if (addonInfo && Number(qty) > 0) {
-        addonsTotal += (isAnnual ? addonInfo.annualPrice : addonInfo.monthlyPrice) * Number(qty);
-      }
-    });
-  }
-  
-  return basePrice + addonsTotal;
+  // Stripe already calculates the exact total (Base Plan + Add-ons)
+  // Returning the exact billed amount guarantees 100% MRR accuracy.
+  return Number(sub.amount) || 0;
 };
 
 export default function SystemMonitor() {
