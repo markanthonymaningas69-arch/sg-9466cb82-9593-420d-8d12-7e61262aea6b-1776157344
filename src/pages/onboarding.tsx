@@ -87,8 +87,7 @@ export default function Onboarding() {
       const primaryModule = invData.modules && invData.modules.length > 0 ? invData.modules[0] : invData.module;
       const allModules = invData.modules && invData.modules.length > 0 ? invData.modules : [invData.module];
 
-      // Update their profile directly with all necessary fields including company_id using upsert
-      const { error: updateError } = await supabase.from('profiles').upsert({
+      const updateData: any = {
         id: user.id,
         full_name: fullName.trim(),
         assigned_module: primaryModule,
@@ -97,7 +96,43 @@ export default function Onboarding() {
         company_id: invData.company_id,
         is_addon: invData.is_addon || false,
         updated_at: new Date().toISOString()
-      });
+      };
+
+      if (invData.is_addon) {
+        // Fetch GM's subscription to determine billing cycle length
+        const { data: gmSub } = await supabase
+          .from('subscriptions')
+          .select('start_date, end_date')
+          .eq('user_id', invData.company_id)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const now = new Date();
+        const expiryDate = new Date(now);
+
+        if (gmSub && gmSub.start_date && gmSub.end_date) {
+           const start = new Date(gmSub.start_date);
+           const end = new Date(gmSub.end_date);
+           const diffMonths = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+           
+           // If GM is on annual plan, add-on gets 1 year. Otherwise 1 month.
+           if (diffMonths >= 11) {
+              expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+           } else {
+              expiryDate.setMonth(expiryDate.getMonth() + 1);
+           }
+        } else {
+           expiryDate.setMonth(expiryDate.getMonth() + 1);
+        }
+
+        updateData.subscription_start_date = now.toISOString().split('T')[0];
+        updateData.subscription_end_date = expiryDate.toISOString().split('T')[0];
+      }
+
+      // Update their profile directly with all necessary fields including company_id using upsert
+      const { error: updateError } = await supabase.from('profiles').upsert(updateData);
 
       if (updateError) throw updateError;
 
