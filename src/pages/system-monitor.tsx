@@ -763,7 +763,7 @@ export default function SystemMonitor() {
             <CardTitle className="text-foreground">Included Independent Users</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto max-h-[400px] overflow-y-auto relative">
+            <div className="overflow-x-auto max-h-[310px] overflow-y-auto relative">
               <Table>
                 <TableHeader className="bg-muted/50 sticky top-0 z-10 shadow-sm">
                   <TableRow className="border-border hover:bg-transparent">
@@ -799,7 +799,7 @@ export default function SystemMonitor() {
             <CardTitle className="text-foreground">Add-ons Independent Users</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto max-h-[400px] overflow-y-auto relative">
+            <div className="overflow-x-auto max-h-[310px] overflow-y-auto relative">
               <Table>
                 <TableHeader className="bg-muted/50 sticky top-0 z-10 shadow-sm">
                   <TableRow className="border-border hover:bg-transparent">
