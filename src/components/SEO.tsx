@@ -11,7 +11,7 @@ interface SEOProps {
 export function SEOElements({
   title = "Thea-X Construction Accounting System",
   description = "Comprehensive construction project management and accounting system",
-  image = "/og-image.png",
+  image,
   url,
 }: SEOProps) {
   return (
@@ -41,7 +41,7 @@ export function SEOElements({
 export function SEO({
   title = "Thea-X Construction Accounting System",
   description = "Comprehensive construction project management and accounting system",
-  image = "/og-image.png",
+  image,
   url,
 }: SEOProps) {
   return (
