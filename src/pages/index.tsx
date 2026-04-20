@@ -96,8 +96,8 @@ export default function LandingPage() {
             <p className="text-xl opacity-90 mb-10">Join the platform that gives you total control over your construction projects, finances, and workforce.</p>
             <div className="flex flex-col sm:flex-row justify-center gap-4">
               <Link href="/auth/login">
-                <Button size="lg" variant="secondary" className="h-14 px-8 text-base text-primary font-bold hover:bg-white w-full sm:w-auto shadow-xl">
-                  Start Now - It's Free
+                <Button size="lg" variant="secondary" className="h-14 px-8 text-base text-primary font-bold hover:bg-white w-full sm:w-auto shadow-xl">Start Free Trial Now!
+
                 </Button>
               </Link>
             </div>
