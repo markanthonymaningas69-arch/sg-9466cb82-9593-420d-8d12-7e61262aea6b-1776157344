@@ -141,19 +141,91 @@ export default function SystemMonitor() {
   const companies = data.companies || [];
   const subscriptions = data.subscriptions || [];
 
+  const allAddonUsers = useMemo(() => {
+    const assigned = [...addonUsers];
+    const unassigned: any[] = [];
+
+    companies.forEach((comp: any) => {
+      const compSubs = subscriptions.filter((s: any) => s.user_id === comp.user_id && (s.status === 'active' || s.status === 'trialing'));
+      
+      const purchased = {
+        'Site Personnel': 0,
+        'Accounting': 0,
+        'Purchasing': 0
+      };
+
+      let earliestStartDate = compSubs[0]?.start_date;
+      const latestEndDate = compSubs[0]?.end_date;
+      const subPlan = compSubs[0]?.plan;
+
+      compSubs.forEach((s: any) => {
+        if (s.features) {
+          let f: any = {};
+          try {
+            f = typeof s.features === 'string' ? JSON.parse(s.features) : s.features;
+          } catch(e) {}
+          if (f.extra_site) purchased['Site Personnel'] += Number(f.extra_site);
+          if (f.accounting) purchased['Accounting'] += Number(f.accounting);
+          if (f.purchasing) purchased['Purchasing'] += Number(f.purchasing);
+        }
+        if (s.start_date && (!earliestStartDate || new Date(s.start_date) < new Date(earliestStartDate))) {
+          earliestStartDate = s.start_date;
+        }
+      });
+
+      const assignedCounts = {
+        'Site Personnel': 0,
+        'Accounting': 0,
+        'Purchasing': 0
+      };
+
+      assigned.forEach(u => {
+        if (u.is_addon && u.company_id === comp.id) {
+          const mod = u.assigned_modules?.[0] || u.assigned_module;
+          if (mod === 'Site Personnel') assignedCounts['Site Personnel']++;
+          else if (mod === 'Accounting') assignedCounts['Accounting']++;
+          else if (mod === 'Purchasing') assignedCounts['Purchasing']++;
+        }
+      });
+
+      // Generate Unassigned "Pending" placeholders
+      Object.keys(purchased).forEach(mod => {
+        const unassCount = purchased[mod as keyof typeof purchased] - assignedCounts[mod as keyof typeof assignedCounts];
+        for (let i = 0; i < unassCount; i++) {
+          unassigned.push({
+            id: `unassigned-${comp.id}-${mod}-${i}`,
+            full_name: 'Pending Assignment',
+            email: 'Waiting for invite...',
+            company_name: comp.name,
+            company_id: comp.id,
+            is_addon: true,
+            is_unassigned: true,
+            assigned_modules: [mod],
+            assigned_module: mod,
+            start_date: earliestStartDate,
+            end_date: latestEndDate,
+            gm_plan: subPlan
+          });
+        }
+      });
+    });
+
+    return [...assigned, ...unassigned];
+  }, [addonUsers, companies, subscriptions]);
+
   const totalGMs = companies.length;
-  const totalTrueAddons = addonUsers.filter((u: any) => !!u.is_addon).length;
+  const totalTrueAddons = allAddonUsers.filter((u: any) => !!u.is_addon).length;
   
-  const siteCount = addonUsers.filter((u: any) => u.assigned_modules?.includes('Site Personnel') || u.assigned_module?.includes('Site Personnel')).length;
-  const accCount = addonUsers.filter((u: any) => u.assigned_modules?.includes('Accounting') || u.assigned_module?.includes('Accounting')).length;
-  const purCount = addonUsers.filter((u: any) => u.assigned_modules?.includes('Purchasing') || u.assigned_module?.includes('Purchasing')).length;
+  const siteCount = allAddonUsers.filter((u: any) => u.assigned_modules?.includes('Site Personnel') || u.assigned_module?.includes('Site Personnel')).length;
+  const accCount = allAddonUsers.filter((u: any) => u.assigned_modules?.includes('Accounting') || u.assigned_module?.includes('Accounting')).length;
+  const purCount = allAddonUsers.filter((u: any) => u.assigned_modules?.includes('Purchasing') || u.assigned_module?.includes('Purchasing')).length;
 
   const subMetrics = useMemo(() => {
     let starterMonthly = 0, starterAnnual = 0;
     let proMonthly = 0, proAnnual = 0;
     let starterMonthlyAmount = 0, starterAnnualAmount = 0;
     let proMonthlyAmount = 0, proAnnualAmount = 0;
-    let totalMRR = 0;
+    let totalBaseMRR = 0;
 
     subscriptions.forEach((sub: any) => {
       if (sub.status !== 'active' && sub.status !== 'trialing') return;
@@ -161,27 +233,10 @@ export default function SystemMonitor() {
       const planName = (sub.plan || '').toLowerCase();
       const isAnnual = planName.includes('annual');
 
-      // 1. Get exact base plan amount from the plan name
       const basePlanAmount = getBasePlanAmount(planName);
-
-      // 2. Dynamically calculate revenue from all active Add-on users tied to this GM
-      let addonRevenueMonthly = 0;
-      const comp = companies.find((c: any) => c.user_id === sub.user_id);
-      addonUsers.forEach((u: any) => {
-        if (u.is_addon && comp && u.company_id === comp.id) {
-          const mod = u.assigned_modules?.[0] || u.assigned_module;
-          if (mod === 'Site Personnel') addonRevenueMonthly += 49;
-          else if (mod === 'Accounting') addonRevenueMonthly += 39;
-          else if (mod === 'Purchasing') addonRevenueMonthly += 29;
-        }
-      });
-
-      // 3. True MRR calculation (Base Plan MRR + Add-ons MRR)
       const basePlanMRR = isAnnual ? (basePlanAmount / 12) : basePlanAmount;
-      const totalCompanyMRR = basePlanMRR + addonRevenueMonthly;
       
-      // Add to Total MRR
-      totalMRR += totalCompanyMRR;
+      totalBaseMRR += basePlanMRR;
       
       if (planName.includes('starter')) {
         if (isAnnual) { starterAnnual++; starterAnnualAmount += basePlanAmount; }
@@ -192,6 +247,19 @@ export default function SystemMonitor() {
       }
     });
 
+    // Decoupled Addon MRR (Prevents double counting from multiple subscription rows)
+    let totalAddonMRR = 0;
+    allAddonUsers.forEach((u: any) => {
+      if (u.is_addon) {
+        const mod = u.assigned_modules?.[0] || u.assigned_module;
+        if (mod === 'Site Personnel') totalAddonMRR += 49;
+        else if (mod === 'Accounting') totalAddonMRR += 39;
+        else if (mod === 'Purchasing') totalAddonMRR += 29;
+      }
+    });
+
+    const totalMRR = totalBaseMRR + totalAddonMRR;
+
     return {
       starterMonthly, starterAnnual, starterMonthlyAmount, starterAnnualAmount,
       proMonthly, proAnnual, proMonthlyAmount, proAnnualAmount,
@@ -201,7 +269,7 @@ export default function SystemMonitor() {
       starterTotalAmount: starterMonthlyAmount + starterAnnualAmount,
       proTotalAmount: proMonthlyAmount + proAnnualAmount
     };
-  }, [subscriptions, addonUsers]);
+  }, [subscriptions, allAddonUsers]);
 
   const chartData = useMemo(() => {
     const result = [];
@@ -222,31 +290,28 @@ export default function SystemMonitor() {
         const subStart = new Date(sub.start_date);
         const subEnd = sub.end_date ? new Date(sub.end_date) : new Date(8640000000000000); // Far future if no end date
         
-        // If subscription was active during this month, add it to the MRR
+        // If base subscription was active during this month, add it to the MRR
         if (subStart <= monthEnd && subEnd >= targetMonth) {
           const planName = (sub.plan || '').toLowerCase();
           const isAnnual = planName.includes('annual');
           const basePlanAmount = getBasePlanAmount(planName);
           const baseMRR = isAnnual ? basePlanAmount / 12 : basePlanAmount;
           
-          let mrr = baseMRR;
+          totalMonthlyMRR += baseMRR;
+        }
+      });
 
-          // Add active Add-on revenue historically
-          const comp = companies.find((c: any) => c.user_id === sub.user_id);
-          addonUsers.forEach((u: any) => {
-             if (u.is_addon && comp && u.company_id === comp.id && u.start_date) {
-                const uStart = new Date(u.start_date);
-                const uEnd = u.end_date ? new Date(u.end_date) : new Date(8640000000000000);
-                if (uStart <= monthEnd && uEnd >= targetMonth) {
-                  const mod = u.assigned_modules?.[0] || u.assigned_module;
-                  if (mod === 'Site Personnel') mrr += 49;
-                  else if (mod === 'Accounting') mrr += 39;
-                  else if (mod === 'Purchasing') mrr += 29;
-                }
-             }
-          });
-          
-          totalMonthlyMRR += mrr;
+      // Independently add active Add-on revenue historically
+      allAddonUsers.forEach((u: any) => {
+        if (u.is_addon && u.start_date) {
+          const uStart = new Date(u.start_date);
+          const uEnd = u.end_date ? new Date(u.end_date) : new Date(8640000000000000);
+          if (uStart <= monthEnd && uEnd >= targetMonth) {
+            const mod = u.assigned_modules?.[0] || u.assigned_module;
+            if (mod === 'Site Personnel') totalMonthlyMRR += 49;
+            else if (mod === 'Accounting') totalMonthlyMRR += 39;
+            else if (mod === 'Purchasing') totalMonthlyMRR += 29;
+          }
         }
       });
       
@@ -254,7 +319,7 @@ export default function SystemMonitor() {
     }
     
     return result;
-  }, [subscriptions, addonUsers]);
+  }, [subscriptions, allAddonUsers]);
 
   const maxChartValue = Math.max(...chartData.map(d => d.value), 1000);
 
@@ -270,7 +335,7 @@ export default function SystemMonitor() {
     return true;
   });
 
-  const baseFilteredUsers = addonUsers.filter((u: any) => {
+  const baseFilteredUsers = allAddonUsers.filter((u: any) => {
     if (filterAddonAssignment !== "all") {
       const modules = u.assigned_modules || (u.assigned_module ? [u.assigned_module] : []);
       if (!modules.includes(filterAddonAssignment)) return false;
@@ -294,8 +359,12 @@ export default function SystemMonitor() {
 
     return (
       <TableRow key={u.id || i} className="border-border transition-colors hover:bg-muted/30">
-        <TableCell className="font-medium text-foreground">{u.full_name || 'Unknown'}</TableCell>
-        <TableCell className="text-muted-foreground">{u.email || '-'}</TableCell>
+        <TableCell className={`font-medium ${u.is_unassigned ? 'text-muted-foreground italic' : 'text-foreground'}`}>
+          {u.full_name || 'Unknown'}
+        </TableCell>
+        <TableCell className={u.is_unassigned ? 'text-muted-foreground/50' : 'text-muted-foreground'}>
+          {u.email || '-'}
+        </TableCell>
         <TableCell className="text-foreground font-medium">{u.company_name || '-'}</TableCell>
         <TableCell>
           <div className="flex flex-wrap gap-1">
@@ -322,7 +391,9 @@ export default function SystemMonitor() {
           {u.gm_plan ? `${u.gm_plan} (${u.gm_billing_cycle || 'monthly'})` : 'No Active Plan'}
         </TableCell>
         <TableCell className="text-right">
-          {u.is_addon ? (
+          {u.is_unassigned ? (
+            <Badge variant="outline" className="text-muted-foreground bg-muted/50 border-dashed">Unassigned</Badge>
+          ) : u.is_addon ? (
             <Button variant="outline" size="sm" className="h-8 text-xs text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-100" onClick={() => openEditAddonDates(u)}>
               <Pencil className="h-3 w-3 mr-1" /> Edit Dates
             </Button>
