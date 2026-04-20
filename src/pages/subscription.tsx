@@ -753,7 +753,7 @@ export default function Subscription() {
             <CardContent>
               <div className="max-h-[420px] overflow-y-auto pr-2">
                 <div className="space-y-4">
-                  {billingHistory.length > 0 ? billingHistory.map((bill, index) => (
+                  {billingHistory && billingHistory.length > 0 ? billingHistory.map((bill, index) => (
                     <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/30 transition-colors">
                       <div className="flex items-center gap-4">
                         <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
