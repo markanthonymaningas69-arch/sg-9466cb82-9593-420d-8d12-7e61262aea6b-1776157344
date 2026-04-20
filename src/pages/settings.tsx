@@ -696,7 +696,10 @@ export default function Settings() {
               <div className="space-y-2">
                 <Label>Select Module(s) to Assign</Label>
                 <div className="flex flex-wrap gap-2">
-                  {(isStarter ? ['Site Personnel', 'Accounting', 'Purchasing'] : ['Site Personnel', 'Accounting', 'Purchasing', 'Warehouse', 'Human Resources']).map(mod => (
+                  {(generateDialogType === 'addon' 
+                    ? (isStarter ? ['Site Personnel'] : ['Site Personnel', 'Accounting', 'Purchasing'])
+                    : (isStarter ? ['Site Personnel', 'Accounting', 'Purchasing'] : ['Site Personnel', 'Accounting', 'Purchasing', 'Warehouse', 'Human Resources'])
+                  ).map(mod => (
                     <div key={mod} className="flex items-center space-x-2 border rounded-md p-2 bg-muted/20">
                       <Checkbox 
                         id={`gen-mod-${mod}`}
