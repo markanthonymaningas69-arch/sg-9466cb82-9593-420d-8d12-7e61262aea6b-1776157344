@@ -23,6 +23,11 @@ interface AIChatAssistantProps {
     bom?: any;
     consumption?: any;
     attendance?: any;
+    accounting?: any;
+    personnel?: any;
+    warehouse?: any;
+    purchases?: any;
+    allProjects?: any;
   };
 }
 
