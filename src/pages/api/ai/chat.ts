@@ -49,7 +49,7 @@ export default async function handler(
         "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "gpt-4",
+        model: "gpt-4o-mini",
         messages,
         temperature: 0.7,
         max_tokens: 1000
