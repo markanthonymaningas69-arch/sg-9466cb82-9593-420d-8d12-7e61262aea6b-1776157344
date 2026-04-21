@@ -504,9 +504,9 @@ export default function Purchasing() {
               </DialogContent>
             </Dialog>
 
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <Dialog open={dialogOpen} onOpenChange={handleOpenChange}>
               <DialogTrigger asChild>
-                <Button onClick={resetForm} disabled={isLocked} className="w-full sm:w-auto">
+                <Button disabled={isLocked} className="w-full sm:w-auto">
                   <Plus className="h-4 w-4 mr-2" />
                   New Purchase
                 </Button>
