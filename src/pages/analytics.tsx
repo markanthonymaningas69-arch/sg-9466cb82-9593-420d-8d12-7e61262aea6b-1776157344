@@ -66,9 +66,9 @@ export default function Analytics() {
         purchasesResponse,
         allProjectsData
       ] = await Promise.all([
-        accountingService.getAll(),
-        personnelService.getAll(),
-        warehouseService.getAll(),
+        supabase.from('vouchers').select('*').limit(100),
+        supabase.from('personnel').select('*').limit(100),
+        supabase.from('warehouse_inventory').select('*').limit(100),
         supabase.from('purchases').select('*').order('order_date', { ascending: false }).limit(100),
         projectService.getAll()
       ]);
