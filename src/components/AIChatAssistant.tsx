@@ -116,7 +116,7 @@ export function AIChatAssistant({ projectData }: AIChatAssistantProps) {
         className="fixed bottom-6 right-6 h-14 px-6 shadow-lg hover:shadow-xl transition-all duration-200 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
       >
         <MessageSquare className="h-5 w-5 mr-2" />
-        Ask AI Assistant
+        Ask AI About Your Data
       </Button>
     );
   }
@@ -147,14 +147,16 @@ export function AIChatAssistant({ projectData }: AIChatAssistantProps) {
         {messages.length === 0 ? (
           <div className="text-center text-muted-foreground py-8 space-y-3">
             <Bot className="h-12 w-12 mx-auto opacity-50" />
-            <p className="text-sm">Ask me anything about your project data!</p>
+            <p className="text-sm">Ask me anything about your construction management data!</p>
             <div className="text-xs space-y-1 text-left bg-muted/50 p-3 rounded-lg">
               <p className="font-medium">Try asking:</p>
               <ul className="list-disc list-inside space-y-1">
                 <li>What's the overall project completion?</li>
-                <li>Which scope has cost overruns?</li>
-                <li>Show me material usage trends</li>
-                <li>What are the OCM materials?</li>
+                <li>Which projects have cost overruns?</li>
+                <li>Show me low stock warehouse items</li>
+                <li>What's my total monthly personnel cost?</li>
+                <li>Analyze pending accounting vouchers</li>
+                <li>Compare actual vs allocated spending</li>
               </ul>
             </div>
           </div>
@@ -216,7 +218,7 @@ export function AIChatAssistant({ projectData }: AIChatAssistantProps) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Ask about your project..."
+            placeholder="Ask about projects, accounting, personnel, warehouse..."
             disabled={isLoading}
             className="flex-1"
           />

@@ -10,6 +10,9 @@ import { useSettings } from "@/contexts/SettingsProvider";
 import { projectService } from "@/services/projectService";
 import { bomService } from "@/services/bomService";
 import { siteService } from "@/services/siteService";
+import { accountingService } from "@/services/accountingService";
+import { personnelService } from "@/services/personnelService";
+import { warehouseService } from "@/services/warehouseService";
 import { ClipboardList, Package, DollarSign, AlertCircle, TrendingUp, BarChart3 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type { Database } from "@/integrations/supabase/types";
@@ -24,18 +27,22 @@ export default function Analytics() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>("");
 
-  // Data states
+  // Analytics data states
   const [bom, setBom] = useState<any>(null);
   const [consumption, setConsumption] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<any[]>([]);
   const [deliveries, setDeliveries] = useState<any[]>([]);
   const [progressUpdates, setProgressUpdates] = useState<any[]>([]);
 
+  // All modules data for AI
+  const [allModulesData, setAllModulesData] = useState<any>({});
+
   // Filters
   const [usageScopeFilter, setUsageScopeFilter] = useState<string>("all");
 
   useEffect(() => {
     loadProjects();
+    loadAllModulesData();
   }, []);
 
   useEffect(() => {
@@ -49,6 +56,34 @@ export default function Analytics() {
       setProgressUpdates([]);
     }
   }, [selectedProject]);
+
+  const loadAllModulesData = async () => {
+    try {
+      const [
+        accountingData,
+        personnelData,
+        warehouseData,
+        purchasesResponse,
+        allProjectsData
+      ] = await Promise.all([
+        accountingService.getAll(),
+        personnelService.getAll(),
+        warehouseService.getAll(),
+        supabase.from('purchases').select('*').order('order_date', { ascending: false }).limit(100),
+        projectService.getAll()
+      ]);
+
+      setAllModulesData({
+        accounting: accountingData.data || [],
+        personnel: personnelData.data || [],
+        warehouse: warehouseData.data || [],
+        purchases: purchasesResponse.data || [],
+        allProjects: allProjectsData.data || []
+      });
+    } catch (error) {
+      console.error("Error loading all modules data:", error);
+    }
+  };
 
   const loadProjects = async () => {
     setLoading(true);
@@ -849,25 +884,30 @@ export default function Analytics() {
 
           </Tabs>
         )}
-
-        {/* AI Chat Assistant - Only show when project is selected and not loading */}
-        {selectedProject && !loading && (
-          <AIChatAssistant
-            projectData={{
-              projectId: selectedProject,
-              projectName: projects.find(p => p.id === selectedProject)?.name || "Project",
-              swaData,
-              materialUsageData,
-              scopeSpendingData,
-              ocmData,
-              visualAnalyticsData,
-              bom,
-              consumption,
-              attendance
-            }}
-          />
-        )}
       </div>
+
+      {/* AI Chat Assistant - Below analytics tabs, analyzes ALL modules data */}
+      <AIChatAssistant
+        projectData={{
+          // Current project analytics
+          projectId: selectedProject,
+          projectName: projects.find(p => p.id === selectedProject)?.name || "All Projects",
+          swaData,
+          materialUsageData,
+          scopeSpendingData,
+          ocmData,
+          visualAnalyticsData,
+          bom,
+          consumption,
+          attendance,
+          // All modules data
+          accounting: allModulesData.accounting,
+          personnel: allModulesData.personnel,
+          warehouse: allModulesData.warehouse,
+          purchases: allModulesData.purchases,
+          allProjects: allModulesData.allProjects
+        }}
+      />
     </Layout>
   );
 }
