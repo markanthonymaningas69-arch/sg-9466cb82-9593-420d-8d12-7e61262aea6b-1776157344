@@ -1,6 +1,6 @@
 ---
 title: AI Assistant Chat for Analytics
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [ai, analytics, openai]
