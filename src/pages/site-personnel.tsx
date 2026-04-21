@@ -918,29 +918,24 @@ export default function SitePersonnel() {
   return (
     <Layout>
       <div className="flex flex-col h-[calc(100vh-120px)] space-y-4 overflow-hidden">
-        <div className="flex justify-between items-center shrink-0">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Site Personnel</h1>
-            <p className="text-muted-foreground">Daily site operations, attendance, deliveries & progress tracking</p>
+            <h1 className="text-2xl sm:text-3xl font-heading font-bold">Site Personnel & Activities</h1>
+            <p className="text-muted-foreground mt-1">Track attendance, progress, and material usage</p>
           </div>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-1 shrink-0">
-          <div>
-            <Label htmlFor="project">Select Project</Label>
-            <Select value={selectedProject} onValueChange={setSelectedProject} disabled={assignedProjectIds.length === 1}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choose a project" />
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Select value={selectedProject} onValueChange={setSelectedProject}>
+              <SelectTrigger className="w-full sm:w-[280px]">
+                <SelectValue placeholder="Select a project" />
               </SelectTrigger>
               <SelectContent>
-                {projects.filter(p => assignedProjectIds.length === 0 || assignedProjectIds.includes(p.id)).map((project) => (
+                {projects.map((project) => (
                   <SelectItem key={project.id} value={project.id}>
                     {project.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {assignedProjectIds.length > 0 && <p className="text-xs text-muted-foreground mt-1">Your account is restricted to {assignedProjectIds.length} assigned project(s).</p>}
           </div>
         </div>
 

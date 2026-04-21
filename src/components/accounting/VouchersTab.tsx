@@ -323,86 +323,85 @@ export function VouchersTab() {
           </DialogContent>
         </Dialog>
       </CardHeader>
-      <CardContent>
-        <div className="flex justify-end mb-4 shrink-0">
-          <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="h-9">
-            <Filter className="h-4 w-4 mr-2" />
-            {showFilters ? "Hide Filters" : "Filters"}
-            {(filterType !== "all" || filterStatus !== "all" || filterProject !== "all") && (
-              <span className="ml-2 flex h-2 w-2 rounded-full bg-primary shadow-[0_0_4px_rgba(var(--primary),0.5)]"></span>
-            )}
-          </Button>
-        </div>
-
-        {showFilters && (
-          <div className="bg-muted/30 p-3 mb-4 border rounded-lg flex flex-wrap gap-4 shrink-0">
-            <div className="space-y-1">
-              <Label className="text-xs">Type</Label>
-              <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger className="w-[150px] h-8 text-xs bg-background"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="payment">Payment</SelectItem>
-                  <SelectItem value="receipt">Receipt</SelectItem>
-                  <SelectItem value="journal">Journal</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Status</Label>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-[150px] h-8 text-xs bg-background"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="approved">Approved</SelectItem>
-                  <SelectItem value="issued">Issued</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Project/Allocation</Label>
-              <Select value={filterProject} onValueChange={setFilterProject}>
-                <SelectTrigger className="w-[180px] h-8 text-xs bg-background"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Allocations</SelectItem>
-                  <SelectItem value="office" className="font-bold text-primary">🏢 Office / Overhead</SelectItem>
-                  {projects.map(p => <SelectItem key={p.id} value={p.id}>🏗️ {p.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            {(filterType !== "all" || filterStatus !== "all" || filterProject !== "all") && (
-              <div className="space-y-1 flex items-end pb-0.5">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-8 text-muted-foreground"
-                  onClick={() => {
-                    setFilterType("all");
-                    setFilterStatus("all");
-                    setFilterProject("all");
-                  }}
-                >
-                  <FilterX className="h-4 w-4 mr-2" />
-                  Clear
-                </Button>
-              </div>
-            )}
+      <CardContent className="p-0 sm:p-6">
+        <div className="overflow-x-auto">
+          <div className="flex justify-end mb-4 shrink-0">
+            <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="h-9">
+              <Filter className="h-4 w-4 mr-2" />
+              {showFilters ? "Hide Filters" : "Filters"}
+              {(filterType !== "all" || filterStatus !== "all" || filterProject !== "all") && (
+                <span className="ml-2 flex h-2 w-2 rounded-full bg-primary shadow-[0_0_4px_rgba(var(--primary),0.5)]"></span>
+              )}
+            </Button>
           </div>
-        )}
 
-        <div className="border rounded-md">
+          {showFilters && (
+            <div className="bg-muted/30 p-3 mb-4 border rounded-lg flex flex-wrap gap-4 shrink-0">
+              <div className="space-y-1">
+                <Label className="text-xs">Type</Label>
+                <Select value={filterType} onValueChange={setFilterType}>
+                  <SelectTrigger className="w-[150px] h-8 text-xs bg-background"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="payment">Payment</SelectItem>
+                    <SelectItem value="receipt">Receipt</SelectItem>
+                    <SelectItem value="journal">Journal</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Status</Label>
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <SelectTrigger className="w-[150px] h-8 text-xs bg-background"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="approved">Approved</SelectItem>
+                    <SelectItem value="issued">Issued</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Project/Allocation</Label>
+                <Select value={filterProject} onValueChange={setFilterProject}>
+                  <SelectTrigger className="w-[180px] h-8 text-xs bg-background"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Allocations</SelectItem>
+                    <SelectItem value="office" className="font-bold text-primary">🏢 Office / Overhead</SelectItem>
+                    {projects.map(p => <SelectItem key={p.id} value={p.id}>🏗️ {p.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              {(filterType !== "all" || filterStatus !== "all" || filterProject !== "all") && (
+                <div className="space-y-1 flex items-end pb-0.5">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-8 text-muted-foreground"
+                    onClick={() => {
+                      setFilterType("all");
+                      setFilterStatus("all");
+                      setFilterProject("all");
+                    }}
+                  >
+                    <FilterX className="h-4 w-4 mr-2" />
+                    Clear
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
           <Table>
-            <TableHeader className="bg-muted/50">
+            <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Voucher No.</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Payee / Details</TableHead>
-                <TableHead>Allocation</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="text-right w-24">Actions</TableHead>
+                <TableHead className="min-w-[100px]">Date</TableHead>
+                <TableHead className="min-w-[120px]">Voucher #</TableHead>
+                <TableHead className="min-w-[150px]">Payee</TableHead>
+                <TableHead className="min-w-[150px]">Description</TableHead>
+                <TableHead className="text-right min-w-[100px]">Amount</TableHead>
+                <TableHead className="min-w-[100px]">Status</TableHead>
+                <TableHead className="text-right min-w-[150px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

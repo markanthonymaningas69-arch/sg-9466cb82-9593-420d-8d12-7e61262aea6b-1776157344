@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { accountingService } from "@/services/accountingService";
 import { useSettings } from "@/contexts/SettingsProvider";
-import { TrendingUp, TrendingDown, Landmark, Receipt, AlertCircle, Maximize2 } from "lucide-react";
+import { TrendingUp, TrendingDown, Landmark, Receipt, AlertCircle, Maximize2, FileText, Clock, DollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -160,7 +160,7 @@ export function AccountingDashboard({ onTabChange }: { onTabChange?: (tab: strin
         </Alert>
       )}
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Assets/Expenses (Debits)</CardTitle>

@@ -10,10 +10,11 @@ import { TaxReportTab } from "@/components/accounting/TaxReportTab";
 import { RequestsViewTab } from "@/components/accounting/RequestsViewTab";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Landmark, FileSpreadsheet, Users, Receipt, CircleDollarSign, FileText, FileSearch } from "lucide-react";
+import { Landmark, FileSpreadsheet, Users, Receipt, CircleDollarSign, FileText, FileSearch, Archive } from "lucide-react";
 import { useSettings } from "@/contexts/SettingsProvider";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
 
 export default function Accounting() {
   const { currentPlan } = useSettings();
@@ -24,6 +25,7 @@ export default function Accounting() {
   const [pendingReqIds, setPendingReqIds] = useState("");
   const [seenVoucherIds, setSeenVoucherIds] = useState<string>(() => typeof window !== 'undefined' ? localStorage.getItem('seenVoucherIds') || "" : "");
   const [seenReqIds, setSeenReqIds] = useState<string>(() => typeof window !== 'undefined' ? localStorage.getItem('seenReqIds') || "" : "");
+  const [archiveOpen, setArchiveOpen] = useState(false);
 
   useEffect(() => {
     loadCounts();
@@ -80,10 +82,16 @@ export default function Accounting() {
 
   return (
     <Layout>
-      <div className="space-y-6 h-full flex flex-col">
-        <div>
-          <h1 className="text-3xl font-heading font-bold">Accounting</h1>
-          <p className="text-muted-foreground mt-1">Manage corporate finances, liquidations, payroll, and UAE taxes</p>
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-heading font-bold">Accounting</h1>
+            <p className="text-muted-foreground mt-1">Financial management and reporting</p>
+          </div>
+          <Button variant="outline" onClick={() => setArchiveOpen(true)} className="border-orange-200 text-orange-700 hover:bg-orange-50 w-full sm:w-auto">
+            <Archive className="mr-2 h-4 w-4" />
+            Archived Files
+          </Button>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">

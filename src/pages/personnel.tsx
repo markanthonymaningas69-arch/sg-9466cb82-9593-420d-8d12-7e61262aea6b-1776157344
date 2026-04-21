@@ -325,8 +325,8 @@ export default function Personnel() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-heading font-bold">Human Resources</h1>
-            <p className="text-muted-foreground mt-1">Manage personnel, attendance, and payroll</p>
+            <h1 className="text-2xl sm:text-3xl font-heading font-bold">Personnel Management</h1>
+            <p className="text-muted-foreground mt-1">Manage construction workforce</p>
           </div>
           
           <div className="bg-muted p-1 rounded-lg flex">
@@ -397,7 +397,7 @@ export default function Personnel() {
             <div className="flex justify-end">
               <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button onClick={resetForm} disabled={isLocked}>
+                  <Button onClick={resetForm} disabled={isLocked} className="w-full sm:w-auto">
                     <Plus className="h-4 w-4 mr-2" />
                     Add Personnel
                   </Button>

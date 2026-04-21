@@ -408,10 +408,10 @@ export default function Purchasing() {
   return (
     <Layout>
       <div className="space-y-6 flex flex-col h-full">
-        <div className="flex justify-between items-center shrink-0">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-heading font-bold">Purchasing</h1>
-            <p className="text-muted-foreground mt-1">Manage purchase orders and direct deliveries to warehouses</p>
+            <h1 className="text-2xl sm:text-3xl font-heading font-bold">Purchasing</h1>
+            <p className="text-muted-foreground mt-1">Procurement and purchase orders</p>
           </div>
           <div className="flex items-center gap-2">
             <DropdownMenu>
@@ -504,11 +504,11 @@ export default function Purchasing() {
               </DialogContent>
             </Dialog>
 
-            <Dialog open={dialogOpen} onOpenChange={handleOpenChange}>
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
-                <Button disabled={isLocked}>
+                <Button onClick={resetForm} disabled={isLocked} className="w-full sm:w-auto">
                   <Plus className="h-4 w-4 mr-2" />
-                  New Purchase Order
+                  New Purchase
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
