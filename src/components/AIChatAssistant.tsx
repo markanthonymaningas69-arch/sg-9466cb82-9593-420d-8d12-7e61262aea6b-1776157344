@@ -118,16 +118,17 @@ export function AIChatAssistant({ projectData }: AIChatAssistantProps) {
       <Button
         onClick={() => setIsOpen(true)}
         size="lg"
-        className="fixed bottom-6 right-6 h-14 px-6 shadow-lg hover:shadow-xl transition-all duration-200 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 h-12 sm:h-14 px-4 sm:px-6 shadow-lg hover:shadow-xl transition-all duration-200 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 z-50 text-sm sm:text-base"
       >
-        <MessageSquare className="h-5 w-5 mr-2" />
-        Ask AI About Your Data
+        <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+        <span className="hidden sm:inline">Ask AI About Your Data</span>
+        <span className="sm:hidden">AI Assistant</span>
       </Button>
     );
   }
 
   return (
-    <Card className="fixed bottom-6 right-6 w-[440px] h-[600px] shadow-2xl flex flex-col z-50 border-2">
+    <Card className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 w-[calc(100vw-2rem)] sm:w-[450px] h-[500px] sm:h-[600px] shadow-2xl z-50 flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-t-lg">
         <div className="flex items-center gap-2">

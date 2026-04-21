@@ -323,19 +323,19 @@ export default function Projects() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-3xl font-heading font-bold">Projects</h1>
             <p className="text-muted-foreground mt-1">Manage construction projects</p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setIsCatalogOpen(true)}>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Button variant="outline" onClick={() => setIsCatalogOpen(true)} className="w-full sm:w-auto">
               <Database className="h-4 w-4 mr-2" />
               Master Catalog Engine
             </Button>
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
-                <Button onClick={resetForm} disabled={isLocked}>
+                <Button onClick={resetForm} disabled={isLocked} className="w-full sm:w-auto">
                   <Plus className="h-4 w-4 mr-2" />
                   New Project
                 </Button>
@@ -433,55 +433,57 @@ export default function Projects() {
           <CardHeader>
             <CardTitle>All Projects</CardTitle>
           </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Project Name</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Client</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Contract Amount</TableHead>
-                  <TableHead>Plan Start</TableHead>
-                  <TableHead>Plan Finish</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {projects.map((project) => (
-                  <TableRow key={project.id}>
-                    <TableCell className="font-medium">{project.name}</TableCell>
-                    <TableCell>{project.location || "-"}</TableCell>
-                    <TableCell>{project.client || "-"}</TableCell>
-                    <TableCell>
-                      <Badge className={statusColors[project.status] || "bg-gray-100 text-gray-800"}>
-                        {project.status.replace("_", " ")}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-medium">{formatCurrency(project.budget || 0)}</TableCell>
-                    <TableCell>{project.start_date || "-"}</TableCell>
-                    <TableCell>{project.end_date || "-"}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2 items-center">
-                        <Button 
-                          size="sm" 
-                          className="bg-green-600 hover:bg-green-700 text-white h-8" 
-                          onClick={() => handleBOM(project.id)}
-                        >
-                          <FileText className="h-3.5 w-3.5 mr-1" /> Add/Edit BOM
-                        </Button>
-                        <Button size="icon" variant="outline" className="h-8 w-8 text-amber-600 border-amber-200 hover:bg-amber-50" onClick={() => handleEdit(project)} disabled={isLocked}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button size="icon" variant="outline" className="h-8 w-8 text-orange-600 border-orange-200 hover:bg-orange-50" onClick={() => handleDelete(project.id)} title="Archive" disabled={isLocked}>
-                          <Archive className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </TableCell>
+          <CardContent className="p-0 sm:p-6">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[150px]">Project Name</TableHead>
+                    <TableHead className="min-w-[120px]">Location</TableHead>
+                    <TableHead className="min-w-[120px]">Client</TableHead>
+                    <TableHead className="min-w-[100px]">Status</TableHead>
+                    <TableHead className="text-right min-w-[120px]">Contract Amount</TableHead>
+                    <TableHead className="min-w-[100px]">Plan Start</TableHead>
+                    <TableHead className="min-w-[100px]">Plan Finish</TableHead>
+                    <TableHead className="text-right min-w-[200px]">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {projects.map((project) => (
+                    <TableRow key={project.id}>
+                      <TableCell className="font-medium">{project.name}</TableCell>
+                      <TableCell>{project.location || "-"}</TableCell>
+                      <TableCell>{project.client || "-"}</TableCell>
+                      <TableCell>
+                        <Badge className={statusColors[project.status] || "bg-gray-100 text-gray-800"}>
+                          {project.status.replace("_", " ")}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-medium">{formatCurrency(project.budget || 0)}</TableCell>
+                      <TableCell>{project.start_date || "-"}</TableCell>
+                      <TableCell>{project.end_date || "-"}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex flex-col sm:flex-row justify-end gap-2 items-stretch sm:items-center">
+                          <Button 
+                            size="sm" 
+                            className="bg-green-600 hover:bg-green-700 text-white h-8 w-full sm:w-auto whitespace-nowrap" 
+                            onClick={() => handleBOM(project.id)}
+                          >
+                            <FileText className="h-3.5 w-3.5 sm:mr-1" /> <span className="sm:inline">Add/Edit BOM</span>
+                          </Button>
+                          <Button size="icon" variant="outline" className="h-8 w-8 text-amber-600 border-amber-200 hover:bg-amber-50" onClick={() => handleEdit(project)} disabled={isLocked}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="icon" variant="outline" className="h-8 w-8 text-orange-600 border-orange-200 hover:bg-orange-50" onClick={() => handleDelete(project.id)} title="Archive" disabled={isLocked}>
+                            <Archive className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       </div>

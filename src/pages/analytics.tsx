@@ -514,7 +514,7 @@ export default function Analytics() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-heading font-bold">Project Analytics</h1>
+            <h1 className="text-2xl sm:text-3xl font-heading font-bold">Project Analytics</h1>
             <p className="text-muted-foreground mt-1">Detailed reporting and accomplishment metrics</p>
           </div>
           <div className="w-full sm:w-72">
@@ -573,10 +573,10 @@ export default function Analytics() {
             {/* 1. SWA */}
             <TabsContent value="swa">
               <Card>
-                <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-4">
+                <CardHeader className="flex flex-col sm:flex-row items-start justify-between space-y-2 sm:space-y-0 pb-4">
                   <div className="space-y-1">
-                    <CardTitle>Statement of Work Accomplishment</CardTitle>
-                    <CardDescription>Weighted progress and financial completion status per scope and indirect costs.</CardDescription>
+                    <CardTitle className="text-lg sm:text-xl">Statement of Work Accomplishment</CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">Weighted progress and financial completion status per scope and indirect costs.</CardDescription>
                   </div>
                   {latestPersonnelDate && (
                     <Badge variant="outline" className="ml-auto text-xs font-normal bg-muted/50 whitespace-nowrap">
@@ -584,52 +584,54 @@ export default function Analytics() {
                     </Badge>
                   )}
                 </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Description</TableHead>
-                        <TableHead className="text-right">Total Cost</TableHead>
-                        <TableHead className="text-right">Wt. %</TableHead>
-                        <TableHead className="text-right">Completed %</TableHead>
-                        <TableHead className="text-right">Accomplishment</TableHead>
-                        <TableHead className="text-right">Amount of Completion</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {swaData.rows.length === 0 ? (
+                <CardContent className="p-0 sm:p-6">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                            No scopes or indirect costs defined in BOM.
-                          </TableCell>
+                          <TableHead className="min-w-[150px]">Description</TableHead>
+                          <TableHead className="text-right min-w-[120px]">Total Cost</TableHead>
+                          <TableHead className="text-right min-w-[80px]">Wt. %</TableHead>
+                          <TableHead className="text-right min-w-[100px]">Completed %</TableHead>
+                          <TableHead className="text-right min-w-[120px]">Accomplishment</TableHead>
+                          <TableHead className="text-right min-w-[150px]">Amount of Completion</TableHead>
                         </TableRow>
-                      ) : (
-                        <>
-                          {swaData.rows.map((row: any) => (
-                            <TableRow key={row.id}>
-                              <TableCell className="font-medium">
-                                {row.name}
-                                {row.type === "indirect" && <Badge variant="outline" className="ml-2 text-[10px] h-5">Indirect Cost</Badge>}
-                              </TableCell>
-                              <TableCell className="text-right">{formatCurrency(row.cost)}</TableCell>
-                              <TableCell className="text-right">{row.wtPercentage.toFixed(2)}%</TableCell>
-                              <TableCell className="text-right">{row.completion.toFixed(2)}%</TableCell>
-                              <TableCell className="text-right font-bold text-primary">{row.accomplishment.toFixed(2)}%</TableCell>
-                              <TableCell className="text-right font-bold text-primary">{formatCurrency(row.amountOfCompletion)}</TableCell>
-                            </TableRow>
-                          ))}
-                          <TableRow className="bg-muted/50 font-bold hover:bg-muted/50">
-                            <TableCell>GRAND TOTAL</TableCell>
-                            <TableCell className="text-right text-primary">{formatCurrency(swaData.totals.cost)}</TableCell>
-                            <TableCell className="text-right text-primary">{swaData.totals.wtPercentage.toFixed(2)}%</TableCell>
-                            <TableCell className="text-right">-</TableCell>
-                            <TableCell className="text-right text-primary">{swaData.totals.accomplishment.toFixed(2)}%</TableCell>
-                            <TableCell className="text-right text-primary">{formatCurrency(swaData.totals.amountOfCompletion)}</TableCell>
+                      </TableHeader>
+                      <TableBody>
+                        {swaData.rows.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                              No scopes or indirect costs defined in BOM.
+                            </TableCell>
                           </TableRow>
-                        </>
-                      )}
-                    </TableBody>
-                  </Table>
+                        ) : (
+                          <>
+                            {swaData.rows.map((row: any) => (
+                              <TableRow key={row.id}>
+                                <TableCell className="font-medium">
+                                  {row.name}
+                                  {row.type === "indirect" && <Badge variant="outline" className="ml-2 text-[10px] h-5">Indirect Cost</Badge>}
+                                </TableCell>
+                                <TableCell className="text-right">{formatCurrency(row.cost)}</TableCell>
+                                <TableCell className="text-right">{row.wtPercentage.toFixed(2)}%</TableCell>
+                                <TableCell className="text-right">{row.completion.toFixed(2)}%</TableCell>
+                                <TableCell className="text-right font-bold text-primary">{row.accomplishment.toFixed(2)}%</TableCell>
+                                <TableCell className="text-right font-bold text-primary">{formatCurrency(row.amountOfCompletion)}</TableCell>
+                              </TableRow>
+                            ))}
+                            <TableRow className="bg-muted/50 font-bold hover:bg-muted/50">
+                              <TableCell>GRAND TOTAL</TableCell>
+                              <TableCell className="text-right text-primary">{formatCurrency(swaData.totals.cost)}</TableCell>
+                              <TableCell className="text-right text-primary">{swaData.totals.wtPercentage.toFixed(2)}%</TableCell>
+                              <TableCell className="text-right">-</TableCell>
+                              <TableCell className="text-right text-primary">{swaData.totals.accomplishment.toFixed(2)}%</TableCell>
+                              <TableCell className="text-right text-primary">{formatCurrency(swaData.totals.amountOfCompletion)}</TableCell>
+                            </TableRow>
+                          </>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -637,13 +639,13 @@ export default function Analytics() {
             {/* 2. Material Usage vs Allocated */}
             <TabsContent value="materials">
               <Card>
-                <CardHeader className="flex flex-row items-start justify-between space-y-0">
+                <CardHeader className="flex flex-col sm:flex-row items-start justify-between space-y-2 sm:space-y-0">
                   <div>
-                    <CardTitle>Material Usage vs Allocated</CardTitle>
-                    <CardDescription>Compare planned material quantities against actual site consumption.</CardDescription>
+                    <CardTitle className="text-lg sm:text-xl">Material Usage vs Allocated</CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">Compare planned material quantities against actual site consumption.</CardDescription>
                   </div>
                   <Select value={usageScopeFilter} onValueChange={setUsageScopeFilter}>
-                    <SelectTrigger className="w-[200px]">
+                    <SelectTrigger className="w-full sm:w-[200px]">
                       <SelectValue placeholder="Filter by Scope" />
                     </SelectTrigger>
                     <SelectContent>
@@ -655,39 +657,41 @@ export default function Analytics() {
                     </SelectContent>
                   </Select>
                 </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Scope</TableHead>
-                        <TableHead>Material</TableHead>
-                        <TableHead className="text-right">Allocated Qty</TableHead>
-                        <TableHead className="text-right">Actual Qty</TableHead>
-                        <TableHead className="text-right">Variance</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {materialUsageData.length === 0 ? (
+                <CardContent className="p-0 sm:p-6">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                            No materials found for the selected criteria.
-                          </TableCell>
+                          <TableHead className="min-w-[120px]">Scope</TableHead>
+                          <TableHead className="min-w-[150px]">Material</TableHead>
+                          <TableHead className="text-right min-w-[100px]">Allocated Qty</TableHead>
+                          <TableHead className="text-right min-w-[100px]">Actual Qty</TableHead>
+                          <TableHead className="text-right min-w-[100px]">Variance</TableHead>
                         </TableRow>
-                      ) : (
-                        materialUsageData.map((row: any, idx: number) => (
-                          <TableRow key={idx}>
-                            <TableCell className="text-sm text-muted-foreground">{row.scopeName}</TableCell>
-                            <TableCell className="font-medium">{row.materialName}</TableCell>
-                            <TableCell className="text-right">{row.allocated} {row.unit}</TableCell>
-                            <TableCell className="text-right">{row.actual} {row.unit}</TableCell>
-                            <TableCell className={`text-right font-medium ${row.variance < 0 ? 'text-destructive' : row.variance > 0 ? 'text-success' : ''}`}>
-                              {row.variance > 0 ? '+' : ''}{row.variance} {row.unit}
+                      </TableHeader>
+                      <TableBody>
+                        {materialUsageData.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                              No materials found for the selected criteria.
                             </TableCell>
                           </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
+                        ) : (
+                          materialUsageData.map((row: any, idx: number) => (
+                            <TableRow key={idx}>
+                              <TableCell className="text-sm text-muted-foreground">{row.scopeName}</TableCell>
+                              <TableCell className="font-medium">{row.materialName}</TableCell>
+                              <TableCell className="text-right">{row.allocated} {row.unit}</TableCell>
+                              <TableCell className="text-right">{row.actual} {row.unit}</TableCell>
+                              <TableCell className={`text-right font-medium ${row.variance < 0 ? 'text-destructive' : row.variance > 0 ? 'text-success' : ''}`}>
+                                {row.variance > 0 ? '+' : ''}{row.variance} {row.unit}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -696,50 +700,52 @@ export default function Analytics() {
             <TabsContent value="spent">
               <Card>
                 <CardHeader>
-                  <CardTitle>Spent vs Allocated per Scope</CardTitle>
-                  <CardDescription>Financial breakdown of materials and labor allocated vs actuals.</CardDescription>
+                  <CardTitle className="text-lg sm:text-xl">Spent vs Allocated per Scope</CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">Financial breakdown of materials and labor allocated vs actuals.</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Scope</TableHead>
-                        <TableHead className="text-right">Allocated Materials</TableHead>
-                        <TableHead className="text-right">Allocated Labor</TableHead>
-                        <TableHead className="text-right border-r">Total Allocated</TableHead>
-                        <TableHead className="text-right bg-muted/30">Actual Materials</TableHead>
-                        <TableHead className="text-right bg-muted/30">Actual Labor</TableHead>
-                        <TableHead className="text-right bg-muted/30">Total Actual</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {scopeSpendingData.length === 0 ? (
+                <CardContent className="p-0 sm:p-6">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                            No scope data available.
-                          </TableCell>
+                          <TableHead className="min-w-[150px]">Scope</TableHead>
+                          <TableHead className="text-right min-w-[120px]">Allocated Materials</TableHead>
+                          <TableHead className="text-right min-w-[120px]">Allocated Labor</TableHead>
+                          <TableHead className="text-right border-r min-w-[120px]">Total Allocated</TableHead>
+                          <TableHead className="text-right bg-muted/30 min-w-[120px]">Actual Materials</TableHead>
+                          <TableHead className="text-right bg-muted/30 min-w-[120px]">Actual Labor</TableHead>
+                          <TableHead className="text-right bg-muted/30 min-w-[120px]">Total Actual</TableHead>
                         </TableRow>
-                      ) : (
-                        scopeSpendingData.map((row: any, idx: number) => (
-                          <TableRow key={idx}>
-                            <TableCell className="font-medium">{row.scopeName}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(row.allocatedMatCost)}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(row.allocatedLabCost)}</TableCell>
-                            <TableCell className="text-right font-bold text-primary border-r">{formatCurrency(row.totalAllocated)}</TableCell>
-                            <TableCell className={`text-right bg-muted/10 font-medium ${row.actualMatCost > row.allocatedMatCost ? 'text-destructive' : ''}`}>
-                              {formatCurrency(row.actualMatCost)}
-                            </TableCell>
-                            <TableCell className={`text-right bg-muted/10 font-medium ${row.actualLabCost > row.allocatedLabCost ? 'text-destructive' : ''}`}>
-                              {formatCurrency(row.actualLabCost)}
-                            </TableCell>
-                            <TableCell className={`text-right bg-muted/10 font-bold ${row.totalActual > row.totalAllocated ? 'text-destructive' : 'text-primary'}`}>
-                              {formatCurrency(row.totalActual)}
+                      </TableHeader>
+                      <TableBody>
+                        {scopeSpendingData.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                              No scope data available.
                             </TableCell>
                           </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
+                        ) : (
+                          scopeSpendingData.map((row: any, idx: number) => (
+                            <TableRow key={idx}>
+                              <TableCell className="font-medium">{row.scopeName}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(row.allocatedMatCost)}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(row.allocatedLabCost)}</TableCell>
+                              <TableCell className="text-right font-bold text-primary border-r">{formatCurrency(row.totalAllocated)}</TableCell>
+                              <TableCell className={`text-right bg-muted/10 font-medium ${row.actualMatCost > row.allocatedMatCost ? 'text-destructive' : ''}`}>
+                                {formatCurrency(row.actualMatCost)}
+                              </TableCell>
+                              <TableCell className={`text-right bg-muted/10 font-medium ${row.actualLabCost > row.allocatedLabCost ? 'text-destructive' : ''}`}>
+                                {formatCurrency(row.actualLabCost)}
+                              </TableCell>
+                              <TableCell className={`text-right bg-muted/10 font-bold ${row.totalActual > row.totalAllocated ? 'text-destructive' : 'text-primary'}`}>
+                                {formatCurrency(row.totalActual)}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -748,45 +754,47 @@ export default function Analytics() {
             <TabsContent value="ocm">
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+                  <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
                     <AlertCircle className="h-5 w-5 text-warning" />
                     Overhead & Contingency Materials (OCM)
                   </CardTitle>
-                  <CardDescription>Materials consumed on site that were not included in the original BOM for their respective scopes.</CardDescription>
+                  <CardDescription className="text-xs sm:text-sm">Materials consumed on site that were not included in the original BOM for their respective scopes.</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date Used</TableHead>
-                        <TableHead>Scope</TableHead>
-                        <TableHead>Material</TableHead>
-                        <TableHead className="text-right">Qty Used</TableHead>
-                        <TableHead className="text-right">Total Cost</TableHead>
-                        <TableHead>Remarks</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {ocmData.length === 0 ? (
+                <CardContent className="p-0 sm:p-6">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                            No OCM materials detected. All usage matches BOM.
-                          </TableCell>
+                          <TableHead className="min-w-[100px]">Date Used</TableHead>
+                          <TableHead className="min-w-[120px]">Scope</TableHead>
+                          <TableHead className="min-w-[150px]">Material</TableHead>
+                          <TableHead className="text-right min-w-[100px]">Qty Used</TableHead>
+                          <TableHead className="text-right min-w-[100px]">Total Cost</TableHead>
+                          <TableHead className="min-w-[120px]">Remarks</TableHead>
                         </TableRow>
-                      ) : (
-                        ocmData.map((row: any, idx: number) => (
-                          <TableRow key={idx}>
-                            <TableCell>{new Date(row.date).toLocaleDateString()}</TableCell>
-                            <TableCell className="text-sm text-muted-foreground">{row.scopeName}</TableCell>
-                            <TableCell className="font-medium">{row.materialName}</TableCell>
-                            <TableCell className="text-right font-bold text-warning">{row.quantity} {row.unit}</TableCell>
-                            <TableCell className="text-right font-medium">{formatCurrency(row.cost)}</TableCell>
-                            <TableCell className="text-sm italic">{row.remarks || "-"}</TableCell>
+                      </TableHeader>
+                      <TableBody>
+                        {ocmData.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                              No OCM materials detected. All usage matches BOM.
+                            </TableCell>
                           </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
+                        ) : (
+                          ocmData.map((row: any, idx: number) => (
+                            <TableRow key={idx}>
+                              <TableCell>{new Date(row.date).toLocaleDateString()}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">{row.scopeName}</TableCell>
+                              <TableCell className="font-medium">{row.materialName}</TableCell>
+                              <TableCell className="text-right font-bold text-warning">{row.quantity} {row.unit}</TableCell>
+                              <TableCell className="text-right font-medium">{formatCurrency(row.cost)}</TableCell>
+                              <TableCell className="text-sm italic">{row.remarks || "-"}</TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -797,11 +805,11 @@ export default function Analytics() {
                 {/* Cost Burn Rate */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
+                    <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
                       <TrendingUp className="h-5 w-5 text-primary" />
                       Cumulative Cost Burn Rate
                     </CardTitle>
-                    <CardDescription>Track how project costs accumulate over time</CardDescription>
+                    <CardDescription className="text-xs sm:text-sm">Track how project costs accumulate over time</CardDescription>
                   </CardHeader>
                   <CardContent>
                     {visualAnalyticsData.length === 0 ? (
@@ -812,10 +820,10 @@ export default function Analytics() {
                       <ResponsiveContainer width="100%" height={300}>
                         <LineChart data={visualAnalyticsData}>
                           <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="date" />
-                          <YAxis />
+                          <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                          <YAxis tick={{ fontSize: 10 }} />
                           <Tooltip formatter={(value: any) => formatCurrency(Number(value))} />
-                          <Legend />
+                          <Legend wrapperStyle={{ fontSize: '12px' }} />
                           <Line type="monotone" dataKey="cumulativeCost" stroke="#8884d8" strokeWidth={2} name="Cumulative Cost" />
                         </LineChart>
                       </ResponsiveContainer>
@@ -826,11 +834,11 @@ export default function Analytics() {
                 {/* Daily Material Consumption */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
+                    <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
                       <Package className="h-5 w-5 text-primary" />
                       Daily Material Consumption Cost
                     </CardTitle>
-                    <CardDescription>Material costs consumed each day</CardDescription>
+                    <CardDescription className="text-xs sm:text-sm">Material costs consumed each day</CardDescription>
                   </CardHeader>
                   <CardContent>
                     {visualAnalyticsData.length === 0 ? (
@@ -841,10 +849,10 @@ export default function Analytics() {
                       <ResponsiveContainer width="100%" height={300}>
                         <BarChart data={visualAnalyticsData}>
                           <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="date" />
-                          <YAxis />
+                          <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                          <YAxis tick={{ fontSize: 10 }} />
                           <Tooltip formatter={(value: any) => formatCurrency(Number(value))} />
-                          <Legend />
+                          <Legend wrapperStyle={{ fontSize: '12px' }} />
                           <Bar dataKey="materialCost" fill="#82ca9d" name="Material Cost" />
                         </BarChart>
                       </ResponsiveContainer>
@@ -855,11 +863,11 @@ export default function Analytics() {
                 {/* Overall Progress Chart */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
+                    <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
                       <BarChart3 className="h-5 w-5 text-primary" />
                       Overall Project Progress
                     </CardTitle>
-                    <CardDescription>Track overall completion percentage over time based on scope updates</CardDescription>
+                    <CardDescription className="text-xs sm:text-sm">Track overall completion percentage over time based on scope updates</CardDescription>
                   </CardHeader>
                   <CardContent>
                     {progressChartData.length === 0 ? (
@@ -870,8 +878,8 @@ export default function Analytics() {
                       <ResponsiveContainer width="100%" height={300}>
                         <LineChart data={progressChartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                          <XAxis dataKey="date" />
-                          <YAxis domain={[0, 100]} tickFormatter={(val) => `${val}%`} />
+                          <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                          <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} tickFormatter={(val) => `${val}%`} />
                           <Tooltip formatter={(value: any) => [`${value}%`, 'Overall Completion']} />
                           <Line type="monotone" dataKey="completion" stroke="#22c55e" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
                         </LineChart>

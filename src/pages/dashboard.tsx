@@ -245,7 +245,7 @@ export default function Dashboard() {
               <Building2 className="h-4 w-4 text-blue-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(summary.totalValue)}</div>
+              <div className="text-xl sm:text-2xl font-bold">{formatCurrency(summary.totalValue)}</div>
               <p className="text-xs text-muted-foreground mt-1">Total Active Contract Amounts</p>
             </CardContent>
           </Card>
@@ -256,7 +256,7 @@ export default function Dashboard() {
               <Wallet className="h-4 w-4 text-orange-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(summary.totalCost)}</div>
+              <div className="text-xl sm:text-2xl font-bold">{formatCurrency(summary.totalCost)}</div>
               <p className="text-xs text-muted-foreground mt-1">Accumulated Project Expenses</p>
             </CardContent>
           </Card>
@@ -267,7 +267,7 @@ export default function Dashboard() {
               <TrendingUp className={`h-4 w-4 ${summary.avgMargin >= 0 ? 'text-green-600' : 'text-red-600'}`} />
             </CardHeader>
             <CardContent>
-              <div className={`text-2xl font-bold ${summary.avgMargin >= 0 ? 'text-success' : 'text-destructive'}`}>
+              <div className={`text-xl sm:text-2xl font-bold ${summary.avgMargin >= 0 ? 'text-success' : 'text-destructive'}`}>
                 {summary.avgMargin.toFixed(2)}%
               </div>
               <p className="text-xs text-muted-foreground mt-1">Portfolio Average Margin</p>
@@ -280,7 +280,7 @@ export default function Dashboard() {
               <Activity className="h-4 w-4 text-purple-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-primary">{summary.avgCompletion.toFixed(2)}%</div>
+              <div className="text-xl sm:text-2xl font-bold text-primary">{summary.avgCompletion.toFixed(2)}%</div>
               <Progress value={summary.avgCompletion} className="h-2 mt-2" />
             </CardContent>
           </Card>
@@ -290,18 +290,18 @@ export default function Dashboard() {
           <CardHeader>
             <CardTitle>Project Portfolio Status</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto border rounded-md">
+          <CardContent className="p-0 sm:p-6">
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader className="bg-muted/50">
                   <TableRow>
-                    <TableHead>Project</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Contract Amount</TableHead>
-                    <TableHead className="text-right">Cost to Date</TableHead>
-                    <TableHead className="text-right">Profit Margin</TableHead>
-                    <TableHead className="w-48 text-right">Accomplishment</TableHead>
-                    <TableHead className="w-24 text-right">Action</TableHead>
+                    <TableHead className="min-w-[150px]">Project</TableHead>
+                    <TableHead className="min-w-[100px]">Status</TableHead>
+                    <TableHead className="text-right min-w-[120px]">Contract Amount</TableHead>
+                    <TableHead className="text-right min-w-[120px]">Cost to Date</TableHead>
+                    <TableHead className="text-right min-w-[100px]">Profit Margin</TableHead>
+                    <TableHead className="w-48 text-right min-w-[150px]">Accomplishment</TableHead>
+                    <TableHead className="w-24 text-right min-w-[100px]">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -341,8 +341,8 @@ export default function Dashboard() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button size="sm" variant="outline" className="h-8" onClick={() => openProjectDetails(project)}>
-                            <Eye className="h-3 w-3 mr-1" /> View
+                          <Button size="sm" variant="outline" className="h-8 w-full sm:w-auto" onClick={() => openProjectDetails(project)}>
+                            <Eye className="h-3 w-3 sm:mr-1" /> <span className="hidden sm:inline">View</span>
                           </Button>
                         </TableCell>
                       </TableRow>
