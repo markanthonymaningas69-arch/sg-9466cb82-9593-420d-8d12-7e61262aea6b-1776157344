@@ -36,6 +36,27 @@ type IndirectCost = Database["public"]["Tables"]["bom_indirect_costs"]["Row"];
 
 type LaborCalculationMethod = "percentage" | "unit_cost";
 
+const MATERIAL_UNIT_OPTIONS = [
+  "Bag",
+  "Bd.ft",
+  "Box",
+  "Cu.m",
+  "Gal",
+  "Kg",
+  "L",
+  "Length",
+  "Lin.m",
+  "Lot",
+  "M",
+  "Pail",
+  "Pair",
+  "Pc",
+  "Roll",
+  "Set",
+  "Sq.m",
+  "Unit"
+] as const;
+
 // Scope cards use default neutral background (no custom colors).
 
 export default function BillOfMaterials() {
@@ -1257,7 +1278,13 @@ export default function BillOfMaterials() {
                                       <div className="flex flex-col gap-1">
                                         <Select
                                           value={materialForm.unit_selection}
-                                          onValueChange={(v) => setMaterialForm({ ...materialForm, unit: v === "Other" ? "" : v, unit_selection: v })}
+                                          onValueChange={(value) =>
+                                            setMaterialForm({
+                                              ...materialForm,
+                                              unit: value === "Other" ? "" : value,
+                                              unit_selection: value
+                                            })
+                                          }
                                         >
                                           <SelectTrigger className="h-6 w-20 text-xs">
                                             <SelectValue placeholder="Unit" />
