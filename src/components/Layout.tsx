@@ -39,6 +39,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useSettings } from "@/contexts/SettingsProvider";
 import { AlertCircle, Lock } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AIChatAssistant } from "@/components/AIChatAssistant";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -1217,6 +1218,9 @@ export function Layout({ children }: LayoutProps) {
           {children}
         </main>
       </div>
+
+      {/* Global AI Chat Assistant */}
+      <AIChatAssistant />
     </div>);
 
 }

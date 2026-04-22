@@ -17,7 +17,6 @@ import { ClipboardList, Package, DollarSign, AlertCircle, TrendingUp, BarChart3 
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type { Database } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
-import { AIChatAssistant } from "@/components/AIChatAssistant";
 
 type Project = Database["public"]["Tables"]["projects"]["Row"];
 
@@ -899,30 +898,6 @@ export default function Analytics() {
           </Tabs>
         )}
 
-        {/* AI Chat Assistant - Below analytics tabs, analyzes ALL modules data */}
-        <AIChatAssistant
-          projectData={{
-            // Current project analytics
-            projectId: selectedProject,
-            projectName: projects.find(p => p.id === selectedProject)?.name || "All Projects",
-            swaData,
-            materialUsageData,
-            scopeSpendingData,
-            ocmData,
-            visualAnalyticsData,
-            bom,
-            consumption,
-            attendance,
-            // All modules data
-            accounting: allModulesData.accounting,
-            ledger: allModulesData.ledger,
-            liquidations: allModulesData.liquidations,
-            personnel: allModulesData.personnel,
-            warehouse: allModulesData.warehouse,
-            purchases: allModulesData.purchases,
-            allProjects: allModulesData.allProjects
-          }}
-        />
       </div>
     </Layout>
   );
