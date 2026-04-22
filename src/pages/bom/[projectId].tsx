@@ -1096,19 +1096,19 @@ export default function BillOfMaterials() {
                         {editingScopeId === scope.id ? (
                           <>
                             <Input value={editingScopeName} onChange={(e) => setEditingScopeName(e.target.value)} placeholder="Scope name" className="h-7 max-w-xs" />
-                            <Input type="number" value={editingScopeQuantity} onChange={(e) => setEditingScopeQuantity(e.target.value)} placeholder="Qty" className="h-7 w-16" />
+                            <Input type="number" value={editingScopeQuantity} onChange={(e) => setEditingScopeQuantity(e.target.value)} placeholder="Qty" className="w-16" />
                             <Select value={editingScopeUnitSelection} onValueChange={(val) => { setEditingScopeUnitSelection(val); if (val !== "Other") setEditingScopeUnit(val); else setEditingScopeUnit(""); }}>
-                              <SelectTrigger className="h-7 w-24 text-xs">
+                              <SelectTrigger className="w-24">
                                 <SelectValue placeholder="Unit" />
                               </SelectTrigger>
                               <SelectContent>
                                 {["Cu.m", "Sq.m", "Lin.m", "Kg", "Other"].map((u) => (
-                                  <SelectItem key={u} value={u} className="text-xs">{u === "Other" ? "Others/Input" : u}</SelectItem>
+                                  <SelectItem key={u} value={u}>{u === "Other" ? "Others/Input" : u}</SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
                             {editingScopeUnitSelection === "Other" && (
-                              <Input placeholder="Unit" value={editingScopeUnit} onChange={(e) => setEditingScopeUnit(e.target.value)} className="h-7 w-20 text-xs" />
+                              <Input placeholder="Unit" value={editingScopeUnit} onChange={(e) => setEditingScopeUnit(e.target.value)} className="w-20" />
                             )}
                             <Button
                               size="sm"
@@ -1216,21 +1216,13 @@ export default function BillOfMaterials() {
                           </TableCell>
                           <TableCell className="py-0.5 text-sm">{material.unit}</TableCell>
                           <TableCell className="text-right py-0.5 text-sm">
-                            {(() => {
-                        const total =
-                        material.total_cost as number ??
-                        (material.quantity || 0) * (
-                        material.unit_cost as number || 0);
-                        return formatCurrency(total);
-                      })()}
+                            {formatCurrency(material.unit_cost as number || 0)}
                           </TableCell>
                           <TableCell className="text-right font-semibold py-0.5 text-sm">
-                            {(() => {
-                        const quantity = parseFloat(materialForm.quantity.replace(/,/g, "") || "0");
-                        const unitCost = parseFloat(materialForm.unit_cost.replace(/,/g, "") || "0");
-                        const amount = quantity * unitCost;
-                        return formatCurrency(amount);
-                      })()}
+                            {formatCurrency(
+                              (material.total_cost as number) ??
+                              ((material.quantity as number || 0) * (material.unit_cost as number || 0))
+                            )}
                           </TableCell>
                           <TableCell className="text-right py-0.5">
                             <div className="flex justify-end items-center gap-1">
@@ -1645,11 +1637,11 @@ export default function BillOfMaterials() {
                 <CardContent className="space-y-1.5">
                   <Table>
                     <TableHeader>
-                      <TableRow className="h-7">
-                        <TableHead className="h-7 py-0.5 w-32">Type</TableHead>
-                        <TableHead className="text-right h-7 py-0.5 w-32">Value</TableHead>
-                        <TableHead className="text-right h-7 py-0.5 w-32">Amount</TableHead>
-                        <TableHead className="text-right h-7 py-0.5 w-24"></TableHead>
+                      <TableRow className="h-7 text-xs hover:bg-transparent border-b">
+                        <TableHead className="h-6 py-0.5 text-[10px]">Type</TableHead>
+                        <TableHead className="text-right h-6 py-0.5 text-[10px]">Value</TableHead>
+                        <TableHead className="text-right h-6 py-0.5 text-[10px]">Amount</TableHead>
+                        <TableHead className="text-right h-6 py-0.5 w-24"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
