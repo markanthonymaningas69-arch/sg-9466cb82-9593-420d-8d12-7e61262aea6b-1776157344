@@ -53,7 +53,7 @@ export const scheduleService = {
   },
 
   async generateTasksFromBOM(projectId: string) {
-    // 1. Get BOM scopes for the project
+    // 1. Get BOM scopes for the project (latest one, regardless of status)
     const { data: bomData, error: bomError } = await supabase
       .from("bill_of_materials")
       .select(`
@@ -61,13 +61,17 @@ export const scheduleService = {
         bom_scope_of_work (id, name, description)
       `)
       .eq("project_id", projectId)
-      .eq("status", "approved")
       .order("created_at", { ascending: false })
       .limit(1);
 
     if (bomError) throw bomError;
-    if (!bomData || bomData.length === 0 || !bomData[0].bom_scope_of_work) {
-      throw new Error("No approved BOM found for this project.");
+    
+    if (!bomData || bomData.length === 0) {
+      throw new Error("No Bill of Materials found for this project. Please create a BOM first.");
+    }
+    
+    if (!bomData[0].bom_scope_of_work || bomData[0].bom_scope_of_work.length === 0) {
+      throw new Error("The Bill of Materials has no Scopes of Work defined. Please add scopes to the BOM first.");
     }
 
     const scopes = bomData[0].bom_scope_of_work;
@@ -102,7 +106,9 @@ export const scheduleService = {
         };
       });
 
-    if (newTasks.length === 0) return [];
+    if (newTasks.length === 0) {
+      throw new Error("All BOM scopes have already been generated into tasks.");
+    }
 
     const { data, error } = await supabase
       .from("project_tasks")
