@@ -438,16 +438,24 @@ export default function SitePersonnel() {
 
   const handleProgressSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await siteService.createProgressUpdate({
-      bom_scope_id: progressForm.bom_scope_id,
-      percentage_completed: parseFloat(progressForm.percentage.toString()),
-      update_date: progressForm.update_date,
-      updated_by: "Site App",
-      notes: progressForm.notes
-    });
-    setUpdateProgressDialogOpen(false);
-    setProgressForm(prev => ({ ...prev, percentage: 0, notes: "" }));
-    loadScopes();
+    try {
+      const { error } = await siteService.createProgressUpdate({
+        bom_scope_id: progressForm.bom_scope_id,
+        percentage_completed: parseFloat(progressForm.percentage.toString()),
+        update_date: progressForm.update_date,
+        updated_by: "Site App",
+        notes: progressForm.notes
+      });
+      
+      if (error) throw error;
+
+      setUpdateProgressDialogOpen(false);
+      setProgressForm(prev => ({ ...prev, percentage: 0, notes: "" }));
+      loadScopes();
+      toast({ title: "Success", description: "Progress updated successfully." });
+    } catch (err: any) {
+      toast({ title: "Error updating progress", description: err.message || "An unexpected error occurred.", variant: "destructive" });
+    }
   };
 
   const syncScopePercentage = async (scopeId: string) => {
@@ -924,7 +932,18 @@ export default function SitePersonnel() {
             <p className="text-muted-foreground mt-1">Track attendance, progress, and material usage</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <Select value={selectedProject} onValueChange={setSelectedProject}>
+            <Select value={selectedProject} onValueChange={(val) => {
+              // Explicitly clear state so UI instantly reflects the change
+              setProjectPersonnelList([]);
+              setAttendanceList([]);
+              setDeliveries([]);
+              setConsumptions([]);
+              setRequests([]);
+              setCashAdvances([]);
+              setScopes([]);
+              setProgressUpdates([]);
+              setSelectedProject(val);
+            }}>
               <SelectTrigger className="w-full sm:w-[280px]">
                 <SelectValue placeholder="Select a project" />
               </SelectTrigger>
