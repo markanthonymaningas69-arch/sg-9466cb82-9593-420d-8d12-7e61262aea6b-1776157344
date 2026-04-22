@@ -583,8 +583,6 @@ export default function BillOfMaterials() {
       ];
       const unit = selectedMaster.unit || "";
       const isKnown = knownUnits.includes(unit);
-      const existsInMaster = masterItems.some(m => m.name.toLowerCase() === (material.description || material.material_name).toLowerCase());
-      const existsInScope = scopes.some(s => s.name.toLowerCase() === materialName.toLowerCase());
 
       setMaterialForm({
         name: selectedMaster.name,
@@ -1122,7 +1120,7 @@ export default function BillOfMaterials() {
                                 placeholder="Unit"
                                 value={editingScopeUnit}
                                 onChange={(e) => setEditingScopeUnit(e.target.value)}
-                                className="h-7 w-24"
+                                className="h-7 w-20"
                               />
                             )}
                           </div>
@@ -1363,8 +1361,8 @@ export default function BillOfMaterials() {
                               )}
 
                               {selectedScopeId === scope.id && !editingMaterial && (
-                                <TableRow className="h-7 bg-muted/20 border-y border-primary/20">
-                                  <TableCell className="py-1">
+                                <TableRow className="h-7 bg-muted/20">
+                                  <TableCell className="py-0.5">
                                     <div className="flex flex-col gap-1">
                                       <Select value={materialForm.name} onValueChange={(val) => handleMaterialChange(val)}>
                                         <SelectTrigger className="h-6 text-xs">
@@ -1389,7 +1387,7 @@ export default function BillOfMaterials() {
                                       )}
                                     </div>
                                   </TableCell>
-                                  <TableCell className="py-1 text-right">
+                                  <TableCell className="py-0.5 text-right">
                                     <Input
                                       placeholder="Qty"
                                       value={materialForm.quantity}
@@ -1397,7 +1395,7 @@ export default function BillOfMaterials() {
                                       className="h-6 text-xs text-right"
                                     />
                                   </TableCell>
-                                  <TableCell className="py-1">
+                                  <TableCell className="py-0.5">
                                     <div className="flex flex-col gap-1">
                                       <Select
                                         value={materialForm.unit_selection}
@@ -1430,7 +1428,7 @@ export default function BillOfMaterials() {
                                       )}
                                     </div>
                                   </TableCell>
-                                  <TableCell className="py-1 text-right">
+                                  <TableCell className="py-0.5 text-right">
                                     <Input
                                       placeholder="Cost"
                                       value={materialForm.unit_cost}
@@ -1438,10 +1436,10 @@ export default function BillOfMaterials() {
                                       className="h-6 text-xs text-right"
                                     />
                                   </TableCell>
-                                  <TableCell className="py-1 text-right font-semibold text-sm">
+                                  <TableCell className="py-0.5 text-right font-semibold text-sm">
                                     {formatCurrency((parseFloat(materialForm.quantity.replace(/,/g, "")) || 0) * (parseFloat(materialForm.unit_cost.replace(/,/g, "")) || 0))}
                                   </TableCell>
-                                  <TableCell className="py-1 text-right">
+                                  <TableCell className="py-0.5">
                                     <div className="flex justify-end items-center gap-1">
                                       <Button
                                         size="sm"
@@ -1459,6 +1457,7 @@ export default function BillOfMaterials() {
                                           resetMaterialForm();
                                           setSelectedScopeId("");
                                         }}
+                                        disabled={isLocked}
                                       >
                                         Cancel
                                       </Button>
