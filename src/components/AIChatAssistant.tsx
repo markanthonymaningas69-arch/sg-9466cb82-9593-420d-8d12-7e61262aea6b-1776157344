@@ -24,6 +24,8 @@ interface AIChatAssistantProps {
     consumption?: any;
     attendance?: any;
     accounting?: any;
+    ledger?: any;
+    liquidations?: any;
     personnel?: any;
     warehouse?: any;
     purchases?: any;
