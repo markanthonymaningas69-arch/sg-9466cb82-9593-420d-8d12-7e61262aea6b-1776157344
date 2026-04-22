@@ -277,7 +277,8 @@ export const bomService = {
         const matCategory = mat.category || "Construction Materials";
         const matUnit = mat.unit || "Lot";
         const matQty = Number(mat.quantity) || 1;
-        const matCost = Number(mat.unit_cost) || 0;
+        // Bulletproof cost capturing regardless of AI's property name choices
+        const matCost = Number(mat.unit_cost) || Number(mat.price) || Number(mat.cost) || Number(mat.unit_price) || 0;
 
         let masterId = null;
         const match = existingMasters.find(m => m.name.toLowerCase() === matName.toLowerCase());
@@ -308,7 +309,8 @@ export const bomService = {
           }
         }
 
-        // Only include exact columns present in database
+        // Strictly format the payload to ONLY include schema-verified columns.
+        // We explicitly omit 'total_cost' so the database auto-calculates it natively.
         generatedMaterialsData.push({
           scope_id: scopeId,
           material_name: matName,
