@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -1316,6 +1316,94 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_tasks: {
+        Row: {
+          assigned_team: string | null
+          bom_scope_id: string | null
+          constraint_type: string | null
+          created_at: string | null
+          created_by: string | null
+          dependencies: Json | null
+          description: string | null
+          duration_days: number | null
+          end_date: string
+          id: string
+          name: string
+          parent_id: string | null
+          priority: string | null
+          progress: number | null
+          project_id: string | null
+          sort_order: number | null
+          start_date: string
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_team?: string | null
+          bom_scope_id?: string | null
+          constraint_type?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          dependencies?: Json | null
+          description?: string | null
+          duration_days?: number | null
+          end_date: string
+          id?: string
+          name: string
+          parent_id?: string | null
+          priority?: string | null
+          progress?: number | null
+          project_id?: string | null
+          sort_order?: number | null
+          start_date: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_team?: string | null
+          bom_scope_id?: string | null
+          constraint_type?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          dependencies?: Json | null
+          description?: string | null
+          duration_days?: number | null
+          end_date?: string
+          id?: string
+          name?: string
+          parent_id?: string | null
+          priority?: string | null
+          progress?: number | null
+          project_id?: string | null
+          sort_order?: number | null
+          start_date?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_tasks_bom_scope_id_fkey"
+            columns: ["bom_scope_id"]
+            isOneToOne: false
+            referencedRelation: "bom_scope_of_work"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_tasks_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "project_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
