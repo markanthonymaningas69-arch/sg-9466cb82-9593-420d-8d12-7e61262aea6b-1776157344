@@ -1,6 +1,6 @@
 ---
 title: Create AI BOM Material Generation API
-status: todo
+status: done
 priority: high
 type: feature
 tags: [ai, backend, bom]

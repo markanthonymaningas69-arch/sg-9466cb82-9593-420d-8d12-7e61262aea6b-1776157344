@@ -243,6 +243,10 @@ export const bomService = {
   // AI Generation
   async generateMaterialsWithAI(scopeId: string, scopeName: string, quantity: number, unit: string, description: string) {
     try {
+      // Get the company ID for RLS requirements
+      const { data: profile } = await supabase.from('profiles').select('company_id').single();
+      const companyId = profile?.company_id;
+
       // 1. Call AI Endpoint
       const response = await fetch('/api/ai/generate-bom', {
         method: 'POST',
@@ -286,7 +290,8 @@ export const bomService = {
             category: mat.category || "Construction Materials",
             unit: mat.unit || "Other",
             default_cost: mat.unit_cost || 0,
-            associated_scopes: [scopeName]
+            associated_scopes: [scopeName],
+            company_id: companyId
           }).select().single();
           
           if (newMaster) {
@@ -303,7 +308,8 @@ export const bomService = {
           quantity: mat.quantity,
           unit: mat.unit,
           unit_cost: mat.unit_cost,
-          total_cost: (mat.quantity * mat.unit_cost)
+          total_cost: (mat.quantity * mat.unit_cost),
+          company_id: companyId
         });
       }
 

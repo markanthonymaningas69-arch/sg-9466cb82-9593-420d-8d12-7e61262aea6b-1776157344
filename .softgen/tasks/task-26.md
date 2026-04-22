@@ -1,6 +1,6 @@
 ---
 title: Add AI Generator UI to BOM
-status: todo
+status: done
 priority: high
 type: feature
 tags: [bom, ui]

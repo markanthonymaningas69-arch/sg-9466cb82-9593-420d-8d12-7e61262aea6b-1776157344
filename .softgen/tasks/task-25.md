@@ -1,6 +1,6 @@
 ---
 title: Update BOM Service for AI Material Processing
-status: todo
+status: done
 priority: high
 type: feature
 tags: [bom, service, data]
