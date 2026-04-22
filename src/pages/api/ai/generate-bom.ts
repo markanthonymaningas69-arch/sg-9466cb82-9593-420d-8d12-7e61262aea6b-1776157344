@@ -32,14 +32,13 @@ export default async function handler(
               "materials": [
                 {
                   "name": "Material Name",
-                  "unit": "kg|m3|pcs|lot",
-                  "quantity": 100,
-                  "unit_cost": 50,
-                  "category": "Category Name"
+                  "unit": "Valid Unit",
+                  "quantity": 100
                 }
               ]
             }
-            WARNING: "quantity" and "unit_cost" MUST be pure numbers (e.g. 50, not "50" or "$50").
+            WARNING: "quantity" MUST be a pure number. Do NOT include unit costs or prices.
+            CRITICAL: The "unit" MUST be chosen EXACTLY from this list: Bag, Bd.ft, Box, Cu.m, Gal, Kg, Length, Lin.m, Liter, Lot, M, Pail, Pair, Pc, Roll, Set, Sq.m, Unit.
             Do not include any markdown wrappers. Just return raw JSON.
             If the prompt lacks details, make standard expert assumptions based on the scope name and quantity.`;
 

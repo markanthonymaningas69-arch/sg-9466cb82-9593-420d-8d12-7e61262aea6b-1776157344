@@ -1325,7 +1325,7 @@ export default function BillOfMaterials() {
                                   <TableCell className="py-1 font-medium">{mat.name || mat.material_name}</TableCell>
                                   <TableCell className="py-1 text-right">{mat.quantity}</TableCell>
                                   <TableCell className="py-1">{mat.unit}</TableCell>
-                                  <TableCell className="py-1 text-right">{formatCurrency(mat.unit_cost)}</TableCell>
+                                  <TableCell className="py-1 text-right">{formatCurrency(Number(mat.unit_cost) || Number(mat.price) || Number(mat.cost) || Number(mat.unit_price) || 0)}</TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>
@@ -1537,7 +1537,7 @@ export default function BillOfMaterials() {
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    className="h-6 px-2 text-xs"
+                                    className="h-6 w-6 text-xs"
                                     onClick={() => {
                                       setActiveLaborScopeId(null);
                                       resetLaborForm();
