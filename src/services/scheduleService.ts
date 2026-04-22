@@ -53,13 +53,10 @@ export const scheduleService = {
   },
 
   async generateTasksFromBOM(projectId: string) {
-    // 1. Get BOM scopes for the project (latest one, regardless of status)
+    // 1. Get the latest BOM for the project (regardless of status)
     const { data: bomData, error: bomError } = await supabase
       .from("bill_of_materials")
-      .select(`
-        id,
-        bom_scope_of_work (id, name, description)
-      `)
+      .select("id")
       .eq("project_id", projectId)
       .order("created_at", { ascending: false })
       .limit(1);
@@ -70,13 +67,22 @@ export const scheduleService = {
       throw new Error("No Bill of Materials found for this project. Please create a BOM first.");
     }
     
-    if (!bomData[0].bom_scope_of_work || bomData[0].bom_scope_of_work.length === 0) {
-      throw new Error("The Bill of Materials has no Scopes of Work defined. Please add scopes to the BOM first.");
-    }
+    const bomId = bomData[0].id;
 
-    const scopes = bomData[0].bom_scope_of_work;
+    // 2. Get all Scopes of Work for this specific BOM
+    const { data: scopes, error: scopesError } = await supabase
+      .from("bom_scope_of_work")
+      .select("id, name, description")
+      .eq("bom_id", bomId)
+      .order("order_number", { ascending: true });
+
+    if (scopesError) throw scopesError;
+
+    if (!scopes || scopes.length === 0) {
+      throw new Error("The latest Bill of Materials has no Scopes of Work defined. Please add scopes to the BOM first.");
+    }
     
-    // 2. Check existing tasks to avoid duplicates
+    // 3. Check existing tasks to avoid duplicates
     const { data: existingTasks } = await supabase
       .from("project_tasks")
       .select("bom_scope_id")
@@ -84,7 +90,7 @@ export const scheduleService = {
       
     const existingScopeIds = new Set(existingTasks?.map(t => t.bom_scope_id).filter(Boolean));
     
-    // 3. Create new tasks for scopes that don't have one
+    // 4. Create new tasks for scopes that don't have one
     const newTasks = scopes
       .filter((s: any) => !existingScopeIds.has(s.id))
       .map((s: any, index: number) => {
