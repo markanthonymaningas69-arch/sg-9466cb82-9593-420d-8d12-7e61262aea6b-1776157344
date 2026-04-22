@@ -315,7 +315,6 @@ export const bomService = {
           quantity: matQty,
           unit: matUnit,
           unit_cost: matCost,
-          total_cost: matQty * matCost,
           ...(companyId ? { company_id: companyId } : {})
         });
       }
