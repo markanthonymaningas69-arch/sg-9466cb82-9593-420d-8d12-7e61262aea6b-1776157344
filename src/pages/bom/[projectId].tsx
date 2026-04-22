@@ -1315,9 +1315,9 @@ export default function BillOfMaterials() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {aiPreviewMaterials[scope.id as string].map((mat: any, idx: number) => (
+                              {Array.isArray(aiPreviewMaterials[scope.id as string]) && aiPreviewMaterials[scope.id as string].map((mat: any, idx: number) => (
                                 <TableRow key={idx} className="h-6 text-xs">
-                                  <TableCell className="py-1 font-medium">{mat.name}</TableCell>
+                                  <TableCell className="py-1 font-medium">{mat.name || mat.material_name}</TableCell>
                                   <TableCell className="py-1 text-right">{mat.quantity}</TableCell>
                                   <TableCell className="py-1">{mat.unit}</TableCell>
                                   <TableCell className="py-1 text-right">{formatCurrency(mat.unit_cost)}</TableCell>

@@ -254,7 +254,22 @@ export const bomService = {
         throw new Error(error.error || 'Failed to generate materials');
       }
 
-      const { materials } = await response.json();
+      const data = await response.json();
+      let materials = data.materials || data.items || data;
+      
+      if (typeof materials === 'string') {
+        try { materials = JSON.parse(materials); } catch (e) {}
+      }
+      
+      if (!Array.isArray(materials)) {
+        if (typeof materials === 'object' && materials !== null) {
+          const arr = Object.values(materials).find(Array.isArray);
+          materials = arr || [];
+        } else {
+          materials = [];
+        }
+      }
+
       return { success: true, materials };
     } catch (error) {
       console.error('AI Fetch Error:', error);
