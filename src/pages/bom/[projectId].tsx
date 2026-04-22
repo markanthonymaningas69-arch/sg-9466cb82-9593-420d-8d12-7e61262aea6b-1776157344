@@ -135,7 +135,12 @@ export default function BillOfMaterials() {
       const matTotal = (scope.bom_materials || []).reduce((mSum, m) => {
         const qty = typeof m.quantity === "number" && Number.isFinite(m.quantity) ? m.quantity : 0;
         const cost = typeof m.unit_cost === "number" && Number.isFinite(m.unit_cost) ? m.unit_cost : 0;
-        return mSum + (m.total_cost != null ? m.total_cost : qty * cost);
+        const storedTotal =
+        typeof m.total_cost === "number" && Number.isFinite(m.total_cost)
+          ? m.total_cost
+          : null;
+        const materialTotal = storedTotal != null ? storedTotal : qty * cost;
+        return mSum + materialTotal;
       }, 0);
       
       const labTotal = (scope.bom_labor || []).reduce((lSum, l) => {
