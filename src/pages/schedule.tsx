@@ -77,8 +77,9 @@ export default function SchedulePage() {
     if (!selectedTask) return;
     try {
       setSaving(true);
-      await scheduleService.updateTask(selectedTask.id, {
+      const taskPayload = {
         name: selectedTask.name,
+        project_id: selectedTask.project_id,
         start_date: selectedTask.start_date,
         end_date: selectedTask.end_date,
         duration_days: selectedTask.duration_days,
@@ -86,11 +87,19 @@ export default function SchedulePage() {
         status: selectedTask.status,
         priority: selectedTask.priority,
         notes: selectedTask.notes
-      });
-      toast({ title: "Success", description: "Task updated successfully" });
+      };
+
+      if (selectedTask.id) {
+        await scheduleService.updateTask(selectedTask.id, taskPayload);
+        toast({ title: "Success", description: "Task updated successfully" });
+      } else {
+        await scheduleService.createTask(taskPayload);
+        toast({ title: "Success", description: "Task created successfully" });
+        setSelectedTask(null);
+      }
       await loadTasks(selectedProject);
     } catch (error: any) {
-      toast({ title: "Error", description: "Failed to update task", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to save task", variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -203,7 +212,7 @@ export default function SchedulePage() {
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent className="p-0 flex-1 relative bg-slate-50/50 overflow-hidden flex flex-col">
+              <CardContent className="p-0 flex-1 relative bg-background overflow-hidden flex flex-col">
                 {loading ? (
                   <div className="flex items-center justify-center h-full min-h-[400px]">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -237,11 +246,11 @@ export default function SchedulePage() {
                           <tr 
                             key={task.id} 
                             onClick={() => setSelectedTask(task)}
-                            className={`border-b cursor-pointer transition-colors ${selectedTask?.id === task.id ? 'bg-primary/5 border-primary/20' : 'bg-white hover:bg-muted/50'}`}
+                            className={`border-b cursor-pointer transition-colors ${selectedTask?.id === task.id ? 'bg-primary/10 border-primary/20' : 'bg-card hover:bg-muted/50'}`}
                           >
                             <td className="px-4 py-3 font-medium">
                               <div className="flex flex-col">
-                                <span className={selectedTask?.id === task.id ? 'text-primary' : ''}>{task.name}</span>
+                                <span className={selectedTask?.id === task.id ? 'text-primary' : 'text-foreground'}>{task.name}</span>
                                 {task.bom_scope && (
                                   <span className="text-[10px] text-muted-foreground truncate max-w-[250px]">Scope: {task.bom_scope.name}</span>
                                 )}
@@ -260,10 +269,10 @@ export default function SchedulePage() {
                             </td>
                             <td className="px-4 py-3">
                               <Badge variant="outline" className={`text-[10px] capitalize ${
-                                task.status === 'completed' ? 'bg-green-50 text-green-700 border-green-200' :
-                                task.status === 'in_progress' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                                task.status === 'delayed' ? 'bg-red-50 text-red-700 border-red-200' :
-                                'bg-gray-50 text-gray-700'
+                                task.status === 'completed' ? 'bg-green-500/10 text-green-600 border-green-500/20' :
+                                task.status === 'in_progress' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' :
+                                task.status === 'delayed' ? 'bg-red-500/10 text-red-600 border-red-500/20' :
+                                'bg-muted text-muted-foreground border-border'
                               }`}>
                                 {task.status?.replace('_', ' ') || 'Pending'}
                               </Badge>
@@ -275,12 +284,12 @@ export default function SchedulePage() {
                   </div>
                 ) : (
                   /* Visual Gantt View */
-                  <div className="flex-1 overflow-auto relative flex flex-col bg-white">
+                  <div className="flex-1 overflow-auto relative flex flex-col bg-background">
                     {timelineBounds ? (
                       <div className="min-w-max">
                         {/* Gantt Header */}
                         <div className="flex border-b bg-muted/30 sticky top-0 z-20">
-                          <div className="w-[250px] shrink-0 border-r p-3 font-medium text-xs text-muted-foreground bg-white sticky left-0 z-30">
+                          <div className="w-[250px] shrink-0 border-r p-3 font-medium text-xs text-muted-foreground bg-card sticky left-0 z-30">
                             Task Name
                           </div>
                           <div className="flex-1 relative h-10 flex">
@@ -322,13 +331,13 @@ export default function SchedulePage() {
                           return (
                             <div 
                               key={task.id} 
-                              className={`flex border-b hover:bg-muted/20 cursor-pointer ${isSelected ? 'bg-primary/5' : ''}`}
+                              className={`flex border-b hover:bg-muted/50 cursor-pointer ${isSelected ? 'bg-primary/10' : ''}`}
                               onClick={() => setSelectedTask(task)}
                             >
-                              <div className={`w-[250px] shrink-0 border-r p-2 text-xs truncate bg-white sticky left-0 z-10 ${isSelected ? 'border-primary/30 font-medium' : ''}`}>
+                              <div className={`w-[250px] shrink-0 border-r p-2 text-xs truncate bg-card text-foreground sticky left-0 z-10 ${isSelected ? 'border-primary/30 font-medium' : ''}`}>
                                 {task.name}
                               </div>
-                              <div className="flex-1 relative h-10 flex bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTI5LjUgMEwyOS41IDQwIiBzdHJva2U9IiNlNWU3ZWIiIGZpbGw9Im5vbmUiLz48L3N2Zz4=')]">
+                              <div className="flex-1 relative h-10 flex border-l border-border/50" style={{ backgroundImage: "linear-gradient(to right, hsl(var(--border) / 0.5) 1px, transparent 1px)", backgroundSize: "30px 100%" }}>
                                 {task.start_date && task.end_date && (
                                   <div 
                                     className={`absolute top-2 h-6 rounded-md shadow-sm border overflow-hidden flex items-center group transition-all

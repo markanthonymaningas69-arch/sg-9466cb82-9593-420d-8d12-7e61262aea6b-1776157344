@@ -20,7 +20,9 @@ import {
   Check,
   XCircle,
   Activity,
-  CalendarDays } from
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight } from
 "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -98,6 +100,7 @@ export function Layout({ children }: LayoutProps) {
   });
   const [userName, setUserName] = useState<string>(() => typeof window !== 'undefined' ? localStorage.getItem('app_user_name') || "User" : "User");
   const [userEmail, setUserEmail] = useState<string>(() => typeof window !== 'undefined' ? localStorage.getItem('app_user_email') || "" : "");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     loadUserProfile();
@@ -453,22 +456,25 @@ export function Layout({ children }: LayoutProps) {
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed top-0 left-0 z-50 h-screen w-64 bg-card border-r transition-transform duration-300 ease-in-out lg:translate-x-0",
-        sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        "fixed top-0 left-0 z-50 h-screen bg-card border-r transition-all duration-300 ease-in-out lg:translate-x-0 flex flex-col",
+        sidebarOpen ? "translate-x-0" : "-translate-x-full",
+        sidebarCollapsed ? "w-[80px]" : "w-64"
       )}>
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full overflow-hidden">
           {/* Logo */}
-          <div className="flex items-center justify-between h-16 px-6 border-b">
+          <div className="flex items-center justify-between h-16 px-6 border-b shrink-0">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
+              <div className="h-10 w-10 shrink-0 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
                 TX
               </div>
-              <div>
-                <h1 className="text-lg font-heading font-bold text-primary leading-tight">
-                  Thea-X
-                </h1>
-                <p className="text-xs text-muted-foreground">Construction Accounting</p>
-              </div>
+              {!sidebarCollapsed && (
+                <div className="min-w-[120px]">
+                  <h1 className="text-lg font-heading font-bold text-primary leading-tight">
+                    Thea-X
+                  </h1>
+                  <p className="text-xs text-muted-foreground">Construction Accounting</p>
+                </div>
+              )}
             </div>
             <Button
               variant="ghost"
@@ -503,36 +509,41 @@ export function Layout({ children }: LayoutProps) {
                   <li key={item.name}>
                     <Link
                       href={item.href}
+                      title={sidebarCollapsed ? item.name : undefined}
                       className={cn(
-                        "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                        "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors relative",
                         isActive ?
                         "bg-primary text-primary-foreground" :
-                        "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                        "text-muted-foreground hover:bg-secondary hover:text-foreground",
+                        sidebarCollapsed && "justify-center"
                       )}
                       onClick={() => setSidebarOpen(false)}>
                       
                       <Icon className="h-5 w-5 shrink-0" />
-                      {item.name}
-                      {item.name === "Accounting" && acctCount > 0 &&
-                      <Badge variant="destructive" className="ml-auto h-5 px-1.5 flex items-center justify-center text-[10px]">
+                      {!sidebarCollapsed && <span className="truncate">{item.name}</span>}
+                      {!sidebarCollapsed && item.name === "Accounting" && acctCount > 0 &&
+                      <Badge variant="destructive" className="ml-auto h-5 px-1.5 flex items-center justify-center text-[10px] shrink-0">
                           {acctCount}
                         </Badge>
                       }
-                      {item.name === "Warehouse" && whseCount > 0 &&
-                      <Badge variant="destructive" className="ml-auto h-5 px-1.5 flex items-center justify-center text-[10px]">
+                      {!sidebarCollapsed && item.name === "Warehouse" && whseCount > 0 &&
+                      <Badge variant="destructive" className="ml-auto h-5 px-1.5 flex items-center justify-center text-[10px] shrink-0">
                           {whseCount}
                         </Badge>
                       }
-                      {item.name === "Human Resources" && hrCount > 0 &&
-                      <Badge variant="destructive" className="ml-auto h-5 px-1.5 flex items-center justify-center text-[10px]">
+                      {!sidebarCollapsed && item.name === "Human Resources" && hrCount > 0 &&
+                      <Badge variant="destructive" className="ml-auto h-5 px-1.5 flex items-center justify-center text-[10px] shrink-0">
                           {hrCount}
                         </Badge>
                       }
-                      {item.name === "Purchasing" && purchCount > 0 &&
-                      <Badge variant="destructive" className="ml-auto h-5 px-1.5 flex items-center justify-center text-[10px]">
+                      {!sidebarCollapsed && item.name === "Purchasing" && purchCount > 0 &&
+                      <Badge variant="destructive" className="ml-auto h-5 px-1.5 flex items-center justify-center text-[10px] shrink-0">
                           {purchCount}
                         </Badge>
                       }
+                      {sidebarCollapsed && (acctCount > 0 || whseCount > 0 || hrCount > 0 || purchCount > 0) && ['Accounting', 'Warehouse', 'Human Resources', 'Purchasing'].includes(item.name) && (
+                        <div className="absolute right-2 top-2 h-2 w-2 rounded-full bg-destructive border-2 border-card"></div>
+                      )}
                     </Link>
                   </li>);
 
@@ -541,39 +552,62 @@ export function Layout({ children }: LayoutProps) {
           </nav>
 
           {/* System Navigation (Separated visually) */}
-          <div className="mt-auto px-3 py-4 border-t space-y-1">
-            <p className="px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-              {assignedModules.includes("GM") ? "System Settings" : "Preferences"}
-            </p>
-            <Link href="/settings" className={cn("flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors", router.pathname === "/settings" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground")} onClick={() => setSidebarOpen(false)}>
+          <div className="mt-auto px-3 py-4 border-t space-y-1 shrink-0">
+            {!sidebarCollapsed && (
+              <p className="px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 truncate">
+                {assignedModules.includes("GM") ? "System Settings" : "Preferences"}
+              </p>
+            )}
+            <Link 
+              href="/settings" 
+              title={sidebarCollapsed ? (assignedModules.includes("GM") ? "Company Settings" : "Settings") : undefined}
+              className={cn("flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors", router.pathname === "/settings" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground", sidebarCollapsed && "justify-center")} 
+              onClick={() => setSidebarOpen(false)}>
               <Settings className="h-4 w-4 shrink-0" />
-              {assignedModules.includes("GM") ? "Company Settings" : "Settings"}
+              {!sidebarCollapsed && <span className="truncate">{assignedModules.includes("GM") ? "Company Settings" : "Settings"}</span>}
             </Link>
             {assignedModules.includes("GM") && (
-              <Link href="/subscription" className={cn("flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors", router.pathname === "/subscription" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground")} onClick={() => setSidebarOpen(false)}>
+              <Link 
+                href="/subscription" 
+                title={sidebarCollapsed ? "Subscription" : undefined}
+                className={cn("flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors", router.pathname === "/subscription" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground", sidebarCollapsed && "justify-center")} 
+                onClick={() => setSidebarOpen(false)}>
                 <CreditCard className="h-4 w-4 shrink-0" />
-                Subscription
+                {!sidebarCollapsed && <span className="truncate">Subscription</span>}
               </Link>
             )}
           </div>
 
+          {/* Collapse Toggle */}
+          <div className="border-t p-2 shrink-0">
+            <Button 
+              variant="ghost" 
+              className="w-full flex justify-center text-muted-foreground hover:text-foreground" 
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            >
+              {sidebarCollapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
+            </Button>
+          </div>
+
           {/* Footer */}
-          <div className="border-t p-4">
-            <div className="flex items-center gap-3 px-3 py-2">
-              <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold text-sm">
+          <div className="border-t p-4 shrink-0">
+            <div className={cn("flex items-center gap-3", sidebarCollapsed ? "justify-center px-0" : "px-3 py-2")}>
+              <div className="h-8 w-8 shrink-0 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold text-sm">
                 {userName.charAt(0).toUpperCase()}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{userName}</p>
-                <p className="text-xs text-muted-foreground truncate">{assignedModule} Role</p>
-              </div>
+              {!sidebarCollapsed && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{userName}</p>
+                  <p className="text-xs text-muted-foreground truncate">{assignedModule} Role</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </aside>
 
       {/* Main content */}
-      <div className="lg:pl-64">
+      <div className={cn("transition-all duration-300 ease-in-out", sidebarCollapsed ? "lg:pl-[80px]" : "lg:pl-64")}>
         {/* Top bar */}
         <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-card px-6">
           <Button
@@ -639,9 +673,6 @@ export function Layout({ children }: LayoutProps) {
               const displayPendingAdvances = (isGM || isAccounting) ? pendingCashAdvances : [];
               const displayPendingLeaves = (isGM || isHR) ? pendingLeaves : [];
               const displayExpiring = (isGM || isHR) ? expiringDocuments : [];
-              const displayPendingPurchases = (isGM || isPurchasing) ? pendingPurchases : [];
-              const displayGmPurchases = isGM ? pendingGmPurchases : [];
-              const displayApprovedVouchers = (isGM || isAccounting) ? approvedVouchers : [];
               const displayPendingRequests = pendingRequests.filter(req => {
                 if (isGM) return true;
                 const isAcctReq = ['Equipment (Rentals)', 'PPE', 'Petty Cash'].includes(req.request_type);
