@@ -546,66 +546,6 @@ export default function BillOfMaterials() {
     }
   };
 
-  
-  const handleGenerateAIMaterials = async (scope: ScopeOfWork) => {
-    const scopeId = scope.id as string;
-    const prompt = aiPrompts[scopeId];
-    if (!prompt?.trim()) return;
-
-    setIsGeneratingAi(prev => ({ ...prev, [scopeId]: true }));
-    try {
-      const result = await bomService.fetchAIPreview(
-        scope.name || "Unnamed Scope",
-        (scope as any).quantity || 1,
-        (scope as any).unit || "Lot",
-        prompt
-      );
-
-      if (result.error) {
-        alert("AI Generation Error: " + result.error);
-      } else if (result.materials) {
-        setAiPreviewMaterials(prev => ({ ...prev, [scopeId]: result.materials }));
-      }
-    } catch (err: any) {
-      alert("Failed to generate materials: " + err.message);
-    } finally {
-      setIsGeneratingAi(prev => ({ ...prev, [scopeId]: false }));
-    }
-  };
-
-  const handleApproveAIMaterials = async (scope: ScopeOfWork) => {
-    const scopeId = scope.id as string;
-    const materials = aiPreviewMaterials[scopeId];
-    if (!materials) return;
-
-    setIsGeneratingAi(prev => ({ ...prev, [scopeId]: true }));
-    try {
-      const result = await bomService.saveAIGeneratedMaterials(
-        scopeId,
-        scope.name || "Unnamed Scope",
-        materials
-      );
-
-      if (result.error) {
-        alert("AI Save Error: " + result.error);
-      } else {
-        if (bom?.project_id) {
-          await loadData(bom.project_id as string);
-        }
-        setAiPrompts(prev => ({ ...prev, [scopeId]: "" }));
-        setAiPreviewMaterials(prev => {
-          const newState = { ...prev };
-          delete newState[scopeId];
-          return newState;
-        });
-      }
-    } catch (err: any) {
-      alert("Failed to save materials: " + err.message);
-    } finally {
-      setIsGeneratingAi(prev => ({ ...prev, [scopeId]: false }));
-    }
-  };
-
   const resetMaterialForm = () => {
     setMaterialForm({
       name: "",
@@ -732,7 +672,7 @@ export default function BillOfMaterials() {
     const unit = material.unit || "";
     const isKnown = knownUnits.includes(unit);
     
-    const existsInMaster = masterItems.some(m => m.name === (material.description || material.material_name));
+    const existsInMaster = masterItems.some(m => m.name.toLowerCase() === (material.description || material.material_name).toLowerCase());
     setIsManualMaterial(!existsInMaster && !!(material.description || material.material_name));
 
     setMaterialForm({
@@ -1108,7 +1048,7 @@ export default function BillOfMaterials() {
                             )}
                             <Button
                               size="sm"
-                              className="bg-green-600 hover:bg-green-700 text-white"
+                              className="bg-green-600 hover:bg-green-700 text-white h-6 px-2 text-xs"
                               onClick={() => void handleSaveEditScope()}
                             >
                               Save
@@ -1124,7 +1064,7 @@ export default function BillOfMaterials() {
                           </>
                         ) : (
                           <>
-                            <CardTitle className="text-lg">{scope.name}</CardTitle>
+                            <CardTitle className="text-lg mt-0">{scope.name}</CardTitle>
                             <span className="text-xs font-medium bg-muted px-2 py-0.5 rounded-md border text-muted-foreground">
                               {(scope as any).quantity != null ? (scope as any).quantity : 1} {(scope as any).unit || "Lot"}
                             </span>
@@ -1383,70 +1323,6 @@ export default function BillOfMaterials() {
                   </div>
                 </div>}
 
-                      
-                  {/* AI Generator Block */}
-                  <div className="bg-purple-50/50 dark:bg-purple-950/10 p-2.5 rounded-md mt-3 mb-2 border border-purple-100 dark:border-purple-900/50">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-1.5">
-                        <Sparkles className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-                        <h4 className="text-[11px] font-semibold text-purple-800 dark:text-purple-300 uppercase tracking-wider">AI Material Generator</h4>
-                      </div>
-                      <span className="text-[10px] text-muted-foreground italic">Review AI suggestions before finalizing</span>
-                    </div>
-                    {aiPreviewMaterials[scope.id as string] ? (
-                      <div className="mt-2 space-y-2">
-                        <div className="text-[11px] font-semibold text-purple-800 dark:text-purple-300">Preview Generated Materials:</div>
-                        <div className="border border-purple-200 dark:border-purple-800/50 rounded-md overflow-hidden bg-white dark:bg-black">
-                          <Table>
-                            <TableHeader className="bg-purple-100 dark:bg-purple-900/30">
-                              <TableRow className="h-6 text-xs">
-                                <TableHead className="h-6 py-1 text-[10px]">Material</TableHead>
-                                <TableHead className="h-6 py-1 text-right text-[10px]">Qty</TableHead>
-                                <TableHead className="h-6 py-1 text-[10px]">Unit</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {Array.isArray(aiPreviewMaterials[scope.id as string]) && aiPreviewMaterials[scope.id as string].map((mat: any, idx: number) => (
-                                <TableRow key={idx} className="h-6 text-xs">
-                                  <TableCell className="py-1 font-medium">{mat.name || mat.material_name}</TableCell>
-                                  <TableCell className="py-1 text-right">{mat.quantity}</TableCell>
-                                  <TableCell className="py-1">{mat.unit}</TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
-                        <div className="flex gap-2 justify-end mt-2">
-                          <Button size="sm" variant="outline" className="h-7 text-xs border-purple-300 text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20" onClick={() => setAiPreviewMaterials(prev => { const s = {...prev}; delete s[scope.id as string]; return s; })}>Discard</Button>
-                          <Button size="sm" className="h-7 text-xs bg-purple-600 hover:bg-purple-700 text-white" disabled={isGeneratingAi[scope.id as string] || isLocked} onClick={() => handleApproveAIMaterials(scope)}>
-                            {isGeneratingAi[scope.id as string] ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Sparkles className="h-3 w-3 mr-1" />}
-                            {isGeneratingAi[scope.id as string] ? "Saving..." : "Approve & Save"}
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex gap-2">
-                        <Input 
-                          placeholder="Describe the scope (e.g. Reinforced concrete slab, 150mm thick with rebars...)" 
-                          className="h-7 text-xs flex-1 border-purple-200 dark:border-purple-800/50 focus-visible:ring-purple-500"
-                          value={aiPrompts[scope.id as string] || ""}
-                          onChange={(e) => setAiPrompts({...aiPrompts, [scope.id as string]: e.target.value})}
-                          disabled={isGeneratingAi[scope.id as string] || isLocked}
-                          onKeyDown={(e) => { if (e.key === "Enter") handleGenerateAIMaterials(scope); }}
-                        />
-                        <Button 
-                          size="sm" 
-                          className="h-7 text-xs bg-purple-600 hover:bg-purple-700 text-white px-3"
-                          disabled={isGeneratingAi[scope.id as string] || isLocked || !aiPrompts[scope.id as string]?.trim()}
-                          onClick={() => handleGenerateAIMaterials(scope)}
-                        >
-                          {isGeneratingAi[scope.id as string] ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Sparkles className="h-3 w-3 mr-1" />}
-                          {isGeneratingAi[scope.id as string] ? "Generating..." : "Generate Preview"}
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-
                       <div className="flex justify-between items-start pt-2 border-t mt-2">
                         <div className="flex-1 pr-4">
                           <div className="flex items-center gap-3 mb-0.5">
@@ -1641,6 +1517,7 @@ export default function BillOfMaterials() {
                                   {(() => {
                                     const laborEntry = scope.bom_labor[0] as Labor;
                                     const desc = laborEntry.description || "";
+
                                     const percentageMatch = desc.match(/(\d+(\.\d+)?)\s*%/);
                                     const isPercentage = !!percentageMatch;
                                     const percentageValue = isPercentage && percentageMatch ? percentageMatch[1] : "";
