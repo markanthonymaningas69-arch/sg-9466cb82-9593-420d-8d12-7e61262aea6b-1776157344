@@ -1235,14 +1235,19 @@ export default function BillOfMaterials() {
                           )}
                           
                           {selectedScopeId === scope.id && !editingMaterial && (
-                            <TableRow className="h-7 bg-muted/20 border-y border-primary/20">
-                              <TableCell className="py-1">
+                            <TableRow className="h-7 bg-muted/20">
+                              <TableCell className="py-0.5">
                                 <div className="flex flex-col gap-1">
                                   <Select value={materialForm.name} onValueChange={(val) => handleMaterialChange(val)}>
                                     <SelectTrigger className="h-6 text-xs"><SelectValue placeholder="Select material" /></SelectTrigger>
                                     <SelectContent>
                                       <SelectItem value="custom">-- Custom Material --</SelectItem>
-                                      {masterItems.map(m => <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>)}
+                                      {masterItems
+                                        .filter(m => m.associated_scopes && Array.isArray(m.associated_scopes) && m.associated_scopes.includes(scope.name))
+                                        .map(m => <SelectItem key={m.id} value={m.name} className="font-semibold text-green-700 dark:text-green-400">★ {m.name}</SelectItem>)}
+                                      {masterItems
+                                        .filter(m => !m.associated_scopes || !Array.isArray(m.associated_scopes) || !m.associated_scopes.includes(scope.name))
+                                        .map(m => <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>)}
                                     </SelectContent>
                                   </Select>
                                   {isManualMaterial && (
@@ -1250,10 +1255,10 @@ export default function BillOfMaterials() {
                                   )}
                                 </div>
                               </TableCell>
-                              <TableCell className="py-1 text-right">
+                              <TableCell className="py-0.5 text-right">
                                 <Input placeholder="Qty" value={materialForm.quantity} onChange={(e) => setMaterialForm({...materialForm, quantity: e.target.value})} className="h-6 text-xs text-right" />
                               </TableCell>
-                              <TableCell className="py-1">
+                              <TableCell className="py-0.5">
                                 <div className="flex flex-col gap-1">
                                   <Select value={materialForm.unit_selection} onValueChange={(v) => setMaterialForm({...materialForm, unit: v === "Other" ? "" : v, unit_selection: v})}>
                                     <SelectTrigger className="h-6 text-xs"><SelectValue placeholder="Unit" /></SelectTrigger>
@@ -1262,18 +1267,23 @@ export default function BillOfMaterials() {
                                     </SelectContent>
                                   </Select>
                                   {materialForm.unit_selection === "Other" && (
-                                    <Input placeholder="Unit" className="h-6 text-xs" value={materialForm.unit} onChange={(e) => setMaterialForm({...materialForm, unit: e.target.value})} />
+                                    <Input placeholder="Unit" className="h-6 text-xs" value={materialForm.unit} onChange={(e) =>
+                                      setMaterialForm({
+                                        ...materialForm,
+                                        unit: e.target.value
+                                      })
+                                    } />
                                   )}
                                 </div>
                               </TableCell>
-                              <TableCell className="py-1 text-right">
+                              <TableCell className="py-0.5 text-right">
                                 <Input placeholder="Cost" value={materialForm.unit_cost} onChange={(e) => setMaterialForm({...materialForm, unit_cost: e.target.value})} className="h-6 text-xs text-right" />
                               </TableCell>
-                              <TableCell className="py-1 text-right font-semibold text-sm">
+                              <TableCell className="py-0.5 text-right font-semibold text-sm">
                                 {formatCurrency((parseFloat(materialForm.quantity.replace(/,/g, ""))||0) * (parseFloat(materialForm.unit_cost.replace(/,/g, ""))||0))}
                               </TableCell>
-                              <TableCell className="py-1 text-right">
-                                <div className="flex justify-end items-center gap-1">
+                              <TableCell className="py-0.5">
+                                <div className="flex justify-end gap-1">
                                   <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white h-6 px-2 text-xs" onClick={() => void handleMaterialSubmitInline()} disabled={isLocked}>
                                     Add
                                   </Button>
