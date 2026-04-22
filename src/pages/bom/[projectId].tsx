@@ -22,7 +22,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useSettings } from "@/contexts/SettingsProvider";
 import { bomService } from "@/services/bomService";
 import { projectService } from "@/services/projectService";
-import { Plus, Pencil, Trash2, ArrowLeft, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Pencil, Trash2, ArrowLeft, ArrowUp, ArrowDown, Sparkles, Loader2 } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
 type BOM = Database["public"]["Tables"]["bill_of_materials"]["Row"];
@@ -73,6 +73,9 @@ export default function BillOfMaterials() {
   const [editingScopeQuantity, setEditingScopeQuantity] = useState<string>("1");
   const [editingScopeUnit, setEditingScopeUnit] = useState<string>("Cu.m");
   const [editingScopeUnitSelection, setEditingScopeUnitSelection] = useState<string>("Cu.m");
+
+  const [aiPrompts, setAiPrompts] = useState<Record<string, string>>({});
+  const [isGeneratingAi, setIsGeneratingAi] = useState<Record<string, boolean>>({});
 
   const [materialForm, setMaterialForm] = useState({
     name: "",
@@ -1147,9 +1150,6 @@ export default function BillOfMaterials() {
                           </TableCell>
                           <TableCell className="py-0.5 text-sm">{material.unit}</TableCell>
                           <TableCell className="text-right py-0.5 text-sm">
-                            {formatCurrency(material.unit_cost as number ?? 0)}
-                          </TableCell>
-                          <TableCell className="text-right font-semibold py-0.5 text-sm">
                             {(() => {
                         const total =
                         material.total_cost as number ??
@@ -1157,183 +1157,6 @@ export default function BillOfMaterials() {
                         material.unit_cost as number || 0);
                         return formatCurrency(total);
                       })()}
-                          </TableCell>
-                          <TableCell className="text-right py-0.5">
-                            <div className="flex justify-end gap-1">
-                              <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-6 w-6 text-green-600 hover:text-green-700"
-                          onClick={() => handleEditMaterial(material)}
-                          disabled={isLocked}>
-                          
-                                <Pencil className="h-3 w-3" />
-                              </Button>
-                              <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-6 w-6 text-red-600 hover:text-red-700"
-                          onClick={() => void handleDeleteMaterial(material.id as string)}
-                          disabled={isLocked}>
-                          
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )}
-
-                      {selectedScopeId === scope.id &&
-                  <TableRow className="h-7">
-                          <TableCell className="py-0.5">
-                            <div className="flex flex-col gap-1">
-                              {!isManualMaterial ? (
-                                <Select
-                                  value={materialForm.name}
-                                  onValueChange={handleMaterialChange}
-                                >
-                                  <SelectTrigger className="h-6 text-xs w-full">
-                                    <SelectValue placeholder="Select from catalog" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {masterItems
-                                      .filter(item => {
-                                        const isLinked = item.associated_scopes && Array.isArray(item.associated_scopes) 
-                                          ? item.associated_scopes.includes(scope.name)
-                                          : false;
-                                        
-                                        const isAlreadyAdded = (scope.bom_materials || []).some(
-                                          m => (m.material_name === item.name || m.description === item.name) && 
-                                               (!editingMaterial || editingMaterial.id !== m.id)
-                                        );
-                                        
-                                        return isLinked && !isAlreadyAdded;
-                                      })
-                                      .map(item => (
-                                      <SelectItem key={item.id} value={item.name}>{item.name}</SelectItem>
-                                    ))}
-                                    <SelectItem value="custom" className="text-primary font-medium border-t mt-1">
-                                      + Custom Material
-                                    </SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              ) : (
-                                <div className="flex gap-1">
-                                  <Input
-                                    placeholder="Material description"
-                                    className="h-6 text-xs"
-                                    value={materialForm.description}
-                                    onChange={(e) =>
-                                      setMaterialForm({
-                                        ...materialForm,
-                                        description: e.target.value,
-                                        name: e.target.value
-                                      })
-                                    } 
-                                  />
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    className="h-6 px-2 text-xs"
-                                    onClick={() => {
-                                      setIsManualMaterial(false);
-                                      setMaterialForm(prev => ({...prev, name: "", description: ""}));
-                                    }}
-                                  >
-                                    Catalog
-                                  </Button>
-                                </div>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right py-0.5">
-                            <Input
-                        type="text"
-                        className="h-6 text-xs text-right w-full min-w-[120px]"
-                        value={materialForm.quantity}
-                        onChange={(e) =>
-                        setMaterialForm({
-                          ...materialForm,
-                          quantity: e.target.value.replace(/[^0-9.,]/g, '')
-                        })
-                        }
-                        onBlur={(e) => {
-                          const val = e.target.value;
-                          if (val) {
-                            const num = parseFloat(val.replace(/,/g, ""));
-                            if (!isNaN(num)) {
-                              setMaterialForm({ ...materialForm, quantity: num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
-                            }
-                          }
-                        }} />
-                      
-                          </TableCell>
-                          <TableCell className="py-0.5">
-                            <div className="space-y-1">
-                              <Select
-                          value={materialForm.unit_selection}
-                          onValueChange={(value) =>
-                          setMaterialForm({
-                            ...materialForm,
-                            unit: value === "Other" ? "" : value,
-                            unit_selection: value
-                          })
-                          }>
-                          
-                                <SelectTrigger className="h-6 text-xs w-full min-w-[100px]">
-                                  <SelectValue placeholder="Select unit" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {[
-                                    "Bag", "Bd.ft", "Box", "Cu.m", "Gal", "Kg", "Length", "Lin.m", "Liter", 
-                                    "Lot", "M", "Pail", "Pair", "Pc", "Roll", "Set", "Sq.m", "Unit", "Other"
-                                  ].map(
-                              (unitOption) =>
-                              <SelectItem key={unitOption} value={unitOption} className="text-xs">
-                                        {unitOption === "Other" ?
-                                "Others/Input" :
-                                unitOption}
-                                      </SelectItem>
-
-                            )}
-                                </SelectContent>
-                              </Select>
-                              {materialForm.unit_selection === "Other" &&
-                        <Input
-                          placeholder="Enter unit"
-                          className="h-6 text-xs w-full"
-                          value={materialForm.unit}
-                          onChange={(e) =>
-                          setMaterialForm({
-                            ...materialForm,
-                            unit: e.target.value
-                          })
-                          } />
-
-                        }
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right py-0.5">
-                            <Input
-                        type="text"
-                        className="h-6 text-xs text-right w-full min-w-[140px]"
-                        value={materialForm.unit_cost}
-                        onChange={(e) =>
-                        setMaterialForm({
-                          ...materialForm,
-                          unit_cost: e.target.value.replace(/[^0-9.,]/g, '')
-                        })
-                        }
-                        onBlur={(e) => {
-                          const val = e.target.value;
-                          if (val) {
-                            const num = parseFloat(val.replace(/,/g, ""));
-                            if (!isNaN(num)) {
-                              setMaterialForm({ ...materialForm, unit_cost: num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) });
-                            }
-                          }
-                        }} />
-                      
                           </TableCell>
                           <TableCell className="text-right font-semibold py-0.5 text-sm">
                             {(() => {
@@ -1603,12 +1426,13 @@ export default function BillOfMaterials() {
                                     const desc = laborEntry.description || "";
                                     const percentageMatch = desc.match(/(\d+(\.\d+)?)\s*%/);
                                     const isPercentage = !!percentageMatch;
+                                    const percentageValue = isPercentage && percentageMatch ? percentageMatch[1] : "";
 
                                     if (isPercentage) {
                                       return (
                                         <>
                                           <span className="text-[11px] font-semibold text-green-700">
-                                            {percentageMatch[1]}% of Materials
+                                            {percentageValue}% of Materials
                                           </span>
                                         </>
                                       );

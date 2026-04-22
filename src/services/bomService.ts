@@ -238,5 +238,86 @@ export const bomService = {
 
     cacheManager.invalidatePattern("BOMSummary");
     return { data, error };
+  },
+
+  // AI Generation
+  async generateMaterialsWithAI(scopeId: string, scopeName: string, quantity: number, unit: string, description: string) {
+    try {
+      // 1. Call AI Endpoint
+      const response = await fetch('/api/ai/generate-bom', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scopeName, description, quantity, unit })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to generate materials");
+      }
+
+      const { materials } = await response.json();
+      
+      // 2. Fetch existing master items
+      const { data: masterItems } = await supabase.from("master_items").select("*");
+      const existingMasters = masterItems || [];
+
+      // 3. Process each generated material
+      const generatedMaterialsData = [];
+      
+      for (const mat of materials) {
+        let masterId = null;
+        
+        // Find existing match by name
+        const match = existingMasters.find(m => m.name.toLowerCase() === mat.name.toLowerCase());
+        
+        if (match) {
+          masterId = match.id;
+          // Optionally link scope to master item if not already linked
+          const associated = match.associated_scopes || [];
+          if (Array.isArray(associated) && !associated.includes(scopeName)) {
+            await supabase.from("master_items").update({
+              associated_scopes: [...associated, scopeName]
+            }).eq("id", masterId);
+          }
+        } else {
+          // Create new master item
+          const { data: newMaster } = await supabase.from("master_items").insert({
+            name: mat.name,
+            category: mat.category || "Construction Materials",
+            unit: mat.unit || "Other",
+            default_cost: mat.unit_cost || 0,
+            associated_scopes: [scopeName]
+          }).select().single();
+          
+          if (newMaster) {
+            masterId = newMaster.id;
+            existingMasters.push(newMaster); // add to local cache for subsequent loop iterations
+          }
+        }
+
+        // Prepare BOM material record
+        generatedMaterialsData.push({
+          scope_id: scopeId,
+          material_name: mat.name,
+          description: mat.name,
+          quantity: mat.quantity,
+          unit: mat.unit,
+          unit_cost: mat.unit_cost,
+          total_cost: (mat.quantity * mat.unit_cost)
+        });
+      }
+
+      // 4. Insert generated materials into the BOM
+      if (generatedMaterialsData.length > 0) {
+        const { error: insertError } = await supabase.from("bom_materials").insert(generatedMaterialsData);
+        if (insertError) throw insertError;
+      }
+
+      cacheManager.invalidatePattern("BOMSummary");
+      return { success: true, count: generatedMaterialsData.length };
+    } catch (error) {
+      console.error("Error generating materials with AI:", error);
+      return { error: error instanceof Error ? error.message : "An error occurred" };
+    }
   }
 };
