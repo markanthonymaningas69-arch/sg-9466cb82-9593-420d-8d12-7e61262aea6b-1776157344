@@ -240,14 +240,9 @@ export const bomService = {
     return { data, error };
   },
 
-  // AI Generation
-  async generateMaterialsWithAI(scopeId: string, scopeName: string, quantity: number, unit: string, description: string) {
+  // AI Generation Preview
+  async fetchAIPreview(scopeName: string, quantity: number, unit: string, description: string) {
     try {
-      // Get the company ID for RLS requirements
-      const { data: profile } = await supabase.from('profiles').select('company_id').single();
-      const companyId = profile?.company_id;
-
-      // 1. Call AI Endpoint
       const response = await fetch('/api/ai/generate-bom', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -256,39 +251,44 @@ export const bomService = {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to generate materials");
+        throw new Error(error.error || 'Failed to generate materials');
       }
 
       const { materials } = await response.json();
-      
-      // 2. Fetch existing master items
-      const { data: masterItems } = await supabase.from("master_items").select("*");
-      const existingMasters = masterItems || [];
+      return { success: true, materials };
+    } catch (error) {
+      console.error('AI Fetch Error:', error);
+      return { error: error instanceof Error ? error.message : 'An error occurred' };
+    }
+  },
 
-      // 3. Process each generated material
+  // Save AI Generated Materials
+  async saveAIGeneratedMaterials(scopeId: string, scopeName: string, materials: any[]) {
+    try {
+      const { data: profile } = await supabase.from('profiles').select('company_id').single();
+      const companyId = profile?.company_id;
+      
+      const { data: masterItems } = await supabase.from('master_items').select('*');
+      const existingMasters = masterItems || [];
       const generatedMaterialsData = [];
       
       for (const mat of materials) {
         let masterId = null;
-        
-        // Find existing match by name
         const match = existingMasters.find(m => m.name.toLowerCase() === mat.name.toLowerCase());
         
         if (match) {
           masterId = match.id;
-          // Optionally link scope to master item if not already linked
           const associated = match.associated_scopes || [];
           if (Array.isArray(associated) && !associated.includes(scopeName)) {
-            await supabase.from("master_items").update({
+            await supabase.from('master_items').update({
               associated_scopes: [...associated, scopeName]
-            }).eq("id", masterId);
+            }).eq('id', masterId);
           }
         } else {
-          // Create new master item
-          const { data: newMaster } = await supabase.from("master_items").insert({
+          const { data: newMaster } = await supabase.from('master_items').insert({
             name: mat.name,
-            category: mat.category || "Construction Materials",
-            unit: mat.unit || "Other",
+            category: mat.category || 'Construction Materials',
+            unit: mat.unit || 'Other',
             default_cost: mat.unit_cost || 0,
             associated_scopes: [scopeName],
             company_id: companyId
@@ -296,11 +296,10 @@ export const bomService = {
           
           if (newMaster) {
             masterId = newMaster.id;
-            existingMasters.push(newMaster); // add to local cache for subsequent loop iterations
+            existingMasters.push(newMaster);
           }
         }
 
-        // Prepare BOM material record
         generatedMaterialsData.push({
           scope_id: scopeId,
           material_name: mat.name,
@@ -313,17 +312,16 @@ export const bomService = {
         });
       }
 
-      // 4. Insert generated materials into the BOM
       if (generatedMaterialsData.length > 0) {
-        const { error: insertError } = await supabase.from("bom_materials").insert(generatedMaterialsData);
+        const { error: insertError } = await supabase.from('bom_materials').insert(generatedMaterialsData);
         if (insertError) throw insertError;
       }
 
-      cacheManager.invalidatePattern("BOMSummary");
+      cacheManager.invalidatePattern('BOMSummary');
       return { success: true, count: generatedMaterialsData.length };
     } catch (error) {
-      console.error("Error generating materials with AI:", error);
-      return { error: error instanceof Error ? error.message : "An error occurred" };
+      console.error('Error saving generated materials:', error);
+      return { error: error instanceof Error ? error.message : 'An error occurred' };
     }
   }
 };
