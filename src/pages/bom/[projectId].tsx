@@ -1127,16 +1127,6 @@ export default function BillOfMaterials() {
                         <h3 className="font-semibold text-lg">Materials</h3>
                       </div>
                       <Table>
-                        <TableHeader>
-                          <TableRow className="h-8">
-                            <TableHead className="h-8 py-1">Material Description</TableHead>
-                            <TableHead className="w-40 text-right h-8 py-1">Qty</TableHead>
-                            <TableHead className="w-40 h-8 py-1">Unit</TableHead>
-                            <TableHead className="w-48 text-right h-8 py-1">Unit Cost</TableHead>
-                            <TableHead className="w-32 text-right h-8 py-1">Amount</TableHead>
-                            <TableHead className="w-28 text-right h-8 py-1" />
-                          </TableRow>
-                        </TableHeader>
                         <TableBody>
                           {(scope.bom_materials || []).map((material) =>
                       <TableRow key={material.id} className="h-8">
@@ -1378,8 +1368,30 @@ export default function BillOfMaterials() {
 
                       <div className="flex justify-between items-start pt-2 border-t mt-2">
                         <div className="flex-1 pr-4">
-                          <div className="flex items-center mb-1">
+                          <div className="flex items-center gap-3 mb-2">
                             <h3 className="font-semibold text-sm">Labor Cost</h3>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-green-600 dark:border-green-500 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/30 h-6 text-[10px] px-2"
+                              disabled={isLocked}
+                              onClick={() => {
+                                if (activeLaborScopeId === scope.id) {
+                                  setActiveLaborScopeId(null);
+                                  resetLaborForm();
+                                } else {
+                                  setActiveLaborScopeId(scope.id as string);
+                                  if (scope.bom_labor && scope.bom_labor.length > 0) {
+                                    handleEditLabor(scope.bom_labor[0] as Labor);
+                                  } else {
+                                    resetLaborForm();
+                                  }
+                                }
+                              }}
+                            >
+                              <Pencil className="h-3 w-3 mr-1" />
+                              {scope.bom_labor && scope.bom_labor.length > 0 ? "Edit Labor" : "Add Labor"}
+                            </Button>
                           </div>
 
                           {activeLaborScopeId === scope.id ? (
