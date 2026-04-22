@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { X, Send, Bot, User, Loader2, MessageSquare, Minus, Maximize2, List, Plus } from "lucide-react";
+import { X, Send, Bot, User, Loader2, MessageSquare, Minus, Maximize2, List, Plus, Pencil, Trash2, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
@@ -30,6 +30,8 @@ export function AIChatAssistant() {
   const [isLoading, setIsLoading] = useState(false);
   const [projectData, setProjectData] = useState<any>({});
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -204,6 +206,39 @@ export function AIChatAssistant() {
     }
   };
 
+  const deleteThread = async (e: React.MouseEvent, threadId: string) => {
+    e.stopPropagation();
+    const key = await getStorageKey();
+    const updatedThreads = threads.filter(t => t.id !== threadId);
+    setThreads(updatedThreads);
+    localStorage.setItem(key, JSON.stringify(updatedThreads));
+    if (currentThreadId === threadId) {
+      setCurrentThreadId(null);
+      setMessages([]);
+    }
+  };
+
+  const startEditing = (e: React.MouseEvent, thread: ChatThread) => {
+    e.stopPropagation();
+    setEditingThreadId(thread.id);
+    setEditTitle(thread.title);
+  };
+
+  const saveTitle = async (e: React.MouseEvent | React.KeyboardEvent | React.FocusEvent, threadId: string) => {
+    e.stopPropagation();
+    if (!editTitle.trim()) {
+      setEditingThreadId(null);
+      return;
+    }
+    const key = await getStorageKey();
+    const updatedThreads = threads.map(t => 
+      t.id === threadId ? { ...t, title: editTitle.trim() } : t
+    );
+    setThreads(updatedThreads);
+    localStorage.setItem(key, JSON.stringify(updatedThreads));
+    setEditingThreadId(null);
+  };
+
   const startNewChat = () => {
     setCurrentThreadId(null);
     setMessages([]);
@@ -295,9 +330,38 @@ export function AIChatAssistant() {
                         <div 
                           key={t.id} 
                           onClick={() => selectThread(t)}
-                          className={`p-3 text-sm rounded-lg border cursor-pointer hover:border-primary transition-colors ${currentThreadId === t.id ? 'bg-primary/5 border-primary' : 'bg-card'}`}
+                          className={`p-3 text-sm rounded-lg border cursor-pointer hover:border-primary transition-colors group ${currentThreadId === t.id ? 'bg-primary/5 border-primary' : 'bg-card'}`}
                         >
-                          <div className="font-medium truncate">{t.title}</div>
+                          <div className="flex justify-between items-start gap-2">
+                            {editingThreadId === t.id ? (
+                              <div className="flex-1 flex gap-1 items-center" onClick={(e) => e.stopPropagation()}>
+                                <Input 
+                                  value={editTitle}
+                                  onChange={(e) => setEditTitle(e.target.value)}
+                                  onKeyDown={(e) => e.key === 'Enter' && saveTitle(e, t.id)}
+                                  onBlur={(e) => saveTitle(e, t.id)}
+                                  className="h-7 text-xs px-2"
+                                  autoFocus
+                                />
+                                <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 text-green-600 hover:bg-green-50 hover:text-green-700" onClick={(e) => saveTitle(e, t.id)}>
+                                  <Check className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="font-medium truncate flex-1">{t.title}</div>
+                            )}
+                            
+                            {editingThreadId !== t.id && (
+                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={(e) => startEditing(e, t)}>
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                                <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={(e) => deleteThread(e, t.id)}>
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )}
+                          </div>
                           <div className="text-[10px] text-muted-foreground mt-1">
                             {new Date(t.updated_at).toLocaleDateString()}
                           </div>
