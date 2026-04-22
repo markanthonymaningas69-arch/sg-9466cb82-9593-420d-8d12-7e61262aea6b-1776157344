@@ -86,6 +86,8 @@ function buildSystemPrompt(projectData: any): string {
     scopeSpendingData, 
     ocmData,
     accounting,
+    ledger,
+    liquidations,
     personnel,
     warehouse,
     purchases,
@@ -161,7 +163,7 @@ function buildSystemPrompt(projectData: any): string {
 
   // ACCOUNTING MODULE
   if (accounting?.length > 0) {
-    prompt += `=== ACCOUNTING ===\n`;
+    prompt += `=== ACCOUNTING (VOUCHERS) ===\n`;
     const totalVouchers = accounting.length;
     const pendingVouchers = accounting.filter((v: any) => v.status === 'pending').length;
     const approvedVouchers = accounting.filter((v: any) => v.status === 'approved').length;
@@ -169,6 +171,29 @@ function buildSystemPrompt(projectData: any): string {
     
     prompt += `Total Vouchers: ${totalVouchers} (Pending: ${pendingVouchers}, Approved: ${approvedVouchers})\n`;
     prompt += `Total Voucher Amount: ${formatCurrency(totalAmount)}\n\n`;
+  }
+
+  // LEDGER / JOURNAL OPEX
+  if (ledger?.length > 0) {
+    prompt += `=== LEDGER & OPEX ===\n`;
+    const totalDebits = ledger.filter((t: any) => t.type === 'debit').reduce((sum: number, t: any) => sum + (Number(t.amount) || 0), 0);
+    const totalCredits = ledger.filter((t: any) => t.type === 'credit').reduce((sum: number, t: any) => sum + (Number(t.amount) || 0), 0);
+    
+    prompt += `Total Ledger Transactions: ${ledger.length}\n`;
+    prompt += `Total Debits: ${formatCurrency(totalDebits)}\n`;
+    prompt += `Total Credits: ${formatCurrency(totalCredits)}\n`;
+    prompt += `Balance (Debits - Credits): ${formatCurrency(totalDebits - totalCredits)}\n\n`;
+  }
+
+  // LIQUIDATIONS
+  if (liquidations?.length > 0) {
+    prompt += `=== LIQUIDATIONS ===\n`;
+    const pendingLiq = liquidations.filter((l: any) => l.status === 'pending').length;
+    const approvedLiq = liquidations.filter((l: any) => l.status === 'approved').length;
+    const totalAmount = liquidations.reduce((sum: number, l: any) => sum + (Number(l.amount) || 0), 0);
+    
+    prompt += `Total Liquidations: ${liquidations.length} (Pending: ${pendingLiq}, Approved: ${approvedLiq})\n`;
+    prompt += `Total Liquidation Amount: ${formatCurrency(totalAmount)}\n\n`;
   }
 
   // PERSONNEL MODULE

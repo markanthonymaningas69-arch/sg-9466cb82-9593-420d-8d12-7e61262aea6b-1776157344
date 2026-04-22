@@ -64,17 +64,23 @@ export default function Analytics() {
         personnelData,
         warehouseData,
         purchasesResponse,
-        allProjectsData
+        allProjectsData,
+        ledgerData,
+        liquidationsData
       ] = await Promise.all([
         supabase.from('vouchers').select('*').limit(100),
         supabase.from('personnel').select('*').limit(100),
         supabase.from('inventory').select('*').limit(100),
         supabase.from('purchases').select('*').order('order_date', { ascending: false }).limit(100),
-        projectService.getAll()
+        projectService.getAll(),
+        supabase.from('accounting_transactions').select('*').order('date', { ascending: false }).limit(100),
+        supabase.from('liquidations').select('*').order('date', { ascending: false }).limit(100)
       ]);
 
       setAllModulesData({
         accounting: accountingData.data || [],
+        ledger: ledgerData.data || [],
+        liquidations: liquidationsData.data || [],
         personnel: personnelData.data || [],
         warehouse: warehouseData.data || [],
         purchases: purchasesResponse.data || [],
@@ -892,30 +898,32 @@ export default function Analytics() {
 
           </Tabs>
         )}
-      </div>
 
-      {/* AI Chat Assistant - Below analytics tabs, analyzes ALL modules data */}
-      <AIChatAssistant
-        projectData={{
-          // Current project analytics
-          projectId: selectedProject,
-          projectName: projects.find(p => p.id === selectedProject)?.name || "All Projects",
-          swaData,
-          materialUsageData,
-          scopeSpendingData,
-          ocmData,
-          visualAnalyticsData,
-          bom,
-          consumption,
-          attendance,
-          // All modules data
-          accounting: allModulesData.accounting,
-          personnel: allModulesData.personnel,
-          warehouse: allModulesData.warehouse,
-          purchases: allModulesData.purchases,
-          allProjects: allModulesData.allProjects
-        }}
-      />
+        {/* AI Chat Assistant - Below analytics tabs, analyzes ALL modules data */}
+        <AIChatAssistant
+          projectData={{
+            // Current project analytics
+            projectId: selectedProject,
+            projectName: projects.find(p => p.id === selectedProject)?.name || "All Projects",
+            swaData,
+            materialUsageData,
+            scopeSpendingData,
+            ocmData,
+            visualAnalyticsData,
+            bom,
+            consumption,
+            attendance,
+            // All modules data
+            accounting: allModulesData.accounting,
+            ledger: allModulesData.ledger,
+            liquidations: allModulesData.liquidations,
+            personnel: allModulesData.personnel,
+            warehouse: allModulesData.warehouse,
+            purchases: allModulesData.purchases,
+            allProjects: allModulesData.allProjects
+          }}
+        />
+      </div>
     </Layout>
   );
 }
