@@ -1262,9 +1262,9 @@ export default function BillOfMaterials() {
                                             <SelectValue placeholder="Unit" />
                                           </SelectTrigger>
                                           <SelectContent>
-                                            {["Cu.m", "Kg", "Lin.m", "Lot", "Sq.m", "Other"].map((unitOption) => (
+                                            {[...MATERIAL_UNIT_OPTIONS, "Other"].map((unitOption) => (
                                               <SelectItem key={unitOption} value={unitOption} className="text-xs">
-                                                {unitOption === "Other" ? "Other" : unitOption}
+                                                {unitOption === "Other" ? "Others/Input" : unitOption}
                                               </SelectItem>
                                             ))}
                                           </SelectContent>
@@ -1366,17 +1366,17 @@ export default function BillOfMaterials() {
                                     <div className="flex flex-col gap-1">
                                       <Select value={materialForm.name} onValueChange={(val) => handleMaterialChange(val)}>
                                         <SelectTrigger className="h-6 text-xs">
-                                          <SelectValue placeholder="Select material" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="custom">-- Custom Material --</SelectItem>
-                                          {getSelectableScopeMaterials(scope).map((m) => (
-                                            <SelectItem key={m.id} value={m.name}>
-                                              {m.name}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
+                                            <SelectValue placeholder="Select material" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="custom">-- Custom Material --</SelectItem>
+                                            {getSelectableScopeMaterials(scope).map((m) => (
+                                              <SelectItem key={m.id} value={m.name}>
+                                                {m.name}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
                                       {isManualMaterial && (
                                         <Input
                                           placeholder="Description"
@@ -1411,9 +1411,9 @@ export default function BillOfMaterials() {
                                           <SelectValue placeholder="Unit" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                          {["Cu.m", "Kg", "Lin.m", "Lot", "Sq.m", "Other"].map((unitOption) => (
+                                          {[...MATERIAL_UNIT_OPTIONS, "Other"].map((unitOption) => (
                                             <SelectItem key={unitOption} value={unitOption} className="text-xs">
-                                              {unitOption === "Other" ? "Other" : unitOption}
+                                              {unitOption === "Other" ? "Others/Input" : unitOption}
                                             </SelectItem>
                                           ))}
                                         </SelectContent>
@@ -1621,9 +1621,9 @@ export default function BillOfMaterials() {
                                         <SelectValue placeholder="Unit" />
                                       </SelectTrigger>
                                       <SelectContent>
-                                        {["Cu.m", "Kg", "Lin.m", "Lot", "Sq.m", "Other"].map((unitOption) => (
+                                        {[...MATERIAL_UNIT_OPTIONS, "Other"].map((unitOption) => (
                                           <SelectItem key={unitOption} value={unitOption} className="text-xs">
-                                            {unitOption === "Other" ? "Other" : unitOption}
+                                            {unitOption === "Other" ? "Others/Input" : unitOption}
                                           </SelectItem>
                                         ))}
                                       </SelectContent>
