@@ -683,6 +683,9 @@ export function Layout({ children }: LayoutProps) {
               });
 
               const displayPendingDeliveries = (isGM || isSitePersonnel) ? pendingDeliveries : [];
+              const displayPendingPurchases = (isGM || isPurchasing) ? pendingPurchases : [];
+              const displayGmPurchases = isGM ? pendingGmPurchases : [];
+              const displayApprovedVouchers = isAccounting ? approvedVouchers : [];
 
               // Resolved Updates
               const displayResolvedAdvances = resolvedCashAdvances.filter(adv => {
@@ -715,7 +718,7 @@ export function Layout({ children }: LayoutProps) {
                 return false;
               });
 
-              const totalNotifications = displayPendingAdvances.length + displayPendingLeaves.length + displayExpiring.length + displayPendingRequests.length + displayPendingDeliveries.length + displayResolvedAdvances.length + displayResolvedLeaves.length + displayResolvedRequests.length + displayReceivedDeliveries.length + displayPendingPurchases.length + displayGmPurchases.length + displayApprovedVouchers.length;
+              const totalNotifications = displayPendingAdvances.length + displayPendingLeaves.length + displayExpiring.length + displayPendingRequests.length + displayPendingDeliveries.length + displayPendingPurchases.length + displayGmPurchases.length + displayApprovedVouchers.length + displayResolvedAdvances.length + displayResolvedLeaves.length + displayResolvedRequests.length + displayReceivedDeliveries.length;
               const hasActionRequired = displayPendingAdvances.length > 0 || displayPendingLeaves.length > 0 || displayExpiring.length > 0 || displayPendingRequests.length > 0 || displayPendingDeliveries.length > 0 || displayPendingPurchases.length > 0 || displayGmPurchases.length > 0 || displayApprovedVouchers.length > 0;
               const hasRecentUpdates = displayResolvedAdvances.length > 0 || displayResolvedLeaves.length > 0 || displayResolvedRequests.length > 0 || displayReceivedDeliveries.length > 0;
 
