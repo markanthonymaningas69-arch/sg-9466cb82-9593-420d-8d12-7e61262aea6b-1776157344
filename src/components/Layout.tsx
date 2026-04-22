@@ -460,6 +460,16 @@ export function Layout({ children }: LayoutProps) {
         sidebarOpen ? "translate-x-0" : "-translate-x-full",
         sidebarCollapsed ? "w-[80px]" : "w-64"
       )}>
+        {/* Floating Collapse Toggle */}
+        <Button
+          variant="outline"
+          size="icon"
+          className="absolute -right-3.5 top-20 h-7 w-7 rounded-full bg-background border shadow-sm z-50 hidden lg:flex text-muted-foreground hover:text-foreground"
+          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+        >
+          {sidebarCollapsed ? <ChevronRight className="h-4 w-4 ml-0.5" /> : <ChevronLeft className="h-4 w-4 mr-0.5" />}
+        </Button>
+
         <div className="flex flex-col h-full overflow-hidden">
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-6 border-b shrink-0">
@@ -576,17 +586,6 @@ export function Layout({ children }: LayoutProps) {
                 {!sidebarCollapsed && <span className="truncate">Subscription</span>}
               </Link>
             )}
-          </div>
-
-          {/* Collapse Toggle */}
-          <div className="border-t p-2 shrink-0">
-            <Button 
-              variant="ghost" 
-              className="w-full flex justify-center text-muted-foreground hover:text-foreground" 
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            >
-              {sidebarCollapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
-            </Button>
           </div>
 
           {/* Footer */}
