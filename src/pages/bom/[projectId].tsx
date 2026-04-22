@@ -1363,10 +1363,44 @@ export default function BillOfMaterials() {
                   }
                     </TableBody>
                   </Table>
-                </div> :
-                null}
 
-                      <div className="flex justify-between items-start pt-2 border-t mt-2">
+                  {selectedScopeId !== scope.id && (
+                    <div className="flex justify-end mt-3 pr-2">
+                      <Button
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700 text-white h-7 text-xs"
+                        disabled={isLocked}
+                        onClick={() => {
+                          setSelectedScopeId(scope.id as string);
+                          resetMaterialForm();
+                        }}
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        Add Materials
+                      </Button>
+                    </div>
+                  )}
+
+                </div> :
+                <div className="text-xs text-muted-foreground italic mt-2 ml-1">
+                  No materials added yet.
+                  <div className="flex justify-start mt-3">
+                    <Button
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700 text-white h-7 text-xs"
+                      disabled={isLocked}
+                      onClick={() => {
+                        setSelectedScopeId(scope.id as string);
+                        resetMaterialForm();
+                      }}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add Materials
+                    </Button>
+                  </div>
+                </div>}
+
+                      <div className="flex justify-between items-start pt-4 border-t mt-4">
                         <div className="flex-1 pr-4">
                           <div className="flex items-center gap-3 mb-2">
                             <h3 className="font-semibold text-sm">Labor Cost</h3>
