@@ -273,8 +273,14 @@ export const bomService = {
       const generatedMaterialsData = [];
       
       for (const mat of materials) {
+        const matName = mat.name || mat.material_name || "Unknown Material";
+        const matCategory = mat.category || "Construction Materials";
+        const matUnit = mat.unit || "Lot";
+        const matQty = Number(mat.quantity) || 1;
+        const matCost = Number(mat.unit_cost) || 0;
+
         let masterId = null;
-        const match = existingMasters.find(m => m.name.toLowerCase() === mat.name.toLowerCase());
+        const match = existingMasters.find(m => m.name.toLowerCase() === matName.toLowerCase());
         
         if (match) {
           masterId = match.id;
@@ -285,16 +291,18 @@ export const bomService = {
             }).eq('id', masterId);
           }
         } else {
-          const { data: newMaster } = await supabase.from('master_items').insert({
-            name: mat.name,
-            category: mat.category || 'Construction Materials',
-            unit: mat.unit || 'Other',
-            default_cost: mat.unit_cost || 0,
+          const { data: newMaster, error: masterError } = await supabase.from('master_items').insert({
+            name: matName,
+            category: matCategory,
+            unit: matUnit,
+            default_cost: matCost,
             associated_scopes: [scopeName],
-            company_id: companyId
+            ...(companyId ? { company_id: companyId } : {})
           }).select().single();
           
-          if (newMaster) {
+          if (masterError) {
+            console.error("Master Catalog Insert Error:", masterError);
+          } else if (newMaster) {
             masterId = newMaster.id;
             existingMasters.push(newMaster);
           }
@@ -302,26 +310,29 @@ export const bomService = {
 
         generatedMaterialsData.push({
           scope_id: scopeId,
-          material_name: mat.name,
-          description: mat.name,
-          quantity: mat.quantity,
-          unit: mat.unit,
-          unit_cost: mat.unit_cost,
-          total_cost: (mat.quantity * mat.unit_cost),
-          company_id: companyId
+          material_name: matName,
+          description: matName,
+          quantity: matQty,
+          unit: matUnit,
+          unit_cost: matCost,
+          total_cost: matQty * matCost,
+          ...(companyId ? { company_id: companyId } : {})
         });
       }
 
       if (generatedMaterialsData.length > 0) {
         const { error: insertError } = await supabase.from('bom_materials').insert(generatedMaterialsData);
-        if (insertError) throw insertError;
+        if (insertError) {
+          console.error("BOM Materials Insert Error:", insertError);
+          throw new Error(insertError.message || "Failed to insert materials into database.");
+        }
       }
 
       cacheManager.invalidatePattern('BOMSummary');
       return { success: true, count: generatedMaterialsData.length };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving generated materials:', error);
-      return { error: error instanceof Error ? error.message : 'An error occurred' };
+      return { error: error.message || 'An error occurred while saving' };
     }
   }
 };
