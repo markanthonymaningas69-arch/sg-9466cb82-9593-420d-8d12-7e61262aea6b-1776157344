@@ -1203,71 +1203,170 @@ export default function BillOfMaterials() {
                         <h3 className="font-semibold text-base">Materials</h3>
                       </div>
                       <Table>
+                        <TableHeader>
+                          <TableRow className="h-7 text-xs hover:bg-transparent border-b">
+                            <TableHead className="py-1">Material</TableHead>
+                            <TableHead className="py-1 text-right w-24">Qty</TableHead>
+                            <TableHead className="py-1 w-28">Unit</TableHead>
+                            <TableHead className="py-1 text-right w-28">Unit Cost</TableHead>
+                            <TableHead className="py-1 text-right w-28">Amount</TableHead>
+                            <TableHead className="py-1 text-right w-20"></TableHead>
+                          </TableRow>
+                        </TableHeader>
                         <TableBody>
                           {(scope.bom_materials || []).map((material) =>
-                      <TableRow key={material.id} className="h-7">
-                          <TableCell className="py-0.5">
-                            <div className="font-medium text-sm">
-                              {material.description || material.material_name}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right py-0.5 text-sm">
-                            {formatNumber(material.quantity as number || 0)}
-                          </TableCell>
-                          <TableCell className="py-0.5 text-sm">{material.unit}</TableCell>
-                          <TableCell className="text-right py-0.5 text-sm">
-                            {formatCurrency(material.unit_cost as number || 0)}
-                          </TableCell>
-                          <TableCell className="text-right font-semibold py-0.5 text-sm">
-                            {formatCurrency(
-                              (material.total_cost as number) ??
-                              ((material.quantity as number || 0) * (material.unit_cost as number || 0))
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right py-0.5">
-                            <div className="flex justify-end items-center gap-1">
-                              <Button
-                          size="sm"
-                          className="bg-green-600 hover:bg-green-700 text-white h-6 px-2 text-xs"
-                          onClick={() => void handleMaterialSubmitInline()}
-                          disabled={isLocked}>
+                            editingMaterial?.id === material.id ? (
+                              <TableRow key={material.id} className="h-7 bg-muted/20 border-y border-primary/20">
+                                <TableCell className="py-1">
+                                  <div className="flex flex-col gap-1">
+                                    <Select value={materialForm.name} onValueChange={(val) => handleMaterialChange(val)}>
+                                      <SelectTrigger className="h-6 text-xs"><SelectValue placeholder="Select material" /></SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="custom">-- Custom Material --</SelectItem>
+                                        {masterItems.map(m => <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>)}
+                                      </SelectContent>
+                                    </Select>
+                                    {isManualMaterial && (
+                                      <Input placeholder="Description" className="h-6 text-xs" value={materialForm.description} onChange={(e) => setMaterialForm({...materialForm, description: e.target.value})} />
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="py-1 text-right">
+                                  <Input placeholder="Qty" value={materialForm.quantity} onChange={(e) => setMaterialForm({...materialForm, quantity: e.target.value})} className="h-6 text-xs text-right" />
+                                </TableCell>
+                                <TableCell className="py-1">
+                                  <div className="flex flex-col gap-1">
+                                    <Select value={materialForm.unit_selection} onValueChange={(v) => setMaterialForm({...materialForm, unit: v === "Other" ? "" : v, unit_selection: v})}>
+                                      <SelectTrigger className="h-6 text-xs"><SelectValue placeholder="Unit" /></SelectTrigger>
+                                      <SelectContent>
+                                        {["Bag", "Bd.ft", "Box", "Cu.m", "Gal", "Kg", "Length", "Lin.m", "Liter", "Lot", "M", "Pail", "Pair", "Pc", "Roll", "Set", "Sq.m", "Unit", "Other"].map(u => <SelectItem key={u} value={u}>{u === "Other" ? "Others/Input" : u}</SelectItem>)}
+                                      </SelectContent>
+                                    </Select>
+                                    {materialForm.unit_selection === "Other" && (
+                                      <Input placeholder="Unit" className="h-6 text-xs" value={materialForm.unit} onChange={(e) => setMaterialForm({...materialForm, unit: e.target.value})} />
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="py-1 text-right">
+                                  <Input placeholder="Cost" value={materialForm.unit_cost} onChange={(e) => setMaterialForm({...materialForm, unit_cost: e.target.value})} className="h-6 text-xs text-right" />
+                                </TableCell>
+                                <TableCell className="py-1 text-right font-semibold text-sm">
+                                  {formatCurrency((parseFloat(materialForm.quantity.replace(/,/g, ""))||0) * (parseFloat(materialForm.unit_cost.replace(/,/g, ""))||0))}
+                                </TableCell>
+                                <TableCell className="py-1 text-right">
+                                  <div className="flex justify-end items-center gap-1">
+                                    <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white h-6 px-2 text-xs" onClick={() => void handleMaterialSubmitInline()} disabled={isLocked}>
+                                      Update
+                                    </Button>
+                                    <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => { resetMaterialForm(); setSelectedScopeId(""); }}>
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              <TableRow key={material.id} className="h-7">
+                                <TableCell className="py-0.5">
+                                  <div className="font-medium text-sm">
+                                    {material.description || material.material_name}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-right py-0.5 text-sm">
+                                  {formatNumber(material.quantity as number || 0)}
+                                </TableCell>
+                                <TableCell className="py-0.5 text-sm">{material.unit}</TableCell>
+                                <TableCell className="text-right py-0.5 text-sm">
+                                  {formatCurrency(material.unit_cost as number || 0)}
+                                </TableCell>
+                                <TableCell className="text-right font-semibold py-0.5 text-sm">
+                                  {formatCurrency(
+                                    (material.total_cost as number) ??
+                                    ((material.quantity as number || 0) * (material.unit_cost as number || 0))
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right py-0.5">
+                                  <div className="flex justify-end items-center gap-1">
+                                    <Button size="icon" variant="ghost" className="h-6 w-6 text-green-700 hover:text-green-800" onClick={() => handleEditMaterial(material as any)} disabled={isLocked}>
+                                      <Pencil className="h-3 w-3" />
+                                    </Button>
+                                    <Button size="icon" variant="ghost" className="h-6 w-6 text-red-600 hover:text-red-700" onClick={() => void handleDeleteMaterial(material.id as string)} disabled={isLocked}>
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )
+                          )}
                           
-                                {editingMaterial ? "Update" : "Add"}
-                              </Button>
-                              <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-6 px-2 text-xs border-red-600 dark:border-red-500 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
-                          onClick={() => {
-                            resetMaterialForm();
-                            setSelectedScopeId("");
-                          }}>
-                          
-                                Cancel
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                  )}
-                    </TableBody>
-                  </Table>
+                          {selectedScopeId === scope.id && !editingMaterial && (
+                            <TableRow className="h-7 bg-muted/20 border-y border-primary/20">
+                              <TableCell className="py-1">
+                                <div className="flex flex-col gap-1">
+                                  <Select value={materialForm.name} onValueChange={(val) => handleMaterialChange(val)}>
+                                    <SelectTrigger className="h-6 text-xs"><SelectValue placeholder="Select material" /></SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="custom">-- Custom Material --</SelectItem>
+                                      {masterItems.map(m => <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>)}
+                                    </SelectContent>
+                                  </Select>
+                                  {isManualMaterial && (
+                                    <Input placeholder="Description" className="h-6 text-xs" value={materialForm.description} onChange={(e) => setMaterialForm({...materialForm, description: e.target.value})} />
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="py-1 text-right">
+                                <Input placeholder="Qty" value={materialForm.quantity} onChange={(e) => setMaterialForm({...materialForm, quantity: e.target.value})} className="h-6 text-xs text-right" />
+                              </TableCell>
+                              <TableCell className="py-1">
+                                <div className="flex flex-col gap-1">
+                                  <Select value={materialForm.unit_selection} onValueChange={(v) => setMaterialForm({...materialForm, unit: v === "Other" ? "" : v, unit_selection: v})}>
+                                    <SelectTrigger className="h-6 text-xs"><SelectValue placeholder="Unit" /></SelectTrigger>
+                                    <SelectContent>
+                                      {["Bag", "Bd.ft", "Box", "Cu.m", "Gal", "Kg", "Length", "Lin.m", "Liter", "Lot", "M", "Pail", "Pair", "Pc", "Roll", "Set", "Sq.m", "Unit", "Other"].map(u => <SelectItem key={u} value={u}>{u === "Other" ? "Others/Input" : u}</SelectItem>)}
+                                    </SelectContent>
+                                  </Select>
+                                  {materialForm.unit_selection === "Other" && (
+                                    <Input placeholder="Unit" className="h-6 text-xs" value={materialForm.unit} onChange={(e) => setMaterialForm({...materialForm, unit: e.target.value})} />
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="py-1 text-right">
+                                <Input placeholder="Cost" value={materialForm.unit_cost} onChange={(e) => setMaterialForm({...materialForm, unit_cost: e.target.value})} className="h-6 text-xs text-right" />
+                              </TableCell>
+                              <TableCell className="py-1 text-right font-semibold text-sm">
+                                {formatCurrency((parseFloat(materialForm.quantity.replace(/,/g, ""))||0) * (parseFloat(materialForm.unit_cost.replace(/,/g, ""))||0))}
+                              </TableCell>
+                              <TableCell className="py-1 text-right">
+                                <div className="flex justify-end items-center gap-1">
+                                  <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white h-6 px-2 text-xs" onClick={() => void handleMaterialSubmitInline()} disabled={isLocked}>
+                                    Add
+                                  </Button>
+                                  <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => { resetMaterialForm(); setSelectedScopeId(""); }}>
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
 
-                  {selectedScopeId !== scope.id && (
-                    <div className="flex justify-end mt-1 pr-2">
-                      <Button
-                        size="sm"
-                        className="bg-green-600 hover:bg-green-700 text-white h-6 text-xs"
-                        disabled={isLocked}
-                        onClick={() => {
-                          setSelectedScopeId(scope.id as string);
-                          resetMaterialForm();
-                        }}
-                      >
-                        <Plus className="h-3 w-3 mr-1" />
-                        Add Materials
-                      </Button>
-                    </div>
-                  )}
+                      {selectedScopeId !== scope.id && (
+                        <div className="flex justify-end mt-1 pr-2">
+                          <Button
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700 text-white h-6 text-xs"
+                            disabled={isLocked}
+                            onClick={() => {
+                              setSelectedScopeId(scope.id as string);
+                              resetMaterialForm();
+                            }}
+                          >
+                            <Plus className="h-3 w-3 mr-1" />
+                            Add Materials
+                          </Button>
+                        </div>
+                      )}
 
                 </div> :
                 <div className="text-xs text-muted-foreground italic mt-0.5 ml-1">
