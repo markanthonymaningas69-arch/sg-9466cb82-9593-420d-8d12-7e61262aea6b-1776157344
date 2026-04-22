@@ -23,26 +23,25 @@ export default async function handler(
       return res.status(400).json({ error: "Missing scope name or description" });
     }
 
-    const systemPrompt = `You are an expert construction estimator and quantity surveyor. 
-Your job is to generate a comprehensive list of required construction materials for a specific Scope of Work.
-
-You will be given the Scope Name, the Quantity of the scope, its Unit, and a detailed Description provided by the user.
-Calculate and estimate the materials required to complete the total quantity of this scope. 
-Use standard construction practices, waste margins, and typical material associations.
-
-Respond STRICTLY with a valid JSON array of objects. Do not include any markdown formatting, backticks, or explanation. Just the raw JSON array.
-Each object must have exactly these keys:
-- "name": (string) Standard material name (e.g., "Portland Cement Type 1")
-- "category": (string) Category (e.g., "Concrete", "Finishing", "Reinforcement", "Formwork", "Masonry")
-- "unit": (string) Standard unit (e.g., "Bag", "Cu.m", "Sq.m", "Kg", "Pc", "Lin.m", "Lot")
-- "quantity": (number) Estimated total quantity needed for the scope
-- "unit_cost": (number) Rough estimated unit cost in AED (provide a reasonable market estimate)
-
-Example output:
-[
-  { "name": "Portland Cement Type 1", "category": "Concrete", "unit": "Bag", "quantity": 150, "unit_cost": 25 },
-  { "name": "River Sand", "category": "Concrete", "unit": "Cu.m", "quantity": 15, "unit_cost": 65 }
-]`;
+    const systemPrompt = `You are an expert construction estimator. 
+            Given a scope of work, generate a structured list of materials required.
+            Consider standard construction practices and waste factors.
+            
+            Return strictly in this JSON format:
+            {
+              "materials": [
+                {
+                  "name": "Material Name",
+                  "unit": "kg|m3|pcs|lot",
+                  "quantity": 100,
+                  "unit_cost": 50,
+                  "category": "Category Name"
+                }
+              ]
+            }
+            WARNING: "quantity" and "unit_cost" MUST be pure numbers (e.g. 50, not "50" or "$50").
+            Do not include any markdown wrappers. Just return raw JSON.
+            If the prompt lacks details, make standard expert assumptions based on the scope name and quantity.`;
 
     const userMessage = `
 Scope Name: ${scopeName}

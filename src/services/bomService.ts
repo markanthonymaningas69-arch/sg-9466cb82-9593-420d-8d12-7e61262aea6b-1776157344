@@ -308,6 +308,7 @@ export const bomService = {
           }
         }
 
+        // Only include exact columns present in database
         generatedMaterialsData.push({
           scope_id: scopeId,
           material_name: matName,
