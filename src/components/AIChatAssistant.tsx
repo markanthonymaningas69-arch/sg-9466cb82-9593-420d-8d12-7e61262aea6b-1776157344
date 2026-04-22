@@ -91,7 +91,7 @@ export function AIChatAssistant() {
     if (data) {
       const parsed = data.map(t => ({
         ...t,
-        messages: t.messages.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }))
+        messages: (t.messages as any[]).map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }))
       }));
       setThreads(parsed);
     }
@@ -101,24 +101,27 @@ export function AIChatAssistant() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return;
 
+    // Convert messages to a simple object array for JSON storage
+    const messagesJson = JSON.parse(JSON.stringify(newMessages));
+
     if (!currentThreadId && newMessages.length > 0) {
       const title = newMessages[0].content.substring(0, 30) + "...";
       const { data } = await supabase.from('ai_chat_threads').insert({
         user_id: session.user.id,
         title,
-        messages: newMessages
+        messages: messagesJson
       }).select().single();
       
       if (data) {
         setCurrentThreadId(data.id);
         setThreads(prev => [{
           ...data,
-          messages: data.messages.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }))
+          messages: (data.messages as any[]).map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }))
         }, ...prev]);
       }
     } else if (currentThreadId) {
       await supabase.from('ai_chat_threads').update({
-        messages: newMessages,
+        messages: messagesJson,
         updated_at: new Date().toISOString()
       }).eq('id', currentThreadId);
       
