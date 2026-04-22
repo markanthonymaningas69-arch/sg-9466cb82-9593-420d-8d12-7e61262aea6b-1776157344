@@ -23,24 +23,72 @@ export default async function handler(
       return res.status(400).json({ error: "Missing scope name or description" });
     }
 
-    const systemPrompt = `You are an expert construction estimator. 
-            Given a scope of work, generate a structured list of materials required.
-            Consider standard construction practices and waste factors.
-            
-            Return strictly in this JSON format:
-            {
-              "materials": [
-                {
-                  "name": "Material Name",
-                  "unit": "Valid Unit",
-                  "quantity": 100
-                }
-              ]
-            }
-            WARNING: "quantity" MUST be a pure number. Do NOT include unit costs or prices.
-            CRITICAL: The "unit" MUST be chosen EXACTLY from this list: Bag, Bd.ft, Box, Cu.m, Gal, Kg, Length, Lin.m, Liter, Lot, M, Pail, Pair, Pc, Roll, Set, Sq.m, Unit.
-            Do not include any markdown wrappers. Just return raw JSON.
-            If the prompt lacks details, make standard expert assumptions based on the scope name and quantity.`;
+    const systemPrompt = `You are a deterministic construction quantity estimator.
+
+OBJECTIVE:
+Generate materials AND show step-by-step calculations using FIXED formulas.
+
+STRICT RULES:
+
+1. ALWAYS USE THESE CONSTANTS:
+- CHB per sqm = 12.5 pcs
+- Mortar per sqm = 0.02 m3
+- Mortar ratio = 1:3 (cement:sand)
+- Wastage = 5%
+- 1 bag cement = 40 kg
+
+2. DO NOT CHANGE FORMULAS
+3. DO NOT INTRODUCE NEW ASSUMPTIONS
+4. SAME INPUT = SAME OUTPUT
+
+5. CALCULATION METHOD (MANDATORY):
+
+For Masonry:
+
+Step 1:
+CHB = Area × 12.5
+
+Step 2:
+Mortar Volume = Area × 0.02
+
+Step 3:
+Cement = Mortar × (1 / (1+3))
+
+Step 4:
+Sand = Mortar × (3 / (1+3))
+
+Step 5:
+Apply Wastage:
+Final = Value × 1.05
+
+Step 6:
+Rounding:
+- CHB → round up
+- Cement → round up (bags)
+- Sand → 2 decimal places
+
+6. OUTPUT FORMAT (STRICT JSON):
+
+{
+  "materials": [
+    {
+      "name": "string",
+      "unit": "string",
+      "quantity": number
+    }
+  ],
+  "calculation": {
+    "steps": [
+      "text explanation of step 1",
+      "text explanation of step 2"
+    ]
+  }
+}
+
+7. NO VARIATION ALLOWED
+8. NO EXTRA TEXT
+
+CRITICAL UI RULE: The "unit" MUST be chosen EXACTLY from this list: Bag, Bd.ft, Box, Cu.m, Gal, Kg, Length, Lin.m, Liter, Lot, M, Pail, Pair, Pc, Roll, Set, Sq.m, Unit.`;
 
     const userMessage = `
 Scope Name: ${scopeName}
@@ -85,9 +133,10 @@ Generate the materials list as JSON.`;
       cleanedJson = cleanedJson.replace(/^```\n/, "").replace(/\n```$/, "");
     }
 
-    const materialsList = JSON.parse(cleanedJson);
+    const generatedData = JSON.parse(cleanedJson);
 
-    return res.status(200).json({ materials: materialsList });
+    // Return the full object (which includes materials and calculation steps)
+    return res.status(200).json(generatedData);
   } catch (error) {
     console.error("AI Generate BOM Error:", error);
     return res.status(500).json({
