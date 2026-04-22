@@ -1400,15 +1400,21 @@ export default function BillOfMaterials() {
                                     <div className="flex flex-col gap-1">
                                       <Select
                                         value={materialForm.unit_selection}
-                                        onValueChange={(v) => setMaterialForm({ ...materialForm, unit: v === "Other" ? "" : v, unit_selection: v })}
+                                        onValueChange={(value) =>
+                                          setMaterialForm({
+                                            ...materialForm,
+                                            unit: value === "Other" ? "" : value,
+                                            unit_selection: value
+                                          })
+                                        }
                                       >
                                         <SelectTrigger className="h-6 text-xs">
                                           <SelectValue placeholder="Unit" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                          {["Bag", "Bd.ft", "Box", "Cu.m", "Gal", "Kg", "Length", "Lin.m", "Liter", "Lot", "M", "Pail", "Pair", "Pc", "Roll", "Set", "Sq.m", "Unit", "Other"].map((u) => (
-                                            <SelectItem key={u} value={u}>
-                                              {u === "Other" ? "Others/Input" : u}
+                                          {["Bag", "Bd.ft", "Box", "Cu.m", "Gal", "Kg", "Length", "Lin.m", "Liter", "Lot", "M", "Pail", "Pair", "Pc", "Roll", "Set", "Sq.m", "Unit", "Other"].map((unitOption) => (
+                                            <SelectItem key={unitOption} value={unitOption} className="text-xs">
+                                              {unitOption === "Other" ? "Other" : unitOption}
                                             </SelectItem>
                                           ))}
                                         </SelectContent>
@@ -1416,9 +1422,9 @@ export default function BillOfMaterials() {
                                       {materialForm.unit_selection === "Other" && (
                                         <Input
                                           placeholder="Unit"
-                                          className="h-6 text-xs"
                                           value={materialForm.unit}
                                           onChange={(e) => setMaterialForm({ ...materialForm, unit: e.target.value })}
+                                          className="h-6 text-xs"
                                         />
                                       )}
                                     </div>
