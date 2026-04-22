@@ -1,6 +1,6 @@
 ---
 title: Linked materials dropdown
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -20,7 +20,7 @@ Update the BOM material picker so it uses the material catalog engine links for 
 - [x] Update the material dropdown to only show catalog materials linked to the active scope
 - [x] Exclude materials already added under the same scope from subsequent dropdown options
 - [x] Apply the same filtering for both add and edit flows where appropriate
-- [ ] Validate the BOM page still compiles cleanly
+- [x] Validate the BOM page still compiles cleanly
 
 ## Acceptance
 In a scope, the material dropdown only lists catalog materials linked to that scope.
