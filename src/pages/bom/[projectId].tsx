@@ -584,6 +584,7 @@ export default function BillOfMaterials() {
       const unit = selectedMaster.unit || "";
       const isKnown = knownUnits.includes(unit);
       const existsInMaster = masterItems.some(m => m.name.toLowerCase() === (material.description || material.material_name).toLowerCase());
+      const existsInScope = scopes.some(s => s.name.toLowerCase() === materialName.toLowerCase());
 
       setMaterialForm({
         name: selectedMaster.name,
@@ -1264,8 +1265,8 @@ export default function BillOfMaterials() {
                                           </SelectTrigger>
                                           <SelectContent>
                                             {["Bag", "Bd.ft", "Box", "Cu.m", "Gal", "Kg", "Length", "Lin.m", "Liter", "Lot", "M", "Pail", "Pair", "Pc", "Roll", "Set", "Sq.m", "Unit", "Other"].map((u) => (
-                                              <SelectItem key={u} value={u}>
-                                                {u === "Other" ? "Others/Input" : u}
+                                              <SelectItem key={u} value={u} className="text-xs">
+                                                {u === "Other" ? "Other" : u}
                                               </SelectItem>
                                             ))}
                                           </SelectContent>
