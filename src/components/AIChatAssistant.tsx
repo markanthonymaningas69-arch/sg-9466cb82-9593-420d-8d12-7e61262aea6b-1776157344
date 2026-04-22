@@ -352,11 +352,11 @@ export function AIChatAssistant() {
                             )}
                             
                             {editingThreadId !== t.id && (
-                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={(e) => startEditing(e, t)}>
+                              <div className="flex gap-1 shrink-0">
+                                <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:bg-muted hover:text-primary" onClick={(e) => startEditing(e, t)}>
                                   <Pencil className="h-3 w-3" />
                                 </Button>
-                                <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={(e) => deleteThread(e, t.id)}>
+                                <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:bg-red-50 hover:text-destructive" onClick={(e) => deleteThread(e, t.id)}>
                                   <Trash2 className="h-3 w-3" />
                                 </Button>
                               </div>
