@@ -14,6 +14,6 @@ Create the database infrastructure and service layer for the Project Manager (Ga
 
 ## Checklist
 - [x] Create `project_tasks` table in database (dependencies, progress, dates, bom link)
-- [ ] Set up Row Level Security (RLS) for the new table
-- [ ] Create `src/services/scheduleService.ts` for CRUD operations
+- [x] Set up Row Level Security (RLS) for the new table
+- [x] Create `src/services/scheduleService.ts` for CRUD operations
 - [ ] Add navigation link for the new module
