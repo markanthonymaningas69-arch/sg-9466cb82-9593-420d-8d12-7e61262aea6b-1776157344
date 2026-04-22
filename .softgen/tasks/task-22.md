@@ -1,6 +1,6 @@
 ---
 title: Project Manager Module - Backend & Schema
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [gantt, scheduling, backend]
@@ -16,4 +16,4 @@ Create the database infrastructure and service layer for the Project Manager (Ga
 - [x] Create `project_tasks` table in database (dependencies, progress, dates, bom link)
 - [x] Set up Row Level Security (RLS) for the new table
 - [x] Create `src/services/scheduleService.ts` for CRUD operations
-- [ ] Add navigation link for the new module
+- [x] Add navigation link for the new module

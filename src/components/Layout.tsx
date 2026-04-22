@@ -19,7 +19,8 @@ import {
   LogOut,
   Check,
   XCircle,
-  Activity } from
+  Activity,
+  CalendarDays } from
 "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,7 @@ interface LayoutProps {
 
 const navigation = [
 { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+{ name: "Project Manager", href: "/schedule", icon: CalendarDays },
 { name: "Project Profile", href: "/projects", icon: FolderKanban },
 { name: "Site Personnel", href: "/site-personnel", icon: ClipboardList },
 { name: "Purchasing", href: "/purchasing", icon: ShoppingCart },
@@ -484,7 +486,7 @@ export function Layout({ children }: LayoutProps) {
               {navigation.filter((item) => {
                 if (assignedModules.includes("GM")) {
                   const isRestrictedPlan = currentPlan === "starter" || currentPlan === "trial" || isTrial;
-                  const isRestrictedModule = item.name === "Human Resources" || item.name === "Warehouse";
+                  const isRestrictedModule = item.name === "Human Resources" || item.name === "Warehouse" || item.name === "Project Manager";
                   return !(isRestrictedPlan && isRestrictedModule);
                 }
                 return assignedModules.includes(item.name);
