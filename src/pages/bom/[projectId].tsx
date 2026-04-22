@@ -1108,9 +1108,9 @@ export default function BillOfMaterials() {
                                 <SelectValue placeholder="Unit" />
                               </SelectTrigger>
                               <SelectContent>
-                                {["Cu.m", "Sq.m", "Lin.m", "Kg", "Other"].map((u) => (
-                                  <SelectItem key={u} value={u}>
-                                    {u === "Other" ? "Others/Input" : u}
+                                {["Cu.m", "Sq.m", "Lin.m", "Kg", "Other"].map((unitOption) => (
+                                  <SelectItem key={unitOption} value={unitOption} className="text-xs">
+                                    {unitOption === "Other" ? "Others/Input" : unitOption}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -1120,7 +1120,7 @@ export default function BillOfMaterials() {
                                 placeholder="Unit"
                                 value={editingScopeUnit}
                                 onChange={(e) => setEditingScopeUnit(e.target.value)}
-                                className="h-7 w-20"
+                                className="h-7 w-20 text-xs"
                               />
                             )}
                           </div>
@@ -1157,8 +1157,9 @@ export default function BillOfMaterials() {
                           <>
                             {!reorderMode && (
                               <Button
-                                size="sm"
-                                variant="outline"
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 text-green-700 hover:text-green-800"
                                 onClick={() =>
                                   setCollapsedScopes((prev) => ({
                                     ...prev,
@@ -1334,7 +1335,7 @@ export default function BillOfMaterials() {
                                           (((material.quantity as number) || 0) * ((material.unit_cost as number) || 0))
                                       )}
                                     </TableCell>
-                                    <TableCell className="text-right py-0.5">
+                                    <TableCell className="py-0.5">
                                       <div className="flex justify-end items-center gap-1">
                                         <Button
                                           size="icon"
@@ -1408,7 +1409,7 @@ export default function BillOfMaterials() {
                                         }
                                       >
                                         <SelectTrigger className="h-6 w-20 text-xs">
-                                          <SelectValue placeholder="Unit" />
+                                        <SelectValue placeholder="Unit" />
                                         </SelectTrigger>
                                         <SelectContent>
                                           {[...MATERIAL_UNIT_OPTIONS, "Other"].map((unitOption) => (
