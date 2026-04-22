@@ -1097,7 +1097,7 @@ export default function BillOfMaterials() {
                           <>
                             <Input value={editingScopeName} onChange={(e) => setEditingScopeName(e.target.value)} placeholder="Scope name" className="h-7 max-w-xs" />
                             <Input type="number" value={editingScopeQuantity} onChange={(e) => setEditingScopeQuantity(e.target.value)} placeholder="Qty" className="w-16" />
-                            <Select value={editingScopeUnitSelection} onValueChange={(val) => { setEditingScopeUnitSelection(val); if (val !== "Other") setEditingScopeUnit(val); else setEditingScopeUnit(""); }}>
+                            <Select value={editingScopeUnitSelection} onValueChange={(val) => { setEditingScopeUnitSelection(val); if (val !== "Other") setEditingScopeUnit(val); else setNewScopeUnit(""); }}>
                               <SelectTrigger className="w-24">
                                 <SelectValue placeholder="Unit" />
                               </SelectTrigger>
