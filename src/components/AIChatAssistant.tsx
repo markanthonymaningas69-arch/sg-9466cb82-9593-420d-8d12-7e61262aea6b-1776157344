@@ -79,58 +79,65 @@ export function AIChatAssistant() {
     }
   };
 
-  const loadThreads = async () => {
+  const MAX_THREADS = 20;
+
+  const getStorageKey = async () => {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) return;
-    const { data } = await supabase
-      .from('ai_chat_threads')
-      .select('*')
-      .eq('user_id', session.user.id)
-      .order('updated_at', { ascending: false });
+    return `ai_threads_${session?.user?.id || 'anon'}`;
+  };
+
+  const loadThreads = async () => {
+    const key = await getStorageKey();
+    const saved = localStorage.getItem(key);
     
-    if (data) {
-      const parsed = data.map(t => ({
-        ...t,
-        messages: (t.messages as any[]).map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }))
-      }));
-      setThreads(parsed);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        const restored = parsed.map((t: any) => ({
+          ...t,
+          messages: t.messages.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }))
+        }));
+        setThreads(restored);
+      } catch (e) {
+        console.error("Failed to parse local threads", e);
+      }
     }
   };
 
   const saveThread = async (newMessages: Message[]) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) return;
-
-    // Convert messages to a simple object array for JSON storage
-    const messagesJson = JSON.parse(JSON.stringify(newMessages));
+    const key = await getStorageKey();
+    let updatedThreads = [...threads];
 
     if (!currentThreadId && newMessages.length > 0) {
       const title = newMessages[0].content.substring(0, 30) + "...";
-      const { data } = await supabase.from('ai_chat_threads').insert({
-        user_id: session.user.id,
+      const newThreadId = Date.now().toString() + Math.random().toString(36).substring(2);
+      
+      const newThread: ChatThread = {
+        id: newThreadId,
         title,
-        messages: messagesJson
-      }).select().single();
-      
-      if (data) {
-        setCurrentThreadId(data.id);
-        setThreads(prev => [{
-          ...data,
-          messages: (data.messages as any[]).map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }))
-        }, ...prev]);
-      }
-    } else if (currentThreadId) {
-      await supabase.from('ai_chat_threads').update({
-        messages: messagesJson,
+        messages: newMessages,
         updated_at: new Date().toISOString()
-      }).eq('id', currentThreadId);
+      };
       
-      setThreads(prev => prev.map(t => 
+      setCurrentThreadId(newThreadId);
+      updatedThreads = [newThread, ...updatedThreads];
+    } else if (currentThreadId) {
+      updatedThreads = updatedThreads.map(t => 
         t.id === currentThreadId 
           ? { ...t, messages: newMessages, updated_at: new Date().toISOString() }
           : t
-      ));
+      );
+      // Sort to bring recently updated thread to the top
+      updatedThreads.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
     }
+
+    // Auto-delete old threads to save browser memory
+    if (updatedThreads.length > MAX_THREADS) {
+      updatedThreads = updatedThreads.slice(0, MAX_THREADS);
+    }
+
+    setThreads(updatedThreads);
+    localStorage.setItem(key, JSON.stringify(updatedThreads));
   };
 
   const sendMessage = async () => {
