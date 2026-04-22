@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer } from "recharts";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useRouter } from "next/router";
+import { AIChatAssistant } from "@/components/AIChatAssistant";
 
 export default function Dashboard() {
   const router = useRouter();
@@ -499,6 +500,8 @@ export default function Dashboard() {
             })()}
           </DialogContent>
         </Dialog>
+        
+        <AIChatAssistant />
       </div>
     </Layout>
   );
