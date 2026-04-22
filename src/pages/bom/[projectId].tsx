@@ -1409,11 +1409,11 @@ export default function BillOfMaterials() {
                                           })
                                         }
                                       >
-                                        <SelectTrigger className="h-6 text-xs">
+                                        <SelectTrigger className="h-6 w-20 text-xs">
                                           <SelectValue placeholder="Unit" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                          {["Bag", "Bd.ft", "Box", "Cu.m", "Gal", "Kg", "Length", "Lin.m", "Liter", "Lot", "M", "Pail", "Pair", "Pc", "Roll", "Set", "Sq.m", "Unit", "Other"].map((unitOption) => (
+                                          {["Cu.m", "Kg", "Lin.m", "Lot", "Sq.m", "Other"].map((unitOption) => (
                                             <SelectItem key={unitOption} value={unitOption} className="text-xs">
                                               {unitOption === "Other" ? "Other" : unitOption}
                                             </SelectItem>
@@ -1425,7 +1425,7 @@ export default function BillOfMaterials() {
                                           placeholder="Unit"
                                           value={materialForm.unit}
                                           onChange={(e) => setMaterialForm({ ...materialForm, unit: e.target.value })}
-                                          className="h-6 text-xs"
+                                          className="h-6 w-20 text-xs"
                                         />
                                       )}
                                     </div>
