@@ -22,7 +22,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useSettings } from "@/contexts/SettingsProvider";
 import { bomService } from "@/services/bomService";
 import { projectService } from "@/services/projectService";
-import { Plus, Pencil, Trash2, ArrowLeft, ArrowUp, ArrowDown, Sparkles, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, ArrowLeft, ArrowUp, ArrowDown } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
 type BOM = Database["public"]["Tables"]["bill_of_materials"]["Row"];
@@ -73,10 +73,6 @@ export default function BillOfMaterials() {
   const [editingScopeQuantity, setEditingScopeQuantity] = useState<string>("1");
   const [editingScopeUnit, setEditingScopeUnit] = useState<string>("Cu.m");
   const [editingScopeUnitSelection, setEditingScopeUnitSelection] = useState<string>("Cu.m");
-
-  const [aiPrompts, setAiPrompts] = useState<Record<string, string>>({});
-  const [isGeneratingAi, setIsGeneratingAi] = useState<Record<string, boolean>>({});
-  const [aiPreviewMaterials, setAiPreviewMaterials] = useState<Record<string, any[]>>({});
 
   const [materialForm, setMaterialForm] = useState({
     name: "",
@@ -1407,7 +1403,6 @@ export default function BillOfMaterials() {
                                 <TableHead className="h-6 py-1 text-[10px]">Material</TableHead>
                                 <TableHead className="h-6 py-1 text-right text-[10px]">Qty</TableHead>
                                 <TableHead className="h-6 py-1 text-[10px]">Unit</TableHead>
-                                <TableHead className="h-6 py-1 text-right text-[10px]">Est. Unit Cost</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -1416,7 +1411,6 @@ export default function BillOfMaterials() {
                                   <TableCell className="py-1 font-medium">{mat.name || mat.material_name}</TableCell>
                                   <TableCell className="py-1 text-right">{mat.quantity}</TableCell>
                                   <TableCell className="py-1">{mat.unit}</TableCell>
-                                  <TableCell className="py-1 text-right">{formatCurrency(Number(mat.unit_cost) || Number(mat.price) || Number(mat.cost) || Number(mat.unit_price) || 0)}</TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>
