@@ -1273,9 +1273,9 @@ export default function BillOfMaterials() {
                                         {materialForm.unit_selection === "Other" && (
                                           <Input
                                             placeholder="Unit"
-                                            className="h-6 text-xs"
                                             value={materialForm.unit}
                                             onChange={(e) => setMaterialForm({ ...materialForm, unit: e.target.value })}
+                                            className="h-6 text-xs"
                                           />
                                         )}
                                       </div>
