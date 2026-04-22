@@ -59,6 +59,9 @@ export default function BillOfMaterials() {
 
   const [showScopeInput, setShowScopeInput] = useState(false);
   const [newScopeName, setNewScopeName] = useState("");
+  const [newScopeQuantity, setNewScopeQuantity] = useState("1");
+  const [newScopeUnit, setNewScopeUnit] = useState("Cu.m");
+  const [newScopeUnitSelection, setNewScopeUnitSelection] = useState("Cu.m");
 
   const [selectedScopeId, setSelectedScopeId] = useState<string>("");
   const [activeLaborScopeId, setActiveLaborScopeId] = useState<string | null>(null);
@@ -67,6 +70,9 @@ export default function BillOfMaterials() {
   const [collapsedScopes, setCollapsedScopes] = useState<Record<string, boolean>>({});
   const [editingScopeId, setEditingScopeId] = useState<string | null>(null);
   const [editingScopeName, setEditingScopeName] = useState<string>("");
+  const [editingScopeQuantity, setEditingScopeQuantity] = useState<string>("1");
+  const [editingScopeUnit, setEditingScopeUnit] = useState<string>("Cu.m");
+  const [editingScopeUnitSelection, setEditingScopeUnitSelection] = useState<string>("Cu.m");
 
   const [materialForm, setMaterialForm] = useState({
     name: "",
@@ -426,6 +432,9 @@ export default function BillOfMaterials() {
   const handleAddScopeClick = () => {
     setShowScopeInput(true);
     setNewScopeName("");
+    setNewScopeQuantity("1");
+    setNewScopeUnit("Cu.m");
+    setNewScopeUnitSelection("Cu.m");
   };
 
   const handleSaveScopeInline = async () => {
@@ -443,8 +452,10 @@ export default function BillOfMaterials() {
       bom_id: bom.id,
       name: newScopeName.trim(),
       description: "",
-      order_number: scopes.length + 1
-    } as Database["public"]["Tables"]["bom_scope_of_work"]["Insert"]);
+      order_number: scopes.length + 1,
+      quantity: parseFloat(newScopeQuantity) || 1,
+      unit: newScopeUnit
+    } as any);
 
     if (error) {
       alert("Error creating scope: " + error.message);
@@ -488,11 +499,18 @@ export default function BillOfMaterials() {
   const handleStartEditScope = (scope: ScopeOfWork) => {
     setEditingScopeId(scope.id as string);
     setEditingScopeName(scope.name || "");
+    setEditingScopeQuantity((scope as any).quantity != null ? String((scope as any).quantity) : "1");
+    const u = (scope as any).unit || "Cu.m";
+    setEditingScopeUnit(u);
+    setEditingScopeUnitSelection(["Cu.m", "Sq.m", "Lin.m", "Kg"].includes(u) ? u : "Other");
   };
 
   const handleCancelEditScope = () => {
     setEditingScopeId(null);
     setEditingScopeName("");
+    setEditingScopeQuantity("1");
+    setEditingScopeUnit("Cu.m");
+    setEditingScopeUnitSelection("Cu.m");
   };
 
   const handleSaveEditScope = async () => {
@@ -505,8 +523,10 @@ export default function BillOfMaterials() {
     }
 
     const { error } = await bomService.updateScope(editingScopeId, {
-      name: trimmedName
-    } as Database["public"]["Tables"]["bom_scope_of_work"]["Update"]);
+      name: trimmedName,
+      quantity: parseFloat(editingScopeQuantity) || 1,
+      unit: editingScopeUnit
+    } as any);
 
     if (error) {
       alert("Error updating scope: " + error.message);
@@ -822,20 +842,20 @@ export default function BillOfMaterials() {
 
   return (
     <Layout>
-      <div className="space-y-4">
+      <div className="space-y-1.5">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" onClick={() => router.push("/projects")}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-3xl font-heading font-bold">Bill of Materials</h1>
+            <h1 className="text-2xl font-heading font-bold">Bill of Materials</h1>
             <p className="text-muted-foreground mt-1">{project?.name}</p>
           </div>
         </div>
 
         {scopes.length === 0 ?
         <Card>
-            <CardContent className="pt-4">
+            <CardContent className="pt-2">
               <div className="flex items-center gap-2">
                 <div className="flex-1 flex gap-2">
                   <Select
@@ -851,19 +871,24 @@ export default function BillOfMaterials() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Input
-                    placeholder="Or enter custom scope name"
-                    value={newScopeName}
-                    onChange={(e) => setNewScopeName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        void handleSaveScopeInline();
-                      }
-                    }}
-                    className="flex-1" />
+                  <Input placeholder="Or enter custom scope name" value={newScopeName} onChange={(e) => setNewScopeName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { void handleSaveScopeInline(); } }} className="flex-1" />
+                      <Input placeholder="Qty" type="number" value={newScopeQuantity} onChange={(e) => setNewScopeQuantity(e.target.value)} className="w-16" />
+                      <Select value={newScopeUnitSelection} onValueChange={(val) => { setNewScopeUnitSelection(val); if (val !== "Other") setNewScopeUnit(val); else setNewScopeUnit(""); }}>
+                        <SelectTrigger className="w-24">
+                          <SelectValue placeholder="Unit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {["Cu.m", "Sq.m", "Lin.m", "Kg", "Other"].map((u) => (
+                            <SelectItem key={u} value={u}>{u === "Other" ? "Others/Input" : u}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {newScopeUnitSelection === "Other" && (
+                        <Input placeholder="Unit" value={newScopeUnit} onChange={(e) => setNewScopeUnit(e.target.value)} className="w-20" />
+                      )}
                 </div>
               </div>
-              <div className="flex justify-end mt-3 gap-2">
+              <div className="flex justify-end mt-1 gap-2">
                 <Button
                   size="sm"
                   onClick={() => void handleSaveScopeInline()}
@@ -927,7 +952,7 @@ export default function BillOfMaterials() {
               </div> :
 
           <Card>
-                <CardContent className="pt-4">
+                <CardContent className="pt-2">
                   <div className="flex items-center gap-2">
                     <div className="flex-1 flex gap-2">
                       <Select
@@ -943,19 +968,24 @@ export default function BillOfMaterials() {
                           ))}
                         </SelectContent>
                       </Select>
-                      <Input
-                        placeholder="Or enter custom scope name"
-                        value={newScopeName}
-                        onChange={(e) => setNewScopeName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            void handleSaveScopeInline();
-                          }
-                        }}
-                        className="flex-1" />
+                      <Input placeholder="Or enter custom scope name" value={newScopeName} onChange={(e) => setNewScopeName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { void handleSaveScopeInline(); } }} className="flex-1" />
+                      <Input placeholder="Qty" type="number" value={newScopeQuantity} onChange={(e) => setNewScopeQuantity(e.target.value)} className="w-16" />
+                      <Select value={newScopeUnitSelection} onValueChange={(val) => { setNewScopeUnitSelection(val); if (val !== "Other") setNewScopeUnit(val); else setNewScopeUnit(""); }}>
+                        <SelectTrigger className="w-24">
+                          <SelectValue placeholder="Unit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {["Cu.m", "Sq.m", "Lin.m", "Kg", "Other"].map((u) => (
+                            <SelectItem key={u} value={u}>{u === "Other" ? "Others/Input" : u}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {newScopeUnitSelection === "Other" && (
+                        <Input placeholder="Unit" value={newScopeUnit} onChange={(e) => setNewScopeUnit(e.target.value)} className="w-20" />
+                      )}
                     </div>
                   </div>
-                  <div className="flex justify-end mt-3 gap-2">
+                  <div className="flex justify-end mt-1 gap-2">
                     <Button
                   size="sm"
                   onClick={() => void handleSaveScopeInline()}
@@ -991,17 +1021,26 @@ export default function BillOfMaterials() {
                   key={scope.id}
                   className="text-foreground"
                 >
-                  <CardHeader className={isCollapsed || reorderMode ? "py-2 px-4" : "pt-6 px-6 pb-3"}>
+                  <CardHeader className={isCollapsed || reorderMode ? "py-1 px-4" : "pt-2 px-6 pb-1"}>
                     <div className="flex justify-between items-center gap-3">
                       <div className="flex items-center gap-2">
                         {editingScopeId === scope.id ? (
                           <>
-                            <Input
-                              value={editingScopeName}
-                              onChange={(e) => setEditingScopeName(e.target.value)}
-                              placeholder="Scope name"
-                              className="h-8 max-w-xs"
-                            />
+                            <Input value={editingScopeName} onChange={(e) => setEditingScopeName(e.target.value)} placeholder="Scope name" className="h-7 max-w-xs" />
+                            <Input type="number" value={editingScopeQuantity} onChange={(e) => setEditingScopeQuantity(e.target.value)} placeholder="Qty" className="h-7 w-16" />
+                            <Select value={editingScopeUnitSelection} onValueChange={(val) => { setEditingScopeUnitSelection(val); if (val !== "Other") setEditingScopeUnit(val); else setEditingScopeUnit(""); }}>
+                              <SelectTrigger className="h-7 w-24 text-xs">
+                                <SelectValue placeholder="Unit" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {["Cu.m", "Sq.m", "Lin.m", "Kg", "Other"].map((u) => (
+                                  <SelectItem key={u} value={u} className="text-xs">{u === "Other" ? "Others/Input" : u}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {editingScopeUnitSelection === "Other" && (
+                              <Input placeholder="Unit" value={editingScopeUnit} onChange={(e) => setEditingScopeUnit(e.target.value)} className="h-7 w-20 text-xs" />
+                            )}
                             <Button
                               size="sm"
                               className="bg-green-600 hover:bg-green-700 text-white"
@@ -1020,7 +1059,10 @@ export default function BillOfMaterials() {
                           </>
                         ) : (
                           <>
-                            <CardTitle className="text-xl">{scope.name}</CardTitle>
+                            <CardTitle className="text-lg">{scope.name}</CardTitle>
+                            <span className="text-xs font-medium bg-muted px-2 py-0.5 rounded-md border text-muted-foreground">
+                              {(scope as any).quantity != null ? (scope as any).quantity : 1} {(scope as any).unit || "Lot"}
+                            </span>
                             <Button
                               size="icon"
                               variant="ghost"
@@ -1039,7 +1081,7 @@ export default function BillOfMaterials() {
                             <Button
                               size="icon"
                               variant="ghost"
-                              className="h-8 w-8"
+                              className="h-7 w-8"
                               disabled={index === 0}
                               onClick={() => moveScope(index, 'up')}
                             >
@@ -1048,7 +1090,7 @@ export default function BillOfMaterials() {
                             <Button
                               size="icon"
                               variant="ghost"
-                              className="h-8 w-8"
+                              className="h-7 w-8"
                               disabled={index === scopes.length - 1}
                               onClick={() => moveScope(index, 'down')}
                             >
@@ -1059,7 +1101,7 @@ export default function BillOfMaterials() {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-8 px-2 text-xs"
+                          className="h-7 px-2 text-xs"
                           onClick={() =>
                             setCollapsedScopes((prev) => ({
                               ...prev,
@@ -1083,66 +1125,31 @@ export default function BillOfMaterials() {
                     </div>
                   </CardHeader>
                   {!isCollapsed && !reorderMode && (
-                    <CardContent className="space-y-4 pt-3">
-                      <div className="flex justify-end gap-2 mb-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-green-600 dark:border-green-500 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/30 h-8 text-xs"
-                          disabled={isLocked}
-                          onClick={() => {
-                            if (activeLaborScopeId === scope.id) {
-                              setActiveLaborScopeId(null);
-                              resetLaborForm();
-                            } else {
-                              setActiveLaborScopeId(scope.id as string);
-                              if (scope.bom_labor && scope.bom_labor.length > 0) {
-                                handleEditLabor(scope.bom_labor[0] as Labor);
-                              } else {
-                                resetLaborForm();
-                              }
-                            }
-                          }}
-                        >
-                          <Pencil className="h-3 w-3 mr-2" />
-                          Add / Edit Labor
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="bg-green-600 hover:bg-green-700 text-white h-8 text-xs"
-                          disabled={isLocked}
-                          onClick={() => {
-                            setSelectedScopeId(scope.id as string);
-                            resetMaterialForm();
-                          }}
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Materials
-                        </Button>
-                      </div>
+                    <CardContent className="space-y-1.5 pt-1.5">
+
 
                       {(scope.bom_materials || []).length > 0 || selectedScopeId === scope.id ?
-                <div className="mt-2">
-                      <div className="flex justify-between items-center mb-2">
-                        <h3 className="font-semibold text-lg">Materials</h3>
+                <div className="mt-0.5">
+                      <div className="flex justify-between items-center mb-0.5">
+                        <h3 className="font-semibold text-base">Materials</h3>
                       </div>
                       <Table>
                         <TableBody>
                           {(scope.bom_materials || []).map((material) =>
-                      <TableRow key={material.id} className="h-8">
-                          <TableCell className="py-1">
+                      <TableRow key={material.id} className="h-7">
+                          <TableCell className="py-0.5">
                             <div className="font-medium text-sm">
                               {material.description || material.material_name}
                             </div>
                           </TableCell>
-                          <TableCell className="text-right py-1 text-sm">
+                          <TableCell className="text-right py-0.5 text-sm">
                             {formatNumber(material.quantity as number || 0)}
                           </TableCell>
-                          <TableCell className="py-1 text-sm">{material.unit}</TableCell>
-                          <TableCell className="text-right py-1 text-sm">
+                          <TableCell className="py-0.5 text-sm">{material.unit}</TableCell>
+                          <TableCell className="text-right py-0.5 text-sm">
                             {formatCurrency(material.unit_cost as number ?? 0)}
                           </TableCell>
-                          <TableCell className="text-right font-semibold py-1 text-sm">
+                          <TableCell className="text-right font-semibold py-0.5 text-sm">
                             {(() => {
                         const total =
                         material.total_cost as number ??
@@ -1151,7 +1158,7 @@ export default function BillOfMaterials() {
                         return formatCurrency(total);
                       })()}
                           </TableCell>
-                          <TableCell className="text-right py-1">
+                          <TableCell className="text-right py-0.5">
                             <div className="flex justify-end gap-1">
                               <Button
                           size="icon"
@@ -1177,15 +1184,15 @@ export default function BillOfMaterials() {
                       )}
 
                       {selectedScopeId === scope.id &&
-                  <TableRow className="h-8">
-                          <TableCell className="py-1">
+                  <TableRow className="h-7">
+                          <TableCell className="py-0.5">
                             <div className="flex flex-col gap-1">
                               {!isManualMaterial ? (
                                 <Select
                                   value={materialForm.name}
                                   onValueChange={handleMaterialChange}
                                 >
-                                  <SelectTrigger className="h-7 text-xs w-full">
+                                  <SelectTrigger className="h-6 text-xs w-full">
                                     <SelectValue placeholder="Select from catalog" />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -1214,7 +1221,7 @@ export default function BillOfMaterials() {
                                 <div className="flex gap-1">
                                   <Input
                                     placeholder="Material description"
-                                    className="h-7 text-xs"
+                                    className="h-6 text-xs"
                                     value={materialForm.description}
                                     onChange={(e) =>
                                       setMaterialForm({
@@ -1227,7 +1234,7 @@ export default function BillOfMaterials() {
                                   <Button 
                                     variant="ghost" 
                                     size="sm" 
-                                    className="h-7 px-2 text-xs"
+                                    className="h-6 px-2 text-xs"
                                     onClick={() => {
                                       setIsManualMaterial(false);
                                       setMaterialForm(prev => ({...prev, name: "", description: ""}));
@@ -1239,10 +1246,10 @@ export default function BillOfMaterials() {
                               )}
                             </div>
                           </TableCell>
-                          <TableCell className="text-right py-1">
+                          <TableCell className="text-right py-0.5">
                             <Input
                         type="text"
-                        className="h-7 text-xs text-right w-full min-w-[120px]"
+                        className="h-6 text-xs text-right w-full min-w-[120px]"
                         value={materialForm.quantity}
                         onChange={(e) =>
                         setMaterialForm({
@@ -1261,7 +1268,7 @@ export default function BillOfMaterials() {
                         }} />
                       
                           </TableCell>
-                          <TableCell className="py-1">
+                          <TableCell className="py-0.5">
                             <div className="space-y-1">
                               <Select
                           value={materialForm.unit_selection}
@@ -1273,7 +1280,7 @@ export default function BillOfMaterials() {
                           })
                           }>
                           
-                                <SelectTrigger className="h-7 text-xs w-full min-w-[100px]">
+                                <SelectTrigger className="h-6 text-xs w-full min-w-[100px]">
                                   <SelectValue placeholder="Select unit" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -1294,7 +1301,7 @@ export default function BillOfMaterials() {
                               {materialForm.unit_selection === "Other" &&
                         <Input
                           placeholder="Enter unit"
-                          className="h-7 text-xs w-full"
+                          className="h-6 text-xs w-full"
                           value={materialForm.unit}
                           onChange={(e) =>
                           setMaterialForm({
@@ -1306,10 +1313,10 @@ export default function BillOfMaterials() {
                         }
                             </div>
                           </TableCell>
-                          <TableCell className="text-right py-1">
+                          <TableCell className="text-right py-0.5">
                             <Input
                         type="text"
-                        className="h-7 text-xs text-right w-full min-w-[140px]"
+                        className="h-6 text-xs text-right w-full min-w-[140px]"
                         value={materialForm.unit_cost}
                         onChange={(e) =>
                         setMaterialForm({
@@ -1328,7 +1335,7 @@ export default function BillOfMaterials() {
                         }} />
                       
                           </TableCell>
-                          <TableCell className="text-right font-semibold py-1 text-sm">
+                          <TableCell className="text-right font-semibold py-0.5 text-sm">
                             {(() => {
                         const quantity = parseFloat(materialForm.quantity.replace(/,/g, "") || "0");
                         const unitCost = parseFloat(materialForm.unit_cost.replace(/,/g, "") || "0");
@@ -1336,11 +1343,11 @@ export default function BillOfMaterials() {
                         return formatCurrency(amount);
                       })()}
                           </TableCell>
-                          <TableCell className="text-right py-1">
+                          <TableCell className="text-right py-0.5">
                             <div className="flex justify-end items-center gap-1">
                               <Button
                           size="sm"
-                          className="bg-green-600 hover:bg-green-700 text-white h-7 px-2 text-xs"
+                          className="bg-green-600 hover:bg-green-700 text-white h-6 px-2 text-xs"
                           onClick={() => void handleMaterialSubmitInline()}
                           disabled={isLocked}>
                           
@@ -1349,7 +1356,7 @@ export default function BillOfMaterials() {
                               <Button
                           size="sm"
                           variant="outline"
-                          className="h-7 px-2 text-xs border-red-600 dark:border-red-500 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
+                          className="h-6 px-2 text-xs border-red-600 dark:border-red-500 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
                           onClick={() => {
                             resetMaterialForm();
                             setSelectedScopeId("");
@@ -1365,10 +1372,10 @@ export default function BillOfMaterials() {
                   </Table>
 
                   {selectedScopeId !== scope.id && (
-                    <div className="flex justify-end mt-3 pr-2">
+                    <div className="flex justify-end mt-1 pr-2">
                       <Button
                         size="sm"
-                        className="bg-green-600 hover:bg-green-700 text-white h-7 text-xs"
+                        className="bg-green-600 hover:bg-green-700 text-white h-6 text-xs"
                         disabled={isLocked}
                         onClick={() => {
                           setSelectedScopeId(scope.id as string);
@@ -1382,12 +1389,12 @@ export default function BillOfMaterials() {
                   )}
 
                 </div> :
-                <div className="text-xs text-muted-foreground italic mt-2 ml-1">
+                <div className="text-xs text-muted-foreground italic mt-0.5 ml-1">
                   No materials added yet.
-                  <div className="flex justify-start mt-3">
+                  <div className="flex justify-start mt-1">
                     <Button
                       size="sm"
-                      className="bg-green-600 hover:bg-green-700 text-white h-7 text-xs"
+                      className="bg-green-600 hover:bg-green-700 text-white h-6 text-xs"
                       disabled={isLocked}
                       onClick={() => {
                         setSelectedScopeId(scope.id as string);
@@ -1400,9 +1407,9 @@ export default function BillOfMaterials() {
                   </div>
                 </div>}
 
-                      <div className="flex justify-between items-start pt-4 border-t mt-4">
+                      <div className="flex justify-between items-start pt-2 border-t mt-2">
                         <div className="flex-1 pr-4">
-                          <div className="flex items-center gap-3 mb-2">
+                          <div className="flex items-center gap-3 mb-0.5">
                             <h3 className="font-semibold text-sm">Labor Cost</h3>
                             <Button
                               size="sm"
@@ -1485,7 +1492,7 @@ export default function BillOfMaterials() {
                                         setLaborForm({ ...laborForm, percentage: e.target.value })
                                       }
                                       placeholder="%"
-                                      className="h-7 w-16 text-xs"
+                                      className="h-6 w-16 text-xs"
                                     />
                                   </>
                                 ) : (
@@ -1506,7 +1513,7 @@ export default function BillOfMaterials() {
                                         }
                                       }}
                                       placeholder="Qty"
-                                      className="h-7 w-24 text-xs"
+                                      className="h-6 w-24 text-xs"
                                     />
                                     <Select
                                       value={laborForm.unit_selection}
@@ -1518,7 +1525,7 @@ export default function BillOfMaterials() {
                                         })
                                       }
                                     >
-                                      <SelectTrigger className="h-7 w-20 text-xs">
+                                      <SelectTrigger className="h-6 w-20 text-xs">
                                         <SelectValue placeholder="Unit" />
                                       </SelectTrigger>
                                       <SelectContent>
@@ -1539,7 +1546,7 @@ export default function BillOfMaterials() {
                                             unit: e.target.value
                                           })
                                         }
-                                        className="h-7 w-20 text-xs"
+                                        className="h-6 w-20 text-xs"
                                       />
                                     )}
                                     <Input
@@ -1558,7 +1565,7 @@ export default function BillOfMaterials() {
                                         }
                                       }}
                                       placeholder="$/u"
-                                      className="h-7 w-32 text-xs"
+                                      className="h-6 w-32 text-xs"
                                     />
                                   </>
                                 )}
@@ -1566,7 +1573,7 @@ export default function BillOfMaterials() {
                                 <div className="flex items-center gap-1">
                                   <Button
                                     size="sm"
-                                    className="bg-green-600 hover:bg-green-700 text-white h-7 px-2 text-xs"
+                                    className="bg-green-600 hover:bg-green-700 text-white h-6 px-2 text-xs"
                                     onClick={() => void handleLaborSubmit(scope.id as string)}
                                     disabled={isLocked}
                                   >
@@ -1575,7 +1582,7 @@ export default function BillOfMaterials() {
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    className="h-7 px-2 text-xs"
+                                    className="h-6 px-2 text-xs"
                                     onClick={() => {
                                       setActiveLaborScopeId(null);
                                       resetLaborForm();
@@ -1654,10 +1661,10 @@ export default function BillOfMaterials() {
 
             {scopes.length > 0 &&
             <Card className="bg-primary/5">
-                <CardContent className="pt-4">
+                <CardContent className="pt-2">
                   <div className="flex justify-between items-center">
-                    <h2 className="text-2xl font-bold">Total Direct Cost</h2>
-                    <div className="text-3xl font-bold text-primary">
+                    <h2 className="text-xl font-bold">Total Direct Cost</h2>
+                    <div className="text-2xl font-bold text-primary">
                       {formatCurrency(calculateTotalDirectCost())}
                     </div>
                   </div>
@@ -1666,44 +1673,44 @@ export default function BillOfMaterials() {
             }
 
             {scopes.length > 0 && (
-              <Card className="mt-4">
-                <CardHeader className={indirectCollapsed ? "py-2 px-4 flex flex-row items-center justify-between space-y-0" : "pt-6 px-6 pb-3 flex flex-row items-center justify-between space-y-0"}>
-                  <CardTitle className="text-xl mt-0">Indirect Costs</CardTitle>
+              <Card className="mt-2">
+                <CardHeader className={indirectCollapsed ? "py-1 px-4 flex flex-row items-center justify-between space-y-0" : "pt-2 px-6 pb-1 flex flex-row items-center justify-between space-y-0"}>
+                  <CardTitle className="text-lg mt-0">Indirect Costs</CardTitle>
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 px-2 text-xs"
+                    className="h-7 px-2 text-xs"
                     onClick={() => setIndirectCollapsed(!indirectCollapsed)}
                   >
                     {indirectCollapsed ? "Show content" : "Hide content"}
                   </Button>
                 </CardHeader>
                 {!indirectCollapsed && (
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-1.5">
                   <Table>
                     <TableHeader>
-                      <TableRow className="h-8">
-                        <TableHead className="h-8 py-1 w-32">Type</TableHead>
-                        <TableHead className="text-right h-8 py-1 w-32">Value</TableHead>
-                        <TableHead className="text-right h-8 py-1 w-32">Amount</TableHead>
-                        <TableHead className="text-right h-8 py-1 w-24"></TableHead>
+                      <TableRow className="h-7">
+                        <TableHead className="h-7 py-0.5 w-32">Type</TableHead>
+                        <TableHead className="text-right h-7 py-0.5 w-32">Value</TableHead>
+                        <TableHead className="text-right h-7 py-0.5 w-32">Amount</TableHead>
+                        <TableHead className="text-right h-7 py-0.5 w-24"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {indirectCostsList.map((cost) => (
-                        <TableRow key={cost.id} className="h-8">
-                          <TableCell className="py-1 font-medium text-sm">{cost.type}</TableCell>
-                          <TableCell className="text-right py-1 text-sm">
+                        <TableRow key={cost.id} className="h-7">
+                          <TableCell className="py-0.5 font-medium text-sm">{cost.type}</TableCell>
+                          <TableCell className="text-right py-0.5 text-sm">
                             {cost.type !== 'Others' ? `${cost.value}%` : formatCurrency(parseFloat(cost.value.replace(/,/g, "") || "0"))}
                           </TableCell>
-                          <TableCell className="text-right font-semibold py-1 text-sm text-muted-foreground">
+                          <TableCell className="text-right font-semibold py-0.5 text-sm text-muted-foreground">
                             {formatCurrency(
                               ['VAT', 'OCM', 'Profit', 'Tax'].includes(cost.type)
                               ? calculateTotalDirectCost() * (parseFloat(cost.value.replace(/,/g, "") || "0") / 100)
                               : parseFloat(cost.value.replace(/,/g, "") || "0")
                             )}
                           </TableCell>
-                          <TableCell className="text-right py-1">
+                          <TableCell className="text-right py-0.5">
                             <div className="flex justify-end gap-1">
                               <Button variant="ghost" size="icon" className="h-6 w-6 text-green-600 hover:text-green-700" onClick={() => handleEditIndirect(cost)} disabled={isLocked}>
                                 <Pencil className="w-3 h-3" />
@@ -1716,10 +1723,10 @@ export default function BillOfMaterials() {
                         </TableRow>
                       ))}
 
-                      <TableRow className="h-8 bg-muted/20">
-                        <TableCell className="py-1">
+                      <TableRow className="h-7 bg-muted/20">
+                        <TableCell className="py-0.5">
                           <Select value={indirectRowForm.type} onValueChange={(val) => setIndirectRowForm({...indirectRowForm, type: val, description: val !== 'Others' ? '' : indirectRowForm.description})}>
-                            <SelectTrigger className="h-7 text-xs"><SelectValue/></SelectTrigger>
+                            <SelectTrigger className="h-6 text-xs"><SelectValue/></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="VAT">VAT</SelectItem>
                               <SelectItem value="Tax">Tax</SelectItem>
@@ -1729,9 +1736,9 @@ export default function BillOfMaterials() {
                             </SelectContent>
                           </Select>
                         </TableCell>
-                        <TableCell className="py-1 text-right">
+                        <TableCell className="py-0.5 text-right">
                           <Input 
-                            className="h-7 text-xs text-right w-full"
+                            className="h-6 text-xs text-right w-full"
                             placeholder={indirectRowForm.type !== 'Others' ? '%' : 'Amount'}
                             value={indirectRowForm.value}
                             onChange={e => setIndirectRowForm({...indirectRowForm, value: e.target.value.replace(/[^0-9.,]/g, '')})}
@@ -1746,20 +1753,20 @@ export default function BillOfMaterials() {
                             }}
                           />
                         </TableCell>
-                        <TableCell className="text-right font-semibold py-1 text-sm text-muted-foreground">
+                        <TableCell className="text-right font-semibold py-0.5 text-sm text-muted-foreground">
                             {formatCurrency(
                               ['VAT', 'OCM', 'Profit', 'Tax'].includes(indirectRowForm.type)
                               ? calculateTotalDirectCost() * (parseFloat(indirectRowForm.value.replace(/,/g, "") || "0") / 100)
                               : parseFloat(indirectRowForm.value.replace(/,/g, "") || "0")
                             )}
                         </TableCell>
-                        <TableCell className="text-right py-1">
+                        <TableCell className="text-right py-0.5">
                           <div className="flex justify-end gap-1">
-                            <Button size="sm" className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={() => void handleAddOrUpdateIndirect()} disabled={isLocked}>
+                            <Button size="sm" className="h-6 px-2 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={() => void handleAddOrUpdateIndirect()} disabled={isLocked}>
                                 {indirectRowForm.id ? 'Update' : 'Add'}
                             </Button>
                             {indirectRowForm.id && (
-                                <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-red-600 dark:border-red-500 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30" onClick={() => setIndirectRowForm({id: '', type: 'VAT', description: '', value: ''})} disabled={isLocked}>Cancel</Button>
+                                <Button size="sm" variant="outline" className="h-6 px-2 text-xs border-red-600 dark:border-red-500 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30" onClick={() => setIndirectRowForm({id: '', type: 'VAT', description: '', value: ''})} disabled={isLocked}>Cancel</Button>
                             )}
                           </div>
                         </TableCell>
@@ -1767,10 +1774,10 @@ export default function BillOfMaterials() {
                     </TableBody>
                   </Table>
 
-                  <div className="pt-4 border-t">
-                    <div className="flex justify-between items-center mb-4">
-                      <span className="text-lg font-semibold">Total Indirect Cost:</span>
-                      <span className="text-2xl font-bold">
+                  <div className="pt-2 border-t">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-base font-semibold">Total Indirect Cost:</span>
+                      <span className="text-xl font-bold">
                         {formatCurrency(calculateIndirectCost())}
                       </span>
                     </div>
@@ -1783,11 +1790,11 @@ export default function BillOfMaterials() {
         )}
 
         {scopes.length > 0 && (
-          <Card className="bg-primary text-primary-foreground mt-4">
-            <CardContent className="pt-4">
+          <Card className="bg-primary text-primary-foreground mt-2">
+            <CardContent className="pt-2">
               <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold">Grand Total</h2>
-                <div className="text-4xl font-bold">
+                <h2 className="text-xl font-bold">Grand Total</h2>
+                <div className="text-2xl font-bold">
                   {formatCurrency(calculateGrandTotal())}
                 </div>
               </div>

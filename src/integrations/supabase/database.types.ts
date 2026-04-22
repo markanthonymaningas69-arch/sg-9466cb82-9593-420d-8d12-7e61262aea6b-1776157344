@@ -406,10 +406,12 @@ export type Database = {
           id: string
           name: string
           order_number: number
+          quantity: number | null
           status: string | null
           subtotal: number | null
           total_labor: number | null
           total_materials: number | null
+          unit: string | null
         }
         Insert: {
           bom_id: string
@@ -420,10 +422,12 @@ export type Database = {
           id?: string
           name: string
           order_number: number
+          quantity?: number | null
           status?: string | null
           subtotal?: number | null
           total_labor?: number | null
           total_materials?: number | null
+          unit?: string | null
         }
         Update: {
           bom_id?: string
@@ -434,10 +438,12 @@ export type Database = {
           id?: string
           name?: string
           order_number?: number
+          quantity?: number | null
           status?: string | null
           subtotal?: number | null
           total_labor?: number | null
           total_materials?: number | null
+          unit?: string | null
         }
         Relationships: [
           {
