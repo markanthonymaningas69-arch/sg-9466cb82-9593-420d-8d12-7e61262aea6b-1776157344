@@ -2784,61 +2784,93 @@ export default function SitePersonnel() {
 
             <TabsContent value="request" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
               <Card className="flex-1 flex flex-col overflow-hidden">
-                <CardHeader className="shrink-0">
-                  <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                    <div className="min-w-0 flex-1">
-                      <CardTitle>Site Requests</CardTitle>
-                      <CardDescription>Request materials, tools, equipment, PPE, and cash advances</CardDescription>
-                      <div className="mt-4 flex flex-wrap items-center gap-3">
-                        <div className="flex min-w-[220px] flex-1 flex-wrap items-center gap-2 sm:flex-initial sm:flex-nowrap">
-                          <Label className="whitespace-nowrap">Date:</Label>
-                          <Input
-                            type="date"
-                            value={requestDate}
-                            onChange={(e) => setRequestDate(e.target.value)}
-                            className="h-9 w-full sm:w-auto sm:min-w-[130px]"
-                          />
-                        </div>
-                        <div className="flex min-w-[240px] flex-1 flex-wrap items-center gap-2 sm:flex-initial sm:flex-nowrap">
-                          <Label className="whitespace-nowrap">Type:</Label>
-                          <Select value={requestFilterType} onValueChange={setRequestFilterType}>
-                            <SelectTrigger className="h-9 w-full sm:w-[180px]">
-                              <SelectValue placeholder="All Types" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">All Types</SelectItem>
-                              <SelectItem value="Materials">Materials</SelectItem>
-                              <SelectItem value="Tools & Equipments">Tools & Equipments</SelectItem>
-                              <SelectItem value="Petty Cash">Petty Cash</SelectItem>
-                              <SelectItem value="Cash Advance">Cash Advance</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        {(requestDate || requestFilterType !== "all") && (
-                          <Button variant="ghost" size="sm" onClick={() => { setRequestDate(""); setRequestFilterType("all"); }} className="h-9 text-muted-foreground">
-                            Clear Filters
-                          </Button>
-                        )}
-                      </div>
+                <CardHeader className="shrink-0 space-y-4">
+                  <div>
+                    <CardTitle>Site Requests</CardTitle>
+                    <CardDescription>Request materials, tools, equipment, PPE, and cash advances</CardDescription>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex min-w-[220px] flex-1 flex-wrap items-center gap-2 sm:flex-initial sm:flex-nowrap">
+                      <Label className="whitespace-nowrap">Date:</Label>
+                      <Input
+                        type="date"
+                        value={requestDate}
+                        onChange={(e) => setRequestDate(e.target.value)}
+                        className="h-9 w-full sm:w-auto sm:min-w-[130px]"
+                      />
                     </div>
-                    <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 xl:max-w-[540px]">
-                      <Button size="sm" onClick={() => openRequestDialog('Materials', 'MR')} disabled={isLocked} variant="default" className="h-9 w-full justify-center bg-blue-600 px-3 text-xs text-white hover:bg-blue-700">
-                        <ShoppingCart className="mr-1.5 h-3 w-3" />
-                        Material Request
-                      </Button>
-                      <Button size="sm" onClick={() => openRequestDialog('Tools & Equipments', 'TE')} disabled={isLocked} variant="outline" className="h-9 w-full justify-center border-orange-500 px-3 text-xs text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/20">
-                        <Wrench className="mr-1.5 h-3 w-3" />
-                        Tools & Equipments
-                      </Button>
-                      <Button size="sm" onClick={() => openRequestDialog('Petty Cash', 'PC')} disabled={isLocked} variant="outline" className="h-9 w-full justify-center border-teal-600 px-3 text-xs text-teal-700 hover:bg-teal-50 dark:text-teal-300 dark:hover:bg-teal-950/20">
-                        <Banknote className="mr-1.5 h-3 w-3" />
-                        Petty Cash
-                      </Button>
-                      <Button size="sm" onClick={() => openRequestDialog('Cash Advance', 'CA')} disabled={isLocked} variant="outline" className="h-9 w-full justify-center border-green-600 px-3 text-xs text-green-700 hover:bg-green-50 dark:text-green-300 dark:hover:bg-green-950/20">
-                        <Banknote className="mr-1.5 h-3 w-3" />
-                        Cash Advance
-                      </Button>
+                    <div className="flex min-w-[240px] flex-1 flex-wrap items-center gap-2 sm:flex-initial sm:flex-nowrap">
+                      <Label className="whitespace-nowrap">Type:</Label>
+                      <Select value={requestFilterType} onValueChange={setRequestFilterType}>
+                        <SelectTrigger className="h-9 w-full sm:w-[180px]">
+                          <SelectValue placeholder="All Types" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Types</SelectItem>
+                          <SelectItem value="Materials">Materials</SelectItem>
+                          <SelectItem value="Tools & Equipments">Tools & Equipments</SelectItem>
+                          <SelectItem value="Petty Cash">Petty Cash</SelectItem>
+                          <SelectItem value="Cash Advance">Cash Advance</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
+                    {(requestDate || requestFilterType !== "all") && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setRequestDate("");
+                          setRequestFilterType("all");
+                        }}
+                        className="h-9 text-muted-foreground"
+                      >
+                        Clear Filters
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                    <Button
+                      size="sm"
+                      onClick={() => openRequestDialog("Materials", "MR")}
+                      disabled={isLocked}
+                      variant="default"
+                      className="relative z-10 h-9 w-full justify-center bg-blue-600 px-3 text-xs text-white hover:bg-blue-700"
+                    >
+                      <ShoppingCart className="mr-1.5 h-3 w-3" />
+                      Material Request
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => openRequestDialog("Tools & Equipments", "TE")}
+                      disabled={isLocked}
+                      variant="outline"
+                      className="relative z-10 h-9 w-full justify-center border-orange-500 px-3 text-xs text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/20"
+                    >
+                      <Wrench className="mr-1.5 h-3 w-3" />
+                      Tools & Equipments
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => openRequestDialog("Petty Cash", "PC")}
+                      disabled={isLocked}
+                      variant="outline"
+                      className="relative z-10 h-9 w-full justify-center border-teal-600 px-3 text-xs text-teal-700 hover:bg-teal-50 dark:text-teal-300 dark:hover:bg-teal-950/20"
+                    >
+                      <Banknote className="mr-1.5 h-3 w-3" />
+                      Petty Cash
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => openRequestDialog("Cash Advance", "CA")}
+                      disabled={isLocked}
+                      variant="outline"
+                      className="relative z-10 h-9 w-full justify-center border-green-600 px-3 text-xs text-green-700 hover:bg-green-50 dark:text-green-300 dark:hover:bg-green-950/20"
+                    >
+                      <Banknote className="mr-1.5 h-3 w-3" />
+                      Cash Advance
+                    </Button>
                   </div>
                 </CardHeader>
                 <CardContent className="flex-1 overflow-hidden pb-4">
