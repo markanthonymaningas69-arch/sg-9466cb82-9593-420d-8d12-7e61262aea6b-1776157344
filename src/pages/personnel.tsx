@@ -1013,7 +1013,6 @@ export default function Personnel() {
                       </div>
 
                       <div className="grid grid-cols-2 gap-8 border-t pt-4 mt-2">
-                        {/* Passport Details */}
                         <div className="space-y-4">
                           <h4 className="font-semibold text-sm text-primary">Passport Details</h4>
                           <div className="space-y-2">
@@ -1044,7 +1043,6 @@ export default function Personnel() {
                           </div>
                         </div>
 
-                        {/* Visa Details */}
                         <div className="space-y-4">
                           <h4 className="font-semibold text-sm text-primary">Visa Details</h4>
                           <div className="space-y-2">
@@ -1109,14 +1107,13 @@ export default function Personnel() {
                       {filteredVisas.map((record) => {
                         const daysToPassportExpiry = record.passport_expiry_date ? Math.ceil((new Date(record.passport_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
                         const daysToVisaExpiry = record.visa_expiry_date ? Math.ceil((new Date(record.visa_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
-                        
                         const minDays = Math.min(daysToPassportExpiry, daysToVisaExpiry);
-                        
+
                         let statusColor = "bg-green-100 text-green-800";
                         let statusText = "Active";
-                        
+
                         if (minDays < 0) {
-                          if (record.status === 'noted') {
+                          if (record.status === "noted") {
                             statusColor = "bg-gray-100 text-gray-800";
                             statusText = "Expired / Noted";
                           } else {
@@ -1124,7 +1121,7 @@ export default function Personnel() {
                             statusText = "Expired";
                           }
                         } else if (minDays <= 30) {
-                          if (record.status === 'noted') {
+                          if (record.status === "noted") {
                             statusColor = "bg-gray-100 text-gray-800";
                             statusText = "Expiring Soon / Noted";
                           } else {
@@ -1134,24 +1131,31 @@ export default function Personnel() {
                         }
 
                         return (
-                          <TableRow key={record.id} className={minDays <= 30 && record.status !== 'noted' ? "bg-red-50/50" : ""}>
+                          <TableRow key={record.id} className={minDays <= 30 && record.status !== "noted" ? "bg-red-50/50" : ""}>
                             <TableCell className="font-medium">{record.personnel?.name}</TableCell>
                             <TableCell>{record.country}</TableCell>
                             <TableCell className="font-mono text-sm">{record.passport_number || "-"}</TableCell>
-                            <TableCell className={daysToPassportExpiry <= 30 && record.status !== 'noted' ? "text-red-700 font-bold bg-red-100/50" : ""}>
+                            <TableCell className={daysToPassportExpiry <= 30 && record.status !== "noted" ? "text-red-700 font-bold bg-red-100/50" : ""}>
                               {record.passport_expiry_date ? new Date(record.passport_expiry_date).toLocaleDateString() : "-"}
                             </TableCell>
                             <TableCell className="font-mono text-sm">{record.visa_number || "-"}</TableCell>
-                            <TableCell className={daysToVisaExpiry <= 30 && record.status !== 'noted' ? "text-red-700 font-bold bg-red-100/50" : ""}>
+                            <TableCell className={daysToVisaExpiry <= 30 && record.status !== "noted" ? "text-red-700 font-bold bg-red-100/50" : ""}>
                               {record.visa_expiry_date ? new Date(record.visa_expiry_date).toLocaleDateString() : "-"}
                             </TableCell>
                             <TableCell>
                               <Badge className={statusColor}>{statusText}</Badge>
                             </TableCell>
                             <TableCell className="text-right">
-                              {minDays <= 30 && record.status !== 'noted' && (
-                                <Button size="sm" variant="outline" className="h-7 border-orange-200 text-orange-700 bg-orange-50 hover:bg-orange-100" onClick={() => handleCheckVisa(record.id)} disabled={isLocked}>
-                                  <Check className="h-3 w-3 mr-1" /> Check
+                              {minDays <= 30 && record.status !== "noted" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 border-orange-200 text-orange-700 bg-orange-50 hover:bg-orange-100"
+                                  onClick={() => handleCheckVisa(record.id)}
+                                  disabled={isLocked}
+                                >
+                                  <Check className="h-3 w-3 mr-1" />
+                                  Check
                                 </Button>
                               )}
                             </TableCell>
@@ -1164,11 +1168,12 @@ export default function Personnel() {
                             No documents found.
                           </TableCell>
                         </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
           )}
         </Tabs>
       </div>
