@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Check, CreditCard, Calendar, FolderGit2, LayoutGrid, Minus, Plus, ShoppingCart, Loader2, Users, ExternalLink } from "lucide-react";
 import { useSettings } from "@/contexts/SettingsProvider";
 import { supabase } from "@/integrations/supabase/client";
+import { getCountrySubscriptionConfig, usesManualPaymentLink, usesStripeSubscription } from "@/config/countrySubscription";
 import { DEFAULT_COUNTRY, OUT_OF_SERVICE_MESSAGE, getAddOnPrice, getAvailableBillingCycles, getPlanPrice, isSupportedCountry, plans, addOns, type BillingCycle, type PlanConfig, type SupportedCountry } from "@/config/pricing";
 import { formatCountryCurrency } from "@/lib/currency";
 import { useToast } from "@/hooks/use-toast";
