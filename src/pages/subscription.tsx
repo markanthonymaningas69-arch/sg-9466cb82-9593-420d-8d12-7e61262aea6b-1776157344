@@ -118,7 +118,6 @@ export default function Subscription() {
           title: "Payment Successful!",
           description: `Your account has been upgraded successfully.`,
         });
-        // Force hard reload to reset SettingsProvider state and clear URL securely
         window.location.href = '/subscription';
       } else {
         toast({
@@ -134,6 +133,66 @@ export default function Subscription() {
       toast({
         title: "Error",
         description: "Failed to reach verification server.",
+        variant: "destructive"
+      });
+      setIsVerifying(false);
+    }
+  }
+
+  const verifyPayMongoPayment = async (sessionId: string, token: string, attempt = 0) => {
+    if (isVerifying && attempt === 0) return;
+
+    if (attempt === 0) {
+      setIsVerifying(true);
+    }
+
+    try {
+      const res = await fetch("/api/paymongo/verify", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ sessionId, token })
+      });
+
+      const data = await res.json();
+      const isPending = res.status === 202 || data.pending;
+
+      if (data.success) {
+        localStorage.removeItem(PAYMONGO_PENDING_CHECKOUT_KEY);
+        toast({
+          title: "Payment Successful!",
+          description: "Your GCash payment has been confirmed and the subscription is now active."
+        });
+        setCurrentPlan(data.plan || selectedPlan || "starter");
+        window.location.href = "/subscription";
+        return;
+      }
+
+      if (isPending && attempt < 12) {
+        if (attempt === 0) {
+          toast({
+            title: "Confirming payment",
+            description: "Waiting for PayMongo to finish confirming your GCash payment."
+          });
+        }
+
+        window.setTimeout(() => {
+          void verifyPayMongoPayment(sessionId, token, attempt + 1);
+        }, 4000);
+        return;
+      }
+
+      toast({
+        title: isPending ? "Payment confirmation pending" : "Verification failed",
+        description: data.error || "The PayMongo payment could not be confirmed.",
+        variant: "destructive"
+      });
+      setIsVerifying(false);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to verify the PayMongo payment.",
         variant: "destructive"
       });
       setIsVerifying(false);
