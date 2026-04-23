@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { DEFAULT_COUNTRY, isSupportedCountry, type SupportedCountry } from "@/config/pricing";
+import { formatCountryCurrency, getCurrencyCodeForCountry } from "@/lib/currency";
 
 type CurrencyType = "USD" | "EUR" | "GBP" | "JPY" | "PHP" | "AUD" | "CAD" | "SGD" | "AED" | "INR";
-const SUPPORTED_CURRENCIES = ["USD", "EUR", "GBP", "JPY", "PHP", "AUD", "CAD", "SGD", "AED", "INR"];
 type PlanType = "trial" | "starter" | "professional";
 type ThemeColor = "blue" | "green" | "orange" | "rose" | "violet";
 
@@ -41,12 +42,13 @@ interface SettingsContextType {
   themeColor: ThemeColor;
   setThemeColor: (color: ThemeColor) => void;
   companyId: string | null;
+  accountCountry: SupportedCountry;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
-  const [currency, setCurrencyState] = useState<CurrencyType>("AED");
+  const [currency, setCurrencyState] = useState<CurrencyType>(getCurrencyCodeForCountry(DEFAULT_COUNTRY));
   const [company, setCompanyState] = useState<CompanySettings>(defaultCompany);
   const [currentPlan, setCurrentPlanState] = useState<PlanType>("trial");
   const [isLocked, setIsLocked] = useState<boolean>(false);
@@ -55,36 +57,47 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [daysRemaining, setDaysRemaining] = useState<number>(7);
   const [themeColor, setThemeColorState] = useState<ThemeColor>("blue");
   const [companyId, setCompanyId] = useState<string | null>(null);
+  const [accountCountry, setAccountCountry] = useState<SupportedCountry>(DEFAULT_COUNTRY);
 
   useEffect(() => {
-    // Force AED currency
-    setCurrencyState("AED");
-    localStorage.setItem("app_currency", "AED");
-    
     const savedColor = localStorage.getItem("app_theme_color") as ThemeColor;
-    if (savedColor) setThemeColorState(savedColor);
+    if (savedColor) {
+      setThemeColorState(savedColor);
+    }
 
-    // Function to load company data securely from DB
     const loadCompanyFromDb = async (userId: string) => {
-      // IMMEDIATELY clear state to prevent memory leaks from previous user in SPA
       setCompanyState(defaultCompany);
       setCompanyId(null);
 
       try {
-        // 1. Fetch Company Data to find the Owner
-        const { data: profile } = await supabase.from('profiles').select('company_id, subscription_end_date').eq('id', userId).single();
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("company_id, subscription_end_date, country")
+          .eq("id", userId)
+          .single();
+
+        const activeCountry = isSupportedCountry(profile?.country) ? profile.country : DEFAULT_COUNTRY;
+        const activeCurrency = getCurrencyCodeForCountry(activeCountry);
+
+        setAccountCountry(activeCountry);
+        setCurrencyState(activeCurrency);
+        localStorage.setItem("app_currency", activeCurrency);
+
         let compId = profile?.company_id;
 
         if (!compId) {
-          // If no company, create one (graceful fallback)
-          const { data: newComp, error: insertError } = await supabase.from('company_settings').insert({
-            user_id: userId,
-            name: "My Company"
-          }).select().single();
+          const { data: newComp, error: insertError } = await supabase
+            .from("company_settings")
+            .insert({
+              user_id: userId,
+              name: "My Company"
+            })
+            .select()
+            .single();
 
           if (newComp) {
             compId = newComp.id;
-            await supabase.from('profiles').update({ company_id: compId }).eq('id', userId);
+            await supabase.from("profiles").update({ company_id: compId }).eq("id", userId);
           } else if (insertError) {
             console.error("Failed to create fallback company:", insertError);
           }
@@ -94,9 +107,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
         if (compId) {
           setCompanyId(compId);
-          const { data: compSettings } = await supabase.from('company_settings').select('*').eq('id', compId).single();
+          const { data: compSettings } = await supabase.from("company_settings").select("*").eq("id", compId).single();
+
           if (compSettings) {
-            if (compSettings.user_id) ownerId = compSettings.user_id; // Set owner to the company's creator (GM)
+            if (compSettings.user_id) {
+              ownerId = compSettings.user_id;
+            }
+
             setCompanyState({
               name: compSettings.name || "",
               address: compSettings.address || "",
@@ -108,34 +125,33 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        // 2. Fetch Subscription Data using the Company Owner's ID
         const { data: subs } = await supabase
-          .from('subscriptions')
-          .select('*')
-          .eq('user_id', ownerId)
-          .order('created_at', { ascending: false });
+          .from("subscriptions")
+          .select("*")
+          .eq("user_id", ownerId)
+          .order("created_at", { ascending: false });
 
         if (subs && subs.length > 0) {
           const sub = subs[0];
           setCurrentPlanState(sub.plan as PlanType);
-          
+
           if (sub.features) {
-            localStorage.setItem('app_subscription_features', JSON.stringify(sub.features));
+            localStorage.setItem("app_subscription_features", JSON.stringify(sub.features));
           }
-          
+
           if (sub.end_date || profile?.subscription_end_date) {
             const endDateStr = profile?.subscription_end_date || sub.end_date;
             const endDate = new Date(endDateStr);
             const now = new Date();
-            const isExpired = now > endDate;
+            const expired = now > endDate;
 
-            if (sub.plan === 'trial') {
+            if (sub.plan === "trial") {
               setIsTrial(true);
               const diffTime = endDate.getTime() - now.getTime();
               const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
               setDaysRemaining(Math.max(0, diffDays));
-              
-              if (isExpired) {
+
+              if (expired) {
                 setIsLocked(true);
                 setLockReason("trial_expired");
               } else {
@@ -145,8 +161,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             } else {
               setIsTrial(false);
               setDaysRemaining(0);
-              
-              if (isExpired) {
+
+              if (expired) {
                 setIsLocked(true);
                 setLockReason("subscription_expired");
               } else {
@@ -156,7 +172,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             }
           }
         } else {
-          // Default fallback if no record is found
           setIsTrial(true);
           setCurrentPlanState("trial");
           setIsLocked(false);
@@ -167,24 +182,30 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    // Listen for Auth changes - automatically reset state on logout and fetch on login
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const {
+      data: { subscription }
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
-        loadCompanyFromDb(session.user.id);
+        void loadCompanyFromDb(session.user.id);
       } else {
-        // Completely wipe state on logout
+        const defaultCurrency = getCurrencyCodeForCountry(DEFAULT_COUNTRY);
+
         setCompanyState(defaultCompany);
         setCompanyId(null);
         setCurrentPlanState("trial");
         setIsTrial(true);
         setIsLocked(false);
+        setLockReason("none");
+        setDaysRemaining(7);
+        setAccountCountry(DEFAULT_COUNTRY);
+        setCurrencyState(defaultCurrency);
+        localStorage.setItem("app_currency", defaultCurrency);
       }
     });
 
-    // Initial load check
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    void supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        loadCompanyFromDb(session.user.id);
+        void loadCompanyFromDb(session.user.id);
       }
     });
 
@@ -219,27 +240,41 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   };
 
   const formatCurrency = (value: number) => {
-    if (!Number.isFinite(value)) return "AED 0.00";
-    
-    return new Intl.NumberFormat("en-AE", {
-      style: "currency",
-      currency: "AED",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value);
+    return formatCountryCurrency(value, accountCountry);
   };
 
   const formatNumber = (value: number) => {
-    if (!Number.isFinite(value)) return "0.00";
-    
+    if (!Number.isFinite(value)) {
+      return "0.00";
+    }
+
     return new Intl.NumberFormat("en-US", {
       minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      maximumFractionDigits: 2
     }).format(value);
   };
 
   return (
-    <SettingsContext.Provider value={{ currency, setCurrency, formatCurrency, formatNumber, company, setCompany, currentPlan, setCurrentPlan, isLocked, lockReason, isTrial, daysRemaining, themeColor, setThemeColor, companyId }}>
+    <SettingsContext.Provider
+      value={{
+        currency,
+        setCurrency,
+        formatCurrency,
+        formatNumber,
+        company,
+        setCompany,
+        currentPlan,
+        setCurrentPlan,
+        isLocked,
+        lockReason,
+        isTrial,
+        daysRemaining,
+        themeColor,
+        setThemeColor,
+        companyId,
+        accountCountry
+      }}
+    >
       {children}
     </SettingsContext.Provider>
   );
@@ -247,8 +282,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
 export function useSettings() {
   const context = useContext(SettingsContext);
+
   if (context === undefined) {
     throw new Error("useSettings must be used within a SettingsProvider");
   }
+
   return context;
 }

@@ -16,10 +16,10 @@ position: 30
 Apply a country-based currency engine across the system. When the active country is Philippines, user-facing currency values across modules should display in Peso. UAE should keep the current currency behavior. The implementation should use the active country already stored for the account and be reusable across pages instead of repeating custom formatters.
 
 ## Checklist
-- [ ] Inspect how the app currently formats currency across pricing and operational modules
-- [ ] Add a shared country-aware currency formatter/engine
-- [ ] Connect the formatter to the active account country
-- [ ] Update key modules and shared layouts to use the shared formatter
+- [x] Inspect how the app currently formats currency across pricing and operational modules
+- [x] Add a shared country-aware currency formatter/engine
+- [x] Connect the formatter to the active account country
+- [x] Update key modules and shared layouts to use the shared formatter
 - [ ] Validate the affected pages compile cleanly
 
 ## Acceptance

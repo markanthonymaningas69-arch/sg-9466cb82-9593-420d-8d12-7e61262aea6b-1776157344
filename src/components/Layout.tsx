@@ -62,7 +62,7 @@ const navigation = [
 export function Layout({ children }: LayoutProps) {
   const router = useRouter();
   const { toast } = useToast();
-  const { company, currentPlan, currency, isLocked, lockReason, isTrial, daysRemaining } = useSettings();
+  const { company, currentPlan, formatCurrency, isLocked, lockReason, isTrial, daysRemaining } = useSettings();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [pendingLeaves, setPendingLeaves] = useState<any[]>([]);
@@ -371,7 +371,7 @@ export function Layout({ children }: LayoutProps) {
         status: 'approved'
       });
 
-      toast({ title: "Cash Advance Approved", description: `${name}'s request for ${currency || '$'}${amount} approved.` });
+      toast({ title: "Cash Advance Approved", description: `${name}'s request for ${formatCurrency(Number(amount || 0))} approved.` });
       loadPendingRequests();
     } else {
       toast({ title: "Error", description: "Failed to approve request", variant: "destructive" });
@@ -805,15 +805,15 @@ export function Layout({ children }: LayoutProps) {
                             }}>
                             <div className="flex items-start justify-between w-full">
                               <span className="font-medium text-sm text-blue-700">Voucher to Issue</span>
-                              <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-600 border-blue-200">
-                                {voucher.voucher_number}
+                              <Badge variant="outline" className="text-xs text-orange-600 border-orange-200 bg-orange-50">
+                                {formatCurrency(Number(voucher.amount || 0))}
                               </Badge>
                             </div>
                             <span className="text-xs text-muted-foreground font-semibold">
                               {voucher.description || 'Payment Voucher'}
                             </span>
                             <span className="text-xs text-muted-foreground">
-                              Amount: AED {voucher.amount.toLocaleString()}
+                              Amount: {formatCurrency(Number(voucher.amount || 0))}
                             </span>
                           </DropdownMenuItem>
                         ))}
@@ -837,7 +837,7 @@ export function Layout({ children }: LayoutProps) {
                               {purchase.item_name} ({purchase.quantity} {purchase.unit})
                             </span>
                             <span className="text-xs text-muted-foreground font-bold">
-                              Cost: AED {(purchase.quantity * (purchase.unit_cost || 0)).toLocaleString()}
+                              Cost: {formatCurrency(Number(purchase.quantity || 0) * Number(purchase.unit_cost || 0))}
                             </span>
                             <div className="flex gap-2 w-full mt-1" onClick={(e) => e.stopPropagation()}>
                               <Button size="sm" variant="default" disabled={isLocked} className="flex-1 h-8 bg-green-600 hover:bg-green-700 text-white" onClick={(e) => handleApprovePurchaseGM(purchase, e)}>
@@ -916,7 +916,7 @@ export function Layout({ children }: LayoutProps) {
                         <div className="flex items-start justify-between w-full">
                           <span className="font-medium text-sm">{adv.personnel?.name}</span>
                           <Badge variant="outline" className="text-xs text-orange-600 border-orange-200 bg-orange-50">
-                            {currency || '$'} {adv.amount}
+                            {formatCurrency(Number(adv.amount || 0))}
                           </Badge>
                         </div>
                         <span className="text-xs text-muted-foreground">
@@ -971,7 +971,7 @@ export function Layout({ children }: LayoutProps) {
                           </div>
                           <Badge variant="outline" className="text-xs">
                             {req.quantity > 0 ? `${req.quantity} ${req.unit}` : ''}
-                            {req.amount > 0 ? ` ${currency || '$'}${req.amount}` : ''}
+                            {req.amount > 0 ? ` ${formatCurrency(Number(req.amount || 0))}` : ''}
                           </Badge>
                         </div>
                         <span className="text-xs text-muted-foreground">

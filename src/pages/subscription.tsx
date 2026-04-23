@@ -191,6 +191,11 @@ export default function Subscription() {
   };
 
   const selectedPlanConfig = plans.find(p => p.id === selectedPlan);
+  const formatAccountCurrency = (value: number) =>
+    formatCountryCurrency(value, accountCountry, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    });
 
   const updateAddOnQuantity = (id: string, delta: number) => {
     const limit = selectedPlanConfig?.addOnLimits?.[id] || 0;
@@ -542,7 +547,7 @@ export default function Subscription() {
           </span>
           <button
             onClick={() => setBillingCycle(billingCycle === "monthly" ? "annual" : "monthly")}
-            className="relative inline-flex h-7 w-12 items-center rounded-full bg-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+            className="relative inline-flex h-7 w-12 items-center rounded-full bg-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1"
           >
             <span
               className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${

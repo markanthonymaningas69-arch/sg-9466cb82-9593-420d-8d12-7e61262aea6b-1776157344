@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Check, Minus, Plus, ShoppingCart, Loader2 } from "lucide-react";
 import { plans, addOns, DEFAULT_COUNTRY, COUNTRY_OPTIONS, OUT_OF_SERVICE_MESSAGE, getAddOnPrice, getAvailableBillingCycles, getPlanPrice, isSupportedCountry, type BillingCycle, type CountryOption, type PlanConfig } from "@/config/pricing";
+import { formatCountryCurrency } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/router";
@@ -24,6 +25,11 @@ export default function PricingPage() {
   const displayPlans = plans.filter(p => p.id !== "trial");
   const availableBillingCycles = getAvailableBillingCycles(selectedCountry);
   const canUseAnnualBilling = availableBillingCycles.includes("annual");
+  const formatSelectedCountryCurrency = (value: number) =>
+    formatCountryCurrency(value, selectedCountry, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    });
 
   React.useEffect(() => {
     if (!router.isReady) {
@@ -259,11 +265,11 @@ export default function PricingPage() {
                   </div>
                   <div className="mt-6">
                     <div className="flex items-baseline gap-1">
-                      <span className="text-5xl font-bold tracking-tight">AED {getPrice(plan)}</span>
+                      <span className="text-5xl font-bold tracking-tight">{formatSelectedCountryCurrency(getPrice(plan))}</span>
                       <span className="text-muted-foreground font-medium">/{effectiveBillingCycle === "monthly" ? "mo" : "yr"}</span>
                     </div>
                     {effectiveBillingCycle === "annual" && (
-                      <p className="text-sm font-semibold text-success mt-2">Save AED {getSavings(plan)} annually</p>
+                      <p className="text-sm font-semibold text-success mt-2">Save {formatSelectedCountryCurrency(getSavings(plan))} annually</p>
                     )}
                   </div>
                 </CardHeader>
@@ -310,7 +316,7 @@ export default function PricingPage() {
                     </CardHeader>
                     <CardContent className="pb-4 flex-1">
                       <div className="text-3xl font-bold text-primary tracking-tight">
-                        AED {getAddOnPrice(addon, selectedCountry, effectiveBillingCycle)}
+                        {formatSelectedCountryCurrency(getAddOnPrice(addon, selectedCountry, effectiveBillingCycle))}
                         <span className="text-base font-normal text-muted-foreground">/{effectiveBillingCycle === "monthly" ? "mo" : "yr"}</span>
                       </div>
                       {!isUnavailable && <div className="text-sm text-muted-foreground mt-2 font-medium">Max Limit: {limit} seat{limit !== 1 ? 's' : ''}</div>}
@@ -344,7 +350,7 @@ export default function PricingPage() {
                       </div>
                       {isSelected && (
                         <div className="w-full text-center text-sm font-semibold text-primary mt-1">
-                          Subtotal: AED {getAddOnPrice(addon, selectedCountry, effectiveBillingCycle) * qty}
+                          Subtotal: {formatSelectedCountryCurrency(getAddOnPrice(addon, selectedCountry, effectiveBillingCycle) * qty)}
                         </div>
                       )}
                     </CardFooter>
@@ -364,7 +370,7 @@ export default function PricingPage() {
                   <div className="space-y-2">
                     <div className="flex justify-between items-center text-muted-foreground border-b pb-2">
                       <span className="font-medium text-foreground">{currentPlanConfig.name} Plan ({effectiveBillingCycle})</span>
-                      <span className="font-semibold text-foreground">AED {basePrice}</span>
+                      <span className="font-semibold text-foreground">{formatSelectedCountryCurrency(basePrice)}</span>
                     </div>
                     
                     {/* List add-ons individually */}
@@ -376,7 +382,7 @@ export default function PricingPage() {
                       return (
                         <div key={`list-${addon.id}`} className="flex justify-between items-center text-muted-foreground pt-1 pl-2 border-l-2 border-primary/20 ml-1">
                           <span className="text-sm">+ {qty}x {addon.name}</span>
-                          <span className="font-semibold text-foreground text-sm">AED {price * qty}</span>
+                          <span className="font-semibold text-foreground text-sm">{formatSelectedCountryCurrency(price * qty)}</span>
                         </div>
                       );
                     })}
@@ -384,7 +390,7 @@ export default function PricingPage() {
                     {totalAddonItems > 0 && (
                       <div className="flex justify-between items-center text-muted-foreground pt-2 border-t mt-2">
                         <span className="text-xs uppercase tracking-wider font-bold">Add-ons Subtotal</span>
-                        <span className="font-semibold text-foreground">AED {addOnsTotal}</span>
+                        <span className="font-semibold text-foreground">{formatSelectedCountryCurrency(addOnsTotal)}</span>
                       </div>
                     )}
                   </div>
@@ -392,7 +398,7 @@ export default function PricingPage() {
                 <div className="flex flex-col items-center md:items-end gap-4 w-full md:w-auto border-t md:border-t-0 pt-6 md:pt-0 pl-0 md:pl-8 md:border-l">
                   <div className="text-center md:text-right w-full">
                     <div className="text-sm font-bold text-muted-foreground uppercase tracking-widest mb-1">Total Due</div>
-                    <div className="text-5xl font-black text-primary tracking-tighter">AED {totalAmount}</div>
+                    <div className="text-5xl font-black text-primary tracking-tighter">{formatSelectedCountryCurrency(totalAmount)}</div>
                     <div className="text-sm font-semibold text-muted-foreground mt-1">/{effectiveBillingCycle === "monthly" ? "month" : "year"}</div>
                   </div>
                   <Button 
