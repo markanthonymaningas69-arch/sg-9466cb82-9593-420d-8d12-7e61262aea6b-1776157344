@@ -3102,6 +3102,61 @@ export default function SitePersonnel() {
                       {isCashRequest ? (
                         <div className="grid gap-4 md:grid-cols-2">
                           <div className="space-y-2">
+                            <Label>Date</Label>
+                            <Input
+                              type="date"
+                              value={requestForm.request_date}
+                              onChange={(e) => setRequestForm({ ...requestForm, request_date: e.target.value })}
+                              required
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Personnel</Label>
+                            <Select
+                              value={requestForm.personnel_id}
+                              onValueChange={(value) => setRequestForm({ ...requestForm, personnel_id: value })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select personnel" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {projectPersonnelList.map((person) => (
+                                  <SelectItem key={person.id} value={person.id}>
+                                    {person.name} - {person.role}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      ) : isToolRequest ? null : (
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="space-y-2">
+                            <Label>Date</Label>
+                            <Input
+                              type="date"
+                              value={requestForm.request_date}
+                              onChange={(e) => setRequestForm({ ...requestForm, request_date: e.target.value })}
+                              required
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Requested By</Label>
+                            <Input
+                              value={requestForm.requested_by}
+                              onChange={(e) => setRequestForm({ ...requestForm, requested_by: e.target.value })}
+                              placeholder="Enter requester name"
+                              required
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {isCashRequest ? (
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="space-y-2">
                             <Label>Amount</Label>
                             <Input
                               type="number"
@@ -3135,7 +3190,7 @@ export default function SitePersonnel() {
                               <Select
                                 value={requestForm.bom_scope_id}
                                 onValueChange={(value) =>
-                                  setRequestForm({ ...requestForm, bom_scope_id: value, item_name: "", unit: "" })
+                                  setRequestForm({ ...requestForm, bom_scope_id: value, item_name: "", unit: "", amount: 0 })
                                 }
                               >
                                 <SelectTrigger>
@@ -3160,7 +3215,7 @@ export default function SitePersonnel() {
                                   onValueChange={(value) => {
                                     if (value === "others") {
                                       setIsManualRequestItem(true);
-                                      setRequestForm({ ...requestForm, item_name: "", unit: "" });
+                                      setRequestForm({ ...requestForm, item_name: "", unit: "", amount: 0 });
                                       setIsManualRequestUnit(false);
                                     } else {
                                       const material = scopedRequestMaterials.find((item) => item.name === value);
@@ -3168,6 +3223,7 @@ export default function SitePersonnel() {
                                         ...requestForm,
                                         item_name: value,
                                         unit: material?.unit || requestForm.unit,
+                                        amount: 0,
                                       });
                                       setIsManualRequestUnit(false);
                                     }
@@ -3216,7 +3272,7 @@ export default function SitePersonnel() {
                                     variant="outline"
                                     onClick={() => {
                                       setIsManualRequestItem(false);
-                                      setRequestForm({ ...requestForm, item_name: "", unit: "" });
+                                      setRequestForm({ ...requestForm, item_name: "", unit: "", amount: 0 });
                                     }}
                                   >
                                     List
@@ -3226,7 +3282,7 @@ export default function SitePersonnel() {
                             </div>
                           </div>
 
-                          <div className="grid gap-4 md:grid-cols-3">
+                          <div className={`grid gap-4 ${isManualRequestItem ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
                             <div className="space-y-2">
                               <Label>Quantity</Label>
                               <Input
@@ -3289,16 +3345,18 @@ export default function SitePersonnel() {
                               )}
                             </div>
 
-                            <div className="space-y-2">
-                              <Label>Estimated Amount</Label>
-                              <Input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={requestForm.amount}
-                                onChange={(e) => setRequestForm({ ...requestForm, amount: parseFloat(e.target.value) || 0 })}
-                              />
-                            </div>
+                            {isManualRequestItem ? (
+                              <div className="space-y-2">
+                                <Label>Estimated Amount</Label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={requestForm.amount}
+                                  onChange={(e) => setRequestForm({ ...requestForm, amount: parseFloat(e.target.value) || 0 })}
+                                />
+                              </div>
+                            ) : null}
                           </div>
 
                           <div className="space-y-2">

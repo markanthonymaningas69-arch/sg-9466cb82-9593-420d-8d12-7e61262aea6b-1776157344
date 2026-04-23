@@ -1,6 +1,6 @@
 ---
 title: Site request form refinement
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -36,7 +36,7 @@ Latest follow-up changes:
 - [x] Remove the Requested By field from Material Request
 - [x] Hide Estimated Amount for BOQ/BOM-listed materials and show it only for non-listed materials
 - [x] Remove the Material Request helper copy above the form
-- [ ] Validate the material modal behavior for listed versus manual items
+- [x] Validate the material modal behavior for listed versus manual items
 
 ## Acceptance
 In Material Request, only materials linked to the selected scope appear in the material dropdown.
