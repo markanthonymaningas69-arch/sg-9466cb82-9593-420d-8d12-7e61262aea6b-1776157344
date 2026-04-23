@@ -209,7 +209,7 @@ export default function Subscription() {
   const selectedPlanConfig = plans.find(p => p.id === selectedPlan);
   const countrySubscriptionConfig = getCountrySubscriptionConfig(accountCountry);
   const stripeSubscriptionEnabled = usesStripeSubscription(accountCountry);
-  const manualPaymentEnabled = usesManualPaymentLink(accountCountry);
+  const payMongoCheckoutEnabled = usesPayMongoCheckout(accountCountry);
   const formatAccountCurrency = (value: number) =>
     formatCountryCurrency(value, accountCountry, {
       minimumFractionDigits: 0,
@@ -575,24 +575,6 @@ export default function Subscription() {
           </CardContent>
         </Card>
 
-        {manualPaymentEnabled && (
-          <Card className="border-primary/20 bg-primary/5">
-            <CardHeader>
-              <CardTitle>Philippines Subscription Flow</CardTitle>
-              <CardDescription>{countrySubscriptionConfig.paymentMethodLabel}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm text-muted-foreground">
-              <p>{countrySubscriptionConfig.helperText}</p>
-              <p>All prices on this page are shown in Peso when Philippines is the active country.</p>
-              {!countrySubscriptionConfig.paymentLink && (
-                <p className="font-medium text-destructive">
-                  GCash payment link is not configured yet. Add the payment link when ready to activate checkout.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
         {payMongoCheckoutEnabled && (
           <Card className="border-primary/20 bg-primary/5">
             <CardHeader>
@@ -833,7 +815,7 @@ export default function Subscription() {
                     isCheckingOut ||
                     !selectedPlan ||
                     (totalAmountDueToday === 0 && !isSelectingSamePlanAndCycle) ||
-                    (manualPaymentEnabled && !countrySubscriptionConfig.paymentLink)
+                    (payMongoCheckoutEnabled && !countrySubscriptionConfig.paymentLink)
                   }
                 >
                   {isCheckingOut ? (
