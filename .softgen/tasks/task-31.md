@@ -22,6 +22,8 @@ Follow-up: switch the Philippines payment path from a generic manual link to a P
 
 Latest feedback: after a successful PayMongo payment, the subscription is not being activated and the account remains in trial. Add the missing subscription persistence/verification flow and provide the webhook URL path for PayMongo configuration.
 
+Additional finding: the success return can happen before PayMongo reports the checkout as paid, so the Philippines flow needs retry-based verification instead of a single verification attempt.
+
 ## Checklist
 - [x] Add shared country payment/subscription configuration for future country expansion
 - [x] Update subscription page to branch by active account country
@@ -38,6 +40,7 @@ Latest feedback: after a successful PayMongo payment, the subscription is not be
 - [x] Update the subscription page to reflect successful PayMongo payments correctly
 - [x] Provide the webhook URL path the user should paste into PayMongo
 - [ ] Revalidate the Philippines payment success flow
+- [x] Add retry-based PayMongo verification after the success redirect
 
 ## Acceptance
 When the active country is Philippines, the subscription page shows the Philippines-specific flow with Peso currency.

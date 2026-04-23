@@ -59,13 +59,37 @@ export default function Subscription() {
       return;
     }
 
-    if (router.query.paymongo === 'success') {
-      toast({
-        title: "GCash Checkout Opened",
-        description: "Your PayMongo payment returned successfully. Complete payment in GCash if prompted."
-      });
-      const newUrl = window.location.pathname;
-      window.history.replaceState({}, document.title, newUrl);
+    if (router.query.paymongo === "success") {
+      const rawPendingCheckout = localStorage.getItem(PAYMONGO_PENDING_CHECKOUT_KEY);
+
+      if (!rawPendingCheckout) {
+        toast({
+          title: "Payment received",
+          description: "Re-open the checkout from this device so the subscription can be verified."
+        });
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+        return;
+      }
+
+      try {
+        const pendingCheckout = JSON.parse(rawPendingCheckout) as { sessionId?: string; token?: string };
+
+        if (!pendingCheckout.sessionId || !pendingCheckout.token) {
+          throw new Error("Incomplete checkout context.");
+        }
+
+        void verifyPayMongoPayment(pendingCheckout.sessionId, pendingCheckout.token, 0);
+      } catch {
+        localStorage.removeItem(PAYMONGO_PENDING_CHECKOUT_KEY);
+        toast({
+          title: "Verification failed",
+          description: "The completed PayMongo checkout could not be matched to this account.",
+          variant: "destructive"
+        });
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+      }
       return;
     }
 

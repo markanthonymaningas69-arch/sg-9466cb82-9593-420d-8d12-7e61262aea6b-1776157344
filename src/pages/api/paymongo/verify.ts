@@ -13,12 +13,17 @@ function getPaidStatuses(payload: unknown): string[] {
     ? (payload as { data?: { attributes?: Record<string, unknown> } }).data?.attributes
     : undefined;
 
+  const paymentIntent =
+    attributes?.payment_intent && typeof attributes.payment_intent === "object"
+      ? (attributes.payment_intent as { status?: string; attributes?: { status?: string } })
+      : undefined;
+
   const payments = Array.isArray(attributes?.payments) ? attributes.payments : [];
   const statuses = [
     typeof attributes?.status === "string" ? attributes.status : null,
-    typeof (attributes?.payment_intent as { status?: string } | undefined)?.status === "string"
-      ? (attributes?.payment_intent as { status?: string }).status
-      : null,
+    typeof attributes?.payment_status === "string" ? attributes.payment_status : null,
+    typeof paymentIntent?.status === "string" ? paymentIntent.status : null,
+    typeof paymentIntent?.attributes?.status === "string" ? paymentIntent.attributes.status : null,
     ...payments.flatMap((payment) => {
       if (!payment || typeof payment !== "object") {
         return [];
@@ -32,9 +37,13 @@ function getPaidStatuses(payload: unknown): string[] {
     })
   ];
 
-  return statuses
-    .filter((value): value is string => Boolean(value))
-    .map((value) => value.toLowerCase());
+  return Array.from(
+    new Set(
+      statuses
+        .filter((value): value is string => Boolean(value))
+        .map((value) => value.toLowerCase())
+    )
+  );
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -76,9 +85,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const statuses = getPaidStatuses(data);
+    const hasConfirmedPayment = statuses.some((status) =>
+      ["paid", "succeeded", "successful", "completed"].includes(status)
+    );
 
-    if (!statuses.includes("paid")) {
-      return res.status(409).json({
+    if (!hasConfirmedPayment) {
+      return res.status(202).json({
+        pending: true,
         error: "Payment has not been marked as paid yet.",
         statuses
       });
