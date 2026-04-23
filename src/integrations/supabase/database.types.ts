@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -1349,6 +1349,7 @@ export type Database = {
           sort_order: number | null
           start_date: string
           status: string | null
+          task_config: Json
           updated_at: string | null
         }
         Insert: {
@@ -1370,6 +1371,7 @@ export type Database = {
           sort_order?: number | null
           start_date: string
           status?: string | null
+          task_config?: Json
           updated_at?: string | null
         }
         Update: {
@@ -1391,6 +1393,7 @@ export type Database = {
           sort_order?: number | null
           start_date?: string
           status?: string | null
+          task_config?: Json
           updated_at?: string | null
         }
         Relationships: [
