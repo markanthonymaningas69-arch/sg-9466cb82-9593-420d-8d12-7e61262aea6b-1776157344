@@ -1,6 +1,6 @@
 ---
 title: Site request form refinement
-status: done
+status: in_progress
 priority: high
 type: feature
 tags:
@@ -17,6 +17,8 @@ Refine the Site Personnel create request flow so Materials only shows items link
 
 Latest follow-up change: keep the Tools & Equipments modal blank for now. Do not show any form inputs until the user provides the final list of required fields.
 
+Additional follow-up: remove any remaining input boxes from the Tools & Equipments modal so the dialog is fully empty except for its shell.
+
 ## Checklist
 - [x] Separate materials and tools request form experiences in the Site Request dialog
 - [x] Scope-filter the materials request list from the current project material source
@@ -24,8 +26,8 @@ Latest follow-up change: keep the Tools & Equipments modal blank for now. Do not
 - [x] Update the Material Request dropdown to use only scope-linked BOQ/BOM items for the selected scope
 - [x] Validate that changing the selected scope updates the available material choices correctly
 - [x] Remove extra fields from the Tools & Equipments request modal
-- [x] Clear the Tools & Equipments modal so it shows no inputs
-- [x] Preserve the Material Request behavior while the tools modal remains blank
+- [ ] Remove any remaining input boxes from the Tools & Equipments modal
+- [ ] Preserve the Material Request behavior while the tools modal remains blank
 
 ## Acceptance
 In Material Request, only materials linked to the selected scope appear in the material dropdown.
