@@ -19,6 +19,7 @@ import { useSettings } from "@/contexts/SettingsProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { ManpowerRateCatalogTab } from "@/components/personnel/ManpowerRateCatalogTab";
 import { PositionRateSelector } from "@/components/personnel/PositionRateSelector";
+import { manpowerRateCatalogService, type ManpowerRateCatalogItem } from "@/services/manpowerRateCatalogService";
 
 type Personnel = Database["public"]["Tables"]["personnel"]["Row"];
 type Project = Database["public"]["Tables"]["projects"]["Row"];
@@ -55,7 +56,8 @@ export default function Personnel() {
   const [attendance, setAttendance] = useState<any[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
   const [visas, setVisas] = useState<any[]>([]);
-  
+  const [rateCatalogItems, setRateCatalogItems] = useState<ManpowerRateCatalogItem[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [attendanceDialogOpen, setAttendanceDialogOpen] = useState(false);
@@ -69,7 +71,7 @@ export default function Personnel() {
   const [minDaysWorked, setMinDaysWorked] = useState<string>("");
   const [minDaysAbsent, setMinDaysAbsent] = useState<string>("");
   
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<PersonnelFormState>({
     name: "",
     role: "",
     position_id: "",
@@ -79,10 +81,10 @@ export default function Personnel() {
     hourly_rate: "",
     daily_rate: "",
     overtime_rate: "",
-    rate_currency: currency,
-    status: "active" as const,
-    worker_type: "construction" as "construction" | "office",
-    employment_type: "full_time" as "full_time" | "contract" | "daily",
+    rate_currency: currency as string,
+    status: "active",
+    worker_type: "construction",
+    employment_type: "full_time",
     hire_date: new Date().toISOString().split("T")[0]
   });
 
