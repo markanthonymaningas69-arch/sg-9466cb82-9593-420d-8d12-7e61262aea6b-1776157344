@@ -112,7 +112,22 @@ function parseTeamComposition(value: unknown): TeamCompositionRole[] {
     .filter((entry): entry is TeamCompositionRole => Boolean(entry));
 }
 
-function buildPayload(input: SaveRateInput): ManpowerRateInsert | ManpowerRateUpdate {
+function buildInsertPayload(input: SaveRateInput): ManpowerRateInsert {
+  const dailyRate = Number(input.dailyRate || 0);
+
+  return {
+    position_name: input.positionName.trim(),
+    category: input.category,
+    daily_rate: dailyRate,
+    hourly_rate: calculateHourlyRate(dailyRate, input.hourlyRate),
+    overtime_rate: Number(input.overtimeRate || 0),
+    currency: input.currency.trim() || "AED",
+    effective_date: input.effectiveDate,
+    status: input.status,
+  };
+}
+
+function buildUpdatePayload(input: SaveRateInput): ManpowerRateUpdate {
   const dailyRate = Number(input.dailyRate || 0);
 
   return {
@@ -162,7 +177,7 @@ export const manpowerRateCatalogService = {
   },
 
   async create(input: SaveRateInput) {
-    const payload = buildPayload(input);
+    const payload = buildInsertPayload(input);
 
     const { data, error } = await supabase
       .from("manpower_rate_catalog")
@@ -181,7 +196,7 @@ export const manpowerRateCatalogService = {
 
   async update(id: string, input: SaveRateInput) {
     const payload: ManpowerRateUpdate = {
-      ...buildPayload(input),
+      ...buildUpdatePayload(input),
       updated_at: new Date().toISOString(),
     };
 
