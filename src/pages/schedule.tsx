@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Calendar as CalendarIcon } from "lucide-react";
-import type { TaskFormData } from "@/lib/schedule";
+import { createDraftTask, type TaskDependency, type TaskFormData, type TaskRoleAllocation } from "@/lib/schedule";
 import {
   calculateRequiredDurationDays,
   createDefaultTaskConfiguration,
@@ -52,20 +52,62 @@ function extractDependencyIds(value: unknown): string[] {
     .filter((dependencyId): dependencyId is string => Boolean(dependencyId));
 }
 
+function createTaskDependencies(dependencyIds: string[]): TaskDependency[] {
+  return dependencyIds.map((dependencyId) => ({
+    id: `dependency-${dependencyId}`,
+    taskId: dependencyId,
+    type: "FS",
+    lagDays: 0,
+  }));
+}
+
+function createTaskRoleAllocations(task: EditableProjectTask): TaskRoleAllocation[] {
+  return normalizeTaskConfiguration(task.task_config, {
+    quantity: task.bom_scope?.quantity,
+    unit: task.bom_scope?.unit,
+    assignedTeamName: task.assigned_team,
+  }).teamRoles.map((role) => ({
+    id: role.id,
+    role: role.role,
+    count: Math.max(1, Math.round(role.quantity)),
+  }));
+}
+
 type ScheduleTaskRecord = TaskFormData & {
   task_config?: unknown;
   bom_scope?: EditableProjectTask["bom_scope"];
 };
 
 function normalizeEditableTask(task: ScheduleTaskRecord): EditableProjectTask {
-  const taskConfig = normalizeTaskConfiguration(task.task_config, {
-    quantity: task.bom_scope?.quantity,
-    unit: task.bom_scope?.unit,
-    assignedTeamName: task.assigned_team,
-  });
+  const seededConfig = {
+    scopeQuantity: Number(task.scope_quantity || task.bom_scope?.quantity || 1),
+    scopeUnit: task.scope_unit || task.bom_scope?.unit || "lot",
+    productivityOutput: Number(task.productivity_rate_per_day || task.productivity_rate_per_hour || task.scope_quantity || task.bom_scope?.quantity || 1),
+    productivityUnit: task.productivity_rate_per_day && Number(task.productivity_rate_per_day) > 0 ? "day" : "hour",
+    workHoursPerDay: Number(task.working_hours_per_day || 8),
+    autoCalculateDuration: task.duration_source !== "manual",
+    teamRoles: (task.team_composition || []).map((role, index) => ({
+      id: role.id || `role-${index}`,
+      role: role.role,
+      quantity: Math.max(1, Math.round(role.count)),
+    })),
+    assignedTeamName: task.assigned_team || "",
+  };
+
+  const taskConfig = normalizeTaskConfiguration(
+    typeof task.task_config === "object" && task.task_config !== null
+      ? { ...seededConfig, ...(task.task_config as Record<string, unknown>) }
+      : seededConfig,
+    {
+      quantity: task.bom_scope?.quantity,
+      unit: task.bom_scope?.unit,
+      assignedTeamName: task.assigned_team,
+    }
+  );
+
   const durationDays = taskConfig.autoCalculateDuration
     ? calculateRequiredDurationDays(taskConfig)
-    : Number(task.duration_days || calculateRequiredDurationDays(taskConfig));
+    : Math.max(1, Number(task.duration_days || calculateRequiredDurationDays(taskConfig)));
 
   return {
     ...task,
@@ -73,43 +115,63 @@ function normalizeEditableTask(task: ScheduleTaskRecord): EditableProjectTask {
     assigned_team: taskConfig.assignedTeamName || task.assigned_team || null,
     task_config: taskConfig,
     duration_days: durationDays,
-    end_date: task.start_date
-      ? addDays(task.start_date, durationDays)
-      : task.end_date,
+    end_date: task.start_date ? addDays(task.start_date, durationDays) : task.end_date,
+    bom_scope: task.bom_scope || null,
+  };
+}
+
+function toTaskFormData(task: EditableProjectTask): TaskFormData {
+  const taskConfig = normalizeTaskConfiguration(task.task_config, {
+    quantity: task.bom_scope?.quantity,
+    unit: task.bom_scope?.unit,
+    assignedTeamName: task.assigned_team,
+  });
+  const roleAllocations = createTaskRoleAllocations(task);
+  const durationDays = taskConfig.autoCalculateDuration
+    ? calculateRequiredDurationDays(taskConfig)
+    : Math.max(1, Number(task.duration_days || 1));
+
+  return {
+    ...task,
+    dependencies: createTaskDependencies(task.dependencies),
+    assigned_team: taskConfig.assignedTeamName || task.assigned_team || null,
+    task_config: taskConfig,
+    duration_days: durationDays,
+    end_date: task.start_date ? addDays(task.start_date, durationDays) : task.end_date,
+    scope_quantity: taskConfig.scopeQuantity,
+    scope_unit: taskConfig.scopeUnit,
+    productivity_rate_per_hour: taskConfig.productivityUnit === "hour" ? taskConfig.productivityOutput : 0,
+    productivity_rate_per_day: taskConfig.productivityUnit === "day" ? taskConfig.productivityOutput : 0,
+    working_hours_per_day: taskConfig.workHoursPerDay,
+    team_composition: roleAllocations,
+    resource_labor: roleAllocations,
+    duration_source: taskConfig.autoCalculateDuration ? "auto" : "manual",
+    equipment: Array.isArray(task.equipment) ? task.equipment : [],
+    cost_links: Array.isArray(task.cost_links) ? task.cost_links : [],
+    notes: task.notes || "",
     bom_scope: task.bom_scope || null,
   };
 }
 
 function createNewTask(projectId: string): EditableProjectTask {
+  const draftTask = createDraftTask(projectId);
   const taskConfig = createDefaultTaskConfiguration();
 
-  return {
-    id: "",
-    project_id: projectId,
-    parent_id: null,
-    bom_scope_id: null,
-    name: "New Task",
-    description: "",
-    start_date: toDateOnly(new Date()),
-    end_date: toDateOnly(new Date()),
-    duration_days: calculateRequiredDurationDays(taskConfig),
-    progress: 0,
-    dependencies: [],
-    assigned_team: taskConfig.assignedTeamName || null,
-    priority: "medium",
-    constraint_type: "ASAP",
-    status: "pending",
-    sort_order: 0,
-    created_by: null,
-    created_at: null,
-    updated_at: null,
+  return normalizeEditableTask({
+    ...draftTask,
     task_config: taskConfig,
-    bom_scope: null,
-  };
+    assigned_team: taskConfig.assignedTeamName || draftTask.assigned_team,
+    scope_quantity: taskConfig.scopeQuantity,
+    scope_unit: taskConfig.scopeUnit,
+    productivity_rate_per_day: taskConfig.productivityUnit === "day" ? taskConfig.productivityOutput : 0,
+    productivity_rate_per_hour: taskConfig.productivityUnit === "hour" ? taskConfig.productivityOutput : 0,
+    working_hours_per_day: taskConfig.workHoursPerDay,
+    duration_source: "auto",
+  });
 }
 
 function syncTaskWithConfiguration(task: EditableProjectTask): EditableProjectTask {
-  const normalizedTask = normalizeEditableTask(task);
+  const normalizedTask = normalizeEditableTask(toTaskFormData(task));
 
   if (!normalizedTask.task_config.autoCalculateDuration) {
     const durationDays = Math.max(1, Number(normalizedTask.duration_days || 1));
@@ -171,7 +233,6 @@ export default function SchedulePage() {
       const data = await scheduleService.getTasksByProject(projectId);
       const normalizedTasks = (data || []).map((task) => normalizeEditableTask(task as ScheduleTaskRecord));
       setTasks(normalizedTasks);
-
       setSelectedTask((currentTask) => {
         if (!currentTask?.id) {
           return currentTask;
@@ -214,8 +275,7 @@ export default function SchedulePage() {
   };
 
   const handleAddTask = () => {
-    const newTask = createNewTask(selectedProject);
-    setSelectedTask(newTask);
+    setSelectedTask(createNewTask(selectedProject));
   };
 
   const handleUpdateTask = async () => {
@@ -224,15 +284,16 @@ export default function SchedulePage() {
     }
 
     const syncedTask = syncTaskWithConfiguration(selectedTask);
+    const taskPayload = toTaskFormData(syncedTask);
 
     try {
       setSaving(true);
 
       if (syncedTask.id) {
-        await scheduleService.updateTask(syncedTask.id, syncedTask);
+        await scheduleService.updateTask(syncedTask.id, taskPayload);
         toast({ title: "Success", description: "Task updated successfully" });
       } else {
-        await scheduleService.createTask(syncedTask);
+        await scheduleService.createTask(taskPayload);
         toast({ title: "Success", description: "Task created successfully" });
         setSelectedTask(null);
       }
@@ -320,9 +381,7 @@ export default function SchedulePage() {
             </SelectTrigger>
             <SelectContent>
               {projects.map((project) => (
-                <SelectItem key={project.id} value={project.id}>
-                  {project.name}
-                </SelectItem>
+                <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -341,22 +400,8 @@ export default function SchedulePage() {
                 <CardTitle className="text-lg">Project Schedule</CardTitle>
                 <div className="flex flex-wrap items-center gap-2 mt-2 sm:mt-0">
                   <div className="flex items-center space-x-2 mr-4 bg-muted/50 p-1 rounded-md">
-                    <Button
-                      size="sm"
-                      variant={viewMode === "list" ? "default" : "ghost"}
-                      onClick={() => setViewMode("list")}
-                      className="h-7 text-xs"
-                    >
-                      List View
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={viewMode === "gantt" ? "default" : "ghost"}
-                      onClick={() => setViewMode("gantt")}
-                      className="h-7 text-xs"
-                    >
-                      Gantt View
-                    </Button>
+                    <Button size="sm" variant={viewMode === "list" ? "default" : "ghost"} onClick={() => setViewMode("list")} className="h-7 text-xs">List View</Button>
+                    <Button size="sm" variant={viewMode === "gantt" ? "default" : "ghost"} onClick={() => setViewMode("gantt")} className="h-7 text-xs">Gantt View</Button>
                   </div>
                   <Button size="sm" variant="outline" onClick={handleGenerateFromBOM}>
                     <CalendarIcon className="h-4 w-4 mr-2" />
@@ -380,9 +425,7 @@ export default function SchedulePage() {
                     </div>
                     <p className="text-lg font-medium text-foreground">No tasks found for this project</p>
                     <p className="text-sm mt-1 max-w-md">Generate your schedule automatically from the current Bill of Materials scopes, or create tasks manually to build your Gantt chart.</p>
-                    <Button className="mt-6" onClick={handleGenerateFromBOM}>
-                      Auto-generate from BOM
-                    </Button>
+                    <Button className="mt-6" onClick={handleGenerateFromBOM}>Auto-generate from BOM</Button>
                   </div>
                 ) : viewMode === "list" ? (
                   <div className="p-0 overflow-x-auto">
@@ -407,9 +450,7 @@ export default function SchedulePage() {
                             <td className="px-4 py-3 font-medium">
                               <div className="flex flex-col">
                                 <span className={selectedTask?.id === task.id ? "text-primary" : "text-foreground"}>{task.name}</span>
-                                {task.bom_scope && (
-                                  <span className="text-[10px] text-muted-foreground truncate max-w-[250px]">Scope: {task.bom_scope.name}</span>
-                                )}
+                                {task.bom_scope && <span className="text-[10px] text-muted-foreground truncate max-w-[250px]">Scope: {task.bom_scope.name}</span>}
                               </div>
                             </td>
                             <td className="px-4 py-3 text-xs">{task.start_date ? new Date(task.start_date).toLocaleDateString() : "-"}</td>
@@ -449,9 +490,7 @@ export default function SchedulePage() {
                     {timelineBounds ? (
                       <div className="min-w-max">
                         <div className="flex border-b bg-muted/30 sticky top-0 z-20">
-                          <div className="w-[250px] shrink-0 border-r p-3 font-medium text-xs text-muted-foreground bg-card sticky left-0 z-30">
-                            Task Name
-                          </div>
+                          <div className="w-[250px] shrink-0 border-r p-3 font-medium text-xs text-muted-foreground bg-card sticky left-0 z-30">Task Name</div>
                           <div className="flex-1 relative h-10 flex">
                             {Array.from({ length: timelineBounds.totalDays }).map((_, index) => {
                               const date = new Date(timelineBounds.minDate);
@@ -475,7 +514,6 @@ export default function SchedulePage() {
                         {tasks.map((task) => {
                           let leftOffset = 0;
                           let barWidth = 0;
-
                           if (task.start_date && task.end_date) {
                             const startDate = new Date(task.start_date);
                             const endDate = new Date(task.end_date);
@@ -491,9 +529,7 @@ export default function SchedulePage() {
                               className={`flex border-b hover:bg-muted/50 cursor-pointer ${isSelected ? "bg-primary/10" : ""}`}
                               onClick={() => setSelectedTask(task)}
                             >
-                              <div className={`w-[250px] shrink-0 border-r p-2 text-xs truncate bg-card text-foreground sticky left-0 z-10 ${isSelected ? "border-primary/30 font-medium" : ""}`}>
-                                {task.name}
-                              </div>
+                              <div className={`w-[250px] shrink-0 border-r p-2 text-xs truncate bg-card text-foreground sticky left-0 z-10 ${isSelected ? "border-primary/30 font-medium" : ""}`}>{task.name}</div>
                               <div className="flex-1 relative h-10 flex border-l border-border/50" style={{ backgroundImage: "linear-gradient(to right, hsl(var(--border) / 0.5) 1px, transparent 1px)", backgroundSize: "30px 100%" }}>
                                 {task.start_date && task.end_date && (
                                   <div
@@ -506,11 +542,7 @@ export default function SchedulePage() {
                                             ? "bg-red-500 border-red-600"
                                             : "bg-slate-400 border-slate-500"
                                     } ${isSelected ? "ring-2 ring-primary ring-offset-1" : ""}`}
-                                    style={{
-                                      left: `${leftOffset}px`,
-                                      width: `${barWidth}px`,
-                                      minWidth: "4px",
-                                    }}
+                                    style={{ left: `${leftOffset}px`, width: `${barWidth}px`, minWidth: "4px" }}
                                   >
                                     <div className="h-full bg-black/20" style={{ width: `${task.progress || 0}%` }}></div>
                                     <div className="absolute inset-0 px-2 flex items-center justify-between text-[10px] text-white font-medium opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap overflow-hidden">

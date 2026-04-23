@@ -67,16 +67,22 @@ export function createDefaultTaskConfiguration(scopeDefaults?: ScopeDefaults): T
 export function normalizeTaskConfiguration(rawValue: unknown, scopeDefaults?: ScopeDefaults): TaskConfiguration {
   const fallback = createDefaultTaskConfiguration(scopeDefaults);
   const typedValue = rawValue && typeof rawValue === "object" ? (rawValue as Partial<TaskConfiguration>) : {};
+  const rawTeamRoles = Array.isArray((typedValue as { teamRoles?: unknown }).teamRoles)
+    ? ((typedValue as { teamRoles?: unknown[] }).teamRoles ?? [])
+    : [];
 
-  const normalizedRoles = Array.isArray(typedValue.teamRoles)
-    ? typedValue.teamRoles
-        .filter((role): role is Record<string, unknown> => Boolean(role && typeof role === "object"))
-        .map((role, index) => ({
-          id: typeof role.id === "string" && role.id ? role.id : createRoleId(typeof role.role === "string" ? role.role : "worker-" + index),
-          role: typeof role.role === "string" && role.role.trim() ? role.role.trim() : "Worker",
-          quantity: toWholeNumber(role.quantity, 1),
-        }))
-    : fallback.teamRoles;
+  const normalizedRoles = rawTeamRoles
+    .filter((role) => Boolean(role && typeof role === "object"))
+    .map((role, index) => {
+      const typedRole = role as Record<string, unknown>;
+      return {
+        id: typeof typedRole.id === "string" && typedRole.id
+          ? typedRole.id
+          : createRoleId(typeof typedRole.role === "string" ? typedRole.role : "worker-" + index),
+        role: typeof typedRole.role === "string" && typedRole.role.trim() ? typedRole.role.trim() : "Worker",
+        quantity: toWholeNumber(typedRole.quantity, 1),
+      };
+    });
 
   return {
     scopeQuantity: toPositiveNumber(typedValue.scopeQuantity, fallback.scopeQuantity),
