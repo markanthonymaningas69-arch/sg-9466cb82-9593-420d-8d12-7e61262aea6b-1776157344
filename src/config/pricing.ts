@@ -1,28 +1,55 @@
 export type BillingCycle = "monthly" | "annual";
 export type SupportedCountry = "UAE" | "Philippines";
-export type CountryOption = SupportedCountry | "Other";
 
-export type PlanConfig = {
-  id: string;
-  name: string;
-  description: string;
-  monthlyPrice: number;
-  annualPrice: number;
-  popular?: boolean;
-  features: string[];
-  addOnLimits: Record<string, number>;
-};
+export const COUNTRY_OPTIONS = [
+  "Australia",
+  "Bahrain",
+  "Bangladesh",
+  "Bhutan",
+  "Brunei",
+  "Cambodia",
+  "China",
+  "India",
+  "Indonesia",
+  "Iran",
+  "Iraq",
+  "Israel",
+  "Japan",
+  "Jordan",
+  "Kuwait",
+  "Kyrgyzstan",
+  "Laos",
+  "Lebanon",
+  "Malaysia",
+  "Maldives",
+  "Mongolia",
+  "Myanmar",
+  "Nepal",
+  "North Korea",
+  "Oman",
+  "Pakistan",
+  "Palestine",
+  "Philippines",
+  "Qatar",
+  "Saudi Arabia",
+  "Singapore",
+  "South Korea",
+  "Sri Lanka",
+  "Syria",
+  "Taiwan",
+  "Tajikistan",
+  "Thailand",
+  "Timor-Leste",
+  "Turkmenistan",
+  "UAE",
+  "Uzbekistan",
+  "Vietnam",
+  "Yemen"
+] as const;
 
-export type AddOnConfig = {
-  id: string;
-  name: string;
-  monthlyPrice: number;
-  annualPrice: number;
-  description: string;
-};
+export type CountryOption = (typeof COUNTRY_OPTIONS)[number];
 
 export const DEFAULT_COUNTRY: SupportedCountry = "UAE";
-export const COUNTRY_OPTIONS: CountryOption[] = ["UAE", "Philippines", "Other"];
 export const OUT_OF_SERVICE_MESSAGE = "The selected Country is out of Service";
 
 export const plans: PlanConfig[] = [

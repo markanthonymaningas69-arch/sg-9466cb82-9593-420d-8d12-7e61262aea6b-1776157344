@@ -115,19 +115,6 @@ export default function RegisterPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                disabled={submitting}
-                placeholder="you@company.com"
-              />
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="country">Country</Label>
               <Select value={country} onValueChange={(value) => setCountry(value as CountryOption)} disabled={submitting}>
                 <SelectTrigger id="country">
