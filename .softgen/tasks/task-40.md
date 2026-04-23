@@ -18,12 +18,18 @@ Refine the Project Manager viewing experience. Remove the visual gridlines from 
 
 This task focuses on schedule presentation only. The restored calendar view must fit into the current Project Manager flow and use the existing task/resource data where possible.
 
+Latest follow-up changes:
+- make dependency connector lines thinner
+- use smaller arrow heads
+- align dependency connectors to the visual middle of each task bar
+
 ## Checklist
 - [x] Remove background gridlines from the Gantt view while keeping task bars and dependency paths readable
 - [x] Inspect the existing calendar view component and confirm what data it expects
 - [x] Restore a calendar view option in Project Manager alongside the task list and Gantt view
 - [x] Show manpower, materials, and tools & equipment requirements in the calendar view
 - [x] Validate the schedule page view switching and resource visibility
+- [x] Refine dependency connector styling and bar alignment in the Gantt view
 
 ## Acceptance
 The Gantt view no longer shows timeline gridlines behind the bars.

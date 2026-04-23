@@ -125,6 +125,8 @@ export function GanttView({ tasks }: GanttViewProps) {
           startY: rowCenterY(index),
           barTop: HEADER_HEIGHT + index * ROW_HEIGHT + 12,
           barHeight: 40,
+          barLeft: barStart + 6,
+          barWidth: Math.max(56, barWidth - 12),
         },
       ] as const;
     })
@@ -139,21 +141,23 @@ export function GanttView({ tasks }: GanttViewProps) {
         return null;
       }
 
+      const predecessorBarRight = predecessor.barLeft + predecessor.barWidth;
+      const successorBarRight = successor.barLeft + successor.barWidth;
       const startX =
-        dependency.type === "SS" || dependency.type === "SF" ? predecessor.startX : predecessor.endX;
+        dependency.type === "SS" || dependency.type === "SF" ? predecessor.barLeft : predecessorBarRight;
       const endX =
-        dependency.type === "SS" || dependency.type === "FS" ? successor.startX : successor.endX;
-      const startY = predecessor.startY;
-      const endY = successor.startY;
-      const elbowX = startX + Math.max(18, Math.abs(endX - startX) / 2);
+        dependency.type === "SS" || dependency.type === "FS" ? successor.barLeft : successorBarRight;
+      const startY = predecessor.barTop + predecessor.barHeight / 2;
+      const endY = successor.barTop + successor.barHeight / 2;
+      const elbowX = startX + Math.max(14, Math.abs(endX - startX) / 2);
 
       return {
         key: `${task.id}-${dependency.taskId}-${dependency.type}-${dependency.lagDays}`,
         color: dependencyColors[dependency.type],
         points: `${LABEL_WIDTH + startX},${startY} ${LABEL_WIDTH + elbowX},${startY} ${LABEL_WIDTH + elbowX},${endY} ${LABEL_WIDTH + endX},${endY}`,
         label: getDependencyLabel(dependency),
-        labelX: LABEL_WIDTH + elbowX + 6,
-        labelY: startY === endY ? startY - 10 : Math.min(startY, endY) + Math.abs(endY - startY) / 2 - 6,
+        labelX: LABEL_WIDTH + elbowX + 5,
+        labelY: startY === endY ? startY - 9 : Math.min(startY, endY) + Math.abs(endY - startY) / 2 - 5,
       };
     })
   ).filter((item): item is NonNullable<typeof item> => Boolean(item));
@@ -204,14 +208,14 @@ export function GanttView({ tasks }: GanttViewProps) {
               <defs>
                 <marker
                   id="gantt-arrow"
-                  markerWidth="8"
-                  markerHeight="8"
-                  refX="6"
-                  refY="3"
+                  markerWidth="5"
+                  markerHeight="5"
+                  refX="4.2"
+                  refY="2"
                   orient="auto"
                   markerUnits="strokeWidth"
                 >
-                  <path d="M0 0 L6 3 L0 6 Z" fill="#475569" />
+                  <path d="M0 0 L4.2 2 L0 4 Z" fill="context-stroke" />
                 </marker>
               </defs>
 
@@ -220,7 +224,7 @@ export function GanttView({ tasks }: GanttViewProps) {
                   <polyline
                     points={path.points}
                     stroke={path.color}
-                    strokeWidth="2.5"
+                    strokeWidth="1"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     fill="none"
@@ -289,9 +293,9 @@ export function GanttView({ tasks }: GanttViewProps) {
                       <div
                         className={`absolute rounded-xl border px-3 py-2 shadow-sm ${getTaskTone(task.status)}`}
                         style={{
-                          left: geometry.startX + 6,
-                          top: 12,
-                          width: Math.max(56, geometry.endX - geometry.startX - 12),
+                          left: geometry.barLeft,
+                          top: geometry.barTop,
+                          width: geometry.barWidth,
                           height: geometry.barHeight,
                         }}
                       >
