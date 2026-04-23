@@ -18,7 +18,7 @@ Update the Project Manager module so it matches the requested workflow. Remove t
 
 In Parameters, users should be able to define a team productivity rate such as 1 mason + 1 helper per hour or per day. That configuration should be used to calculate the required number of days to finish a selected scope.
 
-Current follow-up: align the schedule page, task configuration panel, and schedule service to one shared task model so the Project Manager compiles cleanly while using persisted task configuration data from Supabase.
+Current follow-up: add a fully functional Calendar View to Project Manager alongside List View and Gantt View. The calendar must aggregate active tasks by day and show required workforce, material names from BOM-linked scope data, and tools/equipment. Clicking a day should open a detail panel with that day’s tasks and full breakdowns. Filters are required for project, phase, team, and resource type. The aggregation must stay efficient for large task sets and update instantly when task data changes.
 
 ## Checklist
 - [ ] Remove the export action from the Project Manager toolbar
@@ -28,4 +28,11 @@ Current follow-up: align the schedule page, task configuration panel, and schedu
 - [ ] Calculate required duration for a scope from the configured productivity rate
 - [ ] Persist and load task configuration through the existing project_tasks data model
 - [ ] Fix current schedule typing/runtime issues caused by mismatched task shapes
+- [ ] Add a new Calendar View tab beside List View and Gantt View
+- [ ] Build month, week, and day calendar layouts with efficient daily task aggregation
+- [ ] Aggregate active-task workforce totals and role breakdowns for each calendar day
+- [ ] Aggregate unique material names from BOM-linked tasks for each calendar day
+- [ ] Aggregate unique tools and equipment for each calendar day
+- [ ] Add a clickable day detail modal with tasks, workforce, materials, and equipment
+- [ ] Add filters for phase, team, and resource type within the calendar view
 - [ ] Validate the updated Project Manager flow
