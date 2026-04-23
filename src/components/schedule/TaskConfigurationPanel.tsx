@@ -45,6 +45,7 @@ interface TaskConfigurationPanelProps {
   manpowerRates?: ManpowerRateOption[];
   laborCostSummary?: Pick<TaskLaborCostSummary, "dailyCost" | "totalCost" | "durationDays" | "rateSnapshot"> | null;
   saving: boolean;
+  embedded?: boolean;
   onTaskChange: (task: EditableProjectTask) => void;
   onMaterialDeliveryPlansChange?: (plans: SaveTaskMaterialDeliveryPlanInput[]) => void;
 }
@@ -114,10 +115,15 @@ export function TaskConfigurationPanel({
   saving,
   onTaskChange,
   onMaterialDeliveryPlansChange,
+  embedded = false,
 }: TaskConfigurationPanelProps) {
+  const containerClassName = embedded
+    ? "flex h-full min-h-0 flex-col overflow-hidden rounded-none border-0 shadow-none"
+    : "lg:col-span-1 flex flex-col h-[600px] overflow-hidden";
+
   if (!task) {
     return (
-      <Card className="lg:col-span-1 flex flex-col h-[600px] overflow-hidden">
+      <Card className={containerClassName}>
         <CardHeader className="pb-3 border-b shrink-0 bg-muted/10">
           <CardTitle className="text-base flex items-center">
             <Settings2 className="h-4 w-4 mr-2 text-primary" />
@@ -280,7 +286,7 @@ export function TaskConfigurationPanel({
   };
 
   return (
-    <Card className="lg:col-span-1 flex flex-col h-[600px] overflow-hidden">
+    <Card className={containerClassName}>
       <CardHeader className="pb-3 border-b shrink-0 bg-muted/10">
         <CardTitle className="text-base flex items-center">
           <Settings2 className="h-4 w-4 mr-2 text-primary" />
