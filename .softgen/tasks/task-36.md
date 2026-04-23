@@ -1,6 +1,6 @@
 ---
 title: Site request form refinement
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -23,9 +23,9 @@ Follow-up change: simplify the Tools & Equipments request modal by clearing the 
 - [x] Verify the actual BOQ/BOM table and scope-linking field used by the project material items
 - [x] Update the Material Request dropdown to use only scope-linked BOQ/BOM items for the selected scope
 - [x] Validate that changing the selected scope updates the available material choices correctly
-- [ ] Remove extra fields from the Tools & Equipments request modal
-- [ ] Keep only Date Required, Tools/Equipment Name, Qty, and Unit in the Tools & Equipments form
-- [ ] Validate that the simplified Tools & Equipments request still submits correctly
+- [x] Remove extra fields from the Tools & Equipments request modal
+- [x] Keep only Date Required, Tools/Equipment Name, Qty, and Unit in the Tools & Equipments form
+- [x] Validate that the simplified Tools & Equipments request still submits correctly
 
 ## Acceptance
 In Material Request, only materials linked to the selected scope appear in the material dropdown.
