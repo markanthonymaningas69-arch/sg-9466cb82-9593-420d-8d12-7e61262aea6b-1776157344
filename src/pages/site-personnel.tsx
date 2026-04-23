@@ -2785,24 +2785,24 @@ export default function SitePersonnel() {
             <TabsContent value="request" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
               <Card className="flex-1 flex flex-col overflow-hidden">
                 <CardHeader className="shrink-0">
-                  <div className="flex justify-between items-start">
-                    <div>
+                  <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                    <div className="min-w-0 flex-1">
                       <CardTitle>Site Requests</CardTitle>
                       <CardDescription>Request materials, tools, equipment, PPE, and cash advances</CardDescription>
-                      <div className="flex items-center gap-3 mt-4 flex-nowrap shrink-0 overflow-x-auto pb-1">
-                        <div className="flex items-center gap-2 shrink-0">
+                      <div className="mt-4 flex flex-wrap items-center gap-3">
+                        <div className="flex min-w-[220px] flex-1 flex-wrap items-center gap-2 sm:flex-initial sm:flex-nowrap">
                           <Label className="whitespace-nowrap">Date:</Label>
                           <Input
                             type="date"
                             value={requestDate}
                             onChange={(e) => setRequestDate(e.target.value)}
-                            className="w-auto h-9 min-w-[130px]"
+                            className="h-9 w-full sm:w-auto sm:min-w-[130px]"
                           />
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex min-w-[240px] flex-1 flex-wrap items-center gap-2 sm:flex-initial sm:flex-nowrap">
                           <Label className="whitespace-nowrap">Type:</Label>
                           <Select value={requestFilterType} onValueChange={setRequestFilterType}>
-                            <SelectTrigger className="w-[180px] h-9">
+                            <SelectTrigger className="h-9 w-full sm:w-[180px]">
                               <SelectValue placeholder="All Types" />
                             </SelectTrigger>
                             <SelectContent>
@@ -2815,304 +2815,30 @@ export default function SitePersonnel() {
                           </Select>
                         </div>
                         {(requestDate || requestFilterType !== "all") && (
-                          <Button variant="ghost" size="sm" onClick={() => { setRequestDate(""); setRequestFilterType("all"); }} className="text-muted-foreground h-9 shrink-0">
+                          <Button variant="ghost" size="sm" onClick={() => { setRequestDate(""); setRequestFilterType("all"); }} className="h-9 text-muted-foreground">
                             Clear Filters
                           </Button>
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 overflow-x-auto pb-2 shrink-0 hide-scrollbar w-full">
-                      <Button size="sm" onClick={() => openRequestDialog('Materials', 'MR')} disabled={isLocked} variant="default" className="bg-blue-600 hover:bg-blue-700 text-white shrink-0 h-8 text-xs px-2.5">
-                        <ShoppingCart className="h-3 w-3 mr-1.5" />
+                    <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 xl:max-w-[540px]">
+                      <Button size="sm" onClick={() => openRequestDialog('Materials', 'MR')} disabled={isLocked} variant="default" className="h-9 w-full justify-center bg-blue-600 px-3 text-xs text-white hover:bg-blue-700">
+                        <ShoppingCart className="mr-1.5 h-3 w-3" />
                         Material Request
                       </Button>
-                      <Button size="sm" onClick={() => openRequestDialog('Tools & Equipments', 'TE')} disabled={isLocked} variant="outline" className="border-orange-500 text-orange-600 hover:bg-orange-50 shrink-0 h-8 text-xs px-2.5">
-                        <Wrench className="h-3 w-3 mr-1.5" />
+                      <Button size="sm" onClick={() => openRequestDialog('Tools & Equipments', 'TE')} disabled={isLocked} variant="outline" className="h-9 w-full justify-center border-orange-500 px-3 text-xs text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/20">
+                        <Wrench className="mr-1.5 h-3 w-3" />
                         Tools & Equipments
                       </Button>
-                      <Button size="sm" onClick={() => openRequestDialog('Petty Cash', 'PC')} disabled={isLocked} variant="outline" className="border-teal-600 text-teal-700 hover:bg-teal-50 shrink-0 h-8 text-xs px-2.5">
-                        <Banknote className="h-3 w-3 mr-1.5" />
+                      <Button size="sm" onClick={() => openRequestDialog('Petty Cash', 'PC')} disabled={isLocked} variant="outline" className="h-9 w-full justify-center border-teal-600 px-3 text-xs text-teal-700 hover:bg-teal-50 dark:text-teal-300 dark:hover:bg-teal-950/20">
+                        <Banknote className="mr-1.5 h-3 w-3" />
                         Petty Cash
                       </Button>
-                      <Button size="sm" onClick={() => openRequestDialog('Cash Advance', 'CA')} disabled={isLocked} variant="outline" className="border-green-600 text-green-700 hover:bg-green-50 shrink-0 h-8 text-xs px-2.5">
-                        <Banknote className="h-3 w-3 mr-1.5" />
+                      <Button size="sm" onClick={() => openRequestDialog('Cash Advance', 'CA')} disabled={isLocked} variant="outline" className="h-9 w-full justify-center border-green-600 px-3 text-xs text-green-700 hover:bg-green-50 dark:text-green-300 dark:hover:bg-green-950/20">
+                        <Banknote className="mr-1.5 h-3 w-3" />
                         Cash Advance
                       </Button>
                     </div>
-                    
-                    <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
-                      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0">
-                        <div className="p-6 pb-2 shrink-0">
-                          <DialogHeader>
-                            <DialogTitle>Submit Site Request</DialogTitle>
-                          </DialogHeader>
-                        </div>
-                        
-                        <div className="flex-1 overflow-y-auto px-6">
-                          <div className="flex justify-between items-center bg-muted/50 p-3 rounded-md border border-muted mb-4">
-                            <div className="flex items-center">
-                              <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Form No:</span>
-                              <span className="font-bold ml-3 text-lg text-primary">{requestForm.form_number}</span>
-                            </div>
-                            <Badge variant="outline" className="text-sm px-3 py-1 bg-background text-foreground">{requestForm.request_type}</Badge>
-                          </div>
-
-                          <form id="request-form" onSubmit={handleRequestSubmit} className="space-y-4 pb-4">
-                            <div className="grid grid-cols-2 gap-4 border-b pb-4">
-                              <div className="space-y-2">
-                                <Label>Date Required *</Label>
-                                <Input
-                                  type="date"
-                                  value={requestForm.request_date}
-                                  onChange={(e) => setRequestForm({ ...requestForm, request_date: e.target.value })}
-                                  required
-                                />
-                              </div>
-                              {requestForm.request_type !== "Cash Advance" && requestForm.request_type !== "Petty Cash" && (
-                                <div className="space-y-2">
-                                  <Label>Requested By *</Label>
-                                  <Input
-                                    value={requestForm.requested_by}
-                                    onChange={(e) => setRequestForm({ ...requestForm, requested_by: e.target.value })}
-                                    required
-                                  />
-                                </div>
-                              )}
-                            </div>
-
-                            {requestForm.request_type === "Cash Advance" || requestForm.request_type === "Petty Cash" ? (
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2 col-span-2 md:col-span-1">
-                                  <Label>Personnel *</Label>
-                                  <Select
-                                    value={requestForm.personnel_id}
-                                    onValueChange={(val) => setRequestForm({ ...requestForm, personnel_id: val })}
-                                    required
-                                  >
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Select worker" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {projectPersonnelList.map((p) => (
-                                        <SelectItem key={p.id} value={p.id}>{p.name} ({p.role})</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                <div className="space-y-2">
-                                  <Label>Amount *</Label>
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    min="0.01"
-                                    value={requestForm.amount}
-                                    onChange={(e) => setRequestForm({ ...requestForm, amount: parseFloat(e.target.value) || 0 })}
-                                    required
-                                  />
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="space-y-4">
-                                <div className="bg-muted/30 p-4 rounded-md border space-y-4">
-                                  <h4 className="font-semibold text-sm">Add Item to Request</h4>
-                                  <div className="grid grid-cols-2 gap-4">
-                                    {requestForm.request_type === "Materials" && (
-                                      <div className="space-y-2 col-span-2 md:col-span-1">
-                                        <Label>Scope of Work (Optional)</Label>
-                                        <Select
-                                          value={requestForm.bom_scope_id}
-                                          onValueChange={(val) => setRequestForm({ ...requestForm, bom_scope_id: val })}
-                                        >
-                                          <SelectTrigger>
-                                            <SelectValue placeholder="Assign to scope..." />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            <SelectItem value="unassigned" className="text-muted-foreground italic">General / Unassigned</SelectItem>
-                                            {scopes.map((s) => (
-                                              <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                            ))}
-                                          </SelectContent>
-                                        </Select>
-                                      </div>
-                                    )}
-                                    <div className={`space-y-2 col-span-2 ${requestForm.request_type === "Materials" ? "md:col-span-1" : ""}`}>
-                                      <Label>Requested Item *</Label>
-                                      {requestForm.request_type !== "Materials" ? (
-                                        <Input
-                                          placeholder="Type item name"
-                                          value={requestForm.item_name}
-                                          onChange={(e) => setRequestForm({ ...requestForm, item_name: e.target.value })}
-                                        />
-                                      ) : !isManualRequestItem ? (
-                                        <Select
-                                          value={requestForm.item_name}
-                                          onValueChange={(val) => {
-                                            if (val === "others") {
-                                              setIsManualRequestItem(true);
-                                              setRequestForm({ ...requestForm, item_name: "", unit: "" });
-                                              setIsManualRequestUnit(false);
-                                            } else {
-                                              const mat = bomMaterials.find(m => m.name === val);
-                                              setRequestForm({ ...requestForm, item_name: val, unit: mat?.unit || requestForm.unit });
-                                              setIsManualRequestUnit(false);
-                                            }
-                                          }}
-                                        >
-                                          <SelectTrigger>
-                                            <SelectValue placeholder="Select from BOM" />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            {bomMaterials
-                                              .filter(mat => !requestForm.bom_scope_id || requestForm.bom_scope_id === "unassigned" || mat.scope_id === requestForm.bom_scope_id)
-                                              .map((mat) => (
-                                              <SelectItem key={mat.id} value={mat.name}>{mat.name}</SelectItem>
-                                            ))}
-                                            <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
-                                          </SelectContent>
-                                        </Select>
-                                      ) : (
-                                        <div className="flex gap-2">
-                                          <Input
-                                            placeholder="Type item name"
-                                            value={requestForm.item_name}
-                                            onChange={(e) => setRequestForm({ ...requestForm, item_name: e.target.value })}
-                                            required
-                                          />
-                                          <Button type="button" variant="outline" className="px-2" onClick={() => {
-                                            setIsManualRequestItem(false);
-                                            setRequestForm({ ...requestForm, item_name: "", unit: "" });
-                                          }}>
-                                            BOM
-                                          </Button>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                      <Label>Quantity</Label>
-                                      <Input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        value={requestForm.quantity}
-                                        onChange={(e) => setRequestForm({ ...requestForm, quantity: parseFloat(e.target.value) || 0 })}
-                                        placeholder="Required"
-                                      />
-                                    </div>
-                                    <div className="space-y-2">
-                                      <Label>Unit</Label>
-                                      {!isManualRequestUnit ? (
-                                        <Select
-                                          value={requestForm.unit}
-                                          onValueChange={(val) => {
-                                            if (val === "others") {
-                                              setIsManualRequestUnit(true);
-                                              setRequestForm({ ...requestForm, unit: "" });
-                                            } else {
-                                              setRequestForm({ ...requestForm, unit: val });
-                                            }
-                                          }}
-                                        >
-                                          <SelectTrigger>
-                                            <SelectValue placeholder="Select unit" />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            {availableUnits.map((u) => (
-                                              <SelectItem key={u} value={u}>{u}</SelectItem>
-                                            ))}
-                                            <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
-                                          </SelectContent>
-                                        </Select>
-                                      ) : (
-                                        <div className="flex gap-2">
-                                          <Input
-                                            value={requestForm.unit}
-                                            onChange={(e) => setRequestForm({ ...requestForm, unit: e.target.value })}
-                                            placeholder="Custom unit"
-                                            required
-                                          />
-                                          <Button type="button" variant="outline" className="px-2" onClick={() => {
-                                            setIsManualRequestUnit(false);
-                                            setRequestForm({ ...requestForm, unit: "" });
-                                          }}>
-                                            List
-                                          </Button>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className="space-y-2">
-                                    <Label>Item Notes</Label>
-                                    <Textarea
-                                      value={requestForm.notes}
-                                      onChange={(e) => setRequestForm({ ...requestForm, notes: e.target.value })}
-                                      placeholder="Any specific details for this item..."
-                                      rows={2}
-                                    />
-                                  </div>
-                                  <Button type="button" onClick={handleAddItem} variant="secondary" className="w-full">
-                                    <Plus className="w-4 h-4 mr-2" /> Add Item to Request List
-                                  </Button>
-                                </div>
-
-                                {requestItems.length > 0 && (
-                                  <div className="border rounded-md mt-4 max-h-[30vh] overflow-y-auto">
-                                    <Table>
-                                      <TableHeader>
-                                        <TableRow className="bg-muted/50">
-                                          <TableHead>Scope</TableHead>
-                                          <TableHead>Item Details</TableHead>
-                                          <TableHead>Qty</TableHead>
-                                          <TableHead className="text-right">Action</TableHead>
-                                        </TableRow>
-                                      </TableHeader>
-                                      <TableBody>
-                                        {requestItems.map((item, idx) => (
-                                          <TableRow key={idx}>
-                                            <TableCell>
-                                              {item.bom_scope_id === "unassigned" || !item.bom_scope_id ? (
-                                                <span className="text-muted-foreground italic text-xs">General</span>
-                                              ) : (
-                                                <Badge variant="secondary" className="text-xs">
-                                                  {scopes.find(s => s.id === item.bom_scope_id)?.name || "Unknown"}
-                                                </Badge>
-                                              )}
-                                            </TableCell>
-                                            <TableCell>
-                                              <div className="font-medium text-sm">{item.item_name}</div>
-                                              {item.notes && <div className="text-[10px] text-muted-foreground truncate max-w-[150px]">{item.notes}</div>}
-                                            </TableCell>
-                                            <TableCell className="text-sm">{item.quantity} {item.unit}</TableCell>
-                                            <TableCell className="text-right">
-                                              <Button type="button" size="sm" variant="ghost" onClick={() => handleRemoveItem(idx)} className="h-6 w-6 p-0 text-red-500">
-                                                <Trash2 className="h-4 w-4" />
-                                              </Button>
-                                            </TableCell>
-                                          </TableRow>
-                                        ))}
-                                      </TableBody>
-                                    </Table>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </form>
-                        </div>
-                        
-                        <div className="flex justify-between items-center p-6 pt-4 border-t shrink-0">
-                          <Button type="button" variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={resetRequestForm}>
-                            Clear Form
-                          </Button>
-                          <div className="flex gap-2">
-                            <Button type="button" variant="outline" onClick={() => setRequestDialogOpen(false)}>
-                              Cancel
-                            </Button>
-                            <Button type="submit" form="request-form">Submit Request</Button>
-                          </div>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
                   </div>
                 </CardHeader>
                 <CardContent className="flex-1 overflow-hidden pb-4">
