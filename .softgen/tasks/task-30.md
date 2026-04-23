@@ -1,6 +1,6 @@
 ---
 title: Country-based currency engine
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -20,7 +20,7 @@ Apply a country-based currency engine across the system. When the active country
 - [x] Add a shared country-aware currency formatter/engine
 - [x] Connect the formatter to the active account country
 - [x] Update key modules and shared layouts to use the shared formatter
-- [ ] Validate the affected pages compile cleanly
+- [x] Validate the affected pages compile cleanly
 
 ## Acceptance
 When the active country is Philippines, currency values in the system display in Peso.
