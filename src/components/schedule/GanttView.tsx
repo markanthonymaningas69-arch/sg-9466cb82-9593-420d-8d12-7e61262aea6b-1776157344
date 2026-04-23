@@ -123,6 +123,7 @@ export function GanttView({ tasks }: GanttViewProps) {
           startX: barStart,
           endX: barStart + barWidth,
           startY: rowCenterY(index),
+          barInsetTop: 12,
           barTop: HEADER_HEIGHT + index * ROW_HEIGHT + 12,
           barHeight: 40,
           barLeft: barStart + 6,
@@ -294,7 +295,7 @@ export function GanttView({ tasks }: GanttViewProps) {
                         className={`absolute rounded-xl border px-3 py-2 shadow-sm ${getTaskTone(task.status)}`}
                         style={{
                           left: geometry.barLeft,
-                          top: geometry.barTop,
+                          top: geometry.barInsetTop,
                           width: geometry.barWidth,
                           height: geometry.barHeight,
                         }}

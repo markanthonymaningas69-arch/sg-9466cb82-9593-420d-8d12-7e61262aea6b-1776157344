@@ -1,6 +1,6 @@
 ---
 title: Schedule view refinements
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -31,7 +31,7 @@ Latest follow-up changes:
 - [x] Show manpower, materials, and tools & equipment requirements in the calendar view
 - [x] Validate the schedule page view switching and resource visibility
 - [x] Refine dependency connector styling and bar alignment in the Gantt view
-- [ ] Correct misplaced activity bar layout in the Gantt view
+- [x] Correct misplaced activity bar layout in the Gantt view
 
 ## Acceptance
 The Gantt view no longer shows timeline gridlines behind the bars.
