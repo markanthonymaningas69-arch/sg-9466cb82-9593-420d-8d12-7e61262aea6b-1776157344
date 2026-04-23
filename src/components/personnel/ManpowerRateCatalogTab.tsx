@@ -69,6 +69,8 @@ export function ManpowerRateCatalogTab() {
     event.preventDefault();
 
     try {
+      const actionLabel = editingItem ? "updated" : "created";
+
       if (editingItem) {
         await manpowerRateCatalogService.update(editingItem.id, {
           positionName: form.positionName,
@@ -83,12 +85,14 @@ export function ManpowerRateCatalogTab() {
         });
       }
 
+      const refreshResult = await manpowerRateCatalogService.recalculateProjectLaborCostsFromCatalog();
+
       setDialogOpen(false);
       resetForm();
       await loadData();
       toast({
         title: "Success",
-        description: `Manpower rate ${editingItem ? "updated" : "created"} successfully.`,
+        description: `Manpower rate ${actionLabel} successfully. Refreshed ${refreshResult.updatedTaskCount} task labor baselines across ${refreshResult.recalculatedProjectCount} project(s).`,
       });
     } catch (error) {
       console.error(error);
@@ -118,10 +122,11 @@ export function ManpowerRateCatalogTab() {
 
     try {
       await manpowerRateCatalogService.remove(id);
+      const refreshResult = await manpowerRateCatalogService.recalculateProjectLaborCostsFromCatalog();
       await loadData();
       toast({
         title: "Success",
-        description: "Manpower rate deleted successfully.",
+        description: `Manpower rate deleted successfully. Refreshed ${refreshResult.updatedTaskCount} task labor baselines across ${refreshResult.recalculatedProjectCount} project(s).`,
       });
     } catch (error) {
       console.error(error);
