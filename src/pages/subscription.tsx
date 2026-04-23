@@ -814,8 +814,7 @@ export default function Subscription() {
                   disabled={
                     isCheckingOut ||
                     !selectedPlan ||
-                    (totalAmountDueToday === 0 && !isSelectingSamePlanAndCycle) ||
-                    (payMongoCheckoutEnabled && !countrySubscriptionConfig.paymentLink)
+                    (totalAmountDueToday === 0 && !isSelectingSamePlanAndCycle)
                   }
                 >
                   {isCheckingOut ? (
