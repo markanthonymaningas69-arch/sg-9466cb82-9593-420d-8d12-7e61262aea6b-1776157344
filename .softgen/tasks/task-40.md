@@ -1,6 +1,6 @@
 ---
 title: Schedule view refinements
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -23,7 +23,7 @@ This task focuses on schedule presentation only. The restored calendar view must
 - [x] Inspect the existing calendar view component and confirm what data it expects
 - [x] Restore a calendar view option in Project Manager alongside the task list and Gantt view
 - [x] Show manpower, materials, and tools & equipment requirements in the calendar view
-- [ ] Validate the schedule page view switching and resource visibility
+- [x] Validate the schedule page view switching and resource visibility
 
 ## Acceptance
 The Gantt view no longer shows timeline gridlines behind the bars.

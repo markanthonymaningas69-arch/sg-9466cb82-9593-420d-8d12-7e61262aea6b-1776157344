@@ -215,30 +215,6 @@ export function GanttView({ tasks }: GanttViewProps) {
                 </marker>
               </defs>
 
-              {scheduledTasks.map((task, rowIndex) => (
-                <line
-                  key={`${task.id}-row`}
-                  x1={LABEL_WIDTH}
-                  x2={LABEL_WIDTH + timelineWidth}
-                  y1={HEADER_HEIGHT + rowIndex * ROW_HEIGHT}
-                  y2={HEADER_HEIGHT + rowIndex * ROW_HEIGHT}
-                  stroke="#e2e8f0"
-                  strokeWidth="1"
-                />
-              ))}
-
-              {dates.map((dateKey, index) => (
-                <line
-                  key={dateKey}
-                  x1={LABEL_WIDTH + index * DAY_WIDTH}
-                  x2={LABEL_WIDTH + index * DAY_WIDTH}
-                  y1={HEADER_HEIGHT}
-                  y2={chartHeight}
-                  stroke={index % 7 === 0 ? "#cbd5e1" : "#e2e8f0"}
-                  strokeWidth="1"
-                />
-              ))}
-
               {dependencyPaths.map((path) => (
                 <g key={path.key}>
                   <polyline
