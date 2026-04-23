@@ -97,8 +97,11 @@ export default function Warehouse() {
       warehouseService.getAll(),
       projectService.getAll(),
       projectService.getMasterItems(),
-      supabase.from('deliveries').select('*, projects(name)'),
-      (supabase as any).from('site_material_consumption').select('*, projects(name)')
+      supabase.from("deliveries").select("*, projects(name)"),
+      supabase
+        .from("material_consumption")
+        .select("*, projects(name)")
+        .eq("is_archived", false)
     ]);
     setItems(itemsData as WarehouseItem[] || []);
     setProjects(projectsData || []);
