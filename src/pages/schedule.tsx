@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Calendar as CalendarIcon, Trash2 } from "lucide-react";
-import { createDraftTask, type TaskDependency, type TaskFormData, type TaskRoleAllocation } from "@/lib/schedule";
+import { createDraftTask, applyDependencyScheduling, type TaskDependency, type TaskFormData, type TaskRoleAllocation } from "@/lib/schedule";
 import {
   calculateRequiredDurationDays,
   createDefaultTaskConfiguration,
@@ -27,39 +27,42 @@ function addDays(dateValue: string, days: number) {
   return toDateOnly(date);
 }
 
-function extractDependencyIds(value: unknown): string[] {
+function extractTaskDependencies(value: unknown): TaskDependency[] {
   if (!Array.isArray(value)) {
     return [];
   }
 
   return value
-    .map((dependency) => {
-      if (typeof dependency === "string") {
-        return dependency;
+    .map((dependency, index) => {
+      if (!dependency || typeof dependency !== "object") {
+        return null;
       }
 
-      if (dependency && typeof dependency === "object") {
-        const typedDependency = dependency as { taskId?: unknown; id?: unknown };
-        if (typeof typedDependency.taskId === "string") {
-          return typedDependency.taskId;
-        }
-        if (typeof typedDependency.id === "string") {
-          return typedDependency.id;
-        }
+      const typedDependency = dependency as {
+        id?: unknown;
+        taskId?: unknown;
+        type?: unknown;
+        lagDays?: unknown;
+      };
+
+      const taskId = typeof typedDependency.taskId === "string" ? typedDependency.taskId : "";
+      if (!taskId) {
+        return null;
       }
 
-      return null;
+      const dependencyType =
+        typedDependency.type === "SS" || typedDependency.type === "FF" || typedDependency.type === "SF"
+          ? typedDependency.type
+          : "FS";
+
+      return {
+        id: typeof typedDependency.id === "string" ? typedDependency.id : `dependency-${taskId}-${index}`,
+        taskId,
+        type: dependencyType,
+        lagDays: Math.max(0, Math.round(Number(typedDependency.lagDays) || 0)),
+      } as TaskDependency;
     })
-    .filter((dependencyId): dependencyId is string => Boolean(dependencyId));
-}
-
-function createTaskDependencies(dependencyIds: string[]): TaskDependency[] {
-  return dependencyIds.map((dependencyId) => ({
-    id: `dependency-${dependencyId}`,
-    taskId: dependencyId,
-    type: "FS",
-    lagDays: 0,
-  }));
+    .filter((dependency): dependency is TaskDependency => Boolean(dependency));
 }
 
 function createTaskRoleAllocations(task: EditableProjectTask): TaskRoleAllocation[] {
@@ -76,6 +79,12 @@ function createTaskRoleAllocations(task: EditableProjectTask): TaskRoleAllocatio
 
 function getTaskPersistenceSignature(task: EditableProjectTask) {
   return JSON.stringify(toTaskFormData(syncTaskWithConfiguration(task)));
+}
+
+function applyScheduleToEditableTasks(taskList: EditableProjectTask[]) {
+  return applyDependencyScheduling(taskList.map((task) => toTaskFormData(task))).map((task) =>
+    normalizeEditableTask(task as ScheduleTaskRecord)
+  );
 }
 
 type ScheduleTaskRecord = TaskFormData & {
@@ -120,7 +129,7 @@ function normalizeEditableTask(task: ScheduleTaskRecord): EditableProjectTask {
 
   return {
     ...task,
-    dependencies: extractDependencyIds(task.dependencies),
+    dependencies: extractTaskDependencies(task.dependencies),
     assigned_team: taskConfig.assignedTeamName || task.assigned_team || null,
     task_config: taskConfig,
     duration_days: durationDays,
@@ -142,7 +151,7 @@ function toTaskFormData(task: EditableProjectTask): TaskFormData {
 
   return {
     ...task,
-    dependencies: createTaskDependencies(task.dependencies),
+    dependencies: task.dependencies,
     assigned_team: taskConfig.assignedTeamName || task.assigned_team || null,
     task_config: toTaskConfigJson(taskConfig),
     duration_days: durationDays,
@@ -242,7 +251,7 @@ export default function SchedulePage() {
     try {
       setLoading(true);
       const data = await scheduleService.getTasksByProject(projectId);
-      const normalizedTasks = (data || []).map((task) => normalizeEditableTask(task as ScheduleTaskRecord));
+      const normalizedTasks = applyScheduleToEditableTasks((data || []).map((task) => normalizeEditableTask(task as ScheduleTaskRecord)));
       setTasks(normalizedTasks);
       setSelectedTask((currentTask) => {
         if (!currentTask?.id) {
@@ -286,9 +295,20 @@ export default function SchedulePage() {
 
   const handleTaskChange = (task: EditableProjectTask) => {
     const syncedTask = syncTaskWithConfiguration(task);
-    setSelectedTask(syncedTask);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
     if (syncedTask.id) {
-      setTasks((currentTasks) => currentTasks.map((item) => (item.id === syncedTask.id ? syncedTask : item)));
+      setTasks(recalculatedTasks);
     }
   };
 
@@ -325,7 +345,7 @@ export default function SchedulePage() {
           ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
           : [...currentTasks, normalizedSavedTask];
 
-        return [...nextTasks].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
       });
 
       setSelectedTask((currentTask) => {

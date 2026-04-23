@@ -19,10 +19,10 @@ Enhance the Project Manager scheduling flow so task configuration supports full 
 This task covers the schedule UI, persistence model, and scheduling logic required for dependency-based updates and visual dependency support in the Gantt view.
 
 ## Checklist
-- [ ] Inspect the existing schedule page, task configuration panel, task data model, and persistence flow
-- [ ] Remove Save Task and Delete Task actions from the task configuration panel and keep auto-save only
-- [ ] Extend task dependency data to support dependency type, multiple predecessors, and lag time
-- [ ] Update schedule logic so task dates recalculate dynamically from dependency relationships
+- [x] Inspect the existing schedule page, task configuration panel, task data model, and persistence flow
+- [x] Remove Save Task and Delete Task actions from the task configuration panel and keep auto-save only
+- [x] Extend task dependency data to support dependency type, multiple predecessors, and lag time
+- [x] Update schedule logic so task dates recalculate dynamically from dependency relationships
 - [ ] Update Gantt rendering to reflect dependency relationship data
 - [ ] Validate that task edits auto-save and deletion remains available only from the main task list
 

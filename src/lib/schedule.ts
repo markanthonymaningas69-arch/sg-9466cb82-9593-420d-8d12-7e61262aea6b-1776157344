@@ -49,13 +49,27 @@ const DEFAULT_ROLE_ALLOCATION: TaskRoleAllocation[] = [
   { id: "helper", role: "Helper", count: 1 },
 ];
 
+function todayDate() {
+  return new Date().toISOString().split("T")[0];
+}
+
+function parseUtcDate(dateValue: string) {
+  return new Date(`${dateValue}T00:00:00.000Z`);
+}
+
+function formatUtcDate(date: Date) {
+  return date.toISOString().split("T")[0];
+}
+
+export function shiftDate(dateValue: string | null, offsetDays: number) {
+  const baseDate = parseUtcDate(dateValue || todayDate());
+  baseDate.setUTCDate(baseDate.getUTCDate() + offsetDays);
+  return formatUtcDate(baseDate);
+}
+
 export function toNumber(value: unknown, fallback = 0): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function todayDate() {
-  return new Date().toISOString().split("T")[0];
 }
 
 function parseRoleAllocations(value: unknown, fallback = DEFAULT_ROLE_ALLOCATION): TaskRoleAllocation[] {
@@ -86,10 +100,13 @@ function parseDependencies(value: unknown): TaskDependency[] {
         return null;
       }
 
+      const dependencyType =
+        typed.type === "SS" || typed.type === "FF" || typed.type === "SF" ? typed.type : "FS";
+
       return {
-        id: String(typed.id || `dependency-${index}`),
+        id: String(typed.id || `dependency-${taskId}-${index}`),
         taskId,
-        type: (typed.type === "SS" || typed.type === "FF" || typed.type === "SF" ? typed.type : "FS") as DependencyType,
+        type: dependencyType as DependencyType,
         lagDays: Math.max(0, Math.round(toNumber(typed.lagDays, 0))),
       };
     })
@@ -155,9 +172,33 @@ export function calculateDurationDays(
 export function calculateEndDate(startDate: string | null, durationDays: number | null) {
   const start = startDate || todayDate();
   const totalDays = Math.max(1, Math.round(toNumber(durationDays, 1)));
-  const date = new Date(start);
-  date.setDate(date.getDate() + totalDays - 1);
-  return date.toISOString().split("T")[0];
+  return shiftDate(start, totalDays - 1);
+}
+
+function getDependencyConstraintStartDate(
+  predecessor: Pick<TaskFormData, "start_date" | "end_date">,
+  dependency: TaskDependency,
+  successorDurationDays: number
+) {
+  const durationOffset = Math.max(0, successorDurationDays - 1);
+
+  if (dependency.type === "SS" && predecessor.start_date) {
+    return shiftDate(predecessor.start_date, dependency.lagDays);
+  }
+
+  if (dependency.type === "FF" && predecessor.end_date) {
+    return shiftDate(predecessor.end_date, dependency.lagDays - durationOffset);
+  }
+
+  if (dependency.type === "SF" && predecessor.start_date) {
+    return shiftDate(predecessor.start_date, dependency.lagDays - durationOffset);
+  }
+
+  if (predecessor.end_date) {
+    return shiftDate(predecessor.end_date, dependency.lagDays + 1);
+  }
+
+  return null;
 }
 
 export function syncTaskDerivedFields(task: TaskFormData, forceAuto = false): TaskFormData {
@@ -166,7 +207,9 @@ export function syncTaskDerivedFields(task: TaskFormData, forceAuto = false): Ta
     ...task,
     name: task.bom_scope?.name ? String(task.bom_scope.name) : task.name,
     task_config: task.task_config ?? {},
-    scope_quantity: task.bom_scope ? Math.max(0, toNumber(task.bom_scope.quantity, 0)) : Math.max(0, toNumber(task.scope_quantity, task.bom_scope?.quantity || 0)),
+    scope_quantity: task.bom_scope
+      ? Math.max(0, toNumber(task.bom_scope.quantity, 0))
+      : Math.max(0, toNumber(task.scope_quantity, task.bom_scope?.quantity || 0)),
     scope_unit: task.bom_scope?.unit || task.scope_unit || "lot",
     productivity_rate_per_hour: Math.max(0, toNumber(task.productivity_rate_per_hour, 0)),
     productivity_rate_per_day: Math.max(0, toNumber(task.productivity_rate_per_day, 0)),
@@ -192,6 +235,71 @@ export function syncTaskDerivedFields(task: TaskFormData, forceAuto = false): Ta
     duration_days: nextDuration,
     end_date: calculateEndDate(normalizedTask.start_date, nextDuration),
   };
+}
+
+export function applyDependencyScheduling(tasks: TaskFormData[]) {
+  const scheduledTasks = tasks.map((task) => syncTaskDerivedFields(task));
+  const tasksById = new Map(
+    scheduledTasks
+      .filter((task) => task.id)
+      .map((task) => [task.id, task] as const)
+  );
+
+  const orderedTasks = [...scheduledTasks].sort((left, right) => {
+    const leftOrder = Number(left.sort_order || 0);
+    const rightOrder = Number(right.sort_order || 0);
+    return leftOrder - rightOrder || left.name.localeCompare(right.name);
+  });
+
+  for (let passIndex = 0; passIndex < orderedTasks.length; passIndex += 1) {
+    let changed = false;
+
+    orderedTasks.forEach((task, index) => {
+      const predecessorDates = task.dependencies
+        .map((dependency) => {
+          const predecessor = tasksById.get(dependency.taskId);
+          if (!predecessor || predecessor.id === task.id) {
+            return null;
+          }
+
+          return getDependencyConstraintStartDate(
+            predecessor,
+            dependency,
+            Math.max(1, Math.round(toNumber(task.duration_days, 1)))
+          );
+        })
+        .filter((value): value is string => Boolean(value));
+
+      if (predecessorDates.length === 0) {
+        return;
+      }
+
+      const resolvedStartDate = predecessorDates.reduce((latest, current) => {
+        return current > latest ? current : latest;
+      }, predecessorDates[0]);
+
+      if (resolvedStartDate === task.start_date) {
+        return;
+      }
+
+      const nextTask = syncTaskDerivedFields({
+        ...task,
+        start_date: resolvedStartDate,
+      });
+
+      orderedTasks[index] = nextTask;
+      if (nextTask.id) {
+        tasksById.set(nextTask.id, nextTask);
+      }
+      changed = true;
+    });
+
+    if (!changed) {
+      break;
+    }
+  }
+
+  return orderedTasks;
 }
 
 export function hydrateTask(

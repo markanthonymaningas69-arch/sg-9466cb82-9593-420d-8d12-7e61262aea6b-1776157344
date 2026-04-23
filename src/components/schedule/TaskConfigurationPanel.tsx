@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import type { TaskFormData } from "@/lib/schedule";
+import type { TaskDependency, TaskFormData } from "@/lib/schedule";
 import {
   applyTeamTemplate,
   calculateRequiredDurationDays,
@@ -24,7 +24,7 @@ type EditableTaskScope = NonNullable<TaskFormData["bom_scope"]>;
 export interface EditableProjectTask extends Omit<TaskFormData, "bom_scope" | "task_config" | "dependencies"> {
   bom_scope: EditableTaskScope | null;
   task_config: TaskConfiguration;
-  dependencies: string[];
+  dependencies: TaskDependency[];
 }
 
 interface TaskConfigurationPanelProps {
@@ -35,9 +35,24 @@ interface TaskConfigurationPanelProps {
   onTaskChange: (task: EditableProjectTask) => void;
 }
 
-function getDependencyIds(task: EditableProjectTask) {
-  return Array.isArray(task.dependencies) ? task.dependencies.filter((value): value is string => typeof value === "string") : [];
+function getTaskDependencies(task: EditableProjectTask) {
+  return Array.isArray(task.dependencies)
+    ? task.dependencies.filter(
+        (value): value is TaskDependency =>
+          typeof value === "object" &&
+          value !== null &&
+          typeof value.taskId === "string" &&
+          value.taskId.length > 0
+      )
+    : [];
 }
+
+const dependencyTypeOptions: { value: TaskDependency["type"]; label: string }[] = [
+  { value: "FS", label: "FS" },
+  { value: "SS", label: "SS" },
+  { value: "FF", label: "FF" },
+  { value: "SF", label: "SF" },
+];
 
 export function TaskConfigurationPanel({
   task,
@@ -70,7 +85,8 @@ export function TaskConfigurationPanel({
     unit: task.bom_scope?.unit,
     assignedTeamName: task.assigned_team,
   });
-  const dependencyIds = getDependencyIds(task);
+  const dependencies = getTaskDependencies(task);
+  const dependencyIds = dependencies.map((dependency) => dependency.taskId);
   const otherTasks = tasks.filter((item) => item.id !== task.id);
   const linkedMaterials = Array.isArray(task.bom_scope?.materials) ? task.bom_scope.materials : [];
   const equipmentValue = Array.isArray(task.equipment) ? task.equipment.join("\n") : "";
@@ -99,12 +115,34 @@ export function TaskConfigurationPanel({
 
   const toggleDependency = (dependencyId: string) => {
     const nextDependencies = dependencyIds.includes(dependencyId)
-      ? dependencyIds.filter((item) => item !== dependencyId)
-      : [...dependencyIds, dependencyId];
+      ? dependencies.filter((item) => item.taskId !== dependencyId)
+      : [
+          ...dependencies,
+          {
+            id: `dependency-${dependencyId}`,
+            taskId: dependencyId,
+            type: "FS",
+            lagDays: 0,
+          },
+        ];
 
     onTaskChange({
       ...task,
       dependencies: nextDependencies,
+    });
+  };
+
+  const updateDependency = (dependencyId: string, updates: Partial<TaskDependency>) => {
+    onTaskChange({
+      ...task,
+      dependencies: dependencies.map((item) =>
+        item.taskId === dependencyId
+          ? {
+              ...item,
+              ...updates,
+            }
+          : item
+      ),
     });
   };
 
@@ -302,16 +340,69 @@ export function TaskConfigurationPanel({
                 {otherTasks.length === 0 ? (
                   <p className="text-xs text-muted-foreground">Add more tasks to set predecessor dependencies.</p>
                 ) : (
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {otherTasks.map((dependencyTask) => (
-                      <label key={dependencyTask.id} className="flex items-center gap-2 text-xs">
-                        <Checkbox
-                          checked={dependencyIds.includes(dependencyTask.id)}
-                          onCheckedChange={() => toggleDependency(dependencyTask.id)}
-                        />
-                        <span>{dependencyTask.name}</span>
-                      </label>
-                    ))}
+                  <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
+                    {otherTasks.map((dependencyTask) => {
+                      const selectedDependency = dependencies.find((item) => item.taskId === dependencyTask.id);
+
+                      return (
+                        <div key={dependencyTask.id} className="rounded-md border p-3 space-y-3">
+                          <label className="flex items-center gap-2 text-xs font-medium">
+                            <Checkbox
+                              checked={Boolean(selectedDependency)}
+                              onCheckedChange={() => toggleDependency(dependencyTask.id)}
+                            />
+                            <span>{dependencyTask.name}</span>
+                          </label>
+
+                          {selectedDependency ? (
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-2">
+                                <Label className="text-[11px]">Dependency Type</Label>
+                                <Select
+                                  value={selectedDependency.type}
+                                  onValueChange={(value) =>
+                                    updateDependency(dependencyTask.id, {
+                                      type: value as TaskDependency["type"],
+                                    })
+                                  }
+                                >
+                                  <SelectTrigger className="h-8 text-xs">
+                                    <SelectValue placeholder="Select type" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {dependencyTypeOptions.map((option) => (
+                                      <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label className="text-[11px]">Lag Days</Label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="1"
+                                  value={selectedDependency.lagDays}
+                                  onChange={(event) =>
+                                    updateDependency(dependencyTask.id, {
+                                      lagDays: Math.max(0, Math.round(Number(event.target.value) || 0)),
+                                    })
+                                  }
+                                  className="h-8 text-xs"
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-muted-foreground">
+                              Enable this predecessor to configure link type and lag time.
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
