@@ -383,7 +383,7 @@ export function AIChatAssistant() {
                       <ul className="list-disc list-inside space-y-1 text-muted-foreground">
                         <li>Give me an overview of all projects.</li>
                         <li>What is our current ledger balance?</li>
-                        <li>Are there any low stock items?</li>
+                        <li>Compare Project actual cost from Accounting&apos;s records to Site Personnel&apos;s records.</li>
                         <li>Summarize pending vouchers and liquidations.</li>
                       </ul>
                     </div>
