@@ -21,6 +21,7 @@ The desktop experience should behave like a movable workspace window with dockin
 Follow-up fix:
 - simplify the desktop assistant controls so the window is draggable only
 - remove docking and manual positioning options from the visible UI while preserving saved drag position
+- remove the last stale dock helpers so the drag-only implementation compiles cleanly
 
 ## Checklist
 - [x] Inspect the existing AI assistant component and where it is mounted in the app shell

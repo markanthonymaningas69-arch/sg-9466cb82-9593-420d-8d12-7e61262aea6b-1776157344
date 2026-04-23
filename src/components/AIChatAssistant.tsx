@@ -341,10 +341,6 @@ export function AIChatAssistant() {
     }
   }
 
-  function applyDock(dock: DockMode) {
-    setWindowState((current) => getDockedState(dock, { ...current, collapsed: false }));
-  }
-
   function startDrag(event: React.PointerEvent<HTMLDivElement>) {
     const target = event.target as HTMLElement;
     if (target.closest("button, input")) return;
