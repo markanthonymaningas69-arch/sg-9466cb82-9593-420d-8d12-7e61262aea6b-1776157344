@@ -1,6 +1,6 @@
 ---
 title: AI assistant duplicate mount fix
-status: done
+status: in_progress
 priority: high
 type: bug
 tags:
@@ -22,10 +22,15 @@ Evidence found:
 - `src/components/Layout.tsx` mounted `<AIChatAssistant contained />` inside the module body
 - the same file also mounted a second `<AIChatAssistant />` globally at the bottom of the layout
 
+Follow-up:
+- the preview still shows duplication, so there is likely another active mount or another shell rendering the component
+
 ## Checklist
 - [x] Find every place where AIChatAssistant is mounted or imported
 - [x] Remove the duplicate mount while keeping the assistant inside the module body
-- [x] Validate that only one assistant appears across modules and that drag behavior still works
+- [ ] Re-scan the codebase for any remaining mounts or wrapper-level renders
+- [ ] Keep only one assistant instance in the intended module-body location
+- [ ] Validate that only one assistant appears across modules and that drag behavior still works
 
 ## Acceptance
 Only one AI assistant is visible in each module view.
