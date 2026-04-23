@@ -29,6 +29,7 @@ export interface TaskScopeSummary {
   description?: string | null;
   total_materials?: number | null;
   total_labor?: number | null;
+  materials?: string[];
 }
 
 export interface TaskFormData
@@ -191,7 +192,11 @@ export function syncTaskDerivedFields(task: TaskFormData, forceAuto = false): Ta
   };
 }
 
-export function hydrateTask(task: ProjectTaskRow & { bom_scope?: Partial<ScopeRow> | null }): TaskFormData {
+export function hydrateTask(
+  task: ProjectTaskRow & {
+    bom_scope?: (Partial<ScopeRow> & { bom_materials?: { material_name: string | null }[] | null }) | null;
+  }
+): TaskFormData {
   return syncTaskDerivedFields({
     ...task,
     task_config: task.task_config ?? {},
@@ -213,8 +218,17 @@ export function hydrateTask(task: ProjectTaskRow & { bom_scope?: Partial<ScopeRo
           unit: String(task.bom_scope.unit || "lot"),
           completion_percentage: task.bom_scope.completion_percentage ?? null,
           description: task.bom_scope.description ?? null,
-          total_materials: toNumber(task.bom_scope.total_materials, 0),
-          total_labor: toNumber(task.bom_scope.total_labor, 0),
+          total_materials: task.bom_scope.total_materials ?? null,
+          total_labor: task.bom_scope.total_labor ?? null,
+          materials: Array.isArray(task.bom_scope.bom_materials)
+            ? Array.from(
+                new Set(
+                  task.bom_scope.bom_materials
+                    .map((material) => String(material.material_name || "").trim())
+                    .filter(Boolean)
+                )
+              )
+            : [],
         }
       : null,
   });

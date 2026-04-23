@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Layout } from "@/components/Layout";
+import { CalendarView } from "@/components/schedule/CalendarView";
 import { TaskConfigurationPanel, type EditableProjectTask } from "@/components/schedule/TaskConfigurationPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -203,7 +204,7 @@ export default function SchedulePage() {
   const [selectedTask, setSelectedTask] = useState<EditableProjectTask | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [viewMode, setViewMode] = useState<"list" | "gantt">("list");
+  const [viewMode, setViewMode] = useState<"list" | "gantt" | "calendar">("list");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -406,6 +407,7 @@ export default function SchedulePage() {
                   <div className="flex items-center space-x-2 mr-4 bg-muted/50 p-1 rounded-md">
                     <Button size="sm" variant={viewMode === "list" ? "default" : "ghost"} onClick={() => setViewMode("list")} className="h-7 text-xs">List View</Button>
                     <Button size="sm" variant={viewMode === "gantt" ? "default" : "ghost"} onClick={() => setViewMode("gantt")} className="h-7 text-xs">Gantt View</Button>
+                    <Button size="sm" variant={viewMode === "calendar" ? "default" : "ghost"} onClick={() => setViewMode("calendar")} className="h-7 text-xs">Calendar View</Button>
                   </div>
                   <Button size="sm" variant="outline" onClick={handleGenerateFromBOM}>
                     <CalendarIcon className="h-4 w-4 mr-2" />
@@ -489,7 +491,7 @@ export default function SchedulePage() {
                       </tbody>
                     </table>
                   </div>
-                ) : (
+                ) : viewMode === "gantt" ? (
                   <div className="flex-1 overflow-auto relative flex flex-col bg-background">
                     {timelineBounds ? (
                       <div className="min-w-max">
@@ -565,6 +567,13 @@ export default function SchedulePage() {
                         Define start and end dates for your tasks to generate the timeline view.
                       </div>
                     )}
+                  </div>
+                ) : (
+                  <div className="flex-1 overflow-auto bg-background">
+                    <CalendarView
+                      tasks={tasks}
+                      projectName={projects.find((project) => project.id === selectedProject)?.name || "Selected project"}
+                    />
                   </div>
                 )}
               </CardContent>

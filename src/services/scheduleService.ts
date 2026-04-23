@@ -15,7 +15,10 @@ const taskSelect = `
     unit,
     completion_percentage,
     total_materials,
-    total_labor
+    total_labor,
+    bom_materials (
+      material_name
+    )
   )
 `;
 

@@ -28,11 +28,11 @@ Current follow-up: add a fully functional Calendar View to Project Manager along
 - [ ] Calculate required duration for a scope from the configured productivity rate
 - [ ] Persist and load task configuration through the existing project_tasks data model
 - [ ] Fix current schedule typing/runtime issues caused by mismatched task shapes
-- [ ] Add a new Calendar View tab beside List View and Gantt View
-- [ ] Build month, week, and day calendar layouts with efficient daily task aggregation
-- [ ] Aggregate active-task workforce totals and role breakdowns for each calendar day
-- [ ] Aggregate unique material names from BOM-linked tasks for each calendar day
-- [ ] Aggregate unique tools and equipment for each calendar day
-- [ ] Add a clickable day detail modal with tasks, workforce, materials, and equipment
-- [ ] Add filters for phase, team, and resource type within the calendar view
+- [x] Add a new Calendar View tab beside List View and Gantt View
+- [x] Build month, week, and day calendar layouts with efficient daily task aggregation
+- [x] Aggregate active-task workforce totals and role breakdowns for each calendar day
+- [x] Aggregate unique material names from BOM-linked tasks for each calendar day
+- [x] Aggregate unique tools and equipment for each calendar day
+- [x] Add a clickable day detail modal with tasks, workforce, materials, and equipment
+- [x] Add filters for phase, team, and resource type within the calendar view
 - [ ] Validate the updated Project Manager flow

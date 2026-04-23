@@ -16,7 +16,7 @@ import {
   type TaskConfiguration,
 } from "@/lib/scheduleTaskConfig";
 import type { TaskFormData } from "@/lib/schedule";
-import { AlignLeft, Clock, DollarSign, Plus, Save, Settings2, Trash2, Users, X } from "lucide-react";
+import { AlignLeft, Clock, DollarSign, Package, Plus, Save, Settings2, Trash2, Users, Wrench, X } from "lucide-react";
 
 type EditableTaskScope = NonNullable<TaskFormData["bom_scope"]>;
 
@@ -81,6 +81,8 @@ export function TaskConfigurationPanel({
   const dependencyIds = getDependencyIds(task);
   const productivitySummary = getProductivitySummary(taskConfig);
   const requiredDays = calculateRequiredDurationDays(taskConfig);
+  const linkedMaterials = Array.isArray(task.bom_scope?.materials) ? task.bom_scope.materials : [];
+  const equipmentValue = Array.isArray(task.equipment) ? task.equipment.join("\n") : "";
 
   const handleTaskConfigChange = (updates: Partial<TaskConfiguration>) => {
     onTaskChange({
@@ -459,6 +461,50 @@ export function TaskConfigurationPanel({
                 </div>
                 <p className="text-muted-foreground">{productivitySummary.teamLabel || "No roles assigned"}</p>
                 <p className="text-muted-foreground">Output: {productivitySummary.outputLabel}</p>
+              </div>
+
+              <div className="space-y-2 rounded-md border p-3">
+                <Label className="text-xs flex items-center">
+                  <Package className="h-3 w-3 mr-1" />
+                  Linked BOM Materials
+                </Label>
+                {linkedMaterials.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {linkedMaterials.map((material) => (
+                      <Badge key={material} variant="outline" className="text-[10px]">
+                        {material}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">No BOM materials linked to this task scope yet.</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs flex items-center">
+                  <Wrench className="h-3 w-3 mr-1" />
+                  Tools & Equipment
+                </Label>
+                <Textarea
+                  className="min-h-[110px] text-sm"
+                  placeholder="Enter one tool or equipment item per line..."
+                  value={equipmentValue}
+                  onChange={(event) =>
+                    onTaskChange({
+                      ...task,
+                      equipment: Array.from(
+                        new Set(
+                          event.target.value
+                            .split("\n")
+                            .map((item) => item.trim())
+                            .filter(Boolean)
+                        )
+                      ),
+                    })
+                  }
+                />
+                <p className="text-[11px] text-muted-foreground">These items will appear in the Calendar View daily equipment summary.</p>
               </div>
 
               <div className="space-y-2">
