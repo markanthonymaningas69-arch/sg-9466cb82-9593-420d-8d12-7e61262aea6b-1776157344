@@ -23,6 +23,7 @@ The implementation must support future labor costing, S-Curve labor costing, and
 
 Follow-up fix:
 - restore the missing personnel form state type declaration so the Rates-driven Staff form compiles cleanly
+- resolve the remaining JSX parse error in the Visa tab section so the personnel page compiles again
 
 ## Checklist
 - [x] Inspect the current HR rates and staff module structure, services, and database schema
@@ -33,6 +34,7 @@ Follow-up fix:
 - [x] Persist position_id and rate_snapshot when creating or updating staff
 - [x] Validate the HR workflow end to end and confirm it supports downstream labor costing integrations
 - [ ] Restore the missing PersonnelFormState type declaration and verify compilation
+- [ ] Resolve the remaining Visa tab JSX parse error and verify compilation
 
 ## Acceptance
 Staff can only be created by selecting an active position from the Rates tab.
