@@ -10,6 +10,60 @@ type ScopeOfWorkInsert = Database["public"]["Tables"]["bom_scope_of_work"]["Inse
 type ProgressUpdate = Database["public"]["Tables"]["bom_progress_updates"]["Row"];
 type ProgressUpdateInsert = Database["public"]["Tables"]["bom_progress_updates"]["Insert"];
 
+async function resolveInventoryCategory(itemName: string) {
+  const { data } = await supabase
+    .from("master_items")
+    .select("category")
+    .ilike("name", itemName)
+    .maybeSingle();
+
+  return data?.category || "Construction Materials";
+}
+
+async function adjustProjectInventoryBalance(params: {
+  projectId: string | null;
+  itemName: string;
+  unit: string;
+  quantityDelta: number;
+}) {
+  const { projectId, itemName, unit, quantityDelta } = params;
+
+  if (!projectId || !itemName || !unit || !quantityDelta) {
+    return;
+  }
+
+  const normalizedDelta = Number(quantityDelta);
+
+  const { data: existing } = await supabase
+    .from("inventory")
+    .select("*")
+    .eq("project_id", projectId)
+    .eq("name", itemName)
+    .eq("unit", unit)
+    .eq("is_archived", false)
+    .maybeSingle();
+
+  if (existing) {
+    await supabase
+      .from("inventory")
+      .update({ quantity: Number(existing.quantity || 0) + normalizedDelta })
+      .eq("id", existing.id);
+
+    return;
+  }
+
+  const category = await resolveInventoryCategory(itemName);
+
+  await supabase.from("inventory").insert({
+    project_id: projectId,
+    name: itemName,
+    category,
+    quantity: normalizedDelta,
+    unit,
+    unit_cost: 0,
+  });
+}
+
 export const siteService = {
   // Site Attendance Management
   async getProjectPersonnel(projectId: string) {
@@ -173,6 +227,15 @@ export const siteService = {
       .insert(record)
       .select()
       .single();
+
+    if (data && !error) {
+      await adjustProjectInventoryBalance({
+        projectId: data.project_id,
+        itemName: data.item_name,
+        unit: data.unit,
+        quantityDelta: -Number(data.quantity || 0),
+      });
+    }
     
     return { data, error };
   },
@@ -209,21 +272,58 @@ export const siteService = {
   },
 
   async updateMaterialConsumption(id: string, updates: any) {
+    const { data: existing } = await supabase
+      .from("material_consumption")
+      .select("project_id, item_name, unit, quantity")
+      .eq("id", id)
+      .maybeSingle();
+
     const { data, error } = await supabase
       .from("material_consumption")
       .update(updates)
       .eq("id", id)
       .select()
       .single();
+
+    if (data && existing && !error) {
+      await adjustProjectInventoryBalance({
+        projectId: existing.project_id,
+        itemName: existing.item_name,
+        unit: existing.unit,
+        quantityDelta: Number(existing.quantity || 0),
+      });
+
+      await adjustProjectInventoryBalance({
+        projectId: data.project_id,
+        itemName: data.item_name,
+        unit: data.unit,
+        quantityDelta: -Number(data.quantity || 0),
+      });
+    }
     
     return { data, error };
   },
 
   async deleteMaterialConsumption(id: string) {
+    const { data: existing } = await supabase
+      .from("material_consumption")
+      .select("project_id, item_name, unit, quantity")
+      .eq("id", id)
+      .maybeSingle();
+
     const { error } = await supabase
       .from("material_consumption")
       .update({ is_archived: true } as any)
       .eq("id", id);
+
+    if (existing && !error) {
+      await adjustProjectInventoryBalance({
+        projectId: existing.project_id,
+        itemName: existing.item_name,
+        unit: existing.unit,
+        quantityDelta: Number(existing.quantity || 0),
+      });
+    }
     
     return { error };
   },
