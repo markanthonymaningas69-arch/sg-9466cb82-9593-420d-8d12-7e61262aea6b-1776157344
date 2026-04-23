@@ -1,6 +1,6 @@
 ---
 title: Schedule view refinements
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -34,8 +34,8 @@ Latest follow-up changes:
 - [x] Validate the schedule page view switching and resource visibility
 - [x] Refine dependency connector styling and bar alignment in the Gantt view
 - [x] Correct misplaced activity bar layout in the Gantt view
-- [ ] Correct dependency arrow placement in the Gantt view
-- [ ] Improve task label fit inside each Gantt bar using smaller typography
+- [x] Correct dependency arrow placement in the Gantt view
+- [x] Improve task label fit inside each Gantt bar using smaller typography
 
 ## Acceptance
 The Gantt view no longer shows timeline gridlines behind the bars.

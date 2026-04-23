@@ -142,22 +142,25 @@ export function GanttView({ tasks }: GanttViewProps) {
         return null;
       }
 
-      const predecessorBarRight = predecessor.barLeft + predecessor.barWidth;
-      const successorBarRight = successor.barLeft + successor.barWidth;
+      const predecessorBarLeft = predecessor.barLeft + 1;
+      const predecessorBarRight = predecessor.barLeft + predecessor.barWidth - 1;
+      const successorBarLeft = successor.barLeft + 1;
+      const successorBarRight = successor.barLeft + successor.barWidth - 1;
       const startX =
-        dependency.type === "SS" || dependency.type === "SF" ? predecessor.barLeft : predecessorBarRight;
+        dependency.type === "SS" || dependency.type === "SF" ? predecessorBarLeft : predecessorBarRight;
       const endX =
-        dependency.type === "SS" || dependency.type === "FS" ? successor.barLeft : successorBarRight;
+        dependency.type === "SS" || dependency.type === "FS" ? successorBarLeft : successorBarRight;
       const startY = predecessor.barTop + predecessor.barHeight / 2;
       const endY = successor.barTop + successor.barHeight / 2;
-      const elbowX = startX + Math.max(14, Math.abs(endX - startX) / 2);
+      const horizontalGap = Math.max(12, Math.abs(endX - startX) / 2);
+      const elbowX = startX + (endX >= startX ? horizontalGap : -horizontalGap);
 
       return {
         key: `${task.id}-${dependency.taskId}-${dependency.type}-${dependency.lagDays}`,
         color: dependencyColors[dependency.type],
         points: `${LABEL_WIDTH + startX},${startY} ${LABEL_WIDTH + elbowX},${startY} ${LABEL_WIDTH + elbowX},${endY} ${LABEL_WIDTH + endX},${endY}`,
         label: getDependencyLabel(dependency),
-        labelX: LABEL_WIDTH + elbowX + 5,
+        labelX: LABEL_WIDTH + elbowX + (endX >= startX ? 5 : -5),
         labelY: startY === endY ? startY - 9 : Math.min(startY, endY) + Math.abs(endY - startY) / 2 - 5,
       };
     })
@@ -209,14 +212,14 @@ export function GanttView({ tasks }: GanttViewProps) {
               <defs>
                 <marker
                   id="gantt-arrow"
-                  markerWidth="5"
-                  markerHeight="5"
-                  refX="4.2"
-                  refY="2"
+                  markerWidth="4"
+                  markerHeight="4"
+                  refX="3.4"
+                  refY="1.6"
                   orient="auto"
                   markerUnits="strokeWidth"
                 >
-                  <path d="M0 0 L4.2 2 L0 4 Z" fill="context-stroke" />
+                  <path d="M0 0 L3.4 1.6 L0 3.2 Z" fill="context-stroke" />
                 </marker>
               </defs>
 
@@ -245,7 +248,7 @@ export function GanttView({ tasks }: GanttViewProps) {
                     x={path.labelX + 18}
                     y={path.labelY + 1}
                     textAnchor="middle"
-                    fontSize="10"
+                    fontSize="9"
                     fontWeight="600"
                     fill={path.color}
                   >
@@ -292,7 +295,7 @@ export function GanttView({ tasks }: GanttViewProps) {
 
                     <div className="relative" style={{ width: timelineWidth, height: ROW_HEIGHT }}>
                       <div
-                        className={`absolute rounded-xl border px-3 py-2 shadow-sm ${getTaskTone(task.status)}`}
+                        className={`absolute flex flex-col justify-center overflow-hidden rounded-xl border px-2 py-1.5 shadow-sm ${getTaskTone(task.status)}`}
                         style={{
                           left: geometry.barLeft,
                           top: geometry.barInsetTop,
@@ -300,10 +303,12 @@ export function GanttView({ tasks }: GanttViewProps) {
                           height: geometry.barHeight,
                         }}
                       >
-                        <p className="truncate text-xs font-semibold">{task.name}</p>
-                        <p className="mt-1 text-[10px] opacity-80">
-                          {task.start_date} → {task.end_date}
-                        </p>
+                        <p className="truncate text-[10px] font-semibold leading-[1.1]">{task.name}</p>
+                        {geometry.barWidth >= 118 ? (
+                          <p className="mt-0.5 truncate text-[9px] leading-[1.05] opacity-75">
+                            {task.start_date} → {task.end_date}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
                   </div>
