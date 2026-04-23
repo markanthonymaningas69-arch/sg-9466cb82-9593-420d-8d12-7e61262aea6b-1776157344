@@ -7,6 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import type { TaskDependency, TaskFormData } from "@/lib/schedule";
+import type {
+  SaveTaskMaterialDeliveryPlanInput,
+  TaskLaborCostSummary,
+} from "@/services/taskPlanningService";
 import {
   applyTeamTemplate,
   calculateRequiredDurationDays,
@@ -27,12 +31,22 @@ export interface EditableProjectTask extends Omit<TaskFormData, "bom_scope" | "t
   dependencies: TaskDependency[];
 }
 
+interface ManpowerRateOption {
+  positionName: string;
+  dailyRate: number;
+  overtimeRate: number;
+}
+
 interface TaskConfigurationPanelProps {
   task: EditableProjectTask | null;
   tasks: EditableProjectTask[];
   teamTemplates?: MasterTeamTemplate[];
+  materialDeliveryPlans?: SaveTaskMaterialDeliveryPlanInput[];
+  manpowerRates?: ManpowerRateOption[];
+  laborCostSummary?: Pick<TaskLaborCostSummary, "dailyCost" | "totalCost" | "durationDays" | "rateSnapshot"> | null;
   saving: boolean;
   onTaskChange: (task: EditableProjectTask) => void;
+  onMaterialDeliveryPlansChange?: (plans: SaveTaskMaterialDeliveryPlanInput[]) => void;
 }
 
 function getTaskDependencies(task: EditableProjectTask) {
@@ -54,12 +68,52 @@ const dependencyTypeOptions: { value: TaskDependency["type"]; label: string }[] 
   { value: "SF", label: "SF" },
 ];
 
+function toDateOnly(value: Date) {
+  return value.toISOString().split("T")[0];
+}
+
+function shiftDate(dateValue: string, offsetDays: number) {
+  const date = new Date(`${dateValue}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + offsetDays);
+  return toDateOnly(date);
+}
+
+function buildMaterialDeliveryDates(plan: SaveTaskMaterialDeliveryPlanInput) {
+  if (!plan.deliveryStartDate) {
+    return [];
+  }
+
+  if (plan.deliveryScheduleType === "one_time") {
+    return [plan.deliveryStartDate];
+  }
+
+  const intervalDays =
+    plan.deliveryFrequency === "weekly"
+      ? 7
+      : plan.deliveryFrequency === "custom"
+        ? Math.max(1, Math.round(Number(plan.customIntervalDays || 1)))
+        : 1;
+
+  const durationDays = Math.max(1, Math.round(Number(plan.deliveryDurationDays || 1)));
+  const dates: string[] = [];
+
+  for (let offset = 0; offset < durationDays; offset += intervalDays) {
+    dates.push(shiftDate(plan.deliveryStartDate, offset));
+  }
+
+  return dates;
+}
+
 export function TaskConfigurationPanel({
   task,
   tasks,
   teamTemplates = [],
+  materialDeliveryPlans = [],
+  manpowerRates = [],
+  laborCostSummary = null,
   saving,
   onTaskChange,
+  onMaterialDeliveryPlansChange,
 }: TaskConfigurationPanelProps) {
   if (!task) {
     return (
@@ -95,6 +149,85 @@ export function TaskConfigurationPanel({
   const estimatedDuration = calculateRequiredDurationDays(taskConfig);
   const totalDailyOutput = calculateTotalDailyOutput(taskConfig);
   const selectedTemplate = teamTemplates.find((template) => template.id === taskConfig.teamTemplateId) || null;
+  const ratesByPosition = new Map(
+    manpowerRates.map((rate) => [rate.positionName.trim().toLowerCase(), rate] as const)
+  );
+  const resourceMaterialPlans =
+    materialDeliveryPlans.length > 0
+      ? materialDeliveryPlans
+      : linkedMaterials.map((materialName, index) => ({
+          materialId: `${task.id || "draft"}-${index}-${materialName.toLowerCase().replace(/\s+/g, "-")}`,
+          materialName,
+          deliveryScheduleType: "one_time" as const,
+          deliveryStartDate: task.start_date || null,
+          deliveryFrequency: "daily" as const,
+          deliveryDurationDays: Math.max(1, Number(task.duration_days || estimatedDuration || 1)),
+          customIntervalDays: null,
+          quantityMode: "even" as const,
+          deliveryDates: task.start_date ? [task.start_date] : [],
+          plannedUsagePeriod: task.start_date
+            ? {
+                startDate: task.start_date,
+                endDate: task.end_date || task.start_date,
+              }
+            : null,
+          totalQuantity: 0,
+          unit: task.scope_unit || task.bom_scope?.unit || "unit",
+        }));
+
+  const updateMaterialPlan = (
+    materialId: string,
+    updates: Partial<SaveTaskMaterialDeliveryPlanInput>
+  ) => {
+    if (!onMaterialDeliveryPlansChange) {
+      return;
+    }
+
+    const nextPlans = resourceMaterialPlans.map((plan) => {
+      if (plan.materialId !== materialId) {
+        return plan;
+      }
+
+      const nextPlan: SaveTaskMaterialDeliveryPlanInput = {
+        ...plan,
+        ...updates,
+        deliveryDurationDays:
+          (updates.deliveryScheduleType || plan.deliveryScheduleType) === "one_time"
+            ? 1
+            : Math.max(
+                1,
+                Math.round(
+                  Number(
+                    updates.deliveryDurationDays ?? plan.deliveryDurationDays ?? estimatedDuration ?? 1
+                  )
+                )
+              ),
+        customIntervalDays:
+          (updates.deliveryScheduleType || plan.deliveryScheduleType) === "staggered" &&
+          (updates.deliveryFrequency || plan.deliveryFrequency) === "custom"
+            ? Math.max(
+                1,
+                Math.round(Number(updates.customIntervalDays ?? plan.customIntervalDays ?? 1))
+              )
+            : null,
+        quantityMode: "even",
+        plannedUsagePeriod: task.start_date
+          ? {
+              startDate: task.start_date,
+              endDate: task.end_date || task.start_date,
+            }
+          : null,
+        totalQuantity: Number(plan.totalQuantity || 0),
+      };
+
+      return {
+        ...nextPlan,
+        deliveryDates: buildMaterialDeliveryDates(nextPlan),
+      };
+    });
+
+    onMaterialDeliveryPlansChange(nextPlans);
+  };
 
   const handleTaskConfigChange = (updates: Partial<TaskConfiguration>) => {
     onTaskChange({
@@ -409,32 +542,251 @@ export function TaskConfigurationPanel({
             </TabsContent>
 
             <TabsContent value="resources" className="space-y-4 mt-0">
-              <div className="rounded-md border p-3 space-y-2 text-xs">
+              <section className="space-y-3 rounded-md border p-3">
                 <div className="flex items-center justify-between">
-                  <span className="font-semibold text-foreground">Resource summary</span>
-                  <Badge variant="outline">{estimatedDuration} days</Badge>
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground">Team Assignment</h3>
+                    <p className="text-[11px] text-muted-foreground">
+                      Labor rates are pulled from the HR manpower catalog and multiplied by the assigned teams.
+                    </p>
+                  </div>
+                  <Badge variant="outline">{taskConfig.numberOfTeams} team(s)</Badge>
                 </div>
-                <p className="text-muted-foreground">{productivitySummary.teamLabel || "No team roles assigned"}</p>
-                <p className="text-muted-foreground">Daily output: {productivitySummary.totalOutputLabel}</p>
-              </div>
 
-              <div className="space-y-2 rounded-md border p-3">
-                <Label className="text-xs flex items-center">
-                  <Package className="h-3 w-3 mr-1" />
-                  Linked BOM Materials
-                </Label>
-                {linkedMaterials.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {linkedMaterials.map((material) => (
-                      <Badge key={material} variant="outline" className="text-[10px]">
-                        {material}
-                      </Badge>
+                {taskConfig.teamRoles.length > 0 ? (
+                  <div className="space-y-2">
+                    {taskConfig.teamRoles.map((role) => {
+                      const matchedRate = ratesByPosition.get(role.role.trim().toLowerCase());
+                      const totalAssigned = Math.max(1, Math.round(role.quantity)) * taskConfig.numberOfTeams;
+                      const dailySubtotal = totalAssigned * Number(matchedRate?.dailyRate || 0);
+
+                      return (
+                        <div key={role.id} className="rounded-md border bg-muted/20 p-3 text-xs">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="font-semibold text-foreground">{role.role}</p>
+                              <p className="text-muted-foreground">{totalAssigned} assigned across all teams</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-medium text-foreground">
+                                AED {Number(matchedRate?.dailyRate || 0).toFixed(2)}/day
+                              </p>
+                              <p className="text-muted-foreground">Daily subtotal AED {dailySubtotal.toFixed(2)}</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Select a team type to populate the manpower assignment list.</p>
+                )}
+              </section>
+
+              <section className="space-y-3 rounded-md border p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground">Material Delivery Planning</h3>
+                    <p className="text-[11px] text-muted-foreground">
+                      Delivery schedules are linked to the task timeline and saved for future procurement and cash flow forecasting.
+                    </p>
+                  </div>
+                  <Badge variant="outline">{resourceMaterialPlans.length} material(s)</Badge>
+                </div>
+
+                {resourceMaterialPlans.length > 0 ? (
+                  <div className="space-y-3">
+                    {resourceMaterialPlans.map((plan) => (
+                      <div key={plan.materialId} className="rounded-md border bg-muted/20 p-3 space-y-3">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">{plan.materialName}</p>
+                            <p className="text-[11px] text-muted-foreground">
+                              Planned usage: {plan.plannedUsagePeriod?.startDate || "-"} → {plan.plannedUsagePeriod?.endDate || "-"}
+                            </p>
+                          </div>
+                          <Badge variant="outline">{plan.unit}</Badge>
+                        </div>
+
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <div className="space-y-2">
+                            <Label className="text-[11px]">Delivery Type</Label>
+                            <Select
+                              value={plan.deliveryScheduleType}
+                              onValueChange={(value) =>
+                                updateMaterialPlan(plan.materialId, {
+                                  deliveryScheduleType: value as "one_time" | "staggered",
+                                })
+                              }
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder="Select delivery type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="one_time">One-time delivery</SelectItem>
+                                <SelectItem value="staggered">Staggered delivery</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label className="text-[11px]">Delivery Start Date</Label>
+                            <Input
+                              type="date"
+                              value={plan.deliveryStartDate || ""}
+                              onChange={(event) =>
+                                updateMaterialPlan(plan.materialId, {
+                                  deliveryStartDate: event.target.value || null,
+                                })
+                              }
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid gap-3 md:grid-cols-3">
+                          <div className="space-y-2">
+                            <Label className="text-[11px]">Frequency</Label>
+                            <Select
+                              value={plan.deliveryFrequency}
+                              onValueChange={(value) =>
+                                updateMaterialPlan(plan.materialId, {
+                                  deliveryFrequency: value as "daily" | "weekly" | "custom",
+                                })
+                              }
+                              disabled={plan.deliveryScheduleType === "one_time"}
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder="Select frequency" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="daily">Daily</SelectItem>
+                                <SelectItem value="weekly">Weekly</SelectItem>
+                                <SelectItem value="custom">Custom interval</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label className="text-[11px]">Delivery Duration (days)</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              step="1"
+                              value={plan.deliveryScheduleType === "one_time" ? 1 : plan.deliveryDurationDays}
+                              onChange={(event) =>
+                                updateMaterialPlan(plan.materialId, {
+                                  deliveryDurationDays: Math.max(
+                                    1,
+                                    Math.round(Number(event.target.value) || 1)
+                                  ),
+                                })
+                              }
+                              className="h-8 text-xs"
+                              disabled={plan.deliveryScheduleType === "one_time"}
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label className="text-[11px]">Quantity Option</Label>
+                            <Input value="Even distribution" readOnly className="h-8 text-xs bg-muted/50" />
+                          </div>
+                        </div>
+
+                        {plan.deliveryScheduleType === "staggered" && plan.deliveryFrequency === "custom" ? (
+                          <div className="space-y-2">
+                            <Label className="text-[11px]">Custom Interval (days)</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              step="1"
+                              value={plan.customIntervalDays || 1}
+                              onChange={(event) =>
+                                updateMaterialPlan(plan.materialId, {
+                                  customIntervalDays: Math.max(
+                                    1,
+                                    Math.round(Number(event.target.value) || 1)
+                                  ),
+                                })
+                              }
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                        ) : null}
+
+                        <div className="space-y-2">
+                          <Label className="text-[11px]">Delivery Timeline</Label>
+                          {plan.deliveryDates.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {plan.deliveryDates.map((date) => (
+                                <Badge key={`${plan.materialId}-${date}`} variant="outline" className="text-[10px]">
+                                  {date}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-muted-foreground">
+                              Set the delivery start date to generate the material delivery timeline.
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground">No BOM materials linked to this task scope yet.</p>
+                  <p className="text-xs text-muted-foreground">No BOM materials are linked to this task scope yet.</p>
                 )}
-              </div>
+              </section>
+
+              <section className="space-y-3 rounded-md border p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground">Labor Cost Summary</h3>
+                    <p className="text-[11px] text-muted-foreground">
+                      Costs update automatically whenever team composition, duration, or HR rates change.
+                    </p>
+                  </div>
+                  <Badge variant="outline">{laborCostSummary?.durationDays || estimatedDuration} days</Badge>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-md border bg-primary/5 p-3">
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Daily Labor Cost</p>
+                    <p className="mt-1 text-lg font-semibold text-foreground">
+                      AED {Number(laborCostSummary?.dailyCost || 0).toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="rounded-md border bg-primary/5 p-3">
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Total Labor Cost</p>
+                    <p className="mt-1 text-lg font-semibold text-foreground">
+                      AED {Number(laborCostSummary?.totalCost || 0).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+
+                {laborCostSummary?.rateSnapshot?.length ? (
+                  <div className="space-y-2">
+                    {laborCostSummary.rateSnapshot.map((rate) => (
+                      <div key={`${rate.role}-${rate.count}`} className="rounded-md border bg-muted/20 p-3 text-xs">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-semibold text-foreground">{rate.role}</p>
+                            <p className="text-muted-foreground">{rate.count} personnel assigned</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-foreground">AED {Number(rate.dailyRate || 0).toFixed(2)}/day</p>
+                            <p className="text-muted-foreground">OT AED {Number(rate.overtimeRate || 0).toFixed(2)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    No labor rate snapshot available yet. Add manpower rates in HR to populate this summary.
+                  </p>
+                )}
+              </section>
 
               <div className="space-y-2">
                 <Label className="text-xs flex items-center">

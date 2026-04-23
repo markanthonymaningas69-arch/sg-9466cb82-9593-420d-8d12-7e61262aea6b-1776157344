@@ -1,32 +1,32 @@
 ---
 title: Material delivery planning
-status: todo
+status: in_progress
 priority: high
 type: feature
 tags:
   - schedule
   - materials
-  - bom
-  - forecast
+  - procurement
+  - forecasting
 created_by: agent
 created_at: 2026-04-23
 position: 38
 ---
 
 ## Notes
-Add a Material Delivery Planning subsection under Resources in the task configuration panel. Materials must be auto-linked from the BOM for the selected task and support delivery planning aligned to task schedule.
+Add Material Delivery Planning inside the Project Manager Resources tab so each task can schedule linked BOM materials using one-time or staggered delivery settings. The resulting delivery timeline must persist per task and store the data needed later for procurement planning and budget forecasting.
 
-Store task-linked delivery planning data so it is ready for future budget forecast, cash flow forecast, and procurement planning features.
+This task covers the Resources UI, delivery schedule generation, task-linked storage, and auto-save behavior.
 
 ## Checklist
-- [ ] Inspect how task resources and BOM-linked materials are currently loaded
-- [ ] Add persistence for material delivery planning data keyed by task and material
-- [ ] Build Material Delivery Planning UI with delivery type, start date, frequency, duration, and distribution settings
-- [ ] Generate per-task delivery timelines aligned with task schedule
-- [ ] Store forecast-ready fields including material_id, task_id, delivery_dates, and planned_usage_period
-- [ ] Validate that delivery planning updates auto-save in real time
+- [x] Inspect the current task resources UI and confirm how BOM materials are linked to schedule tasks
+- [x] Add task-level storage and service methods for material delivery planning data
+- [x] Add Material Delivery Planning UI with delivery type, start date, frequency, duration, and timeline output
+- [x] Auto-link materials from the task BOM scope into delivery planning
+- [x] Auto-save per-task material delivery settings and timeline output
+- [ ] Validate delivery planning behavior when task schedule dates change
 
 ## Acceptance
-Resources includes a Material Delivery Planning section for BOM-linked task materials.
-Each planned material delivery stores task-linked forecast-ready schedule data.
-Changing task schedule can be reflected in the material delivery planning output.
+Each task shows linked BOM materials in the Resources tab under Material Delivery Planning.
+Users can set one-time or staggered deliveries with dates that generate a delivery timeline.
+Material delivery data is stored per task and ready for future budget forecasting.

@@ -24,10 +24,10 @@ This task also covers the shared data structure needed for budget forecasting, i
 - [x] Add persistent database storage for task labor cost summaries
 - [x] Add HR service methods for listing, creating, updating, and deleting rate catalog entries
 - [x] Add Manpower Rate Catalog UI inside the HR module
-- [ ] Connect Project Manager task resources to the manpower rate catalog
-- [ ] Show daily labor cost and total labor cost in the Resources section
-- [ ] Persist labor cost summaries for downstream budget forecasting
-- [ ] Auto-refresh labor cost when task duration, team composition, or catalog rates change
+- [x] Connect Project Manager task resources to the manpower rate catalog
+- [x] Show daily labor cost and total labor cost in the Resources section
+- [x] Persist labor cost summaries for downstream budget forecasting
+- [x] Auto-refresh labor cost when task duration, team composition, or catalog rates change
 
 ## Acceptance
 HR includes a Manpower Rate Catalog for positions with daily and overtime rates.

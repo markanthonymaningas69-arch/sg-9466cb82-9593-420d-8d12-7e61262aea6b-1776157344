@@ -14,8 +14,14 @@ import {
   normalizeTaskConfiguration,
 } from "@/lib/scheduleTaskConfig";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { projectService } from "@/services/projectService";
 import { scheduleService } from "@/services/scheduleService";
+import {
+  taskPlanningService,
+  type SaveTaskMaterialDeliveryPlanInput,
+  type TaskLaborCostSummary,
+} from "@/services/taskPlanningService";
 
 function toDateOnly(value: Date) {
   return value.toISOString().split("T")[0];
@@ -210,6 +216,141 @@ function syncTaskWithConfiguration(task: EditableProjectTask): EditableProjectTa
   };
 }
 
+interface ManpowerRateRecord {
+  id: string;
+  positionName: string;
+  dailyRate: number;
+  overtimeRate: number;
+}
+
+interface ComputedTaskLaborCostSummary {
+  taskId: string;
+  dailyCost: number;
+  totalCost: number;
+  durationDays: number;
+  rateSnapshot: Array<{
+    role: string;
+    count: number;
+    dailyRate: number;
+    overtimeRate: number;
+  }>;
+}
+
+function buildDefaultMaterialDeliveryPlans(task: EditableProjectTask): SaveTaskMaterialDeliveryPlanInput[] {
+  const materials = Array.isArray(task.bom_scope?.materials) ? task.bom_scope.materials : [];
+  const startDate = task.start_date || null;
+  const endDate = task.end_date || startDate || null;
+
+  return materials.map((materialName, index) => ({
+    materialId: `${task.id || "draft"}-${index}-${materialName.toLowerCase().replace(/\s+/g, "-")}`,
+    materialName,
+    deliveryScheduleType: "one_time",
+    deliveryStartDate: startDate,
+    deliveryFrequency: "daily",
+    deliveryDurationDays: Math.max(1, Number(task.duration_days || 1)),
+    customIntervalDays: null,
+    quantityMode: "even",
+    deliveryDates: startDate ? [startDate] : [],
+    plannedUsagePeriod:
+      startDate && endDate
+        ? {
+            startDate,
+            endDate,
+          }
+        : null,
+    totalQuantity: 0,
+    unit: task.scope_unit || task.bom_scope?.unit || "unit",
+  }));
+}
+
+function mergeMaterialDeliveryPlans(
+  task: EditableProjectTask,
+  storedPlans: SaveTaskMaterialDeliveryPlanInput[] = []
+) {
+  const defaults = buildDefaultMaterialDeliveryPlans(task);
+  const defaultsByName = new Map(defaults.map((plan) => [plan.materialName, plan] as const));
+  const linkedMaterials = Array.isArray(task.bom_scope?.materials) ? task.bom_scope.materials : [];
+
+  if (linkedMaterials.length === 0) {
+    return [];
+  }
+
+  return linkedMaterials.map((materialName) => {
+    const fallback = defaultsByName.get(materialName);
+    const stored = storedPlans.find((plan) => plan.materialName === materialName);
+
+    if (!fallback) {
+      return {
+        materialId: materialName,
+        materialName,
+        deliveryScheduleType: "one_time" as const,
+        deliveryStartDate: task.start_date || null,
+        deliveryFrequency: "daily" as const,
+        deliveryDurationDays: Math.max(1, Number(task.duration_days || 1)),
+        customIntervalDays: null,
+        quantityMode: "even" as const,
+        deliveryDates: task.start_date ? [task.start_date] : [],
+        plannedUsagePeriod: task.start_date
+          ? {
+              startDate: task.start_date,
+              endDate: task.end_date || task.start_date,
+            }
+          : null,
+        totalQuantity: 0,
+        unit: task.scope_unit || task.bom_scope?.unit || "unit",
+      };
+    }
+
+    if (!stored) {
+      return fallback;
+    }
+
+    return {
+      ...fallback,
+      ...stored,
+      materialName,
+      plannedUsagePeriod: fallback.plannedUsagePeriod,
+      deliveryStartDate: stored.deliveryStartDate || fallback.deliveryStartDate,
+      deliveryDates: stored.deliveryDates.length > 0 ? stored.deliveryDates : fallback.deliveryDates,
+      unit: stored.unit || fallback.unit,
+    };
+  });
+}
+
+function calculateTaskLaborCostSummary(
+  task: EditableProjectTask,
+  rates: ManpowerRateRecord[]
+): ComputedTaskLaborCostSummary {
+  const taskConfig = normalizeTaskConfiguration(task.task_config, {
+    quantity: task.bom_scope?.quantity,
+    unit: task.bom_scope?.unit,
+    assignedTeamName: task.assigned_team,
+  });
+  const rateMap = new Map(rates.map((rate) => [rate.positionName.trim().toLowerCase(), rate] as const));
+  const teamMultiplier = Math.max(1, Number(taskConfig.numberOfTeams || task.number_of_teams || 1));
+  const durationDays = Math.max(1, Number(task.duration_days || calculateRequiredDurationDays(taskConfig)));
+  const rateSnapshot = taskConfig.teamRoles.map((role) => {
+    const matchedRate = rateMap.get(role.role.trim().toLowerCase());
+    const count = Math.max(1, Math.round(role.quantity)) * teamMultiplier;
+
+    return {
+      role: role.role,
+      count,
+      dailyRate: Number(matchedRate?.dailyRate || 0),
+      overtimeRate: Number(matchedRate?.overtimeRate || 0),
+    };
+  });
+  const dailyCost = rateSnapshot.reduce((total, role) => total + role.count * role.dailyRate, 0);
+
+  return {
+    taskId: task.id || "",
+    dailyCost: Number(dailyCost.toFixed(2)),
+    totalCost: Number((dailyCost * durationDays).toFixed(2)),
+    durationDays,
+    rateSnapshot,
+  };
+}
+
 export default function SchedulePage() {
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [selectedProject, setSelectedProject] = useState("");
@@ -218,12 +359,24 @@ export default function SchedulePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "gantt" | "calendar">("list");
+  const [manpowerRates, setManpowerRates] = useState<ManpowerRateRecord[]>([]);
+  const [materialDeliveryPlansByTask, setMaterialDeliveryPlansByTask] = useState<
+    Record<string, SaveTaskMaterialDeliveryPlanInput[]>
+  >({});
+  const [laborCostSummaries, setLaborCostSummaries] = useState<
+    Record<string, TaskLaborCostSummary | ComputedTaskLaborCostSummary | null>
+  >({});
   const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const planningSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const laborCostSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedSignatureRef = useRef("");
+  const lastSavedMaterialPlanSignatureRef = useRef<Record<string, string>>({});
+  const lastSavedLaborCostSignatureRef = useRef<Record<string, string>>({});
   const { toast } = useToast();
 
   useEffect(() => {
     void loadProjects();
+    void loadManpowerRates();
   }, []);
 
   useEffect(() => {
@@ -244,6 +397,31 @@ export default function SchedulePage() {
       console.error(error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadManpowerRates = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("manpower_rate_catalog")
+        .select("id, position_name, daily_rate, overtime_rate")
+        .order("position_name", { ascending: true });
+
+      if (error) {
+        throw error;
+      }
+
+      setManpowerRates(
+        (data || []).map((rate) => ({
+          id: rate.id,
+          positionName: rate.position_name,
+          dailyRate: Number(rate.daily_rate || 0),
+          overtimeRate: Number(rate.overtime_rate || 0),
+        }))
+      );
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Warning", description: "Unable to load manpower rate catalog", variant: "destructive" });
     }
   };
 
@@ -447,240 +625,16925 @@ export default function SchedulePage() {
     };
   }, [tasks]);
 
-  return (
-    <Layout>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-heading font-bold">Project Manager</h1>
-            <p className="text-muted-foreground mt-1">Interactive Gantt Chart and Scheduling</p>
-          </div>
-          <Select value={selectedProject} onValueChange={setSelectedProject}>
-            <SelectTrigger className="w-full sm:w-[280px]">
-              <SelectValue placeholder="Select a project" />
-            </SelectTrigger>
-            <SelectContent>
-              {projects.map((project) => (
-                <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
 
-        {!selectedProject ? (
-          <Card>
-            <CardContent className="py-12 text-center text-muted-foreground">
-              Please select a project to view its schedule and Gantt chart.
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            <Card className="lg:col-span-3 min-h-[600px] flex flex-col">
-              <CardHeader className="flex flex-row items-center justify-between pb-2 border-b">
-                <CardTitle className="text-lg">Project Schedule</CardTitle>
-                <div className="flex flex-wrap items-center gap-2 mt-2 sm:mt-0">
-                  <div className="flex items-center space-x-2 mr-4 bg-muted/50 p-1 rounded-md">
-                    <Button size="sm" variant={viewMode === "list" ? "default" : "ghost"} onClick={() => setViewMode("list")} className="h-7 text-xs">List View</Button>
-                    <Button size="sm" variant={viewMode === "gantt" ? "default" : "ghost"} onClick={() => setViewMode("gantt")} className="h-7 text-xs">Gantt View</Button>
-                    <Button size="sm" variant={viewMode === "calendar" ? "default" : "ghost"} onClick={() => setViewMode("calendar")} className="h-7 text-xs">Calendar View</Button>
-                  </div>
-                  <Button size="sm" variant="outline" onClick={handleGenerateFromBOM}>
-                    <CalendarIcon className="h-4 w-4 mr-2" />
-                    Auto-generate from BOM
-                  </Button>
-                  <Button size="sm" onClick={handleAddTask}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Task
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0 flex-1 relative bg-background overflow-hidden flex flex-col">
-                {loading ? (
-                  <div className="flex items-center justify-center h-full min-h-[400px]">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                  </div>
-                ) : tasks.length === 0 && !selectedTask ? (
-                  <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-muted-foreground p-8 text-center">
-                    <div className="bg-muted h-16 w-16 rounded-full flex items-center justify-center mb-4">
-                      <CalendarIcon className="h-8 w-8 text-muted-foreground" />
-                    </div>
-                    <p className="text-lg font-medium text-foreground">No tasks found for this project</p>
-                    <p className="text-sm mt-1 max-w-md">Generate your schedule automatically from the current Bill of Materials scopes, or create tasks manually to build your Gantt chart.</p>
-                    <Button className="mt-6" onClick={handleGenerateFromBOM}>Auto-generate from BOM</Button>
-                  </div>
-                ) : viewMode === "list" ? (
-                  <div className="p-0 overflow-x-auto">
-                    <table className="w-full text-sm text-left">
-                      <thead className="bg-muted text-muted-foreground sticky top-0 z-10">
-                        <tr>
-                          <th className="px-4 py-3 font-medium min-w-[200px]">Task Name</th>
-                          <th className="px-4 py-3 font-medium min-w-[100px]">Start Date</th>
-                          <th className="px-4 py-3 font-medium min-w-[100px]">End Date</th>
-                          <th className="px-4 py-3 font-medium min-w-[100px]">Duration</th>
-                          <th className="px-4 py-3 font-medium min-w-[120px]">Progress</th>
-                          <th className="px-4 py-3 font-medium min-w-[100px]">Status</th>
-                          <th className="px-4 py-3 font-medium min-w-[72px] text-right">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {tasks.map((task) => (
-                          <tr
-                            key={task.id || task.name}
-                            onClick={() => handleSelectTask(task)}
-                            className={`border-b cursor-pointer transition-colors ${selectedTask?.id === task.id ? "bg-primary/10 border-primary/20" : "bg-card hover:bg-muted/50"}`}
-                          >
-                            <td className="px-4 py-3 font-medium">
-                              <div className="flex flex-col">
-                                <span className={selectedTask?.id === task.id ? "text-primary" : "text-foreground"}>{task.name}</span>
-                                {task.bom_scope && <span className="text-[10px] text-muted-foreground truncate max-w-[250px]">Scope: {task.bom_scope.name}</span>}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-xs">{task.start_date ? new Date(task.start_date).toLocaleDateString() : "-"}</td>
-                            <td className="px-4 py-3 text-xs">{task.end_date ? new Date(task.end_date).toLocaleDateString() : "-"}</td>
-                            <td className="px-4 py-3 text-xs">{task.duration_days ? `${task.duration_days} d` : "-"}</td>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-2">
-                                <div className="w-full bg-muted rounded-full h-1.5 min-w-[60px]">
-                                  <div className="bg-primary h-1.5 rounded-full" style={{ width: `${task.progress || 0}%` }}></div>
-                                </div>
-                                <span className="text-xs font-semibold">{task.progress || 0}%</span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <Badge
-                                variant="outline"
-                                className={`text-[10px] capitalize ${
-                                  task.status === "completed"
-                                    ? "bg-green-500/10 text-green-600 border-green-500/20"
-                                    : task.status === "in_progress"
-                                      ? "bg-blue-500/10 text-blue-600 border-blue-500/20"
-                                      : task.status === "delayed"
-                                        ? "bg-red-500/10 text-red-600 border-red-500/20"
-                                        : "bg-muted text-muted-foreground border-border"
-                                }`}
-                              >
-                                {task.status?.replace("_", " ") || "Pending"}
-                              </Badge>
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  if (task.id) {
-                                    void handleDeleteTask(task.id);
-                                  }
-                                }}
-                                disabled={saving || !task.id}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : viewMode === "gantt" ? (
-                  <div className="flex-1 overflow-auto relative flex flex-col bg-background">
-                    {timelineBounds ? (
-                      <div className="min-w-max">
-                        <div className="flex border-b bg-muted/30 sticky top-0 z-20">
-                          <div className="w-[250px] shrink-0 border-r p-3 font-medium text-xs text-muted-foreground bg-card sticky left-0 z-30">Task Name</div>
-                          <div className="flex-1 relative h-10 flex">
-                            {Array.from({ length: timelineBounds.totalDays }).map((_, index) => {
-                              const date = new Date(timelineBounds.minDate);
-                              date.setDate(date.getDate() + index);
-                              const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-                              const isStartOfMonth = date.getDate() === 1;
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
 
-                              return (
-                                <div
-                                  key={index}
-                                  className={`w-[30px] shrink-0 border-r text-[9px] flex flex-col items-center justify-center ${isWeekend ? "bg-muted/50 text-muted-foreground/50" : "text-muted-foreground"}`}
-                                >
-                                  {isStartOfMonth && <span className="font-bold text-foreground absolute -top-4 whitespace-nowrap">{date.toLocaleString("default", { month: "short" })}</span>}
-                                  <span>{date.getDate()}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
 
-                        {tasks.map((task) => {
-                          let leftOffset = 0;
-                          let barWidth = 0;
-                          if (task.start_date && task.end_date) {
-                            const startDate = new Date(task.start_date);
-                            const endDate = new Date(task.end_date);
-                            leftOffset = Math.max(0, Math.floor((startDate.getTime() - timelineBounds.minDate.getTime()) / (1000 * 3600 * 24))) * 30;
-                            barWidth = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24))) * 30;
-                          }
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
 
-                          const isSelected = selectedTask?.id === task.id;
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
 
-                          return (
-                            <div
-                              key={task.id || task.name}
-                              className={`flex border-b hover:bg-muted/50 cursor-pointer ${isSelected ? "bg-primary/10" : ""}`}
-                              onClick={() => handleSelectTask(task)}
-                            >
-                              <div className={`w-[250px] shrink-0 border-r p-2 text-xs truncate bg-card text-foreground sticky left-0 z-10 ${isSelected ? "border-primary/30 font-medium" : ""}`}>{task.name}</div>
-                              <div className="flex-1 relative h-10 flex border-l border-border/50" style={{ backgroundImage: "linear-gradient(to right, hsl(var(--border) / 0.5) 1px, transparent 1px)", backgroundSize: "30px 100%" }}>
-                                {task.start_date && task.end_date && (
-                                  <div
-                                    className={`absolute top-2 h-6 rounded-md shadow-sm border overflow-hidden flex items-center group transition-all ${
-                                      task.status === "completed"
-                                        ? "bg-green-500 border-green-600"
-                                        : task.status === "in_progress"
-                                          ? "bg-blue-500 border-blue-600"
-                                          : task.status === "delayed"
-                                            ? "bg-red-500 border-red-600"
-                                            : "bg-slate-400 border-slate-500"
-                                    } ${isSelected ? "ring-2 ring-primary ring-offset-1" : ""}`}
-                                    style={{ left: `${leftOffset}px`, width: `${barWidth}px`, minWidth: "4px" }}
-                                  >
-                                    <div className="h-full bg-black/20" style={{ width: `${task.progress || 0}%` }}></div>
-                                    <div className="absolute inset-0 px-2 flex items-center justify-between text-[10px] text-white font-medium opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap overflow-hidden">
-                                      <span>{task.progress || 0}%</span>
-                                      {barWidth > 60 && <span>{task.duration_days}d</span>}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                        Define start and end dates for your tasks to generate the timeline view.
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex-1 overflow-auto bg-background">
-                    <CalendarView
-                      tasks={tasks}
-                      projectName={projects.find((project) => project.id === selectedProject)?.name || "Selected project"}
-                    />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
 
-            <TaskConfigurationPanel
-              task={selectedTask}
-              tasks={tasks}
-              saving={saving}
-              onTaskChange={handleTaskChange}
-            />
-          </div>
-        )}
-      </div>
-    </Layout>
-  );
-}
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const persistMaterialDeliveryPlans = async (
+    taskId: string,
+    plans: SaveTaskMaterialDeliveryPlanInput[]
+  ) => {
+    try {
+      setSaving(true);
+      const savedPlans = await taskPlanningService.replaceMaterialDeliveryPlans(taskId, plans);
+      const normalizedPlans: SaveTaskMaterialDeliveryPlanInput[] = savedPlans.map((plan) => ({
+        materialId: plan.materialId,
+        materialName: plan.materialName,
+        deliveryScheduleType: plan.deliveryScheduleType,
+        deliveryStartDate: plan.deliveryStartDate,
+        deliveryFrequency: plan.deliveryFrequency,
+        deliveryDurationDays: plan.deliveryDurationDays,
+        customIntervalDays: plan.customIntervalDays,
+        quantityMode: plan.quantityMode,
+        deliveryDates: plan.deliveryDates,
+        plannedUsagePeriod: plan.plannedUsagePeriod,
+        totalQuantity: plan.totalQuantity,
+        unit: plan.unit,
+      }));
+
+      lastSavedMaterialPlanSignatureRef.current[taskId] = JSON.stringify(normalizedPlans);
+      setMaterialDeliveryPlansByTask((current) => ({
+        ...current,
+        [taskId]: normalizedPlans,
+      }));
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save material delivery plan", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const persistLaborCostSummary = async (summary: ComputedTaskLaborCostSummary) => {
+    if (!summary.taskId) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedSummary = await taskPlanningService.upsertLaborCostSummary({
+        taskId: summary.taskId,
+        dailyCost: summary.dailyCost,
+        totalCost: summary.totalCost,
+        durationDays: summary.durationDays,
+        rateSnapshot: summary.rateSnapshot,
+      });
+
+      const signature = JSON.stringify({
+        dailyCost: savedSummary.dailyCost,
+        totalCost: savedSummary.totalCost,
+        durationDays: savedSummary.durationDays,
+        rateSnapshot: savedSummary.rateSnapshot,
+      });
+
+      lastSavedLaborCostSignatureRef.current[summary.taskId] = signature;
+      setLaborCostSummaries((current) => ({
+        ...current,
+        [summary.taskId]: savedSummary,
+      }));
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save labor cost summary", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const currentMaterialDeliveryPlans = useMemo(() => {
+    if (!selectedTask) {
+      return [];
+    }
+
+    return mergeMaterialDeliveryPlans(
+      selectedTask,
+      selectedTask.id ? materialDeliveryPlansByTask[selectedTask.id] || [] : []
+    );
+  }, [selectedTask, materialDeliveryPlansByTask]);
+
+  const currentLaborCostSummary = useMemo(() => {
+    if (!selectedTask) {
+      return null;
+    }
+
+    return calculateTaskLaborCostSummary(selectedTask, manpowerRates);
+  }, [selectedTask, manpowerRates]);
+
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      setSaving(true);
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+      await scheduleService.deleteTask(taskId);
+      toast({ title: "Success", description: "Task deleted successfully" });
+      lastSavedSignatureRef.current = "";
+      setSelectedTask((currentTask) => (currentTask?.id === taskId ? null : currentTask));
+      setTasks((currentTasks) => currentTasks.filter((task) => task.id !== taskId));
+      await loadTasks(selectedProject);
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to delete task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleGenerateFromBOM = async () => {
+    if (!selectedProject) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const result = await scheduleService.generateTasksFromBOM(selectedProject);
+      await loadTasks(selectedProject);
+      toast({
+        title: "BOM synced",
+        description: `${result.syncedCount} scope tasks synced (${result.createdCount} created, ${result.updatedCount} updated).`,
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to generate tasks";
+      toast({ title: "Error", description: message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+  const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
+    setSelectedTask(createNewTask(selectedProject));
+  };
+
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
+
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
+
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return applyScheduleToEditableTasks(nextTasks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    const taskId = selectedTask.id;
+    const signature = JSON.stringify(currentMaterialDeliveryPlans);
+
+    if (signature === lastSavedMaterialPlanSignatureRef.current[taskId]) {
+      return;
+    }
+
+    if (planningSaveTimeoutRef.current) {
+      clearTimeout(planningSaveTimeoutRef.current);
+    }
+
+    planningSaveTimeoutRef.current = setTimeout(() => {
+      void persistMaterialDeliveryPlans(taskId, currentMaterialDeliveryPlans);
+    }, 700);
+
+    return () => {
+      if (planningSaveTimeoutRef.current) {
+        clearTimeout(planningSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedTask?.id, currentMaterialDeliveryPlans]);
+
+  useEffect(() => {
+    if (!currentLaborCostSummary?.taskId) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      dailyCost: currentLaborCostSummary.dailyCost,
+      totalCost: currentLaborCostSummary.totalCost,
+      durationDays: currentLaborCostSummary.durationDays,
+      rateSnapshot: currentLaborCostSummary.rateSnapshot,
+    });
+
+    if (signature === lastSavedLaborCostSignatureRef.current[currentLaborCostSummary.taskId]) {
+      return;
+    }
+
+    if (laborCostSaveTimeoutRef.current) {
+      clearTimeout(laborCostSaveTimeoutRef.current);
+    }
+
+    laborCostSaveTimeoutRef.current = setTimeout(() => {
+      void persistLaborCostSummary(currentLaborCostSummary);
+    }, 700);
+
+    return () => {
+      if (laborCostSaveTimeoutRef.current) {
+        clearTimeout(laborCostSaveTimeoutRef.current);
+      }
+    };
+  }, [currentLaborCostSummary]);
+
+  const handleMaterialDeliveryPlansChange = (plans: SaveTaskMaterialDeliveryPlanInput[]) => {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    setMaterialDeliveryPlansByTask((current) => ({
+      ...current,
+      [selectedTask.id]: plans,
+    }));
+  };
+
+  const handleTaskChange = (task: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(task);
+    const recalculatedTasks = syncedTask.id
+      ? applyScheduleToEditableTasks(
+          tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        )
+      : tasks;
+
+    setSelectedTask(
+      syncedTask.id
+        ? recalculatedTasks.find((item) => item.id === syncedTask.id) || syncedTask
+        : syncedTask
+    );
+
+    if (syncedTask.id) {
+      setTasks(recalculatedTasks);
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
+  };
+
+ 
