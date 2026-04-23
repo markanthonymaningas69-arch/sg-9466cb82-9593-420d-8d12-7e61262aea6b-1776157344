@@ -4,11 +4,13 @@ export interface TeamRoleAllocation {
   quantity: number;
 }
 
+export type ProductivityUnit = "hour" | "day";
+
 export interface TaskConfiguration {
   scopeQuantity: number;
   scopeUnit: string;
   productivityOutput: number;
-  productivityUnit: "day";
+  productivityUnit: ProductivityUnit;
   workHoursPerDay: number;
   autoCalculateDuration: boolean;
   teamRoles: TeamRoleAllocation[];
@@ -94,8 +96,8 @@ export function normalizeTaskConfiguration(rawValue: unknown, scopeDefaults?: Sc
         ? String(scopeDefaults?.unit ?? typedValue.scopeUnit).trim()
         : fallback.scopeUnit,
     productivityOutput: toPositiveNumber(typedValue.productivityOutput, fallback.productivityOutput),
-    productivityUnit: "day",
-    workHoursPerDay: 8,
+    productivityUnit: typedValue.productivityUnit === "hour" ? "hour" : "day",
+    workHoursPerDay: toWholeNumber(typedValue.workHoursPerDay, fallback.workHoursPerDay),
     autoCalculateDuration: true,
     teamRoles: normalizedRoles.length > 0 ? normalizedRoles : fallback.teamRoles,
     assignedTeamName:
@@ -131,7 +133,12 @@ export function applyTeamTemplate(
 
 export function calculateTotalDailyOutput(config: TaskConfiguration) {
   const normalizedConfig = normalizeTaskConfiguration(config);
-  return normalizedConfig.productivityOutput * normalizedConfig.numberOfTeams;
+  const perTeamPerDayOutput =
+    normalizedConfig.productivityUnit === "hour"
+      ? normalizedConfig.productivityOutput * normalizedConfig.workHoursPerDay
+      : normalizedConfig.productivityOutput;
+
+  return perTeamPerDayOutput * normalizedConfig.numberOfTeams;
 }
 
 export function calculateRequiredDurationDays(config: TaskConfiguration) {
@@ -167,7 +174,10 @@ export function getProductivitySummary(config: TaskConfiguration) {
 
   return {
     teamLabel,
-    perTeamOutputLabel: `${normalizedConfig.productivityOutput} ${normalizedConfig.scopeUnit} per team per day`,
+    perTeamOutputLabel:
+      normalizedConfig.productivityUnit === "hour"
+        ? `${normalizedConfig.productivityOutput} ${normalizedConfig.scopeUnit} per team per hour`
+        : `${normalizedConfig.productivityOutput} ${normalizedConfig.scopeUnit} per team per day`,
     totalOutputLabel: `${totalDailyOutput} ${normalizedConfig.scopeUnit} per day`,
     durationDays: calculateRequiredDurationDays(normalizedConfig),
   };

@@ -230,6 +230,8 @@ export const scheduleService = {
           productivity_rate_per_hour: 0,
           productivity_rate_per_day: 0,
           working_hours_per_day: 8,
+          team_template_id: null,
+          number_of_teams: 1,
           team_composition: [
             { id: "mason", role: "Mason", count: 1 },
             { id: "helper", role: "Helper", count: 1 },
