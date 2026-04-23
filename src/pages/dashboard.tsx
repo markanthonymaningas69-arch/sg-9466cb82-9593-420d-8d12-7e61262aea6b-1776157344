@@ -500,8 +500,6 @@ export default function Dashboard() {
             })()}
           </DialogContent>
         </Dialog>
-        
-        <AIChatAssistant />
       </div>
     </Layout>
   );

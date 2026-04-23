@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,29 @@ interface ChatThread {
   updated_at: string;
 }
 
+function getModuleLabel(pathname: string) {
+  const routeMap: Record<string, string> = {
+    "/dashboard": "Dashboard",
+    "/projects": "Project Profile",
+    "/schedule": "Project Manager",
+    "/site-personnel": "Site Personnel",
+    "/purchasing": "Purchasing",
+    "/accounting": "Accounting",
+    "/personnel": "Human Resources",
+    "/warehouse": "Warehouse",
+    "/analytics": "Analytics",
+    "/settings": "Settings",
+    "/subscription": "Subscription",
+    "/account": "Account Settings",
+  };
+
+  if (pathname.startsWith("/bom/")) {
+    return "Project BOM";
+  }
+
+  return routeMap[pathname] || "Module";
+}
+
 export function AIChatAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -32,6 +56,17 @@ export function AIChatAssistant() {
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+
+  const router = useRouter();
+  const currentTab = typeof router.query.tab === "string" ? router.query.tab : null;
+  const currentProjectId =
+    typeof router.query.projectId === "string"
+      ? router.query.projectId
+      : typeof router.query.id === "string"
+        ? router.query.id
+        : null;
+  const currentModule = getModuleLabel(router.pathname);
+  const routeContextKey = [router.pathname, currentTab || "", currentProjectId || ""].join("::");
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -49,6 +84,12 @@ export function AIChatAssistant() {
   }, [isOpen, isMinimized, showThreads]);
 
   useEffect(() => {
+    if (isOpen) {
+      setIsDataLoaded(false);
+    }
+  }, [isOpen, routeContextKey]);
+
+  useEffect(() => {
     if (isOpen && !isDataLoaded) {
       loadData();
       loadThreads();
@@ -57,15 +98,51 @@ export function AIChatAssistant() {
 
   const loadData = async () => {
     try {
-      const [acct, ledg, liq, pers, inv, purch, projs] = await Promise.all([
-        supabase.from('vouchers').select('*').limit(100),
-        supabase.from('accounting_transactions').select('*').order('date', { ascending: false }).limit(100),
-        supabase.from('liquidations').select('*').order('date', { ascending: false }).limit(100),
-        supabase.from('personnel').select('*').limit(100),
-        supabase.from('inventory').select('*').limit(100),
-        supabase.from('purchases').select('*').order('order_date', { ascending: false }).limit(100),
-        supabase.from('projects').select('*')
+      const [
+        acct,
+        ledg,
+        liq,
+        pers,
+        inv,
+        purch,
+        projs,
+        deliveries,
+        consumptions,
+        requests,
+        advances,
+        leaves,
+        scheduleTasks,
+        attendance,
+        progressUpdates,
+        bomScopes,
+        bomMaterials,
+        bomIndirectCosts,
+      ] = await Promise.all([
+        supabase.from("vouchers").select("*").limit(200),
+        supabase.from("accounting_transactions").select("*").order("date", { ascending: false }).limit(200),
+        supabase.from("liquidations").select("*").order("date", { ascending: false }).limit(200),
+        supabase.from("personnel").select("*").limit(200),
+        supabase.from("inventory").select("*").limit(400),
+        supabase.from("purchases").select("*").order("order_date", { ascending: false }).limit(200),
+        supabase.from("projects").select("*"),
+        supabase.from("deliveries").select("*").order("delivery_date", { ascending: false }).limit(200),
+        supabase.from("material_consumption").select("*").eq("is_archived", false).order("date_used", { ascending: false }).limit(300),
+        supabase.from("site_requests").select("*").order("request_date", { ascending: false }).limit(200),
+        supabase.from("cash_advance_requests").select("*").order("request_date", { ascending: false }).limit(200),
+        supabase.from("leave_requests").select("*").order("created_at", { ascending: false }).limit(200),
+        supabase.from("project_tasks").select("*").order("sort_order", { ascending: true }).limit(500),
+        supabase.from("site_attendance").select("*").order("date", { ascending: false }).limit(300),
+        supabase.from("bom_progress_updates").select("*").order("update_date", { ascending: false }).limit(300),
+        supabase.from("bom_scope_of_work").select("*").limit(300),
+        supabase.from("bom_materials").select("*").limit(500),
+        supabase.from("bom_indirect_costs").select("*").limit(200),
       ]);
+
+      const allProjects = projs.data || [];
+      const focusedProject = currentProjectId
+        ? allProjects.find((project: { id: string }) => project.id === currentProjectId) || null
+        : null;
+
       setProjectData({
         accounting: acct.data || [],
         ledger: ledg.data || [],
@@ -73,7 +150,19 @@ export function AIChatAssistant() {
         personnel: pers.data || [],
         warehouse: inv.data || [],
         purchases: purch.data || [],
-        allProjects: projs.data || []
+        allProjects,
+        deliveries: deliveries.data || [],
+        materialConsumption: consumptions.data || [],
+        siteRequests: requests.data || [],
+        cashAdvances: advances.data || [],
+        leaveRequests: leaves.data || [],
+        scheduleTasks: scheduleTasks.data || [],
+        siteAttendance: attendance.data || [],
+        progressUpdates: progressUpdates.data || [],
+        bomScopes: bomScopes.data || [],
+        bomMaterials: bomMaterials.data || [],
+        bomIndirectCosts: bomIndirectCosts.data || [],
+        focusedProject,
       });
       setIsDataLoaded(true);
     } catch (error) {
@@ -163,7 +252,13 @@ export function AIChatAssistant() {
         body: JSON.stringify({
           message: userMessage.content,
           projectData,
-          conversationHistory: messages.slice(-10)
+          conversationHistory: messages.slice(-10),
+          uiContext: {
+            module: currentModule,
+            tab: currentTab,
+            pathname: router.pathname,
+            projectId: currentProjectId,
+          },
         })
       });
 
@@ -377,14 +472,14 @@ export function AIChatAssistant() {
                 {messages.length === 0 ? (
                   <div className="text-center text-muted-foreground py-8 space-y-3">
                     <Bot className="h-12 w-12 mx-auto opacity-50" />
-                    <p className="text-sm">I am your AI Project Expert. I have access to your entire system!</p>
+                    <p className="text-sm">I can analyze data across all modules and tabs, including the page you are currently viewing.</p>
                     <div className="text-xs space-y-1 text-left bg-background border p-3 rounded-lg shadow-sm">
                       <p className="font-medium">Try asking:</p>
                       <ul className="list-disc list-inside space-y-1 text-muted-foreground">
                         <li>Give me an overview of all projects.</li>
-                        <li>What is our current ledger balance?</li>
-                        <li>Compare Project actual cost from Accounting&apos;s records to Site Personnel&apos;s records.</li>
-                        <li>Summarize pending vouchers and liquidations.</li>
+                        <li>Analyze this module and tab based on the data currently loaded.</li>
+                        <li>Compare Project Manager schedules with Site Personnel progress and warehouse usage.</li>
+                        <li>Summarize pending vouchers, liquidations, deliveries, and requests.</li>
                       </ul>
                     </div>
                   </div>

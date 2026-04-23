@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 
 interface ChatMessage {
-  role: "user" | "assistant";
+  role: "system" | "user" | "assistant";
   content: string;
 }
 
@@ -22,18 +22,18 @@ export default async function handler(
   }
 
   try {
-    const { message, projectData, conversationHistory } = req.body;
+    const { message, projectData, conversationHistory, uiContext } = req.body;
 
     if (!message || !projectData) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
     // Build context-aware system prompt
-    const systemPrompt = buildSystemPrompt(projectData);
+    const systemPrompt = buildSystemPrompt(projectData, uiContext);
 
     // Prepare messages for OpenAI
     const messages: ChatMessage[] = [
-      { role: "assistant" as const, content: systemPrompt },
+      { role: "system", content: systemPrompt },
       ...(conversationHistory || []).map((msg: any) => ({
         role: msg.role as "user" | "assistant",
         content: msg.content
@@ -78,7 +78,7 @@ export default async function handler(
   }
 }
 
-function buildSystemPrompt(projectData: any): string {
+function buildSystemPrompt(projectData: any, uiContext?: { module?: string; tab?: string | null; pathname?: string; projectId?: string | null }): string {
   const { 
     projectName, 
     swaData, 
@@ -91,10 +91,35 @@ function buildSystemPrompt(projectData: any): string {
     personnel,
     warehouse,
     purchases,
-    allProjects
+    allProjects,
+    deliveries,
+    materialConsumption,
+    siteRequests,
+    cashAdvances,
+    leaveRequests,
+    scheduleTasks,
+    siteAttendance,
+    progressUpdates,
+    bomScopes,
+    bomMaterials,
+    bomIndirectCosts,
+    focusedProject
   } = projectData;
 
-  let prompt = `You are an AI assistant analyzing construction management system data. You have access to data across ALL modules:\n\n`;
+  let prompt = `You are an AI assistant analyzing construction management system data. You have access to data across all modules and all major tabs in the application.\n\n`;
+
+  // PROJECTS OVERVIEW
+  if (uiContext?.module || uiContext?.tab || uiContext?.pathname) {
+    prompt += `=== CURRENT USER VIEW ===\n`;
+    prompt += `Module: ${uiContext.module || "Unknown"}\n`;
+    prompt += `Tab: ${uiContext.tab || "Default"}\n`;
+    prompt += `Path: ${uiContext.pathname || "-"}\n`;
+    prompt += `Focused Project ID: ${uiContext.projectId || "All Projects"}\n`;
+    if (focusedProject?.name) {
+      prompt += `Focused Project Name: ${focusedProject.name}\n`;
+    }
+    prompt += `When the user asks about "this tab", "this module", or "current page", interpret it using this view context first.\n\n`;
+  }
 
   // PROJECTS OVERVIEW
   if (allProjects?.length > 0) {
@@ -248,8 +273,54 @@ function buildSystemPrompt(projectData: any): string {
     prompt += `Total Purchase Records: ${purchases.length}\n\n`;
   }
 
-  prompt += `===\n\n`;
-  prompt += `Provide concise, actionable insights. Use bullet points for clarity. Answer questions about any module. Identify issues, trends, and recommendations.`;
+  if (scheduleTasks?.length > 0 || progressUpdates?.length > 0 || bomScopes?.length > 0) {
+    prompt += `=== PROJECT MANAGER ===\n`;
+    prompt += `Scheduled Tasks: ${scheduleTasks?.length || 0}\n`;
+    const scheduledStatuses = Array.isArray(scheduleTasks)
+      ? scheduleTasks.reduce((acc: Record<string, number>, task: any) => {
+          const key = task.status || "unknown";
+          acc[key] = (acc[key] || 0) + 1;
+          return acc;
+        }, {})
+      : {};
+    const statusSummary = Object.entries(scheduledStatuses)
+      .map(([status, count]) => `${status}: ${count}`)
+      .join(", ");
+    if (statusSummary) {
+      prompt += `Task Statuses: ${statusSummary}\n`;
+    }
+    prompt += `BOM Scopes: ${bomScopes?.length || 0}\n`;
+    prompt += `BOM Materials: ${bomMaterials?.length || 0}\n`;
+    prompt += `Indirect Cost Lines: ${bomIndirectCosts?.length || 0}\n`;
+    prompt += `Progress Updates: ${progressUpdates?.length || 0}\n\n`;
+  }
+
+  if (deliveries?.length > 0 || materialConsumption?.length > 0 || siteRequests?.length > 0 || siteAttendance?.length > 0) {
+    prompt += `=== SITE PERSONNEL ===\n`;
+    prompt += `Deliveries: ${deliveries?.length || 0}\n`;
+    prompt += `Material Usage Logs: ${materialConsumption?.length || 0}\n`;
+    prompt += `Site Requests: ${siteRequests?.length || 0}\n`;
+    prompt += `Attendance Records: ${siteAttendance?.length || 0}\n`;
+
+    const totalConsumedItems = Array.isArray(materialConsumption)
+      ? materialConsumption.reduce((sum: number, row: any) => sum + Number(row.quantity || 0), 0)
+      : 0;
+    if (totalConsumedItems > 0) {
+      prompt += `Total Logged Material Consumption Quantity: ${totalConsumedItems}\n`;
+    }
+    prompt += `\n`;
+  }
+
+  if (cashAdvances?.length > 0 || leaveRequests?.length > 0) {
+    prompt += `=== HR & WORKFORCE REQUESTS ===\n`;
+    prompt += `Cash Advance Requests: ${cashAdvances?.length || 0}\n`;
+    prompt += `Leave Requests: ${leaveRequests?.length || 0}\n\n`;
+  }
+
+  prompt += `=== RESPONSE RULES ===\n`;
+  prompt += `Ground every answer in the provided data only. If data for a requested module or tab is missing, say so clearly.\n`;
+  prompt += `Use bullet points for clarity. Highlight issues, trends, risks, and recommendations.\n`;
+  prompt += `When relevant, connect findings across modules such as Project Manager, Site Personnel, Warehouse, Purchasing, Accounting, HR, and Analytics.\n`;
 
   return prompt;
 }
