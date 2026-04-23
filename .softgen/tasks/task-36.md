@@ -1,6 +1,6 @@
 ---
 title: Site request form refinement
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -20,9 +20,9 @@ This follow-up specifically verifies the actual source table and scope relations
 ## Checklist
 - [x] Separate materials and tools request form experiences in the Site Request dialog
 - [x] Scope-filter the materials request list from the current project material source
-- [ ] Verify the actual BOQ/BOM table and scope-linking field used by the project material items
-- [ ] Update the Material Request dropdown to use only scope-linked BOQ/BOM items for the selected scope
-- [ ] Validate that changing the selected scope updates the available material choices correctly
+- [x] Verify the actual BOQ/BOM table and scope-linking field used by the project material items
+- [x] Update the Material Request dropdown to use only scope-linked BOQ/BOM items for the selected scope
+- [x] Validate that changing the selected scope updates the available material choices correctly
 
 ## Acceptance
 In Material Request, only materials linked to the selected scope appear in the material dropdown.
