@@ -1,6 +1,6 @@
 ---
 title: Schedule view refinements
-status: done
+status: in_progress
 priority: high
 type: feature
 tags:
@@ -22,6 +22,7 @@ Latest follow-up changes:
 - make dependency connector lines thinner
 - use smaller arrow heads
 - align dependency connectors to the visual middle of each task bar
+- correct the Gantt activity bar layout when bars render out of place
 
 ## Checklist
 - [x] Remove background gridlines from the Gantt view while keeping task bars and dependency paths readable
@@ -30,6 +31,7 @@ Latest follow-up changes:
 - [x] Show manpower, materials, and tools & equipment requirements in the calendar view
 - [x] Validate the schedule page view switching and resource visibility
 - [x] Refine dependency connector styling and bar alignment in the Gantt view
+- [ ] Correct misplaced activity bar layout in the Gantt view
 
 ## Acceptance
 The Gantt view no longer shows timeline gridlines behind the bars.
