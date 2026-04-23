@@ -2502,7 +2502,7 @@ export default function SitePersonnel() {
                 </CardHeader>
                 <CardContent className="flex-1 overflow-hidden pb-4">
                   {consumptions.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg bg-gray-50">
+                    <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg bg-muted/20">
                       <p className="mb-4">No material consumption recorded yet.</p>
                     </div>
                   ) : consumptionDate ? (
@@ -2711,7 +2711,7 @@ export default function SitePersonnel() {
                       ).sort(([a], [b]) => b.localeCompare(a)).map(([dateKey, groupConsumptions]: [string, any[]]) => {
                         const isExpanded = expandedConsumptions[dateKey];
                         return (
-                          <div key={dateKey} className="border rounded-lg overflow-hidden">
+                          <div key={dateKey} className="border rounded-lg overflow-hidden bg-card">
                             <div 
                               className="bg-muted/50 p-4 flex justify-between items-center cursor-pointer hover:bg-muted transition-colors"
                               onClick={() => setExpandedConsumptions(prev => ({ ...prev, [dateKey]: !isExpanded }))}
@@ -2854,7 +2854,7 @@ export default function SitePersonnel() {
                               <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Form No:</span>
                               <span className="font-bold ml-3 text-lg text-primary">{requestForm.form_number}</span>
                             </div>
-                            <Badge variant="outline" className="text-sm px-3 py-1 bg-background">{requestForm.request_type}</Badge>
+                            <Badge variant="outline" className="text-sm px-3 py-1 bg-background text-foreground">{requestForm.request_type}</Badge>
                           </div>
 
                           <form id="request-form" onSubmit={handleRequestSubmit} className="space-y-4 pb-4">
@@ -3170,7 +3170,7 @@ export default function SitePersonnel() {
 
                     if (filteredGroups.length === 0) {
                       return (
-                        <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg bg-gray-50 mt-4">
+                        <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg bg-muted/20 mt-4">
                           <p className="mb-4">No requests found matching your filters.</p>
                         </div>
                       );
@@ -3267,7 +3267,7 @@ export default function SitePersonnel() {
                       </DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4">
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-muted/30 p-4 rounded-lg border border-border/50">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-muted/30 p-4 rounded-lg border border-border/50 text-foreground">
                         <div>
                           <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Request Type</div>
                           <div className="font-medium text-sm">
@@ -3502,14 +3502,14 @@ export default function SitePersonnel() {
 
                       if (finalData.length === 0) {
                         return (
-                          <div className="flex items-center justify-center h-full text-muted-foreground border-2 border-dashed rounded-lg bg-gray-50">
+                          <div className="flex items-center justify-center h-full text-muted-foreground border-2 border-dashed rounded-lg bg-muted/20">
                             No chart data available for the selected range.
                           </div>
                         );
                       }
 
                       return (
-                        <div className="h-full w-full min-h-[300px] border rounded-lg p-4 bg-white">
+                        <div className="h-full w-full min-h-[300px] border rounded-lg p-4 bg-card">
                           <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={finalData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                               <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -3537,7 +3537,7 @@ export default function SitePersonnel() {
 
                     if (filteredUpdates.length === 0) {
                       return (
-                        <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg bg-gray-50">
+                        <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg bg-muted/20">
                           <p>No progress updates found for the selected period.</p>
                         </div>
                       );
