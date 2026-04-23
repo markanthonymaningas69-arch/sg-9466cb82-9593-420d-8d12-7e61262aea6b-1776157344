@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Layout } from "@/components/Layout";
+import { CalendarView } from "@/components/schedule/CalendarView";
 import { GanttView } from "@/components/schedule/GanttView";
 import { TaskConfigurationPanel, type EditableProjectTask } from "@/components/schedule/TaskConfigurationPanel";
 import { Badge } from "@/components/ui/badge";
@@ -255,7 +256,7 @@ export default function SchedulePage() {
   const [selectedProject, setSelectedProject] = useState("");
   const [tasks, setTasks] = useState<EditableProjectTask[]>([]);
   const [selectedTask, setSelectedTask] = useState<EditableProjectTask | null>(null);
-  const [viewMode, setViewMode] = useState<"list" | "gantt">("list");
+  const [viewMode, setViewMode] = useState<"list" | "gantt" | "calendar">("list");
   const [manpowerRates, setManpowerRates] = useState<ManpowerRateRecord[]>([]);
   const [materialDeliveryPlansByTask, setMaterialDeliveryPlansByTask] = useState<Record<string, SaveTaskMaterialDeliveryPlanInput[]>>({});
   const [laborCostSummaries, setLaborCostSummaries] = useState<Record<string, ComputedTaskLaborCostSummary | null>>({});
@@ -267,6 +268,11 @@ export default function SchedulePage() {
   const lastSavedSignatureRef = useRef("");
   const lastSavedMaterialPlanSignatureRef = useRef<Record<string, string>>({});
   const lastSavedLaborCostSignatureRef = useRef<Record<string, string>>({});
+
+  const selectedProjectName = useMemo(
+    () => projects.find((project) => project.id === selectedProject)?.name || "Project schedule",
+    [projects, selectedProject]
+  );
 
   useEffect(() => { void loadProjects(); void loadManpowerRates(); }, []);
   useEffect(() => { if (selectedProject) { void loadTasks(selectedProject); } else { setTasks([]); setSelectedTask(null); setLoading(false); } }, [selectedProject]);
@@ -489,6 +495,14 @@ export default function SchedulePage() {
               >
                 Gantt View
               </Button>
+              <Button
+                type="button"
+                variant={viewMode === "calendar" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("calendar")}
+              >
+                Resource Calendar
+              </Button>
             </div>
             <Select value={selectedProject} onValueChange={setSelectedProject}>
               <SelectTrigger className="w-full sm:w-[260px]">
@@ -514,7 +528,7 @@ export default function SchedulePage() {
 
         <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
           <Card>
-            <CardHeader><CardTitle>{viewMode === "gantt" ? "Gantt View" : "Task List"}</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{viewMode === "gantt" ? "Gantt View" : viewMode === "calendar" ? "Resource Calendar" : "Task List"}</CardTitle></CardHeader>
             <CardContent>
               {!selectedProject ? (
                 <p className="text-sm text-muted-foreground">Select a project to manage task schedule, resources, and cost planning.</p>
@@ -524,6 +538,8 @@ export default function SchedulePage() {
                 <p className="text-sm text-muted-foreground">No tasks yet. Sync the BOM or add a task manually.</p>
               ) : viewMode === "gantt" ? (
                 <GanttView tasks={tasks} />
+              ) : viewMode === "calendar" ? (
+                <CalendarView tasks={tasks} projectName={selectedProjectName} />
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
