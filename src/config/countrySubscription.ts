@@ -8,6 +8,9 @@ export interface CountrySubscriptionConfig {
   currencyCode: string;
   currencyLocale: string;
   paymentLink: string | null;
+  paymentMethodLabel: string;
+  checkoutLabel: string;
+  helperText: string;
 }
 
 export const COUNTRY_SUBSCRIPTION_CONFIG: Record<SupportedCountry, CountrySubscriptionConfig> = {
@@ -16,14 +19,20 @@ export const COUNTRY_SUBSCRIPTION_CONFIG: Record<SupportedCountry, CountrySubscr
     paymentProvider: "stripe",
     currencyCode: "AED",
     currencyLocale: "en-AE",
-    paymentLink: null
+    paymentLink: null,
+    paymentMethodLabel: "Card payment via Stripe",
+    checkoutLabel: "Confirm & Pay",
+    helperText: "Your subscription is processed through the current Stripe billing flow."
   },
   Philippines: {
     country: "Philippines",
     paymentProvider: "gcash_link",
     currencyCode: "PHP",
     currencyLocale: "en-PH",
-    paymentLink: null
+    paymentLink: null,
+    paymentMethodLabel: "GCash payment link",
+    checkoutLabel: "Open GCash Payment",
+    helperText: "Philippines accounts use a country-specific GCash payment flow. Add-on numeric values stay the same and only the currency presentation changes to Peso."
   }
 };
 

@@ -192,6 +192,9 @@ export default function Subscription() {
   };
 
   const selectedPlanConfig = plans.find(p => p.id === selectedPlan);
+  const countrySubscriptionConfig = getCountrySubscriptionConfig(accountCountry);
+  const stripeSubscriptionEnabled = usesStripeSubscription(accountCountry);
+  const manualPaymentEnabled = usesManualPaymentLink(accountCountry);
   const formatAccountCurrency = (value: number) =>
     formatCountryCurrency(value, accountCountry, {
       minimumFractionDigits: 0,
@@ -236,8 +239,37 @@ export default function Subscription() {
 
   const handleCheckout = async () => {
     setIsCheckingOut(true);
-    
+
     try {
+      if (!isSupportedCountry(accountCountry)) {
+        throw new Error(OUT_OF_SERVICE_MESSAGE);
+      }
+
+      if (manualPaymentEnabled) {
+        if (!countrySubscriptionConfig.paymentLink) {
+          toast({
+            title: "GCash setup pending",
+            description: "The Philippines payment link has not been configured yet.",
+            variant: "destructive"
+          });
+          setIsCheckingOut(false);
+          return;
+        }
+
+        if (window.self !== window.top) {
+          window.open(countrySubscriptionConfig.paymentLink, "_blank");
+          toast({
+            title: "Payment Opened",
+            description: "The GCash payment link has opened in a new tab."
+          });
+          setIsCheckingOut(false);
+          return;
+        }
+
+        window.location.href = countrySubscriptionConfig.paymentLink;
+        return;
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) {
         toast({
@@ -253,10 +285,6 @@ export default function Subscription() {
       const finalFeatures = { ...(subscriptionDetails?.features || {}) };
       for (const [id, newQty] of Object.entries(addOnQuantities)) {
         finalFeatures[id] = Number(finalFeatures[id] || 0) + Number(newQty);
-      }
-
-      if (!isSupportedCountry(accountCountry)) {
-        throw new Error(OUT_OF_SERVICE_MESSAGE);
       }
 
       const response = await fetch("/api/stripe/checkout", {
@@ -277,11 +305,11 @@ export default function Subscription() {
       });
 
       const data = await response.json();
-      
+
       if (data.url) {
         // Stripe blocks iframes (like our preview). Open in new tab if in iframe.
         if (window.self !== window.top) {
-          window.open(data.url, '_blank');
+          window.open(data.url, "_blank");
           setIsCheckingOut(false);
           toast({
             title: "Checkout Opened",
@@ -296,8 +324,8 @@ export default function Subscription() {
     } catch (error: any) {
       console.error("Checkout Error:", error);
       toast({
-        title: "Checkout Error",
-        description: error.message || "An unexpected error occurred. Check if Stripe keys are set.",
+        title: manualPaymentEnabled ? "Payment Error" : "Checkout Error",
+        description: error.message || "An unexpected error occurred while starting payment.",
         variant: "destructive"
       });
       setIsCheckingOut(false);
@@ -305,6 +333,14 @@ export default function Subscription() {
   };
 
   const handleManageBilling = async () => {
+    if (!stripeSubscriptionEnabled) {
+      toast({
+        title: "Billing managed by country flow",
+        description: `${accountCountry} subscriptions do not use the Stripe billing portal.`,
+      });
+      return;
+    }
+
     setIsManagingBilling(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -461,7 +497,7 @@ export default function Subscription() {
                   <Badge variant={isLocked ? "destructive" : "secondary"}>{isLocked ? "Expired" : "Active"}</Badge>
                 </div>
                 <p className="text-sm text-muted-foreground flex items-center gap-2">
-                  <span>Since: {subscriptionDetails?.start_date ? new Date(subscriptionDetails.start_date).toLocaleDateString() : 'N/A'}</span>
+                  <span>Since: {subscriptionDetails?.start_date ? new Date(subscriptionDetails.start_date).toLocaleDateString() : "N/A"}</span>
                   <span>•</span>
                   <span className={isLocked ? "text-destructive font-medium" : "text-primary font-medium"}>
                     Expires: {getExpirationDate(subscriptionDetails?.start_date, subscriptionDetails?.end_date)}
@@ -470,7 +506,7 @@ export default function Subscription() {
               </div>
               <div className="text-right">
                 <div className="text-3xl font-bold">
-                  AED {trueActiveAmount}
+                  {formatAccountCurrency(trueActiveAmount)}
                 </div>
                 <p className="text-sm text-muted-foreground">per {isActiveAnnual ? "year" : "month"}</p>
               </div>
@@ -540,6 +576,24 @@ export default function Subscription() {
             )}
           </CardContent>
         </Card>
+
+        {manualPaymentEnabled && (
+          <Card className="border-primary/20 bg-primary/5">
+            <CardHeader>
+              <CardTitle>Philippines Subscription Flow</CardTitle>
+              <CardDescription>{countrySubscriptionConfig.paymentMethodLabel}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <p>{countrySubscriptionConfig.helperText}</p>
+              <p>All prices on this page are shown in Peso when Philippines is the active country.</p>
+              {!countrySubscriptionConfig.paymentLink && (
+                <p className="font-medium text-destructive">
+                  GCash payment link is not configured yet. Add the payment link when ready to activate checkout.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Global Billing Toggle */}
         <div className="flex items-center justify-center gap-4 bg-muted/30 py-4 rounded-xl border border-border/50">
@@ -654,7 +708,7 @@ export default function Subscription() {
                   </CardHeader>
                   <CardContent className="pb-4 flex-1">
                     <div className="text-3xl font-bold text-primary tracking-tight">
-                      AED {getAddOnPrice(addon, accountCountry, billingCycle)}
+                      {formatAccountCurrency(getAddOnPrice(addon, accountCountry, billingCycle))}
                       <span className="text-base font-medium text-muted-foreground">/{billingCycle === "monthly" ? "mo" : "yr"}</span>
                     </div>
                     {!isUnavailable && <div className="text-sm text-muted-foreground mt-2 font-medium">Max Limit: {limit} seat{limit !== 1 ? 's' : ''} {activeQty > 0 ? `(${activeQty} active)` : ''}</div>}
@@ -687,7 +741,7 @@ export default function Subscription() {
                     {isSelected && (
                       <div className="w-full text-center flex flex-col items-center mt-1">
                         <span className="text-sm font-medium text-primary">
-                          Subtotal: AED {getAddOnPrice(addon, accountCountry, billingCycle) * newQty}
+                          Subtotal: {formatAccountCurrency(getAddOnPrice(addon, accountCountry, billingCycle) * newQty)}
                         </span>
                         <span className="text-[10px] font-medium text-muted-foreground mt-0.5">
                           Valid until {newItemsExpiryDate}
@@ -718,7 +772,7 @@ export default function Subscription() {
                           {isSelectingSamePlanAndCycle && isLocked && <Badge variant="outline" className="ml-2 text-[10px] bg-warning/10 text-warning border-warning/20">Renewal</Badge>}
                         </span>
                         <span className="font-medium text-foreground">
-                          {isSelectingSamePlanAndCycle && !isLocked ? "AED 0" : `AED ${basePriceToCharge}`}
+                          {isSelectingSamePlanAndCycle && !isLocked ? formatAccountCurrency(0) : formatAccountCurrency(basePriceToCharge)}
                         </span>
                       </>
                     ) : (
@@ -737,7 +791,7 @@ export default function Subscription() {
                       <div key={`new-${addon.id}`} className="flex flex-col text-muted-foreground max-w-sm pl-2 border-l-2 border-primary/20 ml-1">
                         <div className="flex justify-between items-center">
                           <span className="text-sm">+ {newQty}x {addon.name}</span>
-                          <span className="font-medium text-foreground text-sm">AED {price * newQty}</span>
+                          <span className="font-medium text-foreground text-sm">{formatAccountCurrency(price * newQty)}</span>
                         </div>
                         <span className="text-[10px] mt-0.5">Valid until {newItemsExpiryDate}</span>
                       </div>
@@ -748,7 +802,7 @@ export default function Subscription() {
                   {proratedDiscount > 0 && (
                     <div className="flex justify-between text-success max-w-sm mt-2 pt-2 border-t border-success/20">
                       <span className="font-medium">Unused Balance Credit ({daysRemaining} days)</span>
-                      <span className="font-bold">- AED {proratedDiscount}</span>
+                      <span className="font-bold">- {formatAccountCurrency(proratedDiscount)}</span>
                     </div>
                   )}
                 </div>
@@ -763,14 +817,19 @@ export default function Subscription() {
                   size="lg" 
                   className="h-16 px-8 text-lg font-bold w-full sm:w-auto shadow-md hover:shadow-lg transition-all"
                   onClick={handleCheckout}
-                  disabled={isCheckingOut || !selectedPlan || (totalAmountDueToday === 0 && !isSelectingSamePlanAndCycle)}
+                  disabled={
+                    isCheckingOut ||
+                    !selectedPlan ||
+                    (totalAmountDueToday === 0 && !isSelectingSamePlanAndCycle) ||
+                    (manualPaymentEnabled && !countrySubscriptionConfig.paymentLink)
+                  }
                 >
                   {isCheckingOut ? (
                     <Loader2 className="mr-2 h-6 w-6 animate-spin" />
                   ) : (
                     <ShoppingCart className="mr-2 h-6 w-6" />
                   )}
-                  {isCheckingOut ? "Processing..." : "Confirm & Pay"}
+                  {isCheckingOut ? "Processing..." : countrySubscriptionConfig.checkoutLabel}
                 </Button>
               </div>
             </CardContent>
@@ -817,7 +876,7 @@ export default function Subscription() {
                       </div>
                       <div className="text-right flex items-center gap-4">
                         <div>
-                          <div className="font-bold text-lg">AED {bill.amount}</div>
+                          <div className="font-bold text-lg">{formatAccountCurrency(Number(bill.amount || 0))}</div>
                           <Badge variant="outline" className="text-success capitalize mt-1">
                             {bill.status}
                           </Badge>

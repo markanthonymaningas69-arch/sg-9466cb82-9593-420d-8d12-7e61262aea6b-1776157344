@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { stripe } from "@/lib/stripe";
+import { usesStripeSubscription } from "@/config/countrySubscription";
 import { addOns, getAddOnPrice, getAvailableBillingCycles, getPlanPrice, isSupportedCountry, OUT_OF_SERVICE_MESSAGE, plans } from "@/config/pricing";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -20,6 +21,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!getAvailableBillingCycles(country).includes(billingCycle)) {
       return res.status(400).json({ error: "The selected billing cycle is not available for this country." });
+    }
+
+    if (!usesStripeSubscription(country)) {
+      return res.status(400).json({ error: "The selected country uses a manual payment flow." });
     }
 
     const plan = plans.find((p) => p.id === planId);

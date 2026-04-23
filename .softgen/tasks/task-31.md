@@ -19,11 +19,11 @@ Build a country-specific subscription architecture so the subscription page beha
 GCash payment details have not been provided yet, so the Philippines payment action should be implemented in a configurable way and remain safe when no payment URL is configured.
 
 ## Checklist
-- [ ] Add shared country payment/subscription configuration for future country expansion
-- [ ] Update subscription page to branch by active account country
-- [ ] Activate a Philippines-specific subscription experience with Peso display
-- [ ] Keep add-on numeric values the same and only switch currency presentation for Philippines
-- [ ] Route UAE users through the current payment flow and isolate Philippines from Stripe checkout
+- [x] Add shared country payment/subscription configuration for future country expansion
+- [x] Update subscription page to branch by active account country
+- [x] Activate a Philippines-specific subscription experience with Peso display
+- [x] Keep add-on numeric values the same and only switch currency presentation for Philippines
+- [x] Route UAE users through the current payment flow and isolate Philippines from Stripe checkout
 - [ ] Validate the subscription page compiles cleanly
 
 ## Acceptance
