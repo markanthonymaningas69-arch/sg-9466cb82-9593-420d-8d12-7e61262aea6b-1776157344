@@ -2232,18 +2232,18 @@ export default function SitePersonnel() {
                     }
                     
                     return (
-                      <div className="flex flex-col h-full bg-white relative rounded-md border">
-                        <div className="p-3 border-b bg-gray-50 flex gap-4 sticky top-0 z-20">
+                      <div className="flex flex-col h-full bg-card relative rounded-md border">
+                        <div className="p-3 border-b bg-muted/40 flex gap-4 sticky top-0 z-20">
                           <div className="flex-1 max-w-sm">
                             <Input 
                               placeholder="Search item name..." 
                               value={warehouseSearch} 
                               onChange={(e) => setWarehouseSearch(e.target.value)} 
-                              className="bg-white"
+                              className="bg-background"
                             />
                           </div>
                           <Select value={warehouseTypeFilter} onValueChange={setWarehouseTypeFilter}>
-                            <SelectTrigger className="w-[200px] bg-white">
+                            <SelectTrigger className="w-[200px] bg-background">
                               <SelectValue placeholder="All Types" />
                             </SelectTrigger>
                             <SelectContent>
@@ -2256,30 +2256,30 @@ export default function SitePersonnel() {
                         </div>
                         <div className="overflow-y-auto flex-1">
                           <Table>
-                            <TableHeader className="sticky top-0 bg-gray-100 z-10 border-b shadow-sm">
+                            <TableHeader className="sticky top-0 bg-muted/80 z-10 border-b shadow-sm backdrop-blur">
                               <TableRow>
-                                <TableHead className="font-bold text-black">Item Name</TableHead>
-                                <TableHead className="font-bold text-black">Type</TableHead>
-                                <TableHead className="text-right font-bold text-blue-700 bg-blue-50 border-l">Total Received</TableHead>
-                                <TableHead className="text-right font-bold text-orange-700 bg-orange-50">Total Consumed</TableHead>
-                                <TableHead className="text-right font-bold text-green-700 bg-green-50 border-r">Current Balance</TableHead>
+                                <TableHead className="font-bold text-foreground">Item Name</TableHead>
+                                <TableHead className="font-bold text-foreground">Type</TableHead>
+                                <TableHead className="text-right font-bold text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 border-l">Total Received</TableHead>
+                                <TableHead className="text-right font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40">Total Consumed</TableHead>
+                                <TableHead className="text-right font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border-r">Current Balance</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
                               {finalItems.map((item: InventoryItem, idx: number) => (
                                 <TableRow key={idx} className="hover:bg-muted/50">
-                                  <TableCell className="font-medium text-black">{item.name}</TableCell>
+                                  <TableCell className="font-medium text-foreground">{item.name}</TableCell>
                                   <TableCell>
-                                    <Badge variant="outline" className="text-xs bg-gray-50">{item.category}</Badge>
+                                    <Badge variant="outline" className="text-xs bg-muted/40 text-foreground">{item.category}</Badge>
                                   </TableCell>
-                                  <TableCell className="text-right font-semibold text-blue-700 bg-blue-50/30 border-l">
-                                    {item.received} <span className="text-xs text-blue-400 font-normal">{item.unit}</span>
+                                  <TableCell className="text-right font-semibold text-sky-700 dark:text-sky-300 bg-sky-50/60 dark:bg-sky-950/20 border-l">
+                                    {item.received} <span className="text-xs text-sky-500 dark:text-sky-300/80 font-normal">{item.unit}</span>
                                   </TableCell>
-                                  <TableCell className="text-right font-semibold text-orange-700 bg-orange-50/30">
-                                    {item.consumed} <span className="text-xs text-orange-400 font-normal">{item.unit}</span>
+                                  <TableCell className="text-right font-semibold text-amber-700 dark:text-amber-300 bg-amber-50/60 dark:bg-amber-950/20">
+                                    {item.consumed} <span className="text-xs text-amber-500 dark:text-amber-300/80 font-normal">{item.unit}</span>
                                   </TableCell>
-                                  <TableCell className={`text-right font-bold text-lg border-r ${item.balance < 0 ? 'text-red-600 bg-red-50/30' : 'text-green-700 bg-green-50/30'}`}>
-                                    {item.balance} <span className={`text-xs font-normal ${item.balance < 0 ? 'text-red-400' : 'text-green-500'}`}>{item.unit}</span>
+                                  <TableCell className={`text-right font-bold text-lg border-r ${item.balance < 0 ? 'text-red-700 dark:text-red-300 bg-red-50/60 dark:bg-red-950/20' : 'text-emerald-700 dark:text-emerald-300 bg-emerald-50/60 dark:bg-emerald-950/20'}`}>
+                                    {item.balance} <span className={`text-xs font-normal ${item.balance < 0 ? 'text-red-500 dark:text-red-300/80' : 'text-emerald-500 dark:text-emerald-300/80'}`}>{item.unit}</span>
                                   </TableCell>
                                 </TableRow>
                               ))}
