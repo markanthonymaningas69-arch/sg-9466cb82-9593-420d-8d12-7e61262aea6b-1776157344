@@ -1,6 +1,6 @@
 ---
 title: Country-specific subscription flow
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -24,7 +24,7 @@ GCash payment details have not been provided yet, so the Philippines payment act
 - [x] Activate a Philippines-specific subscription experience with Peso display
 - [x] Keep add-on numeric values the same and only switch currency presentation for Philippines
 - [x] Route UAE users through the current payment flow and isolate Philippines from Stripe checkout
-- [ ] Validate the subscription page compiles cleanly
+- [x] Validate the subscription page compiles cleanly
 
 ## Acceptance
 When the active country is Philippines, the subscription page shows the Philippines-specific flow with Peso currency.
