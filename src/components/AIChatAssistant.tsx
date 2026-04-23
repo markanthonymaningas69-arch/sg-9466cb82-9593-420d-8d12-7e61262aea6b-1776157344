@@ -1,24 +1,44 @@
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
+import { Bot, List, Loader2, Minus, Send, Trash2, User, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { X, Send, Bot, User, Loader2, MessageSquare, Minus, Maximize2, List, Plus, Pencil, Trash2, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
-  timestamp: Date;
+  timestamp: string;
 }
 
 interface ChatThread {
   id: string;
   title: string;
   messages: Message[];
-  updated_at: string;
+  updatedAt: string;
 }
+
+type DockMode = "float" | "left" | "right" | "bottom-left" | "bottom-right";
+type ResizeMode = "right" | "bottom" | "corner";
+
+interface WindowState {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  dock: DockMode;
+  collapsed: boolean;
+}
+
+const MARGIN = 16;
+const MIN_WIDTH = 360;
+const MIN_HEIGHT = 420;
+const DEFAULT_WIDTH = 420;
+const DEFAULT_HEIGHT = 620;
+const SNAP_DISTANCE = 24;
+const MAX_THREADS = 20;
 
 function getModuleLabel(pathname: string) {
   const routeMap: Record<string, string> = {
@@ -43,205 +63,235 @@ function getModuleLabel(pathname: string) {
   return routeMap[pathname] || "Module";
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function getViewport() {
+  return {
+    width: window.innerWidth,
+    height: window.innerHeight,
+  };
+}
+
+function getDockedState(dock: DockMode, current: WindowState): WindowState {
+  const viewport = getViewport();
+  const width = clamp(current.width, MIN_WIDTH, Math.max(MIN_WIDTH, viewport.width - MARGIN * 2));
+  const height =
+    dock === "left" || dock === "right"
+      ? clamp(viewport.height - MARGIN * 2, MIN_HEIGHT, viewport.height - MARGIN * 2)
+      : clamp(current.height, MIN_HEIGHT, Math.max(MIN_HEIGHT, viewport.height - MARGIN * 2));
+
+  if (dock === "left") {
+    return { ...current, dock, width, height, x: MARGIN, y: MARGIN };
+  }
+
+  if (dock === "right") {
+    return { ...current, dock, width, height, x: viewport.width - width - MARGIN, y: MARGIN };
+  }
+
+  if (dock === "bottom-left") {
+    return { ...current, dock, width, height, x: MARGIN, y: viewport.height - height - MARGIN };
+  }
+
+  return { ...current, dock: "bottom-right", width, height, x: viewport.width - width - MARGIN, y: viewport.height - height - MARGIN };
+}
+
+function constrainWindow(state: WindowState): WindowState {
+  const viewport = getViewport();
+  const width = clamp(state.width, MIN_WIDTH, Math.max(MIN_WIDTH, viewport.width - MARGIN * 2));
+  const height = clamp(state.height, MIN_HEIGHT, Math.max(MIN_HEIGHT, viewport.height - MARGIN * 2));
+
+  return {
+    ...state,
+    width,
+    height,
+    x: clamp(state.x, MARGIN, Math.max(MARGIN, viewport.width - width - MARGIN)),
+    y: clamp(state.y, MARGIN, Math.max(MARGIN, viewport.height - height - MARGIN)),
+  };
+}
+
+function getSnapDock(state: WindowState): DockMode {
+  const viewport = getViewport();
+  const nearLeft = state.x <= SNAP_DISTANCE;
+  const nearRight = viewport.width - (state.x + state.width) <= SNAP_DISTANCE;
+  const nearBottom = viewport.height - (state.y + state.height) <= SNAP_DISTANCE;
+
+  if (nearLeft && nearBottom) return "bottom-left";
+  if (nearRight && nearBottom) return "bottom-right";
+  if (nearLeft) return "left";
+  if (nearRight) return "right";
+  return "float";
+}
+
 export function AIChatAssistant() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
+  const router = useRouter();
+  const isMobile = useIsMobile();
+  const currentTab = typeof router.query.tab === "string" ? router.query.tab : null;
+  const currentProjectId = typeof router.query.projectId === "string" ? router.query.projectId : typeof router.query.id === "string" ? router.query.id : null;
+  const currentModule = getModuleLabel(router.pathname);
+  const routeContextKey = [router.pathname, currentTab || "", currentProjectId || ""].join("::");
+
+  const [storageKey, setStorageKey] = useState("ai_assistant_window_anon");
+  const [threadKey, setThreadKey] = useState("ai_threads_anon");
+  const [windowState, setWindowState] = useState<WindowState>({ x: 0, y: 0, width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT, dock: "bottom-right", collapsed: true });
+  const [isReady, setIsReady] = useState(false);
   const [showThreads, setShowThreads] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [projectData, setProjectData] = useState<any>({});
+  const [projectData, setProjectData] = useState<Record<string, unknown>>({});
   const [isDataLoaded, setIsDataLoaded] = useState(false);
-  const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
-  const [editTitle, setEditTitle] = useState("");
 
-  const router = useRouter();
-  const currentTab = typeof router.query.tab === "string" ? router.query.tab : null;
-  const currentProjectId =
-    typeof router.query.projectId === "string"
-      ? router.query.projectId
-      : typeof router.query.id === "string"
-        ? router.query.id
-        : null;
-  const currentModule = getModuleLabel(router.pathname);
-  const routeContextKey = [router.pathname, currentTab || "", currentProjectId || ""].join("::");
-
+  const dragRef = useRef({ offsetX: 0, offsetY: 0 });
+  const resizeRef = useRef({ mode: "corner" as ResizeMode, width: 0, height: 0, x: 0, y: 0 });
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    void supabase.auth.getSession().then(({ data }) => {
+      const userId = data.session?.user?.id || "anon";
+      setStorageKey(`ai_assistant_window_${userId}`);
+      setThreadKey(`ai_threads_${userId}`);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = localStorage.getItem(storageKey);
+    const base = getDockedState("bottom-right", { x: 0, y: 0, width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT, dock: "bottom-right", collapsed: true });
+
+    if (!saved) {
+      setWindowState(base);
+      setIsReady(true);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(saved) as WindowState;
+      const nextState = parsed.dock === "float" ? constrainWindow(parsed) : getDockedState(parsed.dock, parsed);
+      setWindowState(nextState);
+    } catch {
+      setWindowState(base);
+    } finally {
+      setIsReady(true);
+    }
+  }, [storageKey]);
+
+  useEffect(() => {
+    if (!isReady || typeof window === "undefined" || isMobile) return;
+    localStorage.setItem(storageKey, JSON.stringify(windowState));
+  }, [isReady, isMobile, storageKey, windowState]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = localStorage.getItem(threadKey);
+    if (!saved) return;
+
+    try {
+      const parsed = JSON.parse(saved) as ChatThread[];
+      setThreads(parsed);
+    } catch {
+      setThreads([]);
+    }
+  }, [threadKey]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(threadKey, JSON.stringify(threads));
+  }, [threadKey, threads]);
 
   useEffect(() => {
     if (scrollRef.current && !showThreads) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, showThreads, isOpen, isMinimized]);
+  }, [messages, showThreads, windowState.collapsed]);
 
   useEffect(() => {
-    if (isOpen && !isMinimized && !showThreads && inputRef.current) {
+    if (!windowState.collapsed && !showThreads && inputRef.current) {
       inputRef.current.focus();
     }
-  }, [isOpen, isMinimized, showThreads]);
+  }, [showThreads, windowState.collapsed]);
 
   useEffect(() => {
-    if (isOpen) {
-      setIsDataLoaded(false);
-    }
-  }, [isOpen, routeContextKey]);
+    setIsDataLoaded(false);
+  }, [routeContextKey]);
 
   useEffect(() => {
-    if (isOpen && !isDataLoaded) {
-      loadData();
-      loadThreads();
+    if (!windowState.collapsed && !isDataLoaded) {
+      void loadData();
     }
-  }, [isOpen, isDataLoaded]);
+  }, [isDataLoaded, windowState.collapsed]);
 
-  const loadData = async () => {
-    try {
-      const [
-        acct,
-        ledg,
-        liq,
-        pers,
-        inv,
-        purch,
-        projs,
-        deliveries,
-        consumptions,
-        requests,
-        advances,
-        leaves,
-        scheduleTasks,
-        attendance,
-        progressUpdates,
-        bomScopes,
-        bomMaterials,
-        bomIndirectCosts,
-      ] = await Promise.all([
-        supabase.from("vouchers").select("*").limit(200),
-        supabase.from("accounting_transactions").select("*").order("date", { ascending: false }).limit(200),
-        supabase.from("liquidations").select("*").order("date", { ascending: false }).limit(200),
-        supabase.from("personnel").select("*").limit(200),
-        supabase.from("inventory").select("*").limit(400),
-        supabase.from("purchases").select("*").order("order_date", { ascending: false }).limit(200),
-        supabase.from("projects").select("*"),
-        supabase.from("deliveries").select("*").order("delivery_date", { ascending: false }).limit(200),
-        supabase.from("material_consumption").select("*").eq("is_archived", false).order("date_used", { ascending: false }).limit(300),
-        supabase.from("site_requests").select("*").order("request_date", { ascending: false }).limit(200),
-        supabase.from("cash_advance_requests").select("*").order("request_date", { ascending: false }).limit(200),
-        supabase.from("leave_requests").select("*").order("created_at", { ascending: false }).limit(200),
-        supabase.from("project_tasks").select("*").order("sort_order", { ascending: true }).limit(500),
-        supabase.from("site_attendance").select("*").order("date", { ascending: false }).limit(300),
-        supabase.from("bom_progress_updates").select("*").order("update_date", { ascending: false }).limit(300),
-        supabase.from("bom_scope_of_work").select("*").limit(300),
-        supabase.from("bom_materials").select("*").limit(500),
-        supabase.from("bom_indirect_costs").select("*").limit(200),
-      ]);
+  useEffect(() => {
+    if (typeof window === "undefined" || isMobile) return;
+    const handleResize = () => setWindowState((current) => (current.dock === "float" ? constrainWindow(current) : getDockedState(current.dock, current)));
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [isMobile]);
 
-      const allProjects = projs.data || [];
-      const focusedProject = currentProjectId
-        ? allProjects.find((project: { id: string }) => project.id === currentProjectId) || null
-        : null;
+  async function loadData() {
+    const [vouchers, ledger, liquidations, personnel, inventory, purchases, projects, deliveries, consumptions, requests, advances, leaves, tasks, attendance, progress] = await Promise.all([
+      supabase.from("vouchers").select("*").limit(200),
+      supabase.from("accounting_transactions").select("*").order("date", { ascending: false }).limit(200),
+      supabase.from("liquidations").select("*").order("date", { ascending: false }).limit(200),
+      supabase.from("personnel").select("*").limit(200),
+      supabase.from("inventory").select("*").limit(400),
+      supabase.from("purchases").select("*").order("order_date", { ascending: false }).limit(200),
+      supabase.from("projects").select("*"),
+      supabase.from("deliveries").select("*").order("delivery_date", { ascending: false }).limit(200),
+      supabase.from("material_consumption").select("*").eq("is_archived", false).order("date_used", { ascending: false }).limit(300),
+      supabase.from("site_requests").select("*").order("request_date", { ascending: false }).limit(200),
+      supabase.from("cash_advance_requests").select("*").order("request_date", { ascending: false }).limit(200),
+      supabase.from("leave_requests").select("*").order("created_at", { ascending: false }).limit(200),
+      supabase.from("project_tasks").select("*").order("sort_order", { ascending: true }).limit(500),
+      supabase.from("site_attendance").select("*").order("date", { ascending: false }).limit(300),
+      supabase.from("bom_progress_updates").select("*").order("update_date", { ascending: false }).limit(300),
+    ]);
 
-      setProjectData({
-        accounting: acct.data || [],
-        ledger: ledg.data || [],
-        liquidations: liq.data || [],
-        personnel: pers.data || [],
-        warehouse: inv.data || [],
-        purchases: purch.data || [],
-        allProjects,
-        deliveries: deliveries.data || [],
-        materialConsumption: consumptions.data || [],
-        siteRequests: requests.data || [],
-        cashAdvances: advances.data || [],
-        leaveRequests: leaves.data || [],
-        scheduleTasks: scheduleTasks.data || [],
-        siteAttendance: attendance.data || [],
-        progressUpdates: progressUpdates.data || [],
-        bomScopes: bomScopes.data || [],
-        bomMaterials: bomMaterials.data || [],
-        bomIndirectCosts: bomIndirectCosts.data || [],
-        focusedProject,
-      });
-      setIsDataLoaded(true);
-    } catch (error) {
-      console.error("Failed to load AI context data:", error);
-    }
-  };
+    setProjectData({
+      accounting: vouchers.data || [],
+      ledger: ledger.data || [],
+      liquidations: liquidations.data || [],
+      personnel: personnel.data || [],
+      warehouse: inventory.data || [],
+      purchases: purchases.data || [],
+      projects: projects.data || [],
+      deliveries: deliveries.data || [],
+      materialConsumption: consumptions.data || [],
+      siteRequests: requests.data || [],
+      cashAdvances: advances.data || [],
+      leaveRequests: leaves.data || [],
+      tasks: tasks.data || [],
+      attendance: attendance.data || [],
+      progress: progress.data || [],
+    });
+    setIsDataLoaded(true);
+  }
 
-  const MAX_THREADS = 20;
+  const floatingButtonStyle = useMemo(() => {
+    if (isMobile) return undefined;
+    return { left: windowState.x, top: windowState.y };
+  }, [isMobile, windowState.x, windowState.y]);
 
-  const getStorageKey = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    return `ai_threads_${session?.user?.id || 'anon'}`;
-  };
+  function persistThread(newMessages: Message[]) {
+    setThreads((current) => {
+      const nextId = currentThreadId || `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const title = (newMessages[0]?.content || "New chat").slice(0, 36);
+      const nextThread: ChatThread = { id: nextId, title, messages: newMessages, updatedAt: new Date().toISOString() };
+      setCurrentThreadId(nextId);
+      return [nextThread, ...current.filter((thread) => thread.id !== nextId)].slice(0, MAX_THREADS);
+    });
+  }
 
-  const loadThreads = async () => {
-    const key = await getStorageKey();
-    const saved = localStorage.getItem(key);
-    
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        const restored = parsed.map((t: any) => ({
-          ...t,
-          messages: t.messages.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }))
-        }));
-        setThreads(restored);
-      } catch (e) {
-        console.error("Failed to parse local threads", e);
-      }
-    }
-  };
-
-  const saveThread = async (newMessages: Message[]) => {
-    const key = await getStorageKey();
-    let updatedThreads = [...threads];
-
-    if (!currentThreadId && newMessages.length > 0) {
-      const title = newMessages[0].content.substring(0, 30) + "...";
-      const newThreadId = Date.now().toString() + Math.random().toString(36).substring(2);
-      
-      const newThread: ChatThread = {
-        id: newThreadId,
-        title,
-        messages: newMessages,
-        updated_at: new Date().toISOString()
-      };
-      
-      setCurrentThreadId(newThreadId);
-      updatedThreads = [newThread, ...updatedThreads];
-    } else if (currentThreadId) {
-      updatedThreads = updatedThreads.map(t => 
-        t.id === currentThreadId 
-          ? { ...t, messages: newMessages, updated_at: new Date().toISOString() }
-          : t
-      );
-      // Sort to bring recently updated thread to the top
-      updatedThreads.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-    }
-
-    // Auto-delete old threads to save browser memory
-    if (updatedThreads.length > MAX_THREADS) {
-      updatedThreads = updatedThreads.slice(0, MAX_THREADS);
-    }
-
-    setThreads(updatedThreads);
-    localStorage.setItem(key, JSON.stringify(updatedThreads));
-  };
-
-  const sendMessage = async () => {
+  async function sendMessage() {
     if (!input.trim() || isLoading) return;
-
-    const userMessage: Message = {
-      role: "user",
-      content: input.trim(),
-      timestamp: new Date()
-    };
-
-    const currentMessages = [...messages, userMessage];
-    setMessages(currentMessages);
+    const userMessage: Message = { role: "user", content: input.trim(), timestamp: new Date().toISOString() };
+    const nextMessages = [...messages, userMessage];
+    setMessages(nextMessages);
     setInput("");
     setIsLoading(true);
 
@@ -249,298 +299,195 @@ export function AIChatAssistant() {
       const response = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: userMessage.content,
-          projectData,
-          conversationHistory: messages.slice(-10),
-          uiContext: {
-            module: currentModule,
-            tab: currentTab,
-            pathname: router.pathname,
-            projectId: currentProjectId,
-          },
-        })
+        body: JSON.stringify({ message: userMessage.content, projectData, conversationHistory: messages.slice(-10), uiContext: { module: currentModule, tab: currentTab, pathname: router.pathname, projectId: currentProjectId } }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to get AI response");
-      }
-
       const data = await response.json();
-
-      const assistantMessage: Message = {
-        role: "assistant",
-        content: data.message,
-        timestamp: new Date()
-      };
-
-      const updatedMessages = [...currentMessages, assistantMessage];
-      setMessages(updatedMessages);
-      await saveThread(updatedMessages);
-      
+      if (!response.ok) throw new Error(data.error || "Failed to get AI response");
+      const assistantMessage: Message = { role: "assistant", content: data.message, timestamp: new Date().toISOString() };
+      const updated = [...nextMessages, assistantMessage];
+      setMessages(updated);
+      persistThread(updated);
     } catch (error) {
-      console.error("AI Chat Error:", error);
-      const errorMessage: Message = {
-        role: "assistant",
-        content: error instanceof Error 
-          ? `Error: ${error.message}`
-          : "Sorry, I encountered an error. Please try again.",
-        timestamp: new Date()
-      };
-      setMessages([...currentMessages, errorMessage]);
+      const fallback: Message = { role: "assistant", content: error instanceof Error ? `Error: ${error.message}` : "Error while processing your request.", timestamp: new Date().toISOString() };
+      setMessages([...nextMessages, fallback]);
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
+  function applyDock(dock: DockMode) {
+    setWindowState((current) => getDockedState(dock, { ...current, collapsed: false }));
+  }
 
-  const deleteThread = async (e: React.MouseEvent, threadId: string) => {
-    e.stopPropagation();
-    const key = await getStorageKey();
-    const updatedThreads = threads.filter(t => t.id !== threadId);
-    setThreads(updatedThreads);
-    localStorage.setItem(key, JSON.stringify(updatedThreads));
-    if (currentThreadId === threadId) {
-      setCurrentThreadId(null);
-      setMessages([]);
-    }
-  };
+  function startDrag(event: React.PointerEvent<HTMLDivElement>) {
+    const target = event.target as HTMLElement;
+    if (target.closest("button, input")) return;
+    dragRef.current = { offsetX: event.clientX - windowState.x, offsetY: event.clientY - windowState.y };
+    setIsDragging(true);
 
-  const startEditing = (e: React.MouseEvent, thread: ChatThread) => {
-    e.stopPropagation();
-    setEditingThreadId(thread.id);
-    setEditTitle(thread.title);
-  };
+    const move = (moveEvent: PointerEvent) => {
+      setWindowState((current) => constrainWindow({ ...current, dock: "float", x: moveEvent.clientX - dragRef.current.offsetX, y: moveEvent.clientY - dragRef.current.offsetY }));
+    };
 
-  const saveTitle = async (e: React.MouseEvent | React.KeyboardEvent | React.FocusEvent, threadId: string) => {
-    e.stopPropagation();
-    if (!editTitle.trim()) {
-      setEditingThreadId(null);
-      return;
-    }
-    const key = await getStorageKey();
-    const updatedThreads = threads.map(t => 
-      t.id === threadId ? { ...t, title: editTitle.trim() } : t
-    );
-    setThreads(updatedThreads);
-    localStorage.setItem(key, JSON.stringify(updatedThreads));
-    setEditingThreadId(null);
-  };
+    const up = () => {
+      setIsDragging(false);
+      setWindowState((current) => {
+        const nextDock = getSnapDock(current);
+        return nextDock === "float" ? current : getDockedState(nextDock, current);
+      });
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
 
-  const startNewChat = () => {
-    setCurrentThreadId(null);
-    setMessages([]);
-    setShowThreads(false);
-  };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
 
-  const selectThread = (thread: ChatThread) => {
+  function startResize(mode: ResizeMode, event: React.PointerEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    resizeRef.current = { mode, width: windowState.width, height: windowState.height, x: event.clientX, y: event.clientY };
+
+    const move = (moveEvent: PointerEvent) => {
+      const widthDelta = moveEvent.clientX - resizeRef.current.x;
+      const heightDelta = moveEvent.clientY - resizeRef.current.y;
+      setWindowState((current) => constrainWindow({ ...current, dock: "float", width: resizeRef.current.width + (mode === "bottom" ? 0 : widthDelta), height: resizeRef.current.height + (mode === "right" ? 0 : heightDelta) }));
+    };
+
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+
+  function openThread(thread: ChatThread) {
     setCurrentThreadId(thread.id);
     setMessages(thread.messages);
     setShowThreads(false);
-  };
+    setWindowState((current) => ({ ...current, collapsed: false }));
+  }
 
-  if (!isOpen) {
+  function newChat() {
+    setCurrentThreadId(null);
+    setMessages([]);
+    setShowThreads(false);
+  }
+
+  const panel = (
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl">
+      <div className={cn("flex h-12 items-center justify-between border-b bg-gradient-to-r from-blue-600 to-purple-600 px-3 text-white", !isMobile && "cursor-move")} onPointerDown={isMobile ? undefined : startDrag}>
+        <div className="flex items-center gap-2 text-sm font-semibold">
+          <Bot className="h-4 w-4" />
+          <span>AI Project Expert</span>
+          {isDragging ? <span className="text-[10px] opacity-80">Dragging</span> : null}
+        </div>
+        <div className="flex items-center gap-1">
+          {!isMobile ? (
+            <>
+              <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-white hover:bg-white/20" onClick={() => applyDock("left")}>L</Button>
+              <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-white hover:bg-white/20" onClick={() => applyDock("right")}>R</Button>
+              <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-white hover:bg-white/20" onClick={() => applyDock("bottom-left")}>BL</Button>
+              <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-white hover:bg-white/20" onClick={() => applyDock("bottom-right")}>BR</Button>
+            </>
+          ) : null}
+          <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-white hover:bg-white/20" onClick={() => setShowThreads((current) => !current)}><List className="h-4 w-4" /></Button>
+          <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-white hover:bg-white/20" onClick={() => setWindowState((current) => ({ ...current, collapsed: true }))}><Minus className="h-4 w-4" /></Button>
+          <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-white hover:bg-white/20" onClick={() => setWindowState((current) => ({ ...current, collapsed: true }))}><X className="h-4 w-4" /></Button>
+        </div>
+      </div>
+
+      <div className="relative flex min-h-0 flex-1">
+        {showThreads ? (
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="border-b p-3"><Button type="button" className="w-full" onClick={newChat}>New Chat</Button></div>
+            <div className="min-h-0 flex-1 overflow-auto p-3 space-y-2">
+              {threads.length === 0 ? <p className="text-center text-sm text-muted-foreground">No chat history yet.</p> : threads.map((thread) => (
+                <div key={thread.id} className="rounded-lg border p-3 hover:border-primary">
+                  <button type="button" className="w-full text-left" onClick={() => openThread(thread)}>
+                    <p className="truncate text-sm font-medium">{thread.title}</p>
+                    <p className="mt-1 text-[10px] text-muted-foreground">{new Date(thread.updatedAt).toLocaleString()}</p>
+                  </button>
+                  <Button type="button" variant="ghost" size="icon" className="mt-2 h-7 w-7" onClick={() => setThreads((current) => current.filter((item) => item.id !== thread.id))}><Trash2 className="h-3.5 w-3.5" /></Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <>
+            <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto bg-muted/20 p-4">
+              {messages.length === 0 ? (
+                <div className="space-y-3 py-8 text-center text-muted-foreground">
+                  <Bot className="mx-auto h-10 w-10 opacity-50" />
+                  <p className="text-sm">Ask for project, cost, manpower, schedule, or site analysis.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {messages.map((message, index) => (
+                    <div key={`${message.timestamp}-${index}`} className={cn("flex gap-3", message.role === "user" ? "justify-end" : "justify-start")}>
+                      {message.role === "assistant" ? <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground"><Bot className="h-4 w-4" /></div> : null}
+                      <div className={cn("max-w-[85%] rounded-lg p-3 text-sm shadow-sm", message.role === "user" ? "bg-primary text-primary-foreground" : "border bg-card")}>
+                        <p className="whitespace-pre-wrap">{message.content}</p>
+                        <p className={cn("mt-1 text-[10px]", message.role === "user" ? "text-primary-foreground/80" : "text-muted-foreground")}>{new Date(message.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
+                      </div>
+                      {message.role === "user" ? <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted"><User className="h-4 w-4" /></div> : null}
+                    </div>
+                  ))}
+                  {isLoading ? <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Analyzing module data...</div> : null}
+                </div>
+              )}
+            </div>
+            <div className="border-t p-3">
+              <div className="flex gap-2">
+                <Input ref={inputRef} value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendMessage(); } }} placeholder={`Ask about ${currentModule}...`} disabled={isLoading} className="h-10" />
+                <Button type="button" size="icon" onClick={() => void sendMessage()} disabled={!input.trim() || isLoading}><Send className="h-4 w-4" /></Button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {!isMobile ? (
+          <>
+            <div className="absolute right-0 top-12 h-[calc(100%-3rem)] w-1 cursor-ew-resize" onPointerDown={(event) => startResize("right", event)} />
+            <div className="absolute bottom-0 left-0 h-1 w-full cursor-ns-resize" onPointerDown={(event) => startResize("bottom", event)} />
+            <div className="absolute bottom-0 right-0 h-4 w-4 cursor-nwse-resize" onPointerDown={(event) => startResize("corner", event)} />
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
+
+  if (!isReady) {
+    return null;
+  }
+
+  if (isMobile) {
     return (
-      <Button
-        onClick={() => setIsOpen(true)}
-        size="lg"
-        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 h-12 sm:h-14 px-4 sm:px-6 shadow-lg hover:shadow-xl transition-all duration-200 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 z-50 text-sm sm:text-base rounded-full"
-      >
-        <Bot className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-        <span className="hidden sm:inline">AI Project Expert</span>
-        <span className="sm:hidden">AI Expert</span>
+      <>
+        <Button type="button" onClick={() => setWindowState((current) => ({ ...current, collapsed: false }))} size="lg" className="fixed bottom-4 right-4 z-50 h-12 rounded-full px-4 shadow-xl">
+          <Bot className="mr-2 h-4 w-4" />
+          AI Assistant
+        </Button>
+        {!windowState.collapsed ? <div className="fixed inset-0 z-50 bg-black/40 p-4"><div className="h-full w-full">{panel}</div></div> : null}
+      </>
+    );
+  }
+
+  if (windowState.collapsed) {
+    return (
+      <Button type="button" onClick={() => setWindowState((current) => ({ ...current, collapsed: false }))} className="fixed z-50 h-12 rounded-full px-4 shadow-xl" style={floatingButtonStyle}>
+        <Bot className="mr-2 h-4 w-4" />
+        AI Expert
       </Button>
     );
   }
 
   return (
-    <Card className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 w-[calc(100vw-2rem)] sm:w-[400px] shadow-2xl z-50 flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${isMinimized ? 'h-[52px]' : 'h-[500px] sm:h-[600px]'}`}>
-      {/* Header */}
-      <div 
-        className="flex items-center justify-between p-3 h-[52px] border-b bg-gradient-to-r from-blue-600 to-purple-600 text-white cursor-pointer select-none"
-        onClick={() => isMinimized && setIsMinimized(false)}
-      >
-        <div className="flex items-center gap-2">
-          <Bot className="h-5 w-5" />
-          <div>
-            <h3 className="font-semibold text-sm leading-none">AI Project Expert</h3>
-            {!isMinimized && <p className="text-[10px] opacity-90 mt-0.5">Global System Analysis</p>}
-          </div>
-        </div>
-        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-          {!isMinimized && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowThreads(!showThreads)}
-              className={`hover:bg-white/20 text-white h-8 w-8 ${showThreads ? 'bg-white/20' : ''}`}
-            >
-              <List className="h-4 w-4" />
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsMinimized(!isMinimized)}
-            className="hover:bg-white/20 text-white h-8 w-8"
-          >
-            {isMinimized ? <Maximize2 className="h-4 w-4" /> : <Minus className="h-4 w-4" />}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsOpen(false)}
-            className="hover:bg-white/20 text-white h-8 w-8"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      {!isMinimized && (
-        <>
-          {/* Main Area */}
-          <div className="flex-1 flex overflow-hidden relative">
-            {/* Threads Sidebar / Overlay */}
-            {showThreads ? (
-              <div className="absolute inset-0 z-10 bg-background flex flex-col">
-                <div className="p-4 border-b">
-                  <Button onClick={startNewChat} className="w-full bg-gradient-to-r from-blue-600 to-purple-600">
-                    <Plus className="mr-2 h-4 w-4" /> New Chat
-                  </Button>
-                </div>
-                <ScrollArea className="flex-1">
-                  <div className="p-4 space-y-2">
-                    {threads.length === 0 ? (
-                      <p className="text-sm text-center text-muted-foreground py-4">No chat history yet.</p>
-                    ) : (
-                      threads.map(t => (
-                        <div 
-                          key={t.id} 
-                          onClick={() => selectThread(t)}
-                          className={`p-3 text-sm rounded-lg border cursor-pointer hover:border-primary transition-colors group ${currentThreadId === t.id ? 'bg-primary/5 border-primary' : 'bg-card'}`}
-                        >
-                          <div className="flex justify-between items-start gap-2">
-                            {editingThreadId === t.id ? (
-                              <div className="flex-1 flex gap-1 items-center" onClick={(e) => e.stopPropagation()}>
-                                <Input 
-                                  value={editTitle}
-                                  onChange={(e) => setEditTitle(e.target.value)}
-                                  onKeyDown={(e) => e.key === 'Enter' && saveTitle(e, t.id)}
-                                  onBlur={(e) => saveTitle(e, t.id)}
-                                  className="h-7 text-xs px-2"
-                                  autoFocus
-                                />
-                                <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 text-green-600 hover:bg-green-50 hover:text-green-700" onClick={(e) => saveTitle(e, t.id)}>
-                                  <Check className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            ) : (
-                              <div className="font-medium truncate flex-1">{t.title}</div>
-                            )}
-                            
-                            {editingThreadId !== t.id && (
-                              <div className="flex gap-1 shrink-0">
-                                <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:bg-muted hover:text-primary" onClick={(e) => startEditing(e, t)}>
-                                  <Pencil className="h-3 w-3" />
-                                </Button>
-                                <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:bg-red-50 hover:text-destructive" onClick={(e) => deleteThread(e, t.id)}>
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                          <div className="text-[10px] text-muted-foreground mt-1">
-                            {new Date(t.updated_at).toLocaleDateString()}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </ScrollArea>
-              </div>
-            ) : (
-              /* Messages Area */
-              <ScrollArea className="flex-1 p-4 bg-muted/20" ref={scrollRef}>
-                {messages.length === 0 ? (
-                  <div className="text-center text-muted-foreground py-8 space-y-3">
-                    <Bot className="h-12 w-12 mx-auto opacity-50" />
-                    <p className="text-sm">I can analyze data across all modules and tabs, including the page you are currently viewing.</p>
-                    <div className="text-xs space-y-1 text-left bg-background border p-3 rounded-lg shadow-sm">
-                      <p className="font-medium">Try asking:</p>
-                      <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                        <li>Give me an overview of all projects.</li>
-                        <li>Analyze this module and tab based on the data currently loaded.</li>
-                        <li>Compare Project Manager schedules with Site Personnel progress and warehouse usage.</li>
-                        <li>Summarize pending vouchers, liquidations, deliveries, and requests.</li>
-                      </ul>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {messages.map((msg, idx) => (
-                      <div key={idx} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                        {msg.role === "assistant" && (
-                          <div className="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center shadow-sm">
-                            <Bot className="h-4 w-4 text-white" />
-                          </div>
-                        )}
-                        <div className={`max-w-[85%] rounded-lg p-3 shadow-sm ${msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-card border"}`}>
-                          <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
-                          <p className={`text-[10px] opacity-70 mt-1 ${msg.role === "user" ? "text-primary-foreground/80 text-right" : "text-muted-foreground"}`}>
-                            {msg.timestamp.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                    {isLoading && (
-                      <div className="flex gap-3 justify-start">
-                        <div className="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center shadow-sm">
-                          <Bot className="h-4 w-4 text-white" />
-                        </div>
-                        <div className="bg-card border rounded-lg p-4 flex items-center shadow-sm">
-                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                          <span className="ml-2 text-xs text-muted-foreground">Analyzing system data...</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </ScrollArea>
-            )}
-          </div>
-
-          {/* Input Area */}
-          <div className="p-3 border-t bg-card">
-            <div className="flex gap-2">
-              <Input
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Ask the AI Project Expert..."
-                disabled={isLoading || showThreads}
-                className="flex-1 focus-visible:ring-1 bg-muted/50"
-              />
-              <Button
-                onClick={sendMessage}
-                disabled={!input.trim() || isLoading || showThreads}
-                size="icon"
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shrink-0 shadow-sm"
-              >
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin text-white" /> : <Send className="h-4 w-4 text-white" />}
-              </Button>
-            </div>
-          </div>
-        </>
-      )}
-    </Card>
+    <div className="fixed z-50" style={{ left: windowState.x, top: windowState.y, width: windowState.width, height: windowState.height }}>
+      {panel}
+    </div>
   );
 }
