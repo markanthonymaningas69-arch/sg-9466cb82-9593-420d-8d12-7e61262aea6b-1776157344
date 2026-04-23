@@ -44,6 +44,6 @@ export function usesStripeSubscription(country: SupportedCountry): boolean {
   return getCountrySubscriptionConfig(country).paymentProvider === "stripe";
 }
 
-export function usesManualPaymentLink(country: SupportedCountry): boolean {
+export function usesPayMongoCheckout(country: SupportedCountry): boolean {
   return getCountrySubscriptionConfig(country).paymentProvider === "paymongo_gcash";
 }

@@ -27,9 +27,9 @@ Follow-up: switch the Philippines payment path from a generic manual link to a P
 - [x] Keep add-on numeric values the same and only switch currency presentation for Philippines
 - [x] Route UAE users through the current payment flow and isolate Philippines from Stripe checkout
 - [x] Validate the subscription page compiles cleanly
-- [ ] Add PayMongo configuration that reads secure environment variables
-- [ ] Create a server-side PayMongo checkout endpoint for Philippines GCash payments
-- [ ] Connect the Philippines subscription action to the PayMongo checkout flow
+- [x] Add PayMongo configuration that reads secure environment variables
+- [x] Create a server-side PayMongo checkout endpoint for Philippines GCash payments
+- [x] Connect the Philippines subscription action to the PayMongo checkout flow
 - [ ] Revalidate the subscription flow after PayMongo integration
 
 ## Acceptance

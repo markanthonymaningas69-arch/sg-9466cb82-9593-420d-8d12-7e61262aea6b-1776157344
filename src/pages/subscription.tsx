@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Check, CreditCard, Calendar, FolderGit2, LayoutGrid, Minus, Plus, ShoppingCart, Loader2, Users, ExternalLink } from "lucide-react";
 import { useSettings } from "@/contexts/SettingsProvider";
 import { supabase } from "@/integrations/supabase/client";
-import { getCountrySubscriptionConfig, usesManualPaymentLink, usesStripeSubscription } from "@/config/countrySubscription";
+import { getCountrySubscriptionConfig, usesPayMongoCheckout, usesStripeSubscription } from "@/config/countrySubscription";
 import { DEFAULT_COUNTRY, OUT_OF_SERVICE_MESSAGE, getAddOnPrice, getAvailableBillingCycles, getPlanPrice, isSupportedCountry, plans, addOns, type BillingCycle, type PlanConfig, type SupportedCountry } from "@/config/pricing";
 import { formatCountryCurrency } from "@/lib/currency";
 import { useToast } from "@/hooks/use-toast";
@@ -48,18 +48,32 @@ export default function Subscription() {
   }, [accountCountry, billingCycle]);
 
   useEffect(() => {
-    if (router.isReady) {
-      if (router.query.success === 'true' && router.query.session_id) {
-        verifyPayment(router.query.session_id as string);
-      } else if (router.query.canceled === 'true') {
-        toast({
-          title: "Checkout Canceled",
-          description: "Your payment process was not completed.",
-        });
-        // Clean URL
-        const newUrl = window.location.pathname;
-        window.history.replaceState({}, document.title, newUrl);
-      }
+    if (!router.isReady) {
+      return;
+    }
+
+    if (router.query.success === 'true' && router.query.session_id) {
+      verifyPayment(router.query.session_id as string);
+      return;
+    }
+
+    if (router.query.paymongo === 'success') {
+      toast({
+        title: "GCash Checkout Opened",
+        description: "Your PayMongo payment returned successfully. Complete payment in GCash if prompted."
+      });
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+      return;
+    }
+
+    if (router.query.canceled === 'true' || router.query.paymongo === 'canceled') {
+      toast({
+        title: "Checkout Canceled",
+        description: "Your payment process was not completed."
+      });
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
     }
   }, [router.isReady, router.query]);
 
@@ -246,31 +260,6 @@ export default function Subscription() {
         throw new Error(OUT_OF_SERVICE_MESSAGE);
       }
 
-      if (manualPaymentEnabled) {
-        if (!countrySubscriptionConfig.paymentLink) {
-          toast({
-            title: "GCash setup pending",
-            description: "The Philippines payment link has not been configured yet.",
-            variant: "destructive"
-          });
-          setIsCheckingOut(false);
-          return;
-        }
-
-        if (window.self !== window.top) {
-          window.open(countrySubscriptionConfig.paymentLink, "_blank");
-          toast({
-            title: "Payment Opened",
-            description: "The GCash payment link has opened in a new tab."
-          });
-          setIsCheckingOut(false);
-          return;
-        }
-
-        window.location.href = countrySubscriptionConfig.paymentLink;
-        return;
-      }
-
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) {
         toast({
@@ -282,13 +271,20 @@ export default function Subscription() {
         return;
       }
 
-      // Calculate final active features by merging active + cart
       const finalFeatures = { ...(subscriptionDetails?.features || {}) };
       for (const [id, newQty] of Object.entries(addOnQuantities)) {
         finalFeatures[id] = Number(finalFeatures[id] || 0) + Number(newQty);
       }
 
-      const response = await fetch("/api/stripe/checkout", {
+      const checkoutPath = payMongoCheckoutEnabled
+        ? countrySubscriptionConfig.checkoutApiPath
+        : "/api/stripe/checkout";
+
+      if (!checkoutPath) {
+        throw new Error("The selected country does not have a checkout route configured yet.");
+      }
+
+      const response = await fetch(checkoutPath, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -301,23 +297,24 @@ export default function Subscription() {
           proratedDiscount: proratedDiscount,
           userId: session.user.id,
           email: session.user.email,
-          returnUrl: window.location.origin + "/subscription",
-        }),
+          returnUrl: window.location.origin + "/subscription"
+        })
       });
 
       const data = await response.json();
 
       if (data.url) {
-        // Stripe blocks iframes (like our preview). Open in new tab if in iframe.
         if (window.self !== window.top) {
           window.open(data.url, "_blank");
           setIsCheckingOut(false);
           toast({
             title: "Checkout Opened",
-            description: "Stripe Checkout has opened securely in a new tab.",
+            description: payMongoCheckoutEnabled
+              ? "PayMongo GCash checkout has opened in a new tab."
+              : "Stripe Checkout has opened securely in a new tab."
           });
         } else {
-          window.location.href = data.url; // Normal redirect for production
+          window.location.href = data.url;
         }
       } else {
         throw new Error(data.error || "Failed to create checkout session");
@@ -325,7 +322,7 @@ export default function Subscription() {
     } catch (error: any) {
       console.error("Checkout Error:", error);
       toast({
-        title: manualPaymentEnabled ? "Payment Error" : "Checkout Error",
+        title: payMongoCheckoutEnabled ? "Payment Error" : "Checkout Error",
         description: error.message || "An unexpected error occurred while starting payment.",
         variant: "destructive"
       });
@@ -592,6 +589,20 @@ export default function Subscription() {
                   GCash payment link is not configured yet. Add the payment link when ready to activate checkout.
                 </p>
               )}
+            </CardContent>
+          </Card>
+        )}
+
+        {payMongoCheckoutEnabled && (
+          <Card className="border-primary/20 bg-primary/5">
+            <CardHeader>
+              <CardTitle>Philippines Subscription Flow</CardTitle>
+              <CardDescription>{countrySubscriptionConfig.paymentMethodLabel}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <p>{countrySubscriptionConfig.helperText}</p>
+              <p>All prices on this page are shown in Peso when Philippines is the active country.</p>
+              <p>Your checkout is created securely on the server before redirecting to PayMongo GCash.</p>
             </CardContent>
           </Card>
         )}

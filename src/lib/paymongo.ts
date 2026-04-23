@@ -1,6 +1,6 @@
 const PAYMONGO_API_BASE_URL = "https://api.paymongo.com/v1";
 
-function getRequiredEnv(name: "PAYMONGO_SECRET_KEY"): string {
+function getRequiredEnv(name: "PAYMONGO_SECRET_KEY" | "NEXT_PUBLIC_PAYMONGO_PUBLIC_KEY"): string {
   const value = process.env[name];
 
   if (!value) {
@@ -16,6 +16,10 @@ export function getPayMongoApiBaseUrl(): string {
 
 export function getPayMongoSecretKey(): string {
   return getRequiredEnv("PAYMONGO_SECRET_KEY");
+}
+
+export function getPayMongoPublicKey(): string {
+  return getRequiredEnv("NEXT_PUBLIC_PAYMONGO_PUBLIC_KEY");
 }
 
 export function getPayMongoAuthHeader(): string {
