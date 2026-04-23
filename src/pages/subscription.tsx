@@ -648,7 +648,7 @@ export default function Subscription() {
                   </CardHeader>
                   <CardContent className="pb-4 flex-1">
                     <div className="text-3xl font-bold text-primary tracking-tight">
-                      AED {getPrice(addon)}
+                      AED {getAddOnPrice(addon, accountCountry, billingCycle)}
                       <span className="text-base font-medium text-muted-foreground">/{billingCycle === "monthly" ? "mo" : "yr"}</span>
                     </div>
                     {!isUnavailable && <div className="text-sm text-muted-foreground mt-2 font-medium">Max Limit: {limit} seat{limit !== 1 ? 's' : ''} {activeQty > 0 ? `(${activeQty} active)` : ''}</div>}
@@ -681,7 +681,7 @@ export default function Subscription() {
                     {isSelected && (
                       <div className="w-full text-center flex flex-col items-center mt-1">
                         <span className="text-sm font-medium text-primary">
-                          Subtotal: AED {getPrice(addon) * newQty}
+                          Subtotal: AED {getAddOnPrice(addon, accountCountry, billingCycle) * newQty}
                         </span>
                         <span className="text-[10px] font-medium text-muted-foreground mt-0.5">
                           Valid until {newItemsExpiryDate}
