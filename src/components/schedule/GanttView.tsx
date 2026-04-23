@@ -142,10 +142,10 @@ export function GanttView({ tasks }: GanttViewProps) {
         return null;
       }
 
-      const predecessorBarLeft = predecessor.barLeft + 1;
-      const predecessorBarRight = predecessor.barLeft + predecessor.barWidth - 1;
-      const successorBarLeft = successor.barLeft + 1;
-      const successorBarRight = successor.barLeft + successor.barWidth - 1;
+      const predecessorBarLeft = predecessor.barLeft;
+      const predecessorBarRight = predecessor.barLeft + predecessor.barWidth;
+      const successorBarLeft = successor.barLeft;
+      const successorBarRight = successor.barLeft + successor.barWidth;
       const startX =
         dependency.type === "SS" || dependency.type === "SF" ? predecessorBarLeft : predecessorBarRight;
       const endX =
