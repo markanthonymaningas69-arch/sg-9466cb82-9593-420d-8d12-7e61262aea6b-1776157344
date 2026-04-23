@@ -78,6 +78,10 @@ type ScheduleTaskRecord = TaskFormData & {
   bom_scope?: EditableProjectTask["bom_scope"];
 };
 
+function toTaskConfigJson(taskConfig: ReturnType<typeof normalizeTaskConfiguration>): TaskFormData["task_config"] {
+  return taskConfig as unknown as TaskFormData["task_config"];
+}
+
 function normalizeEditableTask(task: ScheduleTaskRecord): EditableProjectTask {
   const seededConfig = {
     scopeQuantity: Number(task.scope_quantity || task.bom_scope?.quantity || 1),
@@ -135,7 +139,7 @@ function toTaskFormData(task: EditableProjectTask): TaskFormData {
     ...task,
     dependencies: createTaskDependencies(task.dependencies),
     assigned_team: taskConfig.assignedTeamName || task.assigned_team || null,
-    task_config: taskConfig as unknown as TaskFormData["task_config"],
+    task_config: toTaskConfigJson(taskConfig),
     duration_days: durationDays,
     end_date: task.start_date ? addDays(task.start_date, durationDays) : task.end_date,
     scope_quantity: taskConfig.scopeQuantity,
@@ -159,7 +163,7 @@ function createNewTask(projectId: string): EditableProjectTask {
 
   return normalizeEditableTask({
     ...draftTask,
-    task_config: taskConfig,
+    task_config: toTaskConfigJson(taskConfig),
     assigned_team: taskConfig.assignedTeamName || draftTask.assigned_team,
     scope_quantity: taskConfig.scopeQuantity,
     scope_unit: taskConfig.scopeUnit,
