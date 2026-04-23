@@ -21,7 +21,7 @@ In Parameters, users should be able to define a team productivity rate such as 1
 The implementation should stay extensible so more scope/task rules can be added later without rewriting the whole module.
 
 ## Checklist
-- [ ] Locate the Project Manager UI and remove the export action
+- [x] Locate the Project Manager UI and remove the export action
 - [ ] Connect Auto generate from BOM to the current project scopes in the BOM
 - [ ] Refactor Task configuration into Parameters, Schedule, and Resources sections
 - [ ] Add functional productivity inputs for team composition and rate unit

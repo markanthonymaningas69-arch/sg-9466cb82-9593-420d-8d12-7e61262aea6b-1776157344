@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Settings2, Calendar as CalendarIcon, Download, Save, Trash2, AlignLeft, Clock, Users, DollarSign } from "lucide-react";
+import { Plus, Settings2, Calendar as CalendarIcon, Save, Trash2, AlignLeft, Clock, Users, DollarSign } from "lucide-react";
 import { projectService } from "@/services/projectService";
 import { scheduleService } from "@/services/scheduleService";
 import { useToast } from "@/hooks/use-toast";
@@ -157,10 +157,6 @@ export default function SchedulePage() {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" className="w-full sm:w-auto">
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
           </div>
         </div>
 
@@ -396,15 +392,15 @@ export default function SchedulePage() {
                 </CardContent>
               ) : (
                 <div className="flex-1 overflow-y-auto">
-                  <Tabs defaultValue="properties" className="w-full">
+                  <Tabs defaultValue="parameters" className="w-full">
                     <TabsList className="w-full rounded-none border-b bg-transparent p-0 h-10">
-                      <TabsTrigger value="properties" className="flex-1 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none">Properties</TabsTrigger>
+                      <TabsTrigger value="parameters" className="flex-1 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none">Parameters</TabsTrigger>
                       <TabsTrigger value="scheduling" className="flex-1 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none">Schedule</TabsTrigger>
                       <TabsTrigger value="resources" className="flex-1 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none">Resources</TabsTrigger>
                     </TabsList>
                     
                     <div className="p-4 space-y-4">
-                      <TabsContent value="properties" className="space-y-4 mt-0">
+                      <TabsContent value="parameters" className="space-y-4 mt-0">
                         <div className="space-y-2">
                           <Label htmlFor="task-name" className="text-xs">Task Name</Label>
                           <Input 
