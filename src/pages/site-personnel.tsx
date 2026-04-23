@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { siteService } from "@/services/siteService";
 import { projectService } from "@/services/projectService";
 import { personnelService } from "@/services/personnelService";
+import { scurveService } from "@/services/scurveService";
 import { Plus, Pencil, Trash2, Archive, Users, Truck, ClipboardList, ArrowUp, ArrowDown, Check, ArrowUpDown, ShoppingCart, Banknote, Wrench, Eye, Activity, List as ListIcon, CheckCircle2, AlertCircle, Warehouse } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer } from "recharts";
@@ -166,6 +167,7 @@ export default function SitePersonnel() {
   const [masterItems, setMasterItems] = useState<any[]>([]);
   const [warehouseSearch, setWarehouseSearch] = useState("");
   const [warehouseTypeFilter, setWarehouseTypeFilter] = useState("all");
+  const scurveSyncSignatureRef = useRef("");
 
   useEffect(() => {
     loadProjects();
@@ -215,6 +217,35 @@ export default function SitePersonnel() {
       loadCashAdvances();
     }
   }, [selectedProject, deliveriesDate, consumptionDate, requestDate]);
+
+  useEffect(() => {
+    if (!selectedProject) {
+      return;
+    }
+
+    const signature = JSON.stringify({
+      attendance: attendanceList
+        .map((row) => `${row.personnel_id}:${row.status}:${row.hours_worked}:${row.overtime_hours}:${row.bom_scope_id || ""}`)
+        .sort(),
+      consumptions: consumptions
+        .map((row) => `${row.id}:${row.date_used}:${row.item_name}:${row.quantity}:${row.unit}:${row.estimated_cost || 0}:${row.bom_scope_id || ""}`)
+        .sort(),
+      progress: progressUpdates
+        .map((row) => `${row.id}:${row.bom_scope_id}:${row.update_date}:${row.percentage_completed || 0}`)
+        .sort(),
+    });
+
+    if (signature === scurveSyncSignatureRef.current) {
+      return;
+    }
+
+    scurveSyncSignatureRef.current = signature;
+    const timeoutId = window.setTimeout(() => {
+      void recalculateSelectedProjectSCurve();
+    }, 700);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [selectedProject, attendanceList, consumptions, progressUpdates]);
 
   const resolvedRequestIds = [...requests, ...cashAdvances]
     .filter(r => r.status === 'approved' || r.status === 'rejected')
@@ -940,6 +971,15 @@ export default function SitePersonnel() {
   const toolRequestUnits = Array.from(new Set(["unit", "pcs", "set", "kit", "day", "lot", ...availableUnits]));
   const isCashRequest = requestForm.request_type === "Petty Cash" || requestForm.request_type === "Cash Advance";
   const isToolRequest = requestForm.request_type === "Tools & Equipments";
+
+  const recalculateSelectedProjectSCurve = async () => {
+    if (!selectedProject) return;
+    try {
+      await scurveService.recalculateProject(selectedProject);
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   return (
     <Layout>

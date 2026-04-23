@@ -1,6 +1,6 @@
 ---
 title: S-Curve data pipeline
-status: in_progress
+status: done
 priority: urgent
 type: feature
 tags:
@@ -22,13 +22,14 @@ This task covers baseline cost extraction, actual cost/progress extraction, dail
 Progress update:
 - Project Manager now exposes an S-Curve view per selected project
 - Schedule edits, BOM sync, planned material delivery updates, and labor cost updates now trigger recalculation
+- Site Personnel actual attendance, consumption, and progress updates now trigger recalculation
 
 ## Checklist
 - [x] Inspect current project schedule, labor cost, material delivery, and execution progress data sources
 - [x] Add persistent storage for daily S-Curve aggregates with project_id, date, planned_value, actual_value, earned_value
 - [x] Create calculation utilities for daily PV, AV, EV and cumulative totals
 - [x] Create service methods to generate and read S-Curve aggregates per project
-- [ ] Recalculate aggregates when schedule, planned cost, or actual execution data changes
+- [x] Recalculate aggregates when schedule, planned cost, or actual execution data changes
 
 ## Acceptance
 Each project can produce daily PV, AV, and EV aggregate records.
