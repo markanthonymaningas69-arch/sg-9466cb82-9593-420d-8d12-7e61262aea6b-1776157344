@@ -184,29 +184,45 @@ function buildDefaultMaterialDeliveryPlans(task: EditableProjectTask): SaveTaskM
   }));
 }
 
-function mergeMaterialDeliveryPlans(task: EditableProjectTask, storedPlans: SaveTaskMaterialDeliveryPlanInput[] = []) {
+function mergeMaterialDeliveryPlans(task: EditableProjectTask, storedPlans: SaveTaskMaterialDeliveryPlanInput[] = []): SaveTaskMaterialDeliveryPlanInput[] {
   const defaults = buildDefaultMaterialDeliveryPlans(task);
   const defaultsByName = new Map(defaults.map((plan) => [plan.materialName, plan] as const));
   const linkedMaterials = Array.isArray(task.bom_scope?.materials) ? task.bom_scope.materials : [];
-  return linkedMaterials.map((materialName) => {
+  return linkedMaterials.map<SaveTaskMaterialDeliveryPlanInput>((materialName) => {
     const fallback = defaultsByName.get(materialName);
     const stored = storedPlans.find((plan) => plan.materialName === materialName);
-    return fallback && stored
-      ? { ...fallback, ...stored, materialName, plannedUsagePeriod: fallback.plannedUsagePeriod }
-      : fallback || {
-          materialId: materialName,
-          materialName,
-          deliveryScheduleType: "one_time",
-          deliveryStartDate: task.start_date || null,
-          deliveryFrequency: "daily",
-          deliveryDurationDays: Math.max(1, Number(task.duration_days || 1)),
-          customIntervalDays: null,
-          quantityMode: "even",
-          deliveryDates: task.start_date ? [task.start_date] : [],
-          plannedUsagePeriod: task.start_date ? { startDate: task.start_date, endDate: task.end_date || task.start_date } : null,
-          totalQuantity: 0,
-          unit: task.scope_unit || task.bom_scope?.unit || "unit",
-        };
+
+    if (fallback && stored) {
+      return {
+        ...fallback,
+        ...stored,
+        materialName,
+        plannedUsagePeriod: fallback.plannedUsagePeriod,
+      };
+    }
+
+    if (fallback) {
+      return fallback;
+    }
+
+    const fallbackPlan: SaveTaskMaterialDeliveryPlanInput = {
+      materialId: materialName,
+      materialName,
+      deliveryScheduleType: "one_time",
+      deliveryStartDate: task.start_date || null,
+      deliveryFrequency: "daily",
+      deliveryDurationDays: Math.max(1, Number(task.duration_days || 1)),
+      customIntervalDays: null,
+      quantityMode: "even",
+      deliveryDates: task.start_date ? [task.start_date] : [],
+      plannedUsagePeriod: task.start_date
+        ? { startDate: task.start_date, endDate: task.end_date || task.start_date }
+        : null,
+      totalQuantity: 0,
+      unit: task.scope_unit || task.bom_scope?.unit || "unit",
+    };
+
+    return fallbackPlan;
   });
 }
 
