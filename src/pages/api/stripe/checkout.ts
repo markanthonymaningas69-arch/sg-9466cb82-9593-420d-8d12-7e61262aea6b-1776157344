@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { stripe } from "@/lib/stripe";
-import { plans, addOns } from "@/config/pricing";
+import { addOns, getAddOnPrice, getAvailableBillingCycles, getPlanPrice, isSupportedCountry, OUT_OF_SERVICE_MESSAGE, plans } from "@/config/pricing";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -8,10 +8,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { planId, billingCycle, features, featuresToCharge, chargeBasePlan, proratedDiscount, userId, email, returnUrl } = req.body;
+    const { planId, billingCycle, country, features, featuresToCharge, chargeBasePlan, proratedDiscount, userId, email, returnUrl } = req.body;
 
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    if (!isSupportedCountry(country)) {
+      return res.status(400).json({ error: OUT_OF_SERVICE_MESSAGE });
+    }
+
+    if (!getAvailableBillingCycles(country).includes(billingCycle)) {
+      return res.status(400).json({ error: "The selected billing cycle is not available for this country." });
     }
 
     const plan = plans.find((p) => p.id === planId);
@@ -20,7 +28,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const lineItems = [];
     
     // Base Plan (Skip if chargeBasePlan is false - means they are just adding add-ons)
-    const basePrice = billingCycle === "annual" ? plan.annualPrice : plan.monthlyPrice;
+    const basePrice = getPlanPrice(plan, country, billingCycle);
     const shouldChargeBase = chargeBasePlan !== undefined ? chargeBasePlan : true;
 
     if (basePrice > 0 && shouldChargeBase) {
@@ -45,7 +53,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     for (const [addonId, qty] of Object.entries(addonsToCharge)) {
       const addon = addOns.find((a) => a.id === addonId);
       if (addon && (qty as number) > 0) {
-        const addonPrice = billingCycle === "annual" ? addon.annualPrice : addon.monthlyPrice;
+        const addonPrice = getAddOnPrice(addon, country, billingCycle);
         lineItems.push({
           price_data: {
             currency: "aed",
@@ -78,6 +86,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         userId,
         planId,
         billingCycle,
+        country,
         features: JSON.stringify(features || {}),
       },
     };

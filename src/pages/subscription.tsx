@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Check, CreditCard, Calendar, FolderGit2, LayoutGrid, Minus, Plus, ShoppingCart, Loader2, Users, ExternalLink } from "lucide-react";
 import { useSettings } from "@/contexts/SettingsProvider";
 import { supabase } from "@/integrations/supabase/client";
-import { plans, addOns, type PlanConfig } from "@/config/pricing";
+import { DEFAULT_COUNTRY, OUT_OF_SERVICE_MESSAGE, getAddOnPrice, getAvailableBillingCycles, getPlanPrice, isSupportedCountry, plans, addOns, type BillingCycle, type PlanConfig, type SupportedCountry } from "@/config/pricing";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/router";
 
@@ -16,7 +16,7 @@ export default function Subscription() {
   const { toast } = useToast();
   const router = useRouter();
   
-  const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
   const [billingHistory, setBillingHistory] = useState<any[]>([]);
   const [subscriptionDetails, setSubscriptionDetails] = useState<any>(null);
   
@@ -27,6 +27,7 @@ export default function Subscription() {
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [isManagingBilling, setIsManagingBilling] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [accountCountry, setAccountCountry] = useState<SupportedCountry>(DEFAULT_COUNTRY);
 
   useEffect(() => {
     if (currentPlan && currentPlan !== 'trial') {
@@ -37,6 +38,12 @@ export default function Subscription() {
   useEffect(() => {
     loadBillingHistory();
   }, []);
+
+  useEffect(() => {
+    if (!getAvailableBillingCycles(accountCountry).includes("annual") && billingCycle === "annual") {
+      setBillingCycle("monthly");
+    }
+  }, [accountCountry, billingCycle]);
 
   useEffect(() => {
     if (router.isReady) {
@@ -106,6 +113,18 @@ export default function Subscription() {
     }
 
     if (session?.user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("country")
+        .eq("id", session.user.id)
+        .maybeSingle();
+
+      if (isSupportedCountry(profile?.country)) {
+        setAccountCountry(profile.country);
+      } else {
+        setAccountCountry(DEFAULT_COUNTRY);
+      }
+
       const { data } = await supabase
         .from('subscriptions')
         .select('*')
@@ -146,12 +165,16 @@ export default function Subscription() {
   };
 
   const getPrice = (plan: PlanConfig) => {
-    return billingCycle === "monthly" ? plan.monthlyPrice : plan.annualPrice;
+    return getPlanPrice(plan, accountCountry, billingCycle);
   };
 
   const getSavings = (plan: PlanConfig) => {
-    const monthlyCost = plan.monthlyPrice * 12;
-    const annualCost = plan.annualPrice;
+    if (!getAvailableBillingCycles(accountCountry).includes("annual")) {
+      return 0;
+    }
+
+    const monthlyCost = getPlanPrice(plan, accountCountry, "monthly") * 12;
+    const annualCost = getPlanPrice(plan, accountCountry, "annual");
     return monthlyCost - annualCost;
   };
 
@@ -226,19 +249,24 @@ export default function Subscription() {
         finalFeatures[id] = Number(finalFeatures[id] || 0) + Number(newQty);
       }
 
-      const response = await fetch('/api/stripe/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      if (!isSupportedCountry(accountCountry)) {
+        throw new Error(OUT_OF_SERVICE_MESSAGE);
+      }
+
+      const response = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           planId: selectedPlan,
           billingCycle,
-          features: finalFeatures, // Total features sent to metadata for DB update
-          featuresToCharge: addOnQuantities, // Only the newly added seats for Stripe billing
-          chargeBasePlan: basePriceToCharge > 0, // Explicit flag to skip base plan charge if already active
-          proratedDiscount: proratedDiscount, // Send the unused balance credit to Stripe
+          country: accountCountry,
+          features: finalFeatures,
+          featuresToCharge: addOnQuantities,
+          chargeBasePlan: basePriceToCharge > 0,
+          proratedDiscount: proratedDiscount,
           userId: session.user.id,
           email: session.user.email,
-          returnUrl: window.location.origin + '/subscription',
+          returnUrl: window.location.origin + "/subscription",
         }),
       });
 
@@ -328,16 +356,16 @@ export default function Subscription() {
     Object.entries(subscriptionDetails.features).forEach(([id, qty]) => {
       const addonInfo = addOns.find(a => a.id === id);
       if (addonInfo && Number(qty) > 0) {
-        activeAddonsTotal += (isActiveAnnual ? addonInfo.annualPrice : addonInfo.monthlyPrice) * Number(qty);
+        activeAddonsTotal += getAddOnPrice(addonInfo, accountCountry, isActiveAnnual ? "annual" : "monthly") * Number(qty);
       }
     });
   }
 
-  const trueActiveAmount = hasActiveSub ? (activeBasePrice + activeAddonsTotal) : (billingCycle === "annual" ? activePlanObj.annualPrice : activePlanObj.monthlyPrice);
+  const trueActiveAmount = hasActiveSub ? (activeBasePrice + activeAddonsTotal) : getPlanPrice(activePlanObj, accountCountry, billingCycle);
 
   const isSelectingSamePlanAndCycle = subscriptionDetails?.plan === selectedPlan && (billingCycle === "annual") === isActiveAnnual;
 
-  const basePrice = selectedPlanConfig ? (billingCycle === "monthly" ? selectedPlanConfig.monthlyPrice : selectedPlanConfig.annualPrice) : 0;
+  const basePrice = selectedPlanConfig ? getPlanPrice(selectedPlanConfig, accountCountry, billingCycle) : 0;
   
   // Only charge base price if they are upgrading/changing plans or cycle, or don't have an active one, or if it's expired (locked)
   const basePriceToCharge = (!hasActiveSub || !isSelectingSamePlanAndCycle || isLocked) ? basePrice : 0;
@@ -368,7 +396,7 @@ export default function Subscription() {
   // Math to strictly calculate only NEWLY added add-ons to charge today
   const addOnsToChargeTotal = addOns.reduce((total, addon) => {
     const newQty = Number(addOnQuantities[addon.id] || 0);
-    const price = billingCycle === "monthly" ? addon.monthlyPrice : addon.annualPrice;
+    const price = getAddOnPrice(addon, accountCountry, billingCycle);
     return total + (price * newQty);
   }, 0);
 
@@ -413,7 +441,11 @@ export default function Subscription() {
         <Card className="bg-card/50">
           <CardHeader>
             <CardTitle>Current Plan Status</CardTitle>
-            <CardDescription>You are currently on the {isTrial ? "7-Day Trial" : (currentPlan === "starter" ? "Starter" : "Professional")} plan</CardDescription>
+            <CardDescription>
+              You are currently on the {isTrial ? "7-Day Trial" : (currentPlan === "starter" ? "Starter" : "Professional")} plan
+              {" • "}
+              Country: {accountCountry}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
@@ -520,7 +552,11 @@ export default function Subscription() {
           </button>
           <span className={`text-sm font-semibold flex items-center gap-2 ${billingCycle === "annual" ? "text-primary" : "text-muted-foreground"}`}>
             Annual Billing
-            <Badge variant="secondary" className="bg-success/15 text-success hover:bg-success/25 border-success/30">Save up to 20%</Badge>
+            {getAvailableBillingCycles(accountCountry).includes("annual") ? (
+              <Badge variant="secondary" className="bg-success/15 text-success hover:bg-success/25 border-success/30">Save up to 20%</Badge>
+            ) : (
+              <Badge variant="secondary">Monthly only</Badge>
+            )}
           </span>
         </div>
 
@@ -551,6 +587,9 @@ export default function Subscription() {
                     <span className="text-muted-foreground font-medium">/{billingCycle === "monthly" ? "mo" : "yr"}</span>
                   </div>
                   {billingCycle === "annual" && plan.id !== "trial" && (
+                    <p className="text-sm text-success mt-1 font-medium">Save AED {getSavings(plan)}/year</p>
+                  )}
+                  {billingCycle === "annual" && getAvailableBillingCycles(accountCountry).includes("annual") && plan.id !== "trial" && (
                     <p className="text-sm text-success mt-1 font-medium">Save AED {getSavings(plan)}/year</p>
                   )}
                 </div>
@@ -609,7 +648,7 @@ export default function Subscription() {
                   </CardHeader>
                   <CardContent className="pb-4 flex-1">
                     <div className="text-3xl font-bold text-primary tracking-tight">
-                      AED {billingCycle === "monthly" ? addon.monthlyPrice : addon.annualPrice}
+                      AED {getPrice(addon)}
                       <span className="text-base font-medium text-muted-foreground">/{billingCycle === "monthly" ? "mo" : "yr"}</span>
                     </div>
                     {!isUnavailable && <div className="text-sm text-muted-foreground mt-2 font-medium">Max Limit: {limit} seat{limit !== 1 ? 's' : ''} {activeQty > 0 ? `(${activeQty} active)` : ''}</div>}
@@ -642,7 +681,7 @@ export default function Subscription() {
                     {isSelected && (
                       <div className="w-full text-center flex flex-col items-center mt-1">
                         <span className="text-sm font-medium text-primary">
-                          Subtotal: AED {(billingCycle === "monthly" ? addon.monthlyPrice : addon.annualPrice) * newQty}
+                          Subtotal: AED {getPrice(addon) * newQty}
                         </span>
                         <span className="text-[10px] font-medium text-muted-foreground mt-0.5">
                           Valid until {newItemsExpiryDate}

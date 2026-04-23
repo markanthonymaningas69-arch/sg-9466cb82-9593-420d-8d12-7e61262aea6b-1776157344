@@ -5,14 +5,16 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Check, Minus, Plus, ShoppingCart, Loader2 } from "lucide-react";
-import { plans, addOns, type PlanConfig } from "@/config/pricing";
+import { plans, addOns, DEFAULT_COUNTRY, COUNTRY_OPTIONS, OUT_OF_SERVICE_MESSAGE, getAddOnPrice, getAvailableBillingCycles, getPlanPrice, isSupportedCountry, type BillingCycle, type CountryOption, type PlanConfig } from "@/config/pricing";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/router";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function PricingPage() {
-  const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
   const [selectedPlan, setSelectedPlan] = useState<string>("professional");
+  const [selectedCountry, setSelectedCountry] = useState<CountryOption>(DEFAULT_COUNTRY);
   const [addOnQuantities, setAddOnQuantities] = useState<Record<string, number>>({});
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const { toast } = useToast();
@@ -20,14 +22,37 @@ export default function PricingPage() {
 
   // Filter out the "trial" plan for the main pricing display
   const displayPlans = plans.filter(p => p.id !== "trial");
+  const availableBillingCycles = getAvailableBillingCycles(selectedCountry);
+  const canUseAnnualBilling = availableBillingCycles.includes("annual");
+
+  React.useEffect(() => {
+    if (!router.isReady) {
+      return;
+    }
+
+    const queryCountry = router.query.country;
+    if (typeof queryCountry === "string" && COUNTRY_OPTIONS.includes(queryCountry as CountryOption)) {
+      setSelectedCountry(queryCountry as CountryOption);
+    }
+  }, [router.isReady, router.query.country]);
+
+  React.useEffect(() => {
+    if (!canUseAnnualBilling && billingCycle === "annual") {
+      setBillingCycle("monthly");
+    }
+  }, [billingCycle, canUseAnnualBilling]);
 
   const getPrice = (plan: PlanConfig) => {
-    return billingCycle === "monthly" ? plan.monthlyPrice : plan.annualPrice;
+    return getPlanPrice(plan, selectedCountry, billingCycle);
   };
 
   const getSavings = (plan: PlanConfig) => {
-    const monthlyCost = plan.monthlyPrice * 12;
-    const annualCost = plan.annualPrice;
+    if (!canUseAnnualBilling) {
+      return 0;
+    }
+
+    const monthlyCost = getPlanPrice(plan, selectedCountry, "monthly") * 12;
+    const annualCost = getPlanPrice(plan, selectedCountry, "annual");
     return monthlyCost - annualCost;
   };
 
@@ -66,11 +91,12 @@ export default function PricingPage() {
   };
 
   // Calculate Totals
-  const basePrice = billingCycle === "monthly" ? currentPlanConfig.monthlyPrice : currentPlanConfig.annualPrice;
+  const effectiveBillingCycle: BillingCycle = canUseAnnualBilling ? billingCycle : "monthly";
+  const basePrice = getPlanPrice(currentPlanConfig, selectedCountry, effectiveBillingCycle);
 
   const addOnsTotal = addOns.reduce((total, addon) => {
     const qty = addOnQuantities[addon.id] || 0;
-    const price = billingCycle === "monthly" ? addon.monthlyPrice : addon.annualPrice;
+    const price = getAddOnPrice(addon, selectedCountry, effectiveBillingCycle);
     return total + (price * qty);
   }, 0);
 
@@ -78,12 +104,21 @@ export default function PricingPage() {
   const totalAddonItems = Object.values(addOnQuantities).reduce((a, b) => a + b, 0);
 
   const handleCheckout = async () => {
+    if (!isSupportedCountry(selectedCountry)) {
+      toast({
+        title: "Country not supported",
+        description: OUT_OF_SERVICE_MESSAGE,
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsCheckingOut(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session?.user) {
-        router.push(`/auth/register?plan=${selectedPlan}&cycle=${billingCycle}`);
+        router.push(`/auth/register?plan=${selectedPlan}&cycle=${effectiveBillingCycle}&country=${encodeURIComponent(selectedCountry)}`);
         return;
       }
       
@@ -92,11 +127,12 @@ export default function PricingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           planId: selectedPlan,
-          billingCycle,
+          billingCycle: effectiveBillingCycle,
+          country: selectedCountry,
           features: addOnQuantities,
           userId: session.user.id,
           email: session.user.email,
-          returnUrl: window.location.origin + '/subscription',
+          returnUrl: window.location.origin + "/subscription",
         }),
       });
 
@@ -139,25 +175,53 @@ export default function PricingPage() {
               Start with a 7-day free trial. Build your perfect package below to see your total.
             </p>
             
-            {/* Global Billing Toggle */}
-            <div className="inline-flex items-center justify-center gap-4 bg-muted/50 py-3 px-6 rounded-full border border-border/50 shadow-sm">
-              <span className={`text-sm font-semibold ${billingCycle === "monthly" ? "text-primary" : "text-muted-foreground"}`}>
-                Monthly Billing
-              </span>
-              <button
-                onClick={() => setBillingCycle(billingCycle === "monthly" ? "annual" : "monthly")}
-                className="relative inline-flex h-7 w-12 items-center rounded-full bg-primary transition-colors focus:outline-none"
-              >
-                <span
-                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
-                    billingCycle === "annual" ? "translate-x-6" : "translate-x-1"
-                  }`}
-                />
-              </button>
-              <span className={`text-sm font-semibold flex items-center gap-2 ${billingCycle === "annual" ? "text-primary" : "text-muted-foreground"}`}>
-                Annual Billing
-                <Badge variant="secondary" className="bg-success/15 text-success hover:bg-success/25 border-success/30 border">Save up to 20%</Badge>
-              </span>
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-full max-w-sm text-left">
+                <p className="text-sm font-semibold text-foreground mb-2">Country</p>
+                <Select value={selectedCountry} onValueChange={(value) => setSelectedCountry(value as CountryOption)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select country" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COUNTRY_OPTIONS.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="inline-flex items-center justify-center gap-4 bg-muted/50 py-3 px-6 rounded-full border border-border/50 shadow-sm">
+                <span className={`text-sm font-semibold ${effectiveBillingCycle === "monthly" ? "text-primary" : "text-muted-foreground"}`}>
+                  Monthly Billing
+                </span>
+                <button
+                  onClick={() => canUseAnnualBilling && setBillingCycle(billingCycle === "monthly" ? "annual" : "monthly")}
+                  disabled={!canUseAnnualBilling}
+                  className="relative inline-flex h-7 w-12 items-center rounded-full bg-primary transition-colors focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
+                      effectiveBillingCycle === "annual" ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+                <span className={`text-sm font-semibold flex items-center gap-2 ${effectiveBillingCycle === "annual" ? "text-primary" : "text-muted-foreground"}`}>
+                  Annual Billing
+                  {canUseAnnualBilling ? (
+                    <Badge variant="secondary" className="bg-success/15 text-success hover:bg-success/25 border-success/30 border">Save up to 20%</Badge>
+                  ) : (
+                    <Badge variant="secondary">Monthly only</Badge>
+                  )}
+                </span>
+              </div>
+
+              {!isSupportedCountry(selectedCountry) && (
+                <p className="text-sm text-destructive font-medium p-2 bg-destructive/10 rounded">
+                  {OUT_OF_SERVICE_MESSAGE}
+                </p>
+              )}
             </div>
           </div>
 
@@ -196,9 +260,9 @@ export default function PricingPage() {
                   <div className="mt-6">
                     <div className="flex items-baseline gap-1">
                       <span className="text-5xl font-bold tracking-tight">AED {getPrice(plan)}</span>
-                      <span className="text-muted-foreground font-medium">/{billingCycle === "monthly" ? "mo" : "yr"}</span>
+                      <span className="text-muted-foreground font-medium">/{effectiveBillingCycle === "monthly" ? "mo" : "yr"}</span>
                     </div>
-                    {billingCycle === "annual" && (
+                    {effectiveBillingCycle === "annual" && (
                       <p className="text-sm font-semibold text-success mt-2">Save AED {getSavings(plan)} annually</p>
                     )}
                   </div>
@@ -246,8 +310,8 @@ export default function PricingPage() {
                     </CardHeader>
                     <CardContent className="pb-4 flex-1">
                       <div className="text-3xl font-bold text-primary tracking-tight">
-                        AED {billingCycle === "monthly" ? addon.monthlyPrice : addon.annualPrice}
-                        <span className="text-base font-normal text-muted-foreground">/{billingCycle === "monthly" ? "mo" : "yr"}</span>
+                        AED {getAddOnPrice(addon, selectedCountry, effectiveBillingCycle)}
+                        <span className="text-base font-normal text-muted-foreground">/{effectiveBillingCycle === "monthly" ? "mo" : "yr"}</span>
                       </div>
                       {!isUnavailable && <div className="text-sm text-muted-foreground mt-2 font-medium">Max Limit: {limit} seat{limit !== 1 ? 's' : ''}</div>}
                     </CardContent>
@@ -280,7 +344,7 @@ export default function PricingPage() {
                       </div>
                       {isSelected && (
                         <div className="w-full text-center text-sm font-semibold text-primary mt-1">
-                          Subtotal: AED {(billingCycle === "monthly" ? addon.monthlyPrice : addon.annualPrice) * qty}
+                          Subtotal: AED {getAddOnPrice(addon, selectedCountry, effectiveBillingCycle) * qty}
                         </div>
                       )}
                     </CardFooter>
@@ -299,7 +363,7 @@ export default function PricingPage() {
                   <h3 className="text-2xl font-bold tracking-tight mb-3">Your Custom Plan</h3>
                   <div className="space-y-2">
                     <div className="flex justify-between items-center text-muted-foreground border-b pb-2">
-                      <span className="font-medium text-foreground">{currentPlanConfig.name} Plan ({billingCycle})</span>
+                      <span className="font-medium text-foreground">{currentPlanConfig.name} Plan ({effectiveBillingCycle})</span>
                       <span className="font-semibold text-foreground">AED {basePrice}</span>
                     </div>
                     
@@ -308,7 +372,7 @@ export default function PricingPage() {
                       const qty = addOnQuantities[addon.id] || 0;
                       if (qty === 0) return null;
                       
-                      const price = billingCycle === "monthly" ? addon.monthlyPrice : addon.annualPrice;
+                      const price = getAddOnPrice(addon, selectedCountry, effectiveBillingCycle);
                       return (
                         <div key={`list-${addon.id}`} className="flex justify-between items-center text-muted-foreground pt-1 pl-2 border-l-2 border-primary/20 ml-1">
                           <span className="text-sm">+ {qty}x {addon.name}</span>
@@ -329,13 +393,13 @@ export default function PricingPage() {
                   <div className="text-center md:text-right w-full">
                     <div className="text-sm font-bold text-muted-foreground uppercase tracking-widest mb-1">Total Due</div>
                     <div className="text-5xl font-black text-primary tracking-tighter">AED {totalAmount}</div>
-                    <div className="text-sm font-semibold text-muted-foreground mt-1">/{billingCycle === "monthly" ? "month" : "year"}</div>
+                    <div className="text-sm font-semibold text-muted-foreground mt-1">/{effectiveBillingCycle === "monthly" ? "month" : "year"}</div>
                   </div>
                   <Button 
                     size="lg" 
                     className="h-16 px-8 text-lg font-bold w-full shadow-md hover:shadow-lg transition-all"
                     onClick={handleCheckout}
-                    disabled={isCheckingOut}
+                    disabled={isCheckingOut || !isSupportedCountry(selectedCountry)}
                   >
                     {isCheckingOut ? <Loader2 className="mr-2 h-6 w-6 animate-spin" /> : <ShoppingCart className="mr-2 h-6 w-6" />}
                     {isCheckingOut ? "Processing..." : "Proceed to Checkout"}
