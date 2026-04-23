@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-empty-object-type */
+ 
 export type Json =
   | string
   | number
@@ -1334,67 +1334,100 @@ export type Database = {
           assigned_team: string | null
           bom_scope_id: string | null
           constraint_type: string | null
+          cost_links: Json | null
           created_at: string | null
           created_by: string | null
           dependencies: Json | null
           description: string | null
           duration_days: number | null
+          duration_source: string | null
           end_date: string
+          equipment: Json | null
           id: string
           name: string
+          notes: string | null
           parent_id: string | null
           priority: string | null
+          productivity_rate_per_day: number | null
+          productivity_rate_per_hour: number | null
           progress: number | null
           project_id: string | null
+          resource_labor: Json | null
+          scope_quantity: number | null
+          scope_unit: string | null
           sort_order: number | null
           start_date: string
           status: string | null
           task_config: Json
+          team_composition: Json | null
           updated_at: string | null
+          working_hours_per_day: number | null
         }
         Insert: {
           assigned_team?: string | null
           bom_scope_id?: string | null
           constraint_type?: string | null
+          cost_links?: Json | null
           created_at?: string | null
           created_by?: string | null
           dependencies?: Json | null
           description?: string | null
           duration_days?: number | null
+          duration_source?: string | null
           end_date: string
+          equipment?: Json | null
           id?: string
           name: string
+          notes?: string | null
           parent_id?: string | null
           priority?: string | null
+          productivity_rate_per_day?: number | null
+          productivity_rate_per_hour?: number | null
           progress?: number | null
           project_id?: string | null
+          resource_labor?: Json | null
+          scope_quantity?: number | null
+          scope_unit?: string | null
           sort_order?: number | null
           start_date: string
           status?: string | null
           task_config?: Json
+          team_composition?: Json | null
           updated_at?: string | null
+          working_hours_per_day?: number | null
         }
         Update: {
           assigned_team?: string | null
           bom_scope_id?: string | null
           constraint_type?: string | null
+          cost_links?: Json | null
           created_at?: string | null
           created_by?: string | null
           dependencies?: Json | null
           description?: string | null
           duration_days?: number | null
+          duration_source?: string | null
           end_date?: string
+          equipment?: Json | null
           id?: string
           name?: string
+          notes?: string | null
           parent_id?: string | null
           priority?: string | null
+          productivity_rate_per_day?: number | null
+          productivity_rate_per_hour?: number | null
           progress?: number | null
           project_id?: string | null
+          resource_labor?: Json | null
+          scope_quantity?: number | null
+          scope_unit?: string | null
           sort_order?: number | null
           start_date?: string
           status?: string | null
           task_config?: Json
+          team_composition?: Json | null
           updated_at?: string | null
+          working_hours_per_day?: number | null
         }
         Relationships: [
           {

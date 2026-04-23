@@ -1,6 +1,6 @@
 ---
 title: Project manager task configuration
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -22,9 +22,9 @@ The implementation should stay extensible so more scope/task rules can be added 
 
 ## Checklist
 - [x] Locate the Project Manager UI and remove the export action
-- [ ] Connect Auto generate from BOM to the current project scopes in the BOM
-- [ ] Refactor Task configuration into Parameters, Schedule, and Resources sections
-- [ ] Add functional productivity inputs for team composition and rate unit
-- [ ] Calculate required duration for a scope from the configured productivity rate
-- [ ] Persist or load task configuration from the existing backend structure if available
-- [ ] Validate the updated Project Manager flow
+- [x] Connect Auto generate from BOM to the current project scopes in the BOM
+- [x] Refactor Task configuration into Parameters, Schedule, and Resources sections
+- [x] Add functional productivity inputs for team composition and rate unit
+- [x] Calculate required duration for a scope from the configured productivity rate
+- [x] Persist or load task configuration from the existing backend structure if available
+- [x] Validate the updated Project Manager flow

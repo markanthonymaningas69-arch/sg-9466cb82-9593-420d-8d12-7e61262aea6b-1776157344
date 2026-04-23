@@ -1,147 +1,24 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { Database } from "@/integrations/supabase/types";
-import {
-  calculateRequiredDurationDays,
-  createDefaultTaskConfiguration,
-  normalizeTaskConfiguration,
-  type TaskConfiguration,
-} from "@/lib/scheduleTaskConfig";
+import { calculateEndDate, hydrateTask, serializeTask, syncTaskDerivedFields, type TaskFormData } from "@/lib/schedule";
 
-type ProjectTaskRow = Database["public"]["Tables"]["project_tasks"]["Row"];
-type ProjectTaskInsert = Database["public"]["Tables"]["project_tasks"]["Insert"];
-type ProjectTaskUpdate = Database["public"]["Tables"]["project_tasks"]["Update"];
-type BomScopeRow = Database["public"]["Tables"]["bom_scope_of_work"]["Row"];
+type SyncMode = "merge" | "resync";
 
-export interface ProjectTaskScope
-  extends Pick<
-    BomScopeRow,
-    "id" | "name" | "description" | "completion_percentage" | "quantity" | "unit" | "total_materials" | "total_labor"
-  > {}
-
-export interface ProjectTask extends ProjectTaskRow {
-  bom_scope: ProjectTaskScope | null;
-}
-
-interface GenerateTasksResult {
-  createdCount: number;
-  updatedCount: number;
-  syncedCount: number;
-}
-
-function toDateOnly(value: Date) {
-  return value.toISOString().split("T")[0];
-}
-
-function addDays(dateValue: string, days: number) {
-  const date = new Date(dateValue);
-  date.setDate(date.getDate() + Math.max(days - 1, 0));
-  return toDateOnly(date);
-}
-
-function getScopeDefaults(scope: ProjectTaskScope | null, assignedTeamName?: string | null) {
-  return {
-    quantity: scope?.quantity ?? 1,
-    unit: scope?.unit ?? "lot",
-    assignedTeamName: assignedTeamName ?? "",
-  };
-}
-
-function buildTaskConfiguration(scope: ProjectTaskScope | null, rawConfig: unknown, assignedTeamName?: string | null) {
-  const defaults = getScopeDefaults(scope, assignedTeamName);
-  const hasConfig = rawConfig && typeof rawConfig === "object" && Object.keys(rawConfig as Record<string, unknown>).length > 0;
-
-  if (!hasConfig) {
-    return createDefaultTaskConfiguration(defaults);
-  }
-
-  return normalizeTaskConfiguration(rawConfig, defaults);
-}
-
-function calculateDurationAndEndDate(
-  taskConfig: TaskConfiguration,
-  startDate?: string | null,
-  currentDuration?: number | null,
-  currentEndDate?: string | null
-) {
-  if (!taskConfig.autoCalculateDuration) {
-    return {
-      durationDays: currentDuration ?? calculateRequiredDurationDays(taskConfig),
-      endDate: currentEndDate ?? (startDate ? addDays(startDate, currentDuration ?? calculateRequiredDurationDays(taskConfig)) : null),
-    };
-  }
-
-  const durationDays = calculateRequiredDurationDays(taskConfig);
-  const endDate = startDate ? addDays(startDate, durationDays) : currentEndDate ?? null;
-
-  return { durationDays, endDate };
-}
-
-async function getLatestBomId(projectId: string) {
-  const { data, error } = await supabase
-    .from("bill_of_materials")
-    .select("id")
-    .eq("project_id", projectId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  if (!data?.id) {
-    throw new Error("No Bill of Materials found for this project. Please create a BOM first.");
-  }
-
-  return data.id;
-}
-
-async function getCurrentBomScopes(projectId: string) {
-  const bomId = await getLatestBomId(projectId);
-
-  const { data, error } = await supabase
-    .from("bom_scope_of_work")
-    .select("id, name, description, completion_percentage, quantity, unit, total_materials, total_labor, order_number")
-    .eq("bom_id", bomId)
-    .order("order_number", { ascending: true });
-
-  if (error) {
-    throw error;
-  }
-
-  if (!data || data.length === 0) {
-    throw new Error("The current Bill of Materials has no scopes of work. Please add scopes to the BOM first.");
-  }
-
-  return data.map((scope) => ({
-    id: scope.id,
-    name: scope.name,
-    description: scope.description,
-    completion_percentage: scope.completion_percentage,
-    quantity: scope.quantity,
-    unit: scope.unit,
-    total_materials: scope.total_materials,
-    total_labor: scope.total_labor,
-  })) as ProjectTaskScope[];
-}
+const taskSelect = `
+  *,
+  bom_scope:bom_scope_id (
+    id,
+    name,
+    quantity,
+    unit,
+    completion_percentage
+  )
+`;
 
 export const scheduleService = {
   async getTasksByProject(projectId: string) {
     const { data, error } = await supabase
       .from("project_tasks")
-      .select(`
-        *,
-        bom_scope:bom_scope_id (
-          id,
-          name,
-          description,
-          completion_percentage,
-          quantity,
-          unit,
-          total_materials,
-          total_labor
-        )
-      `)
+      .select(taskSelect)
       .eq("project_id", projectId)
       .order("sort_order", { ascending: true });
 
@@ -149,65 +26,43 @@ export const scheduleService = {
       throw error;
     }
 
-    return (data || []) as ProjectTask[];
+    return (data || []).map((task) => hydrateTask(task));
   },
 
-  async createTask(taskData: ProjectTaskInsert) {
-    const { data: authData } = await supabase.auth.getUser();
+  async createTask(taskData: TaskFormData) {
+    const { data: { user } } = await supabase.auth.getUser();
+    const payload = {
+      ...serializeTask(taskData),
+      created_by: user?.id || null
+    };
 
     const { data, error } = await supabase
       .from("project_tasks")
-      .insert({
-        ...taskData,
-        created_by: taskData.created_by ?? authData.user?.id ?? null,
-      })
-      .select(`
-        *,
-        bom_scope:bom_scope_id (
-          id,
-          name,
-          description,
-          completion_percentage,
-          quantity,
-          unit,
-          total_materials,
-          total_labor
-        )
-      `)
+      .insert(payload)
+      .select(taskSelect)
       .single();
 
     if (error) {
       throw error;
     }
 
-    return data as ProjectTask;
+    return hydrateTask(data);
   },
 
-  async updateTask(taskId: string, updates: ProjectTaskUpdate) {
+  async updateTask(taskId: string, taskData: TaskFormData) {
+    const payload = serializeTask(taskData);
     const { data, error } = await supabase
       .from("project_tasks")
-      .update(updates)
+      .update(payload)
       .eq("id", taskId)
-      .select(`
-        *,
-        bom_scope:bom_scope_id (
-          id,
-          name,
-          description,
-          completion_percentage,
-          quantity,
-          unit,
-          total_materials,
-          total_labor
-        )
-      `)
+      .select(taskSelect)
       .single();
 
     if (error) {
       throw error;
     }
 
-    return data as ProjectTask;
+    return hydrateTask(data);
   },
 
   async deleteTask(taskId: string) {
@@ -223,104 +78,136 @@ export const scheduleService = {
     return true;
   },
 
-  async generateTasksFromBOM(projectId: string): Promise<GenerateTasksResult> {
-    const scopes = await getCurrentBomScopes(projectId);
-
-    const { data: existingTasks, error: tasksError } = await supabase
-      .from("project_tasks")
-      .select("id, bom_scope_id, start_date, end_date, duration_days, sort_order, assigned_team, task_config")
+  async generateTasksFromBOM(projectId: string, syncMode: SyncMode = "merge") {
+    const { data: bomData, error: bomError } = await supabase
+      .from("bill_of_materials")
+      .select("id")
       .eq("project_id", projectId)
-      .not("bom_scope_id", "is", null);
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (tasksError) {
-      throw tasksError;
+    if (bomError) {
+      throw bomError;
     }
 
-    const existingByScopeId = new Map(
+    if (!bomData?.id) {
+      throw new Error("No Bill of Materials found for this project. Please create a BOM first.");
+    }
+
+    const { data: scopes, error: scopeError } = await supabase
+      .from("bom_scope_of_work")
+      .select("id, name, description, order_number, quantity, unit, completion_percentage")
+      .eq("bom_id", bomData.id)
+      .order("order_number", { ascending: true });
+
+    if (scopeError) {
+      throw scopeError;
+    }
+
+    if (!scopes || scopes.length === 0) {
+      throw new Error("The current Bill of Materials has no scopes to generate.");
+    }
+
+    const { data: existingTasks, error: existingError } = await supabase
+      .from("project_tasks")
+      .select(taskSelect)
+      .eq("project_id", projectId);
+
+    if (existingError) {
+      throw existingError;
+    }
+
+    const existingByScope = new Map(
       (existingTasks || [])
         .filter((task) => task.bom_scope_id)
-        .map((task) => [task.bom_scope_id as string, task])
+        .map((task) => [String(task.bom_scope_id), hydrateTask(task)])
     );
 
-    const { data: authData } = await supabase.auth.getUser();
-    const today = toDateOnly(new Date());
-    let fallbackStartDate = today;
-    let createdCount = 0;
-    let updatedCount = 0;
+    const inserts = [];
+    const updates = [];
 
-    for (const [index, scope] of scopes.entries()) {
-      const existingTask = existingByScopeId.get(scope.id);
-      const taskConfig = buildTaskConfiguration(scope, existingTask?.task_config, existingTask?.assigned_team);
-      const startDate = existingTask?.start_date || fallbackStartDate;
-      const { durationDays, endDate } = calculateDurationAndEndDate(
-        taskConfig,
-        startDate,
-        existingTask?.duration_days,
-        existingTask?.end_date
-      );
+    for (const scope of scopes) {
+      const matchedTask = existingByScope.get(scope.id);
 
-      const payload: ProjectTaskUpdate = {
-        bom_scope_id: scope.id,
-        name: scope.name,
-        description: scope.description || `Generated from BOM scope: ${scope.name}`,
-        start_date: startDate,
-        end_date: endDate || startDate,
-        duration_days: durationDays,
-        sort_order: index,
-        task_config: taskConfig,
-        assigned_team: taskConfig.assignedTeamName || existingTask?.assigned_team || null,
-      };
-
-      if (existingTask?.id) {
-        const { error } = await supabase
-          .from("project_tasks")
-          .update(payload)
-          .eq("id", existingTask.id);
-
-        if (error) {
-          throw error;
-        }
-
-        updatedCount += 1;
-      } else {
-        const insertPayload: ProjectTaskInsert = {
+      if (!matchedTask) {
+        inserts.push({
           project_id: projectId,
           bom_scope_id: scope.id,
-          parent_id: null,
           name: scope.name,
           description: scope.description || `Generated from BOM scope: ${scope.name}`,
-          start_date: startDate,
-          end_date: endDate || startDate,
-          duration_days: durationDays,
-          progress: Number(scope.completion_percentage || 0),
+          start_date: new Date().toISOString().split("T")[0],
+          end_date: calculateEndDate(new Date().toISOString().split("T")[0], 1),
+          duration_days: 1,
+          progress: 0,
+          status: "not_started",
+          sort_order: scope.order_number || 0,
+          scope_quantity: Number(scope.quantity || 1),
+          scope_unit: scope.unit || "lot",
+          productivity_rate_per_hour: 0,
+          productivity_rate_per_day: 0,
+          working_hours_per_day: 8,
+          team_composition: [
+            { id: "mason", role: "Mason", count: 1 },
+            { id: "helper", role: "Helper", count: 1 }
+          ],
+          resource_labor: [
+            { id: "mason", role: "Mason", count: 1 },
+            { id: "helper", role: "Helper", count: 1 }
+          ],
+          equipment: [],
+          cost_links: [],
+          duration_source: "auto",
           dependencies: [],
-          assigned_team: taskConfig.assignedTeamName || null,
+          assigned_team: null,
           priority: "medium",
           constraint_type: "ASAP",
-          status: "pending",
-          sort_order: index,
-          created_by: authData.user?.id ?? null,
-          task_config: taskConfig,
-        };
-
-        const { error } = await supabase
-          .from("project_tasks")
-          .insert(insertPayload);
-
-        if (error) {
-          throw error;
-        }
-
-        createdCount += 1;
+          notes: null
+        });
+        continue;
       }
 
-      fallbackStartDate = addDays(startDate, durationDays);
+      if (syncMode === "resync") {
+        const syncedTask = syncTaskDerivedFields({
+          ...matchedTask,
+          name: scope.name,
+          description: scope.description || matchedTask.description || `Generated from BOM scope: ${scope.name}`,
+          scope_quantity: Number(scope.quantity || matchedTask.scope_quantity || 1),
+          scope_unit: scope.unit || matchedTask.scope_unit || "lot",
+          sort_order: scope.order_number || matchedTask.sort_order || 0,
+          bom_scope: {
+            id: scope.id,
+            name: scope.name,
+            quantity: Number(scope.quantity || 1),
+            unit: scope.unit || "lot",
+            completion_percentage: scope.completion_percentage ?? null
+          }
+        }, matchedTask.duration_source !== "manual");
+
+        updates.push(
+          supabase
+            .from("project_tasks")
+            .update(serializeTask(syncedTask))
+            .eq("id", matchedTask.id)
+        );
+      }
     }
 
-    return {
-      createdCount,
-      updatedCount,
-      syncedCount: scopes.length,
-    };
-  },
+    if (inserts.length > 0) {
+      const { error } = await supabase.from("project_tasks").insert(inserts);
+      if (error) {
+        throw error;
+      }
+    }
+
+    if (updates.length > 0) {
+      const results = await Promise.all(updates);
+      const failed = results.find((result) => result.error);
+      if (failed?.error) {
+        throw failed.error;
+      }
+    }
+
+    return this.getTasksByProject(projectId);
+  }
 };
