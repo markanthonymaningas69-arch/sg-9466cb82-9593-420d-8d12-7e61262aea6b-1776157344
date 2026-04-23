@@ -1,6 +1,6 @@
 ---
 title: AI assistant floating workspace
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -36,7 +36,7 @@ Follow-up fix:
 - [x] Support responsive mobile overlay behavior
 - [x] Validate interaction smoothness and app stability
 - [x] Remove docking and positioning controls from the AI assistant while keeping drag-to-move behavior
-- [ ] Anchor the assistant inside the module body at the bottom-right and preserve drag behavior there
+- [x] Anchor the assistant inside the module body at the bottom-right and preserve drag behavior there
 
 ## Acceptance
 Users can drag, resize, collapse, and restore the AI assistant without blocking the main workspace.
