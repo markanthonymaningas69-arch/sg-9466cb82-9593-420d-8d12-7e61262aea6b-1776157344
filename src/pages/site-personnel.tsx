@@ -847,8 +847,12 @@ export default function SitePersonnel() {
   };
 
   const handleAddItem = () => {
+    if (requestForm.request_type === "Materials" && requestForm.bom_scope_id === "unassigned") {
+      alert("Please select a scope of work first.");
+      return;
+    }
     if (!requestForm.item_name) {
-      alert("Please enter an item name or select one from the BOM.");
+      alert("Please enter an item name or select one from the BOQ material list.");
       return;
     }
     setRequestItems([...requestItems, { ...requestForm }]);
@@ -858,7 +862,7 @@ export default function SitePersonnel() {
       quantity: 0,
       amount: 0,
       notes: "",
-      bom_scope_id: "unassigned"
+      bom_scope_id: prev.request_type === "Materials" ? prev.bom_scope_id : "unassigned"
     }));
     setIsManualRequestItem(false);
   };
