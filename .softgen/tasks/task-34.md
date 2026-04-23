@@ -1,6 +1,6 @@
 ---
 title: AI expert cross-module access
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -19,12 +19,12 @@ Extend the AI Project Expert so it can access and analyze data from all modules 
 The feature should cover the global AI expert experience, the backend chat context assembly, and the module data aggregation layer needed to provide complete project analysis.
 
 ## Checklist
-- [ ] Review the current AI assistant UI entry points and chat API flow
-- [ ] Identify all module and tab data sources that should be included in AI analysis context
-- [ ] Add a shared project context builder for all supported modules and tabs
-- [ ] Update the AI chat API to use the expanded cross-module context
-- [ ] Ensure the AI expert can be opened from the main app flow with access to the active project context
-- [ ] Validate the AI expert returns answers based on data from all modules and tabs
+- [x] Review the current AI assistant UI entry points and chat API flow
+- [x] Identify all module and tab data sources that should be included in AI analysis context
+- [x] Add a shared project context builder for all supported modules and tabs
+- [x] Update the AI chat API to use the expanded cross-module context
+- [x] Ensure the AI expert can be opened from the main app flow with access to the active project context
+- [x] Validate the AI expert returns answers based on data from all modules and tabs
 
 ## Acceptance
 The AI Project Expert can analyze information from all app modules and their tabs for the selected project.
