@@ -1,6 +1,6 @@
 ---
 title: Site personnel request button fix
-status: in_progress
+status: done
 priority: high
 type: bug
 tags:
@@ -13,15 +13,17 @@ position: 35
 ---
 
 ## Notes
-Investigate why the Site Personnel Request action buttons for Material Request, Tools & Equipments, Petty Cash, and Cash Advance are no longer working. The issue persisted after the responsive header layout change, so the fix must verify the actual button click path, dialog state updates, and any disabling logic such as `isLocked`.
+The Site Personnel Request action buttons stopped working because the shared request dialog was no longer mounted in the page. The button handlers still called `openRequestDialog`, but no dialog existed with `requestDialogOpen`, so clicks produced no visible result.
+
+Restore the request dialog for Material Request, Tools & Equipments, Petty Cash, and Cash Advance, keeping the header layout inside the card and preserving the existing request submission handlers.
 
 ## Checklist
-- [ ] Inspect the Request section button JSX and click handlers
-- [ ] Verify whether `isLocked` is preventing interaction
-- [ ] Inspect `openRequestDialog` and related dialog state
-- [ ] Apply the smallest fix that restores button interaction
-- [ ] Validate the Request buttons open the correct dialog again
+- [x] Verify the four request buttons still call the dialog open handler
+- [x] Confirm the request dialog mount is missing from the page
+- [x] Restore the request dialog and reconnect it to `requestDialogOpen`
+- [x] Preserve request form handling for materials, tools, petty cash, and cash advance
+- [x] Validate the buttons open the correct dialog again
 
 ## Acceptance
-Each Request action button opens its corresponding dialog.
+Clicking any of the four Site Personnel request buttons opens the corresponding dialog.
 The Request header still fits within the card without blocking interactions.
