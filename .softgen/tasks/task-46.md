@@ -1,6 +1,6 @@
 ---
 title: AI assistant floating workspace
-status: done
+status: in_progress
 priority: high
 type: feature
 tags:
@@ -18,6 +18,10 @@ Enhance the AI assistant UI so it can float across the application without block
 
 The desktop experience should behave like a movable workspace window with docking and edge snapping. On smaller screens, the assistant should default to a compact floating trigger and expand as an overlay.
 
+Follow-up fix:
+- simplify the desktop assistant controls so the window is draggable only
+- remove docking and manual positioning options from the visible UI while preserving saved drag position
+
 ## Checklist
 - [x] Inspect the existing AI assistant component and where it is mounted in the app shell
 - [x] Implement draggable assistant window with movement constrained to the viewport
@@ -29,8 +33,9 @@ The desktop experience should behave like a movable workspace window with dockin
 - [x] Ensure z-index and pointer behavior keep the assistant non-blocking when idle or minimized
 - [x] Support responsive mobile overlay behavior
 - [x] Validate interaction smoothness and app stability
+- [ ] Remove docking and positioning controls from the AI assistant while keeping drag-to-move behavior
 
 ## Acceptance
-Users can drag, dock, resize, collapse, and restore the AI assistant without blocking the main workspace.
+Users can drag, resize, collapse, and restore the AI assistant without blocking the main workspace.
 The assistant remembers its last position and size after reload.
 On smaller screens, the assistant opens from a compact floating button in overlay mode.
