@@ -1,5 +1,3 @@
-export type ProductivityUnit = "hour" | "day";
-
 export interface TeamRoleAllocation {
   id: string;
   role: string;
@@ -10,11 +8,13 @@ export interface TaskConfiguration {
   scopeQuantity: number;
   scopeUnit: string;
   productivityOutput: number;
-  productivityUnit: ProductivityUnit;
+  productivityUnit: "day";
   workHoursPerDay: number;
   autoCalculateDuration: boolean;
   teamRoles: TeamRoleAllocation[];
   assignedTeamName: string;
+  teamTemplateId: string;
+  numberOfTeams: number;
 }
 
 interface ScopeDefaults {
@@ -22,8 +22,6 @@ interface ScopeDefaults {
   unit?: string | null;
   assignedTeamName?: string | null;
 }
-
-const DEFAULT_WORK_HOURS_PER_DAY = 8;
 
 function toPositiveNumber(value: unknown, fallback: number) {
   const numericValue = Number(value);
@@ -34,17 +32,20 @@ function toWholeNumber(value: unknown, fallback: number) {
   return Math.max(1, Math.round(toPositiveNumber(value, fallback)));
 }
 
-function createRoleId(role: string) {
-  return role
+function slugify(value: string) {
+  return value
     .toLowerCase()
+    .trim()
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "") + "-" + Math.random().toString(36).slice(2, 8);
+    .replace(/^-|-$/g, "");
 }
 
-export function createTeamRole(role = "Worker", quantity = 1): TeamRoleAllocation {
+export function createTeamRole(role = "Worker", quantity = 1, index = 0): TeamRoleAllocation {
+  const normalizedRole = role.trim() || "Worker";
+
   return {
-    id: createRoleId(role),
-    role,
+    id: `${slugify(normalizedRole) || "role"}-${index + 1}`,
+    role: normalizedRole,
     quantity: toWholeNumber(quantity, 1),
   };
 }
@@ -57,10 +58,12 @@ export function createDefaultTaskConfiguration(scopeDefaults?: ScopeDefaults): T
     scopeUnit: scopeDefaults?.unit?.trim() || "lot",
     productivityOutput: scopeQuantity,
     productivityUnit: "day",
-    workHoursPerDay: DEFAULT_WORK_HOURS_PER_DAY,
+    workHoursPerDay: 8,
     autoCalculateDuration: true,
-    teamRoles: [createTeamRole("Mason", 1), createTeamRole("Helper", 1)],
+    teamRoles: [createTeamRole("Mason", 1, 0), createTeamRole("Helper", 1, 1)],
     assignedTeamName: scopeDefaults?.assignedTeamName?.trim() || "",
+    teamTemplateId: "",
+    numberOfTeams: 1,
   };
 }
 
@@ -72,59 +75,100 @@ export function normalizeTaskConfiguration(rawValue: unknown, scopeDefaults?: Sc
     : [];
 
   const normalizedRoles = rawTeamRoles
-    .filter((role) => Boolean(role && typeof role === "object"))
     .map((role, index) => {
-      const typedRole = role as Record<string, unknown>;
+      const typedRole = role && typeof role === "object" ? (role as Record<string, unknown>) : {};
+      const roleName = typeof typedRole.role === "string" && typedRole.role.trim() ? typedRole.role.trim() : "Worker";
+
       return {
-        id: typeof typedRole.id === "string" && typedRole.id
-          ? typedRole.id
-          : createRoleId(typeof typedRole.role === "string" ? typedRole.role : "worker-" + index),
-        role: typeof typedRole.role === "string" && typedRole.role.trim() ? typedRole.role.trim() : "Worker",
+        id: typeof typedRole.id === "string" && typedRole.id ? typedRole.id : `${slugify(roleName) || "role"}-${index + 1}`,
+        role: roleName,
         quantity: toWholeNumber(typedRole.quantity, 1),
       };
-    });
+    })
+    .filter((role) => role.role.trim().length > 0);
 
   return {
-    scopeQuantity: toPositiveNumber(typedValue.scopeQuantity, fallback.scopeQuantity),
-    scopeUnit: typeof typedValue.scopeUnit === "string" && typedValue.scopeUnit.trim()
-      ? typedValue.scopeUnit.trim()
-      : fallback.scopeUnit,
+    scopeQuantity: toPositiveNumber(scopeDefaults?.quantity ?? typedValue.scopeQuantity, fallback.scopeQuantity),
+    scopeUnit:
+      typeof (scopeDefaults?.unit ?? typedValue.scopeUnit) === "string" && String(scopeDefaults?.unit ?? typedValue.scopeUnit).trim()
+        ? String(scopeDefaults?.unit ?? typedValue.scopeUnit).trim()
+        : fallback.scopeUnit,
     productivityOutput: toPositiveNumber(typedValue.productivityOutput, fallback.productivityOutput),
-    productivityUnit: typedValue.productivityUnit === "hour" ? "hour" : "day",
-    workHoursPerDay: toPositiveNumber(typedValue.workHoursPerDay, fallback.workHoursPerDay),
-    autoCalculateDuration: typeof typedValue.autoCalculateDuration === "boolean"
-      ? typedValue.autoCalculateDuration
-      : fallback.autoCalculateDuration,
+    productivityUnit: "day",
+    workHoursPerDay: 8,
+    autoCalculateDuration: true,
     teamRoles: normalizedRoles.length > 0 ? normalizedRoles : fallback.teamRoles,
-    assignedTeamName: typeof typedValue.assignedTeamName === "string"
-      ? typedValue.assignedTeamName
-      : fallback.assignedTeamName,
+    assignedTeamName:
+      typeof typedValue.assignedTeamName === "string" && typedValue.assignedTeamName.trim()
+        ? typedValue.assignedTeamName.trim()
+        : fallback.assignedTeamName,
+    teamTemplateId: typeof typedValue.teamTemplateId === "string" ? typedValue.teamTemplateId : fallback.teamTemplateId,
+    numberOfTeams: toWholeNumber(typedValue.numberOfTeams, fallback.numberOfTeams),
   };
+}
+
+export function applyTeamTemplate(
+  config: TaskConfiguration,
+  template: {
+    id: string;
+    name: string;
+    roles: Array<{ id?: string; role: string; quantity: number }>;
+  }
+): TaskConfiguration {
+  const normalizedConfig = normalizeTaskConfiguration(config);
+
+  return normalizeTaskConfiguration({
+    ...normalizedConfig,
+    teamTemplateId: template.id,
+    assignedTeamName: template.name,
+    teamRoles: template.roles.map((role, index) => ({
+      id: role.id || `${slugify(role.role) || "role"}-${index + 1}`,
+      role: role.role,
+      quantity: role.quantity,
+    })),
+  });
+}
+
+export function calculateTotalDailyOutput(config: TaskConfiguration) {
+  const normalizedConfig = normalizeTaskConfiguration(config);
+  return normalizedConfig.productivityOutput * normalizedConfig.numberOfTeams;
 }
 
 export function calculateRequiredDurationDays(config: TaskConfiguration) {
   const normalizedConfig = normalizeTaskConfiguration(config);
   const scopeQuantity = toPositiveNumber(normalizedConfig.scopeQuantity, 1);
-  const productivityOutput = toPositiveNumber(normalizedConfig.productivityOutput, scopeQuantity);
-  const rawDuration = scopeQuantity / productivityOutput;
+  const totalDailyOutput = calculateTotalDailyOutput(normalizedConfig);
 
-  if (normalizedConfig.productivityUnit === "day") {
-    return Math.max(1, Math.ceil(rawDuration));
+  if (totalDailyOutput <= 0) {
+    return 1;
   }
 
-  const workHoursPerDay = toPositiveNumber(normalizedConfig.workHoursPerDay, DEFAULT_WORK_HOURS_PER_DAY);
-  return Math.max(1, Math.ceil(rawDuration / workHoursPerDay));
+  return Math.max(1, Math.ceil(scopeQuantity / totalDailyOutput));
+}
+
+export function getTaskConfigurationValidation(config: TaskConfiguration) {
+  const normalizedConfig = normalizeTaskConfiguration(config);
+
+  return {
+    teamTemplateValid: normalizedConfig.teamTemplateId.trim().length > 0,
+    numberOfTeamsValid: normalizedConfig.numberOfTeams >= 1,
+    productivityValid: normalizedConfig.productivityOutput > 0,
+    isValid:
+      normalizedConfig.teamTemplateId.trim().length > 0 &&
+      normalizedConfig.numberOfTeams >= 1 &&
+      normalizedConfig.productivityOutput > 0,
+  };
 }
 
 export function getProductivitySummary(config: TaskConfiguration) {
   const normalizedConfig = normalizeTaskConfiguration(config);
-  const teamLabel = normalizedConfig.teamRoles
-    .map((role) => role.quantity + " " + role.role)
-    .join(" + ");
+  const teamLabel = normalizedConfig.teamRoles.map((role) => `${role.quantity} ${role.role}`).join(" + ");
+  const totalDailyOutput = calculateTotalDailyOutput(normalizedConfig);
 
   return {
     teamLabel,
-    outputLabel: normalizedConfig.productivityOutput + " " + normalizedConfig.scopeUnit + " per " + normalizedConfig.productivityUnit,
+    perTeamOutputLabel: `${normalizedConfig.productivityOutput} ${normalizedConfig.scopeUnit} per team per day`,
+    totalOutputLabel: `${totalDailyOutput} ${normalizedConfig.scopeUnit} per day`,
     durationDays: calculateRequiredDurationDays(normalizedConfig),
   };
 }

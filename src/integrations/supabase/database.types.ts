@@ -971,6 +971,41 @@ export type Database = {
           },
         ]
       }
+      master_team_templates: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          id: string
+          name: string
+          roles: Json
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          name: string
+          roles?: Json
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          name?: string
+          roles?: Json
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "master_team_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       material_consumption: {
         Row: {
           bom_scope_id: string | null
@@ -1346,6 +1381,7 @@ export type Database = {
           id: string
           name: string
           notes: string | null
+          number_of_teams: number
           parent_id: string | null
           priority: string | null
           productivity_rate_per_day: number | null
@@ -1360,6 +1396,7 @@ export type Database = {
           status: string | null
           task_config: Json
           team_composition: Json | null
+          team_template_id: string | null
           updated_at: string | null
           working_hours_per_day: number | null
         }
@@ -1379,6 +1416,7 @@ export type Database = {
           id?: string
           name: string
           notes?: string | null
+          number_of_teams?: number
           parent_id?: string | null
           priority?: string | null
           productivity_rate_per_day?: number | null
@@ -1393,6 +1431,7 @@ export type Database = {
           status?: string | null
           task_config?: Json
           team_composition?: Json | null
+          team_template_id?: string | null
           updated_at?: string | null
           working_hours_per_day?: number | null
         }
@@ -1412,6 +1451,7 @@ export type Database = {
           id?: string
           name?: string
           notes?: string | null
+          number_of_teams?: number
           parent_id?: string | null
           priority?: string | null
           productivity_rate_per_day?: number | null
@@ -1426,6 +1466,7 @@ export type Database = {
           status?: string | null
           task_config?: Json
           team_composition?: Json | null
+          team_template_id?: string | null
           updated_at?: string | null
           working_hours_per_day?: number | null
         }
@@ -1449,6 +1490,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_tasks_team_template_id_fkey"
+            columns: ["team_template_id"]
+            isOneToOne: false
+            referencedRelation: "master_team_templates"
             referencedColumns: ["id"]
           },
         ]

@@ -5,18 +5,20 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import type { TaskFormData } from "@/lib/schedule";
 import {
+  applyTeamTemplate,
   calculateRequiredDurationDays,
-  createTeamRole,
+  calculateTotalDailyOutput,
   getProductivitySummary,
+  getTaskConfigurationValidation,
   normalizeTaskConfiguration,
   type TaskConfiguration,
 } from "@/lib/scheduleTaskConfig";
-import type { TaskFormData } from "@/lib/schedule";
-import { AlignLeft, Clock, DollarSign, Package, Plus, Save, Settings2, Trash2, Users, Wrench, X } from "lucide-react";
+import type { MasterTeamTemplate } from "@/services/masterCatalogService";
+import { AlignLeft, Clock, Package, Save, Settings2, Trash2, Users, Wrench } from "lucide-react";
 
 type EditableTaskScope = NonNullable<TaskFormData["bom_scope"]>;
 
@@ -29,16 +31,11 @@ export interface EditableProjectTask extends Omit<TaskFormData, "bom_scope" | "t
 interface TaskConfigurationPanelProps {
   task: EditableProjectTask | null;
   tasks: EditableProjectTask[];
+  teamTemplates?: MasterTeamTemplate[];
   saving: boolean;
   onTaskChange: (task: EditableProjectTask) => void;
   onSave: () => void;
   onDelete: () => void;
-}
-
-function formatScopeBudget(task: EditableProjectTask) {
-  const materials = Number(task.bom_scope?.total_materials || 0);
-  const labor = Number(task.bom_scope?.total_labor || 0);
-  return materials + labor;
 }
 
 function getDependencyIds(task: EditableProjectTask) {
@@ -48,6 +45,7 @@ function getDependencyIds(task: EditableProjectTask) {
 export function TaskConfigurationPanel({
   task,
   tasks,
+  teamTemplates = [],
   saving,
   onTaskChange,
   onSave,
@@ -77,12 +75,15 @@ export function TaskConfigurationPanel({
     unit: task.bom_scope?.unit,
     assignedTeamName: task.assigned_team,
   });
-  const otherTasks = tasks.filter((item) => item.id !== task.id);
   const dependencyIds = getDependencyIds(task);
-  const productivitySummary = getProductivitySummary(taskConfig);
-  const requiredDays = calculateRequiredDurationDays(taskConfig);
+  const otherTasks = tasks.filter((item) => item.id !== task.id);
   const linkedMaterials = Array.isArray(task.bom_scope?.materials) ? task.bom_scope.materials : [];
   const equipmentValue = Array.isArray(task.equipment) ? task.equipment.join("\n") : "";
+  const productivitySummary = getProductivitySummary(taskConfig);
+  const validation = getTaskConfigurationValidation(taskConfig);
+  const estimatedDuration = calculateRequiredDurationDays(taskConfig);
+  const totalDailyOutput = calculateTotalDailyOutput(taskConfig);
+  const selectedTemplate = teamTemplates.find((template) => template.id === taskConfig.teamTemplateId) || null;
 
   const handleTaskConfigChange = (updates: Partial<TaskConfiguration>) => {
     onTaskChange({
@@ -98,32 +99,6 @@ export function TaskConfigurationPanel({
           assignedTeamName: task.assigned_team,
         }
       ),
-    });
-  };
-
-  const handleRoleChange = (roleId: string, updates: { role?: string; quantity?: number }) => {
-    handleTaskConfigChange({
-      teamRoles: taskConfig.teamRoles.map((role) =>
-        role.id === roleId
-          ? {
-              ...role,
-              role: updates.role ?? role.role,
-              quantity: Math.max(1, Math.round(updates.quantity ?? role.quantity)),
-            }
-          : role
-      ),
-    });
-  };
-
-  const handleAddRole = () => {
-    handleTaskConfigChange({
-      teamRoles: [...taskConfig.teamRoles, createTeamRole("Worker", 1)],
-    });
-  };
-
-  const handleRemoveRole = (roleId: string) => {
-    handleTaskConfigChange({
-      teamRoles: taskConfig.teamRoles.filter((role) => role.id !== roleId),
     });
   };
 
@@ -163,101 +138,31 @@ export function TaskConfigurationPanel({
 
           <div className="p-4 space-y-4">
             <TabsContent value="parameters" className="space-y-4 mt-0">
-              <div className="space-y-2">
-                <Label htmlFor="task-name" className="text-xs">Task Name</Label>
-                <Input
-                  id="task-name"
-                  value={task.name || ""}
-                  onChange={(event) => onTaskChange({ ...task, name: event.target.value })}
-                  className="h-8 text-sm"
-                />
-              </div>
-
-              {task.bom_scope && (
-                <div className="bg-muted/50 p-3 rounded-md border text-sm space-y-2">
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="h-4 w-4 text-primary" />
-                    <span className="font-semibold">Linked Scope</span>
-                  </div>
-                  <p className="text-muted-foreground text-xs">{task.bom_scope.name}</p>
-                  <div className="flex flex-wrap gap-2 text-xs">
-                    <Badge variant="outline">
-                      Qty: {taskConfig.scopeQuantity} {taskConfig.scopeUnit}
-                    </Badge>
-                    <Badge variant="outline">
-                      Budget: AED {formatScopeBudget(task).toLocaleString()}
-                    </Badge>
-                    <Badge variant="outline">
-                      Required days: {requiredDays}
-                    </Badge>
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label className="text-xs">Status</Label>
-                  <Select value={task.status || "pending"} onValueChange={(value) => onTaskChange({ ...task, status: value })}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="delayed">Delayed</SelectItem>
-                    </SelectContent>
-                  </Select>
+              <section className="space-y-3 rounded-md border p-3">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-semibold text-foreground">Basic Info</h3>
+                  <p className="text-[11px] text-muted-foreground">These values are synced from the linked BOM scope and can only be changed in the BOM module.</p>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs">Priority</Label>
-                  <Select value={task.priority || "medium"} onValueChange={(value) => onTaskChange({ ...task, priority: value })}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="critical">Critical</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label className="text-xs">Task Name</Label>
+                  <Input value={task.bom_scope?.name || task.name || ""} readOnly className="h-8 text-sm bg-muted/50" />
                 </div>
-              </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Scope Quantity</Label>
+                  <div className="grid grid-cols-[1fr_110px] gap-2">
+                    <Input value={String(task.bom_scope?.quantity ?? taskConfig.scopeQuantity)} readOnly className="h-8 text-sm bg-muted/50" />
+                    <Input value={task.bom_scope?.unit || taskConfig.scopeUnit} readOnly className="h-8 text-sm bg-muted/50" />
+                  </div>
+                </div>
+              </section>
 
-              <div className="space-y-2">
-                <Label className="text-xs">Scope Quantity</Label>
-                <div className="grid grid-cols-[1fr_120px] gap-2">
-                  <Input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    value={taskConfig.scopeQuantity}
-                    onChange={(event) =>
-                      handleTaskConfigChange({
-                        scopeQuantity: Number(event.target.value) || 1,
-                      })
-                    }
-                    className="h-8 text-sm"
-                  />
-                  <Input
-                    value={taskConfig.scopeUnit}
-                    onChange={(event) =>
-                      handleTaskConfigChange({
-                        scopeUnit: event.target.value || "lot",
-                      })
-                    }
-                    className="h-8 text-sm"
-                  />
+              <section className="space-y-3 rounded-md border p-3">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-semibold text-foreground">Productivity</h3>
+                  <p className="text-[11px] text-muted-foreground">Enter the daily output of one team. The schedule will multiply it by the number of teams.</p>
                 </div>
-              </div>
-
-              <div className="space-y-2 rounded-md border p-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs font-semibold">Team productivity rate</Label>
-                  <Badge variant="secondary">{productivitySummary.durationDays} day estimate</Badge>
-                </div>
-                <div className="grid grid-cols-[1fr_110px] gap-2">
+                <div className="space-y-2">
+                  <Label className="text-xs">Output per team per day</Label>
                   <Input
                     type="number"
                     min="0.01"
@@ -265,99 +170,110 @@ export function TaskConfigurationPanel({
                     value={taskConfig.productivityOutput}
                     onChange={(event) =>
                       handleTaskConfigChange({
-                        productivityOutput: Number(event.target.value) || 1,
+                        productivityOutput: Number(event.target.value) || 0,
                       })
                     }
                     className="h-8 text-sm"
                   />
+                </div>
+                {!validation.productivityValid && <p className="text-[11px] text-destructive">Productivity must be greater than 0.</p>}
+              </section>
+
+              <section className="space-y-3 rounded-md border p-3">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-semibold text-foreground">Team Composition</h3>
+                  <p className="text-[11px] text-muted-foreground">Choose a team template from the Master Catalog Engine and set how many teams will work on this scope.</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Team Type</Label>
                   <Select
-                    value={taskConfig.productivityUnit}
-                    onValueChange={(value) =>
-                      handleTaskConfigChange({
-                        productivityUnit: value === "hour" ? "hour" : "day",
-                      })
-                    }
+                    value={taskConfig.teamTemplateId || undefined}
+                    onValueChange={(templateId) => {
+                      const template = teamTemplates.find((item) => item.id === templateId);
+                      if (!template) {
+                        return;
+                      }
+
+                      const nextConfig = applyTeamTemplate(taskConfig, template);
+
+                      onTaskChange({
+                        ...task,
+                        assigned_team: template.name,
+                        team_template_id: template.id,
+                        number_of_teams: nextConfig.numberOfTeams,
+                        task_config: nextConfig,
+                      });
+                    }}
                   >
                     <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
+                      <SelectValue placeholder="Select a team template" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="hour">Per Hour</SelectItem>
-                      <SelectItem value="day">Per Day</SelectItem>
+                      {teamTemplates.map((template) => (
+                        <SelectItem key={template.id} value={template.id}>
+                          {template.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
+                  {teamTemplates.length === 0 && (
+                    <p className="text-[11px] text-muted-foreground">No team templates found in the Master Catalog Engine yet.</p>
+                  )}
+                  {!validation.teamTemplateValid && teamTemplates.length > 0 && (
+                    <p className="text-[11px] text-destructive">Team Type is required.</p>
+                  )}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Current setup: {productivitySummary.teamLabel || "No roles"} completes {productivitySummary.outputLabel}
-                </p>
-                {taskConfig.productivityUnit === "hour" && (
-                  <div className="space-y-2">
-                    <Label className="text-xs">Work hours per day</Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      step="0.5"
-                      value={taskConfig.workHoursPerDay}
-                      onChange={(event) =>
-                        handleTaskConfigChange({
-                          workHoursPerDay: Number(event.target.value) || 8,
-                        })
-                      }
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                )}
-              </div>
 
-              <div className="space-y-3 rounded-md border p-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs font-semibold">Team composition</Label>
-                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleAddRole}>
-                    <Plus className="h-3 w-3 mr-1" />
-                    Add Role
-                  </Button>
-                </div>
                 <div className="space-y-2">
-                  {taskConfig.teamRoles.map((role) => (
-                    <div key={role.id} className="grid grid-cols-[1fr_80px_32px] gap-2 items-center">
-                      <Input
-                        value={role.role}
-                        onChange={(event) => handleRoleChange(role.id, { role: event.target.value })}
-                        className="h-8 text-sm"
-                      />
-                      <Input
-                        type="number"
-                        min="1"
-                        step="1"
-                        value={role.quantity}
-                        onChange={(event) => handleRoleChange(role.id, { quantity: Number(event.target.value) || 1 })}
-                        className="h-8 text-sm"
-                      />
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8"
-                        onClick={() => handleRemoveRole(role.id)}
-                        disabled={taskConfig.teamRoles.length === 1}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
+                  <Label className="text-xs">Team Members</Label>
+                  <div className="rounded-md border bg-muted/20 p-3">
+                    {taskConfig.teamRoles.length > 0 ? (
+                      <div className="space-y-2">
+                        {taskConfig.teamRoles.map((role) => (
+                          <div key={role.id} className="flex items-center justify-between text-xs">
+                            <span className="text-foreground">{role.role}</span>
+                            <Badge variant="outline">{role.quantity}</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Select a team type to load the member breakdown.</p>
+                    )}
+                  </div>
+                  {selectedTemplate && <p className="text-[11px] text-muted-foreground">Template: {selectedTemplate.name}</p>}
                 </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label className="text-xs">Progress ({task.progress || 0}%)</Label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={task.progress || 0}
-                  onChange={(event) => onTaskChange({ ...task, progress: parseInt(event.target.value, 10) || 0 })}
-                  className="w-full accent-primary"
-                />
-              </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Number of Teams</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={taskConfig.numberOfTeams}
+                    onChange={(event) => {
+                      const value = Math.max(1, Math.round(Number(event.target.value) || 1));
+                      handleTaskConfigChange({ numberOfTeams: value });
+                      onTaskChange({
+                        ...task,
+                        number_of_teams: value,
+                      });
+                    }}
+                    className="h-8 text-sm"
+                  />
+                  {!validation.numberOfTeamsValid && <p className="text-[11px] text-destructive">Number of Teams must be at least 1.</p>}
+                </div>
+
+                <div className="rounded-md border bg-primary/5 p-3 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-foreground">Estimated Duration</span>
+                    <Badge>{estimatedDuration} days</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{productivitySummary.teamLabel || "No team members selected"}</p>
+                  <p className="text-xs text-muted-foreground">Output per team: {productivitySummary.perTeamOutputLabel}</p>
+                  <p className="text-xs text-muted-foreground">Total output with {taskConfig.numberOfTeams} team(s): {totalDailyOutput} {taskConfig.scopeUnit} per day</p>
+                </div>
+              </section>
             </TabsContent>
 
             <TabsContent value="schedule" className="space-y-4 mt-0">
@@ -373,44 +289,14 @@ export function TaskConfigurationPanel({
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs">End Date</Label>
-                  <Input
-                    type="date"
-                    value={task.end_date || ""}
-                    onChange={(event) => onTaskChange({ ...task, end_date: event.target.value })}
-                    className="h-8 text-xs"
-                    disabled={taskConfig.autoCalculateDuration}
-                  />
+                  <Input type="date" value={task.end_date || ""} readOnly className="h-8 text-xs bg-muted/50" />
                 </div>
               </div>
 
               <div className="space-y-2 rounded-md border p-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs font-semibold">Duration</Label>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="auto-duration"
-                      checked={taskConfig.autoCalculateDuration}
-                      onCheckedChange={(checked) =>
-                        handleTaskConfigChange({
-                          autoCalculateDuration: checked,
-                        })
-                      }
-                    />
-                    <Label htmlFor="auto-duration" className="text-[10px]">Auto-calc</Label>
-                  </div>
-                </div>
-                <Input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={task.duration_days || requiredDays}
-                  onChange={(event) => onTaskChange({ ...task, duration_days: Number(event.target.value) || 1 })}
-                  className="h-8 text-sm"
-                  disabled={taskConfig.autoCalculateDuration}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Required duration from parameters: {requiredDays} day(s)
-                </p>
+                <Label className="text-xs font-semibold">Calculated Duration</Label>
+                <Input type="number" value={estimatedDuration} readOnly className="h-8 text-sm bg-muted/50" />
+                <p className="text-xs text-muted-foreground">Duration updates automatically from scope quantity, productivity, and number of teams.</p>
               </div>
 
               <div className="space-y-2 rounded-md border p-3">
@@ -437,30 +323,13 @@ export function TaskConfigurationPanel({
             </TabsContent>
 
             <TabsContent value="resources" className="space-y-4 mt-0">
-              <div className="space-y-2">
-                <Label className="text-xs flex items-center">
-                  <Users className="h-3 w-3 mr-1" />
-                  Assigned Team Name
-                </Label>
-                <Input
-                  value={taskConfig.assignedTeamName}
-                  onChange={(event) =>
-                    handleTaskConfigChange({
-                      assignedTeamName: event.target.value,
-                    })
-                  }
-                  className="h-8 text-sm"
-                  placeholder="Masonry Team A"
-                />
-              </div>
-
               <div className="rounded-md border p-3 space-y-2 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-foreground">Resource summary</span>
-                  <Badge variant="outline">{requiredDays} days</Badge>
+                  <Badge variant="outline">{estimatedDuration} days</Badge>
                 </div>
-                <p className="text-muted-foreground">{productivitySummary.teamLabel || "No roles assigned"}</p>
-                <p className="text-muted-foreground">Output: {productivitySummary.outputLabel}</p>
+                <p className="text-muted-foreground">{productivitySummary.teamLabel || "No team roles assigned"}</p>
+                <p className="text-muted-foreground">Daily output: {productivitySummary.totalOutputLabel}</p>
               </div>
 
               <div className="space-y-2 rounded-md border p-3">
@@ -504,7 +373,6 @@ export function TaskConfigurationPanel({
                     })
                   }
                 />
-                <p className="text-[11px] text-muted-foreground">These items will appear in the Calendar View daily equipment summary.</p>
               </div>
 
               <div className="space-y-2">
@@ -522,7 +390,7 @@ export function TaskConfigurationPanel({
       </div>
 
       <div className="p-4 border-t bg-muted/10 shrink-0 flex gap-2">
-        <Button className="flex-1 h-9 text-xs" onClick={onSave} disabled={saving}>
+        <Button className="flex-1 h-9 text-xs" onClick={onSave} disabled={saving || !validation.isValid}>
           {saving ? (
             <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>
           ) : (
