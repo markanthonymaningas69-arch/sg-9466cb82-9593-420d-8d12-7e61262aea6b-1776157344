@@ -6,6 +6,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
 interface PlanningWorkspaceShellProps {
@@ -35,6 +36,7 @@ export function PlanningWorkspaceShell({
   panelWidthClassName = "lg:grid-cols-[minmax(0,1fr)_24rem]",
   className,
 }: PlanningWorkspaceShellProps) {
+  const isMobile = useIsMobile();
   const desktopGridClassName = panelOpen
     ? panelWidthClassName
     : "lg:grid-cols-[minmax(0,1fr)]";
@@ -77,19 +79,21 @@ export function PlanningWorkspaceShell({
         <div className="h-full lg:hidden">{mainContent}</div>
       </div>
 
-      <Sheet open={panelOpen} onOpenChange={onPanelOpenChange}>
-        <SheetContent side="right" className="w-full max-w-[420px] p-0 lg:hidden">
-          <SheetHeader className="border-b px-4 py-3 text-left">
-            <SheetTitle>{panelTitle}</SheetTitle>
-            {panelDescription ? (
-              <SheetDescription>{panelDescription}</SheetDescription>
-            ) : null}
-          </SheetHeader>
-          <div className="h-[calc(100vh-4.75rem)] overflow-y-auto px-4 py-4">
-            {sidePanelPlaceholder || sidePanel}
-          </div>
-        </SheetContent>
-      </Sheet>
+      {isMobile ? (
+        <Sheet open={panelOpen} onOpenChange={onPanelOpenChange}>
+          <SheetContent side="right" className="w-full max-w-[420px] p-0 lg:hidden">
+            <SheetHeader className="border-b px-4 py-3 text-left">
+              <SheetTitle>{panelTitle}</SheetTitle>
+              {panelDescription ? (
+                <SheetDescription>{panelDescription}</SheetDescription>
+              ) : null}
+            </SheetHeader>
+            <div className="h-[calc(100vh-4.75rem)] overflow-y-auto px-4 py-4">
+              {sidePanelPlaceholder || sidePanel}
+            </div>
+          </SheetContent>
+        </Sheet>
+      ) : null}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 ---
 title: Project Manager workspace layout
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -29,7 +29,7 @@ Follow-up fix:
 - [x] Expand the main view area dynamically when the configuration panel is hidden
 - [x] Ensure responsive behavior uses a right-side drawer on smaller screens
 - [x] Validate scrolling, resizing, and overall layout behavior across List, Gantt, Calendar, and S-Curve views
-- [ ] Remove the blocking dark overlay from the desktop side panel while preserving mobile drawer behavior
+- [x] Remove the blocking dark overlay from the desktop side panel while preserving mobile drawer behavior
 
 ## Acceptance
 Project Manager uses a full-height planning workspace with the main view occupying the maximum available vertical area.
