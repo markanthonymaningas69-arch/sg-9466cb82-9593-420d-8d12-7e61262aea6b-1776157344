@@ -1,6 +1,6 @@
 ---
 title: Site request form refinement
-status: done
+status: in_progress
 priority: high
 type: feature
 tags:
@@ -15,9 +15,12 @@ position: 36
 ## Notes
 Refine the Site Personnel create request flow so Materials only shows items linked to the selected scope of work, based on the BOQ/BOM data source used by the project. Tools & Equipments should keep an appropriate request form layout separate from materials.
 
-Latest follow-up change: keep the Tools & Equipments modal blank for now. Do not show any form inputs until the user provides the final list of required fields.
-
-Additional follow-up: remove duplicated field sections that are currently showing across all request button modal variants, including Materials, Tools & Equipments, Cash Advance, and Petty Cash.
+Latest follow-up changes:
+- keep the Tools & Equipments modal blank for now
+- remove duplicated field sections across all request types
+- in Material Request, show the Estimated Amount field only when the selected material is not listed in the BOQ/BOM
+- remove the "Material Request, Only BOQ/BOM..." helper copy
+- remove the "Requested By" field from the Material Request modal
 
 ## Checklist
 - [x] Separate materials and tools request form experiences in the Site Request dialog
@@ -30,8 +33,13 @@ Additional follow-up: remove duplicated field sections that are currently showin
 - [x] Identify the duplicated field blocks in the shared request modal
 - [x] Remove duplicated inputs for Materials, Tools & Equipments, Cash Advance, and Petty Cash
 - [x] Validate each request type shows only its intended fields
+- [ ] Remove the Requested By field from Material Request
+- [ ] Hide Estimated Amount for BOQ/BOM-listed materials and show it only for non-listed materials
+- [ ] Remove the Material Request helper copy above the form
+- [ ] Validate the material modal behavior for listed versus manual items
 
 ## Acceptance
 In Material Request, only materials linked to the selected scope appear in the material dropdown.
+In Material Request, Estimated Amount only appears for materials not listed in the BOQ/BOM and the Requested By field is removed.
 In Tools & Equipments request, the modal opens as a blank shell with no input fields until the final field list is provided.
 Each request button opens a modal without duplicated field sections.
