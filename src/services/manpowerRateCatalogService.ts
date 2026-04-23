@@ -8,11 +8,19 @@ type ManpowerRateUpdate = Database["public"]["Tables"]["manpower_rate_catalog"][
 type ProjectTaskRow = Database["public"]["Tables"]["project_tasks"]["Row"];
 type TaskLaborCostInsert = Database["public"]["Tables"]["task_labor_costs"]["Insert"];
 
+export type ManpowerRateCategory = "office" | "construction";
+export type ManpowerRateStatus = "active" | "inactive";
+
 export interface ManpowerRateCatalogItem {
   id: string;
   positionName: string;
+  category: ManpowerRateCategory;
   dailyRate: number;
+  hourlyRate: number;
   overtimeRate: number;
+  currency: string;
+  effectiveDate: string;
+  status: ManpowerRateStatus;
   createdAt: string;
   updatedAt: string;
 }
@@ -27,12 +35,46 @@ interface LaborRefreshResult {
   recalculatedProjectCount: number;
 }
 
+interface SaveRateInput {
+  positionName: string;
+  category: ManpowerRateCategory;
+  dailyRate: number;
+  hourlyRate?: number;
+  overtimeRate: number;
+  currency: string;
+  effectiveDate: string;
+  status: ManpowerRateStatus;
+}
+
+function normalizeCategory(value: string | null | undefined): ManpowerRateCategory {
+  return value === "office" ? "office" : "construction";
+}
+
+function normalizeStatus(value: string | null | undefined): ManpowerRateStatus {
+  return value === "inactive" ? "inactive" : "active";
+}
+
+function calculateHourlyRate(dailyRate: number, explicitHourlyRate?: number) {
+  if (explicitHourlyRate && explicitHourlyRate > 0) {
+    return Number(explicitHourlyRate.toFixed(2));
+  }
+
+  return Number((dailyRate / 8).toFixed(2));
+}
+
 function normalizeRate(row: ManpowerRateRow): ManpowerRateCatalogItem {
+  const dailyRate = Number(row.daily_rate || 0);
+
   return {
     id: row.id,
     positionName: row.position_name,
-    dailyRate: Number(row.daily_rate || 0),
+    category: normalizeCategory(row.category),
+    dailyRate,
+    hourlyRate: Number(row.hourly_rate || calculateHourlyRate(dailyRate)),
     overtimeRate: Number(row.overtime_rate || 0),
+    currency: row.currency || "AED",
+    effectiveDate: row.effective_date || "",
+    status: normalizeStatus(row.status),
     createdAt: row.created_at || "",
     updatedAt: row.updated_at || "",
   };
@@ -59,7 +101,8 @@ function parseTeamComposition(value: unknown): TeamCompositionRole[] {
         return null;
       }
 
-      const quantitySource = typeof typed.count === "number" || typeof typed.count === "string" ? typed.count : typed.quantity;
+      const quantitySource =
+        typeof typed.count === "number" || typeof typed.count === "string" ? typed.count : typed.quantity;
 
       return {
         role,
@@ -69,11 +112,29 @@ function parseTeamComposition(value: unknown): TeamCompositionRole[] {
     .filter((entry): entry is TeamCompositionRole => Boolean(entry));
 }
 
+function buildPayload(input: SaveRateInput): ManpowerRateInsert | ManpowerRateUpdate {
+  const dailyRate = Number(input.dailyRate || 0);
+
+  return {
+    position_name: input.positionName.trim(),
+    category: input.category,
+    daily_rate: dailyRate,
+    hourly_rate: calculateHourlyRate(dailyRate, input.hourlyRate),
+    overtime_rate: Number(input.overtimeRate || 0),
+    currency: input.currency.trim() || "AED",
+    effective_date: input.effectiveDate,
+    status: input.status,
+  };
+}
+
 export const manpowerRateCatalogService = {
   async getAll() {
     const { data, error } = await supabase
       .from("manpower_rate_catalog")
-      .select("id, position_name, daily_rate, overtime_rate, created_at, updated_at")
+      .select(
+        "id, position_name, category, daily_rate, hourly_rate, overtime_rate, currency, effective_date, status, created_at, updated_at"
+      )
+      .order("category", { ascending: true })
       .order("position_name", { ascending: true });
 
     if (error) {
@@ -83,17 +144,32 @@ export const manpowerRateCatalogService = {
     return (data || []).map((row) => normalizeRate(row as ManpowerRateRow));
   },
 
-  async create(input: { positionName: string; dailyRate: number; overtimeRate: number }) {
-    const payload: ManpowerRateInsert = {
-      position_name: input.positionName.trim(),
-      daily_rate: Number(input.dailyRate || 0),
-      overtime_rate: Number(input.overtimeRate || 0),
-    };
+  async getActive() {
+    const { data, error } = await supabase
+      .from("manpower_rate_catalog")
+      .select(
+        "id, position_name, category, daily_rate, hourly_rate, overtime_rate, currency, effective_date, status, created_at, updated_at"
+      )
+      .eq("status", "active")
+      .order("category", { ascending: true })
+      .order("position_name", { ascending: true });
+
+    if (error) {
+      throw error;
+    }
+
+    return (data || []).map((row) => normalizeRate(row as ManpowerRateRow));
+  },
+
+  async create(input: SaveRateInput) {
+    const payload = buildPayload(input);
 
     const { data, error } = await supabase
       .from("manpower_rate_catalog")
       .insert(payload)
-      .select("id, position_name, daily_rate, overtime_rate, created_at, updated_at")
+      .select(
+        "id, position_name, category, daily_rate, hourly_rate, overtime_rate, currency, effective_date, status, created_at, updated_at"
+      )
       .single();
 
     if (error) {
@@ -103,11 +179,9 @@ export const manpowerRateCatalogService = {
     return normalizeRate(data as ManpowerRateRow);
   },
 
-  async update(id: string, input: { positionName: string; dailyRate: number; overtimeRate: number }) {
+  async update(id: string, input: SaveRateInput) {
     const payload: ManpowerRateUpdate = {
-      position_name: input.positionName.trim(),
-      daily_rate: Number(input.dailyRate || 0),
-      overtime_rate: Number(input.overtimeRate || 0),
+      ...buildPayload(input),
       updated_at: new Date().toISOString(),
     };
 
@@ -115,7 +189,9 @@ export const manpowerRateCatalogService = {
       .from("manpower_rate_catalog")
       .update(payload)
       .eq("id", id)
-      .select("id, position_name, daily_rate, overtime_rate, created_at, updated_at")
+      .select(
+        "id, position_name, category, daily_rate, hourly_rate, overtime_rate, currency, effective_date, status, created_at, updated_at"
+      )
       .single();
 
     if (error) {

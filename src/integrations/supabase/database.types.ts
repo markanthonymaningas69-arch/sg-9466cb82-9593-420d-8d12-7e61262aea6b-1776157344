@@ -900,30 +900,45 @@ export type Database = {
       }
       manpower_rate_catalog: {
         Row: {
+          category: string
           company_id: string
           created_at: string
+          currency: string
           daily_rate: number
+          effective_date: string
+          hourly_rate: number
           id: string
           overtime_rate: number
           position_name: string
+          status: string
           updated_at: string
         }
         Insert: {
+          category?: string
           company_id?: string
           created_at?: string
+          currency?: string
           daily_rate?: number
+          effective_date?: string
+          hourly_rate?: number
           id?: string
           overtime_rate?: number
           position_name: string
+          status?: string
           updated_at?: string
         }
         Update: {
+          category?: string
           company_id?: string
           created_at?: string
+          currency?: string
           daily_rate?: number
+          effective_date?: string
+          hourly_rate?: number
           id?: string
           overtime_rate?: number
           position_name?: string
+          status?: string
           updated_at?: string
         }
         Relationships: [
@@ -1193,6 +1208,7 @@ export type Database = {
           created_source: string | null
           daily_rate: number | null
           email: string
+          employment_type: string
           hire_date: string
           hourly_rate: number | null
           id: string
@@ -1200,7 +1216,9 @@ export type Database = {
           name: string
           overtime_rate: number | null
           phone: string | null
+          position_id: string | null
           project_id: string | null
+          rate_snapshot: Json
           role: string
           status: string
           updated_source: string | null
@@ -1212,6 +1230,7 @@ export type Database = {
           created_source?: string | null
           daily_rate?: number | null
           email: string
+          employment_type?: string
           hire_date: string
           hourly_rate?: number | null
           id?: string
@@ -1219,7 +1238,9 @@ export type Database = {
           name: string
           overtime_rate?: number | null
           phone?: string | null
+          position_id?: string | null
           project_id?: string | null
+          rate_snapshot?: Json
           role: string
           status: string
           updated_source?: string | null
@@ -1231,6 +1252,7 @@ export type Database = {
           created_source?: string | null
           daily_rate?: number | null
           email?: string
+          employment_type?: string
           hire_date?: string
           hourly_rate?: number | null
           id?: string
@@ -1238,7 +1260,9 @@ export type Database = {
           name?: string
           overtime_rate?: number | null
           phone?: string | null
+          position_id?: string | null
           project_id?: string | null
+          rate_snapshot?: Json
           role?: string
           status?: string
           updated_source?: string | null
@@ -1250,6 +1274,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "personnel_position_id_fkey"
+            columns: ["position_id"]
+            isOneToOne: false
+            referencedRelation: "manpower_rate_catalog"
             referencedColumns: ["id"]
           },
           {

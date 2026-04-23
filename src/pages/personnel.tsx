@@ -18,9 +18,32 @@ import type { Database } from "@/integrations/supabase/types";
 import { useSettings } from "@/contexts/SettingsProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { ManpowerRateCatalogTab } from "@/components/personnel/ManpowerRateCatalogTab";
+import { PositionRateSelector } from "@/components/personnel/PositionRateSelector";
 
 type Personnel = Database["public"]["Tables"]["personnel"]["Row"];
 type Project = Database["public"]["Tables"]["projects"]["Row"];
+
+const EMPLOYMENT_TYPE_OPTIONS = [
+  { value: "full_time", label: "Full-time" },
+  { value: "contract", label: "Contract" },
+  { value: "daily", label: "Daily" },
+] as const;
+
+function readRateSnapshot(person: any) {
+  if (!person?.rate_snapshot || typeof person.rate_snapshot !== "object" || Array.isArray(person.rate_snapshot)) {
+    return null;
+  }
+
+  const snapshot = person.rate_snapshot as Record<string, unknown>;
+
+  return {
+    category: snapshot.category === "office" ? "office" : "construction",
+    dailyRate: Number(snapshot.daily_rate || 0),
+    hourlyRate: Number(snapshot.hourly_rate || 0),
+    overtimeRate: Number(snapshot.overtime_rate || 0),
+    currency: typeof snapshot.currency === "string" ? snapshot.currency : "",
+  };
+}
 
 export default function Personnel() {
   const { currency, isLocked } = useSettings();
@@ -49,14 +72,17 @@ export default function Personnel() {
   const [formData, setFormData] = useState({
     name: "",
     role: "",
+    position_id: "",
     project_id: "",
     phone: "",
     email: "",
     hourly_rate: "",
     daily_rate: "",
     overtime_rate: "",
+    rate_currency: currency,
     status: "active" as const,
     worker_type: "construction" as "construction" | "office",
+    employment_type: "full_time" as "full_time" | "contract" | "daily",
     hire_date: new Date().toISOString().split("T")[0]
   });
 
@@ -108,12 +134,13 @@ export default function Personnel() {
   }, []);
 
   const loadData = async () => {
-    const [personnelData, projectsData, attendanceData, leaveData, visaData] = await Promise.all([
+    const [personnelData, projectsData, attendanceData, leaveData, visaData, catalogItems] = await Promise.all([
       personnelService.getAll(),
       projectService.getAll(),
       personnelService.getAttendance(attStartDate, attEndDate),
       personnelService.getLeaveRequests(),
-      personnelService.getVisas()
+      personnelService.getVisas(),
+      manpowerRateCatalogService.getAll().catch(() => []),
     ]);
     
     setPersonnel(personnelData.data || []);
@@ -121,6 +148,7 @@ export default function Personnel() {
     setAttendance(attendanceData.data || []);
     setLeaveRequests(leaveData.data || []);
     setVisas(visaData.data || []);
+    setRateCatalogItems(catalogItems);
     setLoading(false);
   };
 
@@ -195,19 +223,25 @@ export default function Personnel() {
     loadData();
   };
 
-  const handleEdit = (person: Personnel) => {
+  const handleEdit = (person: any) => {
+    const rateSnapshot = readRateSnapshot(person);
+    const rateCurrency = rateSnapshot?.currency || currency;
+
     setEditingPersonnel(person);
     setFormData({
       name: person.name,
       role: person.role,
+      position_id: person.position_id || "",
       project_id: person.project_id || "",
       phone: person.phone || "",
       email: person.email || "",
-      hourly_rate: person.hourly_rate?.toString() || "",
-      daily_rate: person.daily_rate?.toString() || "",
-      overtime_rate: person.overtime_rate?.toString() || "",
-      status: person.status as any,
-      worker_type: (person.worker_type as any) || "construction",
+      hourly_rate: String(rateSnapshot?.hourlyRate ?? person.hourly_rate ?? ""),
+      daily_rate: String(rateSnapshot?.dailyRate ?? person.daily_rate ?? ""),
+      overtime_rate: String(rateSnapshot?.overtimeRate ?? person.overtime_rate ?? ""),
+      rate_currency: rateCurrency,
+      status: (person.status === "on_leave" ? "on-leave" : person.status) as any,
+      worker_type: (rateSnapshot?.category || person.worker_type || "construction") as any,
+      employment_type: (person.employment_type || "full_time") as any,
       hire_date: person.hire_date || new Date().toISOString().split("T")[0]
     });
     setDialogOpen(true);
@@ -231,17 +265,19 @@ export default function Personnel() {
     setFormData({
       name: "",
       role: "",
+      position_id: "",
       project_id: "",
       phone: "",
       email: "",
       hourly_rate: "",
       daily_rate: "",
       overtime_rate: "",
+      rate_currency: currency,
       status: "active",
       worker_type: "construction",
+      employment_type: "full_time",
       hire_date: new Date().toISOString().split("T")[0]
     });
-    setIsManualRole(false);
     setEditingPersonnel(null);
   };
 
