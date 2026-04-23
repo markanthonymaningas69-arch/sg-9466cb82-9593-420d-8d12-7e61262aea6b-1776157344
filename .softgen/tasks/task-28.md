@@ -17,13 +17,18 @@ Add country selection to account creation so users can be isolated in the databa
 
 Follow-up feedback: the signup screen currently shows the email field twice, and the country selector should show Asian country choices together with UAE and Australia while keeping the support rules intact.
 
+Latest feedback: replace the country dropdown with a selector that allows typing and filters choices by the typed starting letters, keep the country field blank by default, and remove suggestion placeholders from the full name and email inputs.
+
 ## Checklist
 - [x] Add country selector to the registration form
 - [x] Block signup for unsupported countries with the required out-of-service message
 - [x] Persist the selected country to the profiles table
 - [x] Validate the signup flow and error handling
-- [ ] Remove the duplicated email input from the registration form
-- [ ] Update the country selector choices to show Asian countries, UAE, and Australia
+- [x] Remove the duplicated email input from the registration form
+- [x] Update the country selector choices to show Asian countries, UAE, and Australia
+- [ ] Replace the country field with a searchable type-to-filter selector
+- [ ] Make the country field blank by default
+- [ ] Remove placeholder suggestions from the full name and email inputs
 - [ ] Revalidate the signup form behavior
 
 ## Acceptance
