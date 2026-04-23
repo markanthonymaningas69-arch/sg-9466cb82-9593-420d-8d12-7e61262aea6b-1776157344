@@ -30,6 +30,8 @@ const EMPLOYMENT_TYPE_OPTIONS = [
   { value: "daily", label: "Daily" },
 ] as const;
 
+const UNASSIGNED_PROJECT_VALUE = "__unassigned_project__";
+
 interface PersonnelFormState {
   name: string;
   role: string;
@@ -533,12 +535,20 @@ export default function Personnel() {
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="project_id">Assigned Project</Label>
-                        <Select value={formData.project_id} onValueChange={(value) => setFormData({ ...formData, project_id: value })}>
+                        <Select
+                          value={formData.project_id || UNASSIGNED_PROJECT_VALUE}
+                          onValueChange={(value) =>
+                            setFormData({
+                              ...formData,
+                              project_id: value === UNASSIGNED_PROJECT_VALUE ? "" : value,
+                            })
+                          }
+                        >
                           <SelectTrigger>
                             <SelectValue placeholder="Select project" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">Unassigned</SelectItem>
+                            <SelectItem value={UNASSIGNED_PROJECT_VALUE}>Unassigned</SelectItem>
                             {projects.map((project) => (
                               <SelectItem key={project.id} value={project.id}>
                                 {project.name}
