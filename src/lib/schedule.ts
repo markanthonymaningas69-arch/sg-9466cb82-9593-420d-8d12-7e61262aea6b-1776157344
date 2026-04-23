@@ -41,6 +41,8 @@ export interface TaskFormData
   bom_scope?: TaskScopeSummary | null;
 }
 
+export type ProjectTask = TaskFormData;
+
 const DEFAULT_ROLE_ALLOCATION: TaskRoleAllocation[] = [
   { id: "mason", role: "Mason", count: 1 },
   { id: "helper", role: "Helper", count: 1 },
