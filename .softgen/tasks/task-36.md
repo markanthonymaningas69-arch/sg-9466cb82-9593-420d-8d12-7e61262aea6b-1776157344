@@ -1,6 +1,6 @@
 ---
 title: Site request form refinement
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -27,9 +27,9 @@ Additional follow-up: remove duplicated field sections that are currently showin
 - [x] Validate that changing the selected scope updates the available material choices correctly
 - [x] Remove extra fields from the Tools & Equipments request modal
 - [x] Remove any remaining input boxes from the Tools & Equipments modal
-- [ ] Identify the duplicated field blocks in the shared request modal
-- [ ] Remove duplicated inputs for Materials, Tools & Equipments, Cash Advance, and Petty Cash
-- [ ] Validate each request type shows only its intended fields
+- [x] Identify the duplicated field blocks in the shared request modal
+- [x] Remove duplicated inputs for Materials, Tools & Equipments, Cash Advance, and Petty Cash
+- [x] Validate each request type shows only its intended fields
 
 ## Acceptance
 In Material Request, only materials linked to the selected scope appear in the material dropdown.
