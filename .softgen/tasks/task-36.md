@@ -33,9 +33,9 @@ Latest follow-up changes:
 - [x] Identify the duplicated field blocks in the shared request modal
 - [x] Remove duplicated inputs for Materials, Tools & Equipments, Cash Advance, and Petty Cash
 - [x] Validate each request type shows only its intended fields
-- [ ] Remove the Requested By field from Material Request
-- [ ] Hide Estimated Amount for BOQ/BOM-listed materials and show it only for non-listed materials
-- [ ] Remove the Material Request helper copy above the form
+- [x] Remove the Requested By field from Material Request
+- [x] Hide Estimated Amount for BOQ/BOM-listed materials and show it only for non-listed materials
+- [x] Remove the Material Request helper copy above the form
 - [ ] Validate the material modal behavior for listed versus manual items
 
 ## Acceptance
