@@ -1,6 +1,6 @@
 ---
 title: Project Manager workspace layout
-status: done
+status: in_progress
 priority: high
 type: feature
 tags:
@@ -18,6 +18,10 @@ Redesign the Project Manager module into a full-height planning workspace. The m
 
 The workspace must minimize top spacing, keep the toolbar compact, prevent whole-page scrolling, and support responsive behavior where the right-side panel becomes a slide-over drawer on smaller screens.
 
+Follow-up fix:
+- remove the blocking dark screen effect when the right-side task configuration panel is shown on desktop
+- keep drawer overlay behavior only for smaller screens where the panel becomes a slide-over
+
 ## Checklist
 - [x] Audit the current Project Manager page layout and shared app shell constraints
 - [x] Build a full-height workspace shell with compact toolbar and internal panel scrolling
@@ -25,6 +29,7 @@ The workspace must minimize top spacing, keep the toolbar compact, prevent whole
 - [x] Expand the main view area dynamically when the configuration panel is hidden
 - [x] Ensure responsive behavior uses a right-side drawer on smaller screens
 - [x] Validate scrolling, resizing, and overall layout behavior across List, Gantt, Calendar, and S-Curve views
+- [ ] Remove the blocking dark overlay from the desktop side panel while preserving mobile drawer behavior
 
 ## Acceptance
 Project Manager uses a full-height planning workspace with the main view occupying the maximum available vertical area.
