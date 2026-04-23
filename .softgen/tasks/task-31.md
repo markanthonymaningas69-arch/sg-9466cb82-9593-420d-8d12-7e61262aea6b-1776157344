@@ -1,6 +1,6 @@
 ---
 title: Country-specific subscription flow
-status: done
+status: in_progress
 priority: high
 type: feature
 tags:
@@ -20,6 +20,8 @@ GCash payment details have not been provided yet, so the Philippines payment act
 
 Follow-up: switch the Philippines payment path from a generic manual link to a PayMongo-powered GCash checkout flow using environment variables. Use secure server-side handling only and keep the architecture ready for more country/payment providers later.
 
+Latest feedback: after a successful PayMongo payment, the subscription is not being activated and the account remains in trial. Add the missing subscription persistence/verification flow and provide the webhook URL path for PayMongo configuration.
+
 ## Checklist
 - [x] Add shared country payment/subscription configuration for future country expansion
 - [x] Update subscription page to branch by active account country
@@ -31,6 +33,11 @@ Follow-up: switch the Philippines payment path from a generic manual link to a P
 - [x] Create a server-side PayMongo checkout endpoint for Philippines GCash payments
 - [x] Connect the Philippines subscription action to the PayMongo checkout flow
 - [x] Revalidate the subscription flow after PayMongo integration
+- [ ] Trace the successful PayMongo payment path and identify why the subscription record is not updated
+- [ ] Add a server-side PayMongo webhook handler that activates the subscription after confirmed payment
+- [ ] Update the subscription page to reflect successful PayMongo payments correctly
+- [ ] Provide the webhook URL path the user should paste into PayMongo
+- [ ] Revalidate the Philippines payment success flow
 
 ## Acceptance
 When the active country is Philippines, the subscription page shows the Philippines-specific flow with Peso currency.
