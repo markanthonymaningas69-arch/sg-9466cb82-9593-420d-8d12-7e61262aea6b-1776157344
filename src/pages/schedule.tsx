@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Layout } from "@/components/Layout";
+import { GanttView } from "@/components/schedule/GanttView";
 import { TaskConfigurationPanel, type EditableProjectTask } from "@/components/schedule/TaskConfigurationPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -254,6 +255,7 @@ export default function SchedulePage() {
   const [selectedProject, setSelectedProject] = useState("");
   const [tasks, setTasks] = useState<EditableProjectTask[]>([]);
   const [selectedTask, setSelectedTask] = useState<EditableProjectTask | null>(null);
+  const [viewMode, setViewMode] = useState<"list" | "gantt">("list");
   const [manpowerRates, setManpowerRates] = useState<ManpowerRateRecord[]>([]);
   const [materialDeliveryPlansByTask, setMaterialDeliveryPlansByTask] = useState<Record<string, SaveTaskMaterialDeliveryPlanInput[]>>({});
   const [laborCostSummaries, setLaborCostSummaries] = useState<Record<string, ComputedTaskLaborCostSummary | null>>({});
@@ -470,6 +472,24 @@ export default function SchedulePage() {
             <p className="text-sm text-muted-foreground">Dynamic task scheduling with dependency logic, delivery planning, and labor costing.</p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="flex rounded-lg border bg-card p-1">
+              <Button
+                type="button"
+                variant={viewMode === "list" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("list")}
+              >
+                Task List
+              </Button>
+              <Button
+                type="button"
+                variant={viewMode === "gantt" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("gantt")}
+              >
+                Gantt View
+              </Button>
+            </div>
             <Select value={selectedProject} onValueChange={setSelectedProject}>
               <SelectTrigger className="w-full sm:w-[260px]">
                 <SelectValue placeholder="Select project" />
@@ -494,7 +514,7 @@ export default function SchedulePage() {
 
         <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
           <Card>
-            <CardHeader><CardTitle>Task List</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{viewMode === "gantt" ? "Gantt View" : "Task List"}</CardTitle></CardHeader>
             <CardContent>
               {!selectedProject ? (
                 <p className="text-sm text-muted-foreground">Select a project to manage task schedule, resources, and cost planning.</p>
@@ -502,6 +522,8 @@ export default function SchedulePage() {
                 <p className="text-sm text-muted-foreground">Loading schedule...</p>
               ) : tasks.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No tasks yet. Sync the BOM or add a task manually.</p>
+              ) : viewMode === "gantt" ? (
+                <GanttView tasks={tasks} />
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">

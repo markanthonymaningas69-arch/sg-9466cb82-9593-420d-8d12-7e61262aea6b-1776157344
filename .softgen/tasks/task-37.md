@@ -1,6 +1,6 @@
 ---
 title: Dependency scheduling upgrade
-status: in_progress
+status: done
 priority: urgent
 type: feature
 tags:
@@ -23,8 +23,8 @@ This task covers the schedule UI, persistence model, and scheduling logic requir
 - [x] Remove Save Task and Delete Task actions from the task configuration panel and keep auto-save only
 - [x] Extend task dependency data to support dependency type, multiple predecessors, and lag time
 - [x] Update schedule logic so task dates recalculate dynamically from dependency relationships
-- [ ] Update Gantt rendering to reflect dependency relationship data
-- [ ] Validate that task edits auto-save and deletion remains available only from the main task list
+- [x] Update Gantt rendering to reflect dependency relationship data
+- [x] Validate that task edits auto-save and deletion remains available only from the main task list
 
 ## Acceptance
 Task Configuration no longer shows Save Task or Delete Task buttons.

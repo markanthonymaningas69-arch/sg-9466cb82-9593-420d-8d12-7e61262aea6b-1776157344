@@ -1,6 +1,6 @@
 ---
 title: Material delivery planning
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -24,7 +24,7 @@ This task covers the Resources UI, delivery schedule generation, task-linked sto
 - [x] Add Material Delivery Planning UI with delivery type, start date, frequency, duration, and timeline output
 - [x] Auto-link materials from the task BOM scope into delivery planning
 - [x] Auto-save per-task material delivery settings and timeline output
-- [ ] Validate delivery planning behavior when task schedule dates change
+- [x] Validate delivery planning behavior when task schedule dates change
 
 ## Acceptance
 Each task shows linked BOM materials in the Resources tab under Material Delivery Planning.
