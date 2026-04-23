@@ -1,6 +1,6 @@
 ---
 title: Country-specific subscription flow
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -30,7 +30,7 @@ Follow-up: switch the Philippines payment path from a generic manual link to a P
 - [x] Add PayMongo configuration that reads secure environment variables
 - [x] Create a server-side PayMongo checkout endpoint for Philippines GCash payments
 - [x] Connect the Philippines subscription action to the PayMongo checkout flow
-- [ ] Revalidate the subscription flow after PayMongo integration
+- [x] Revalidate the subscription flow after PayMongo integration
 
 ## Acceptance
 When the active country is Philippines, the subscription page shows the Philippines-specific flow with Peso currency.
