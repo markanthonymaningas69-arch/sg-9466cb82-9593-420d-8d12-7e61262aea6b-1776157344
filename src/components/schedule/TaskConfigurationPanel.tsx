@@ -114,7 +114,7 @@ export function TaskConfigurationPanel({
   };
 
   const toggleDependency = (dependencyId: string) => {
-    const nextDependencies = dependencyIds.includes(dependencyId)
+    const nextDependencies: TaskDependency[] = dependencyIds.includes(dependencyId)
       ? dependencies.filter((item) => item.taskId !== dependencyId)
       : [
           ...dependencies,
