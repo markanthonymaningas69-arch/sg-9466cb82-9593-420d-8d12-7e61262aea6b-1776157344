@@ -1,6 +1,6 @@
 ---
 title: Site request form refinement
-status: done
+status: in_progress
 priority: high
 type: feature
 tags:
@@ -17,7 +17,7 @@ Refine the Site Personnel create request flow so Materials only shows items link
 
 Latest follow-up change: keep the Tools & Equipments modal blank for now. Do not show any form inputs until the user provides the final list of required fields.
 
-Additional follow-up: remove any remaining input boxes from the Tools & Equipments modal so the dialog is fully empty except for its shell.
+Additional follow-up: remove duplicated field sections that are currently showing across all request button modal variants, including Materials, Tools & Equipments, Cash Advance, and Petty Cash.
 
 ## Checklist
 - [x] Separate materials and tools request form experiences in the Site Request dialog
@@ -27,8 +27,11 @@ Additional follow-up: remove any remaining input boxes from the Tools & Equipmen
 - [x] Validate that changing the selected scope updates the available material choices correctly
 - [x] Remove extra fields from the Tools & Equipments request modal
 - [x] Remove any remaining input boxes from the Tools & Equipments modal
-- [x] Preserve the Material Request behavior while the tools modal remains blank
+- [ ] Identify the duplicated field blocks in the shared request modal
+- [ ] Remove duplicated inputs for Materials, Tools & Equipments, Cash Advance, and Petty Cash
+- [ ] Validate each request type shows only its intended fields
 
 ## Acceptance
 In Material Request, only materials linked to the selected scope appear in the material dropdown.
 In Tools & Equipments request, the modal opens as a blank shell with no input fields until the final field list is provided.
+Each request button opens a modal without duplicated field sections.
