@@ -20,10 +20,10 @@ Build the S-Curve calculation pipeline for each project using planned schedule a
 This task covers baseline cost extraction, actual cost/progress extraction, daily aggregation, cumulative calculations, and persistence of project daily S-Curve snapshots.
 
 ## Checklist
-- [ ] Inspect current project schedule, labor cost, material delivery, and execution progress data sources
-- [ ] Add persistent storage for daily S-Curve aggregates with project_id, date, planned_value, actual_value, earned_value
-- [ ] Create calculation utilities for daily PV, AV, EV and cumulative totals
-- [ ] Create service methods to generate and read S-Curve aggregates per project
+- [x] Inspect current project schedule, labor cost, material delivery, and execution progress data sources
+- [x] Add persistent storage for daily S-Curve aggregates with project_id, date, planned_value, actual_value, earned_value
+- [x] Create calculation utilities for daily PV, AV, EV and cumulative totals
+- [x] Create service methods to generate and read S-Curve aggregates per project
 - [ ] Recalculate aggregates when schedule, planned cost, or actual execution data changes
 
 ## Acceptance

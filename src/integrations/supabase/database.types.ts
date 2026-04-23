@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -1398,6 +1398,57 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_scurve_daily: {
+        Row: {
+          actual_value: number
+          company_id: string
+          created_at: string
+          date: string
+          earned_value: number
+          id: string
+          planned_value: number
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          actual_value?: number
+          company_id?: string
+          created_at?: string
+          date: string
+          earned_value?: number
+          id?: string
+          planned_value?: number
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          actual_value?: number
+          company_id?: string
+          created_at?: string
+          date?: string
+          earned_value?: number
+          id?: string
+          planned_value?: number
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_scurve_daily_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_scurve_daily_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
