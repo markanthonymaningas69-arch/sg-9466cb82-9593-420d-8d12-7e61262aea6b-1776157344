@@ -19,6 +19,10 @@ Build the S-Curve calculation pipeline for each project using planned schedule a
 
 This task covers baseline cost extraction, actual cost/progress extraction, daily aggregation, cumulative calculations, and persistence of project daily S-Curve snapshots.
 
+Progress update:
+- Project Manager now exposes an S-Curve view per selected project
+- Schedule edits, BOM sync, planned material delivery updates, and labor cost updates now trigger recalculation
+
 ## Checklist
 - [x] Inspect current project schedule, labor cost, material delivery, and execution progress data sources
 - [x] Add persistent storage for daily S-Curve aggregates with project_id, date, planned_value, actual_value, earned_value

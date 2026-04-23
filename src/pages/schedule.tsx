@@ -3,6 +3,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { Layout } from "@/components/Layout";
 import { CalendarView } from "@/components/schedule/CalendarView";
 import { GanttView } from "@/components/schedule/GanttView";
+import { SCurveView } from "@/components/schedule/SCurveView";
 import { TaskConfigurationPanel, type EditableProjectTask } from "@/components/schedule/TaskConfigurationPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ import { calculateRequiredDurationDays, createDefaultTaskConfiguration, normaliz
 import { supabase } from "@/integrations/supabase/client";
 import { projectService } from "@/services/projectService";
 import { scheduleService } from "@/services/scheduleService";
+import { scurveService } from "@/services/scurveService";
 import { taskPlanningService, type SaveTaskMaterialDeliveryPlanInput } from "@/services/taskPlanningService";
 
 type ScheduleTaskRecord = TaskFormData & { task_config?: unknown; bom_scope?: EditableProjectTask["bom_scope"] };
@@ -256,7 +258,7 @@ export default function SchedulePage() {
   const [selectedProject, setSelectedProject] = useState("");
   const [tasks, setTasks] = useState<EditableProjectTask[]>([]);
   const [selectedTask, setSelectedTask] = useState<EditableProjectTask | null>(null);
-  const [viewMode, setViewMode] = useState<"list" | "gantt" | "calendar">("list");
+  const [viewMode, setViewMode] = useState<"list" | "gantt" | "calendar" | "scurve">("list");
   const [manpowerRates, setManpowerRates] = useState<ManpowerRateRecord[]>([]);
   const [materialDeliveryPlansByTask, setMaterialDeliveryPlansByTask] = useState<Record<string, SaveTaskMaterialDeliveryPlanInput[]>>({});
   const [laborCostSummaries, setLaborCostSummaries] = useState<Record<string, ComputedTaskLaborCostSummary | null>>({});
@@ -286,6 +288,14 @@ export default function SchedulePage() {
       toast({ title: "Error", description: "Failed to load projects", variant: "destructive" });
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function recalculateProjectSCurve(projectId: string) {
+    try {
+      await scurveService.recalculateProject(projectId);
+    } catch (error) {
+      console.error(error);
     }
   }
 
@@ -320,6 +330,7 @@ export default function SchedulePage() {
       setLoading(true);
       const result = await scheduleService.generateTasksFromBOM(selectedProject);
       await loadTasks(selectedProject);
+      await recalculateProjectSCurve(selectedProject);
       toast({ title: "BOM synced", description: `${result.syncedCount} scope tasks synced (${result.createdCount} created, ${result.updatedCount} updated).` });
     } catch (error: unknown) {
       toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to sync BOM", variant: "destructive" });
@@ -347,6 +358,7 @@ export default function SchedulePage() {
       lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
       setTasks((current) => applyScheduleToEditableTasks([...current.filter((item) => item.id !== normalizedSavedTask.id), normalizedSavedTask]).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
       setSelectedTask(normalizedSavedTask);
+      void recalculateProjectSCurve(selectedProject);
     } catch (error) {
       console.error(error);
       toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
@@ -370,6 +382,9 @@ export default function SchedulePage() {
       await scheduleService.deleteTask(taskId);
       setTasks((current) => current.filter((task) => task.id !== taskId));
       setSelectedTask((current) => current?.id === taskId ? null : current);
+      if (selectedProject) {
+        await recalculateProjectSCurve(selectedProject);
+      }
       toast({ title: "Success", description: "Task deleted successfully" });
     } catch (error) {
       console.error(error);
@@ -440,6 +455,9 @@ export default function SchedulePage() {
         }));
         lastSavedMaterialPlanSignatureRef.current[taskId] = JSON.stringify(normalized);
         setMaterialDeliveryPlansByTask((current) => ({ ...current, [taskId]: normalized }));
+        if (selectedProject) {
+          void recalculateProjectSCurve(selectedProject);
+        }
       }).catch((error) => {
         console.error(error);
         toast({ title: "Error", description: "Failed to auto-save material delivery plan", variant: "destructive" });
@@ -461,6 +479,9 @@ export default function SchedulePage() {
           durationDays: savedSummary.durationDays,
           rateSnapshot: savedSummary.rateSnapshot,
         });
+        if (selectedProject) {
+          void recalculateProjectSCurve(selectedProject);
+        }
       }).catch((error) => {
         console.error(error);
         toast({ title: "Error", description: "Failed to auto-save labor cost summary", variant: "destructive" });
@@ -503,6 +524,14 @@ export default function SchedulePage() {
               >
                 Resource Calendar
               </Button>
+              <Button
+                type="button"
+                variant={viewMode === "scurve" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("scurve")}
+              >
+                S-Curve
+              </Button>
             </div>
             <Select value={selectedProject} onValueChange={setSelectedProject}>
               <SelectTrigger className="w-full sm:w-[260px]">
@@ -528,7 +557,7 @@ export default function SchedulePage() {
 
         <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
           <Card>
-            <CardHeader><CardTitle>{viewMode === "gantt" ? "Gantt View" : viewMode === "calendar" ? "Resource Calendar" : "Task List"}</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{viewMode === "gantt" ? "Gantt View" : viewMode === "calendar" ? "Resource Calendar" : viewMode === "scurve" ? "S-Curve" : "Task List"}</CardTitle></CardHeader>
             <CardContent>
               {!selectedProject ? (
                 <p className="text-sm text-muted-foreground">Select a project to manage task schedule, resources, and cost planning.</p>
@@ -540,6 +569,8 @@ export default function SchedulePage() {
                 <GanttView tasks={tasks} />
               ) : viewMode === "calendar" ? (
                 <CalendarView tasks={tasks} projectName={selectedProjectName} />
+              ) : viewMode === "scurve" ? (
+                <SCurveView projectId={selectedProject} projectName={selectedProjectName} />
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
