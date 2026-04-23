@@ -17,6 +17,7 @@ import { Plus, Pencil, Trash2, Archive, UserCheck, Calendar, DollarSign, Clock, 
 import type { Database } from "@/integrations/supabase/types";
 import { useSettings } from "@/contexts/SettingsProvider";
 import { supabase } from "@/integrations/supabase/client";
+import { ManpowerRateCatalogTab } from "@/components/personnel/ManpowerRateCatalogTab";
 
 type Personnel = Database["public"]["Tables"]["personnel"]["Row"];
 type Project = Database["public"]["Tables"]["projects"]["Row"];
@@ -365,6 +366,10 @@ export default function Personnel() {
               <UserCheck className="h-3 w-3 mr-1.5 hidden sm:inline" />
               Staff
             </TabsTrigger>
+            <TabsTrigger value="rates" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-violet-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-violet-700 bg-violet-50 text-violet-700 hover:bg-violet-100">
+              <DollarSign className="h-3 w-3 mr-1.5 hidden sm:inline" />
+              Rates
+            </TabsTrigger>
             <TabsTrigger value="attendance" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-indigo-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-indigo-700 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
               <Clock className="h-3 w-3 mr-1.5 hidden sm:inline" />
               Time
@@ -673,6 +678,10 @@ export default function Personnel() {
                 </Table>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="rates" className="space-y-4">
+            <ManpowerRateCatalogTab />
           </TabsContent>
 
           <TabsContent value="attendance" className="space-y-4">

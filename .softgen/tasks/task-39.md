@@ -1,32 +1,35 @@
 ---
 title: Manpower rate catalog and labor costing
-status: todo
+status: in_progress
 priority: high
 type: feature
 tags:
   - hr
-  - rates
-  - labor-cost
   - schedule
+  - labor
+  - forecasting
 created_by: agent
 created_at: 2026-04-23
 position: 39
 ---
 
 ## Notes
-Enhance the HR module with a Manpower Rate Catalog master reference and integrate it with Project Manager task resources so labor cost is calculated automatically from team composition, number of teams, duration, and role-based rates.
+Enhance the HR module with a Manpower Rate Catalog that acts as the master labor rate reference for Project Manager. The catalog should feed task resource costing automatically so schedule edits, duration changes, team composition changes, and rate updates can recalculate daily and total labor cost without manual save actions.
 
-The rate catalog must support position name, daily rate, and overtime rate. Task resources must show rate per person, daily labor cost, and total labor cost. Data must auto-save and be ready for later budget forecast use.
+This task also covers the shared data structure needed for budget forecasting, including task labor cost storage and rate snapshots.
 
 ## Checklist
-- [ ] Inspect existing HR/personnel data structures, role catalogs, and admin edit patterns
-- [ ] Add storage and services for manpower rate catalog records
-- [ ] Build HR module UI for maintaining rate catalog with admin-only editing
-- [ ] Link task resource roles to HR catalog rates inside Task Configuration
-- [ ] Add daily and total labor cost calculations based on team composition, number of teams, and task duration
-- [ ] Persist labor cost summary data for each task and validate auto-updates when inputs or rates change
+- [x] Verify the current HR module structure and project scheduling data model
+- [x] Add persistent database storage for the manpower rate catalog
+- [x] Add persistent database storage for task labor cost summaries
+- [x] Add HR service methods for listing, creating, updating, and deleting rate catalog entries
+- [x] Add Manpower Rate Catalog UI inside the HR module
+- [ ] Connect Project Manager task resources to the manpower rate catalog
+- [ ] Show daily labor cost and total labor cost in the Resources section
+- [ ] Persist labor cost summaries for downstream budget forecasting
+- [ ] Auto-refresh labor cost when task duration, team composition, or catalog rates change
 
 ## Acceptance
-HR module includes a Manpower Rate Catalog with position name, daily rate, and overtime rate.
-Task Resources automatically display rate per person, Daily Labor Cost, and Total Labor Cost.
-Updating team composition, duration, or rates refreshes labor cost without a manual save action.
+HR includes a Manpower Rate Catalog for positions with daily and overtime rates.
+Project Manager can use catalog rates to compute daily and total labor cost per task.
+Labor cost data is stored in a structure ready for budget forecasting.

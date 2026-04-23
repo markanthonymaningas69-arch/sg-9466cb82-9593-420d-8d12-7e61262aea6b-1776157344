@@ -898,6 +898,44 @@ export type Database = {
           },
         ]
       }
+      manpower_rate_catalog: {
+        Row: {
+          company_id: string
+          created_at: string
+          daily_rate: number
+          id: string
+          overtime_rate: number
+          position_name: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string
+          created_at?: string
+          daily_rate?: number
+          id?: string
+          overtime_rate?: number
+          position_name: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          daily_rate?: number
+          id?: string
+          overtime_rate?: number
+          position_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manpower_rate_catalog_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       master_items: {
         Row: {
           associated_scopes: Json | null
@@ -1878,6 +1916,139 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_labor_costs: {
+        Row: {
+          company_id: string
+          created_at: string
+          daily_cost: number
+          duration_days: number
+          id: string
+          rate_snapshot: Json
+          task_id: string
+          total_cost: number
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string
+          created_at?: string
+          daily_cost?: number
+          duration_days?: number
+          id?: string
+          rate_snapshot?: Json
+          task_id: string
+          total_cost?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          daily_cost?: number
+          duration_days?: number
+          id?: string
+          rate_snapshot?: Json
+          task_id?: string
+          total_cost?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_labor_costs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_labor_costs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: true
+            referencedRelation: "project_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_material_delivery_plans: {
+        Row: {
+          company_id: string
+          created_at: string
+          custom_interval_days: number | null
+          delivery_dates: Json
+          delivery_duration_days: number
+          delivery_frequency: string
+          delivery_schedule_type: string
+          delivery_start_date: string | null
+          id: string
+          material_id: string
+          material_name: string
+          planned_usage_period: Json
+          quantity_mode: string
+          task_id: string
+          total_quantity: number
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string
+          created_at?: string
+          custom_interval_days?: number | null
+          delivery_dates?: Json
+          delivery_duration_days?: number
+          delivery_frequency?: string
+          delivery_schedule_type?: string
+          delivery_start_date?: string | null
+          id?: string
+          material_id: string
+          material_name: string
+          planned_usage_period?: Json
+          quantity_mode?: string
+          task_id: string
+          total_quantity?: number
+          unit: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          custom_interval_days?: number | null
+          delivery_dates?: Json
+          delivery_duration_days?: number
+          delivery_frequency?: string
+          delivery_schedule_type?: string
+          delivery_start_date?: string | null
+          id?: string
+          material_id?: string
+          material_name?: string
+          planned_usage_period?: Json
+          quantity_mode?: string
+          task_id?: string
+          total_quantity?: number
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_material_delivery_plans_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_material_delivery_plans_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "bom_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_material_delivery_plans_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "project_tasks"
             referencedColumns: ["id"]
           },
         ]
