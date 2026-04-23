@@ -33,10 +33,10 @@ Latest feedback: after a successful PayMongo payment, the subscription is not be
 - [x] Create a server-side PayMongo checkout endpoint for Philippines GCash payments
 - [x] Connect the Philippines subscription action to the PayMongo checkout flow
 - [x] Revalidate the subscription flow after PayMongo integration
-- [ ] Trace the successful PayMongo payment path and identify why the subscription record is not updated
+- [x] Trace the successful PayMongo payment path and identify why the subscription record is not updated
 - [ ] Add a server-side PayMongo webhook handler that activates the subscription after confirmed payment
-- [ ] Update the subscription page to reflect successful PayMongo payments correctly
-- [ ] Provide the webhook URL path the user should paste into PayMongo
+- [x] Update the subscription page to reflect successful PayMongo payments correctly
+- [x] Provide the webhook URL path the user should paste into PayMongo
 - [ ] Revalidate the Philippines payment success flow
 
 ## Acceptance

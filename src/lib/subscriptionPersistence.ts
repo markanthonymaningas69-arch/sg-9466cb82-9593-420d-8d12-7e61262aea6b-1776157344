@@ -69,6 +69,30 @@ export async function activateSubscription(input: ActivateSubscriptionInput) {
   const endDate = getEndDate(now, input.billingCycle);
   const plan = normalizePlan(input.planId);
   const features = sanitizeFeatures(input.features);
+  const today = toDateOnly(now);
+
+  const { data: existingSubscription } = await supabaseAdmin
+    .from("subscriptions")
+    .select("plan, amount, start_date, end_date")
+    .eq("user_id", input.userId)
+    .eq("status", "active")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (
+    existingSubscription &&
+    existingSubscription.plan === plan &&
+    Number(existingSubscription.amount || 0) === Number(input.amount || 0) &&
+    existingSubscription.start_date === today
+  ) {
+    return {
+      plan,
+      startDate: existingSubscription.start_date || today,
+      endDate: existingSubscription.end_date || toDateOnly(endDate),
+      features
+    };
+  }
 
   const { error: previousSubscriptionError } = await supabaseAdmin
     .from("subscriptions")

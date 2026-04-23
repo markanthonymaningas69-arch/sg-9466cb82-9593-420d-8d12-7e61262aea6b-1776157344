@@ -13,6 +13,8 @@ import { formatCountryCurrency } from "@/lib/currency";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/router";
 
+const PAYMONGO_PENDING_CHECKOUT_KEY = "app_paymongo_pending_checkout";
+
 export default function Subscription() {
   const { currentPlan, setCurrentPlan, isTrial, isLocked } = useSettings();
   const { toast } = useToast();

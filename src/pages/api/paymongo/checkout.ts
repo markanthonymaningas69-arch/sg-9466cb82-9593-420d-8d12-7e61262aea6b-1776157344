@@ -2,11 +2,13 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getCountrySubscriptionConfig, usesPayMongoCheckout } from "@/config/countrySubscription";
 import { addOns, getAddOnPrice, getAvailableBillingCycles, getPlanPrice, isSupportedCountry, OUT_OF_SERVICE_MESSAGE, plans, type BillingCycle, type SupportedCountry } from "@/config/pricing";
 import { getPayMongoApiBaseUrl, getPayMongoAuthHeader, isPayMongoConfigured } from "@/lib/paymongo";
+import { createPayMongoCheckoutToken } from "@/lib/paymongoCheckoutToken";
 
 interface CheckoutRequestBody {
   planId?: string;
   billingCycle?: BillingCycle;
   country?: SupportedCountry;
+  features?: Record<string, number>;
   featuresToCharge?: Record<string, number>;
   chargeBasePlan?: boolean;
   proratedDiscount?: number;
@@ -34,6 +36,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     planId,
     billingCycle,
     country,
+    features = {},
     featuresToCharge = {},
     chargeBasePlan = true,
     proratedDiscount = 0,
@@ -111,6 +114,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: "Nothing to charge for this checkout." });
   }
 
+  const totalAmount = lineItems.reduce((sum, item) => sum + item.amount * item.quantity, 0) / 100;
+  const checkoutToken = createPayMongoCheckoutToken({
+    userId,
+    planId,
+    billingCycle,
+    amount: totalAmount,
+    features,
+    issuedAt: new Date().toISOString()
+  });
+
   const subscriptionConfig = getCountrySubscriptionConfig(country);
   const payload = {
     data: {
@@ -155,12 +168,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const checkoutUrl = data?.data?.attributes?.checkout_url;
+    const checkoutSessionId = data?.data?.id;
 
-    if (!checkoutUrl) {
-      return res.status(502).json({ error: "PayMongo did not return a checkout URL." });
+    if (!checkoutUrl || !checkoutSessionId) {
+      return res.status(502).json({ error: "PayMongo did not return complete checkout session details." });
     }
 
-    return res.status(200).json({ url: checkoutUrl });
+    return res.status(200).json({
+      url: checkoutUrl,
+      sessionId: checkoutSessionId,
+      token: checkoutToken
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected PayMongo error.";
     return res.status(500).json({ error: message });
