@@ -135,7 +135,7 @@ function toTaskFormData(task: EditableProjectTask): TaskFormData {
     ...task,
     dependencies: createTaskDependencies(task.dependencies),
     assigned_team: taskConfig.assignedTeamName || task.assigned_team || null,
-    task_config: taskConfig,
+    task_config: taskConfig as TaskFormData["task_config"],
     duration_days: durationDays,
     end_date: task.start_date ? addDays(task.start_date, durationDays) : task.end_date,
     scope_quantity: taskConfig.scopeQuantity,
