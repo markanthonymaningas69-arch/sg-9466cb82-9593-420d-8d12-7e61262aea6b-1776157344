@@ -1,6 +1,29 @@
 export type BillingCycle = "monthly" | "annual";
 export type SupportedCountry = "UAE" | "Philippines";
 
+export interface PlanConfig {
+  id: "starter" | "professional" | "trial";
+  name: string;
+  description: string;
+  monthlyPrice: number;
+  annualPrice: number;
+  features: string[];
+  addOnLimits: {
+    extra_site: number;
+    extra_acc: number;
+    purchasing: number;
+  };
+  popular?: boolean;
+}
+
+export interface AddOnConfig {
+  id: "extra_site" | "extra_acc" | "purchasing";
+  name: string;
+  monthlyPrice: number;
+  annualPrice: number;
+  description: string;
+}
+
 export const COUNTRY_OPTIONS = [
   "Australia",
   "Bahrain",
