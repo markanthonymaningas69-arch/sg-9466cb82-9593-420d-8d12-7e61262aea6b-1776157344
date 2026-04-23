@@ -1254,9 +1254,6 @@ export function Layout({ children }: LayoutProps) {
           <AIChatAssistant contained />
         </main>
       </div>
-
-      {/* Global AI Chat Assistant */}
-      <AIChatAssistant />
     </div>);
 
 }
