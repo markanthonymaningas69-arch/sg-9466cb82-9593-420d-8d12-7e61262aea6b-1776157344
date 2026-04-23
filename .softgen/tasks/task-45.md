@@ -1,6 +1,6 @@
 ---
 title: HR rates-driven staff management
-status: done
+status: in_progress
 priority: high
 type: feature
 tags:
@@ -21,6 +21,9 @@ The staff creation flow must require selecting an active position from the rates
 
 The implementation must support future labor costing, S-Curve labor costing, and payroll use cases. Only active positions should be selectable. Position names in the rates catalog must be unique. The Staff form should clearly show that the rate is sourced from the HR Rates Catalog.
 
+Follow-up fix:
+- restore the missing personnel form state type declaration so the Rates-driven Staff form compiles cleanly
+
 ## Checklist
 - [x] Inspect the current HR rates and staff module structure, services, and database schema
 - [x] Update database structure to support master rate catalog rules, position references, and rate snapshots on staff records
@@ -29,6 +32,7 @@ The implementation must support future labor costing, S-Curve labor costing, and
 - [x] Auto-fill category and rate fields from the selected position and prevent invalid manual entry
 - [x] Persist position_id and rate_snapshot when creating or updating staff
 - [x] Validate the HR workflow end to end and confirm it supports downstream labor costing integrations
+- [ ] Restore the missing PersonnelFormState type declaration and verify compilation
 
 ## Acceptance
 Staff can only be created by selecting an active position from the Rates tab.

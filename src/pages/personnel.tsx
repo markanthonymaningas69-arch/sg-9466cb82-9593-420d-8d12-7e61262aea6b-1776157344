@@ -30,6 +30,23 @@ const EMPLOYMENT_TYPE_OPTIONS = [
   { value: "daily", label: "Daily" },
 ] as const;
 
+interface PersonnelFormState {
+  name: string;
+  role: string;
+  position_id: string;
+  project_id: string;
+  phone: string;
+  email: string;
+  hourly_rate: string;
+  daily_rate: string;
+  overtime_rate: string;
+  rate_currency: string;
+  status: "active" | "on-leave" | "inactive";
+  worker_type: "construction" | "office";
+  employment_type: "full_time" | "contract" | "daily";
+  hire_date: string;
+}
+
 function readRateSnapshot(person: any) {
   if (!person?.rate_snapshot || typeof person.rate_snapshot !== "object" || Array.isArray(person.rate_snapshot)) {
     return null;
@@ -1147,14 +1164,12 @@ export default function Personnel() {
                             No documents found.
                           </TableCell>
                         </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
-
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
     </Layout>
