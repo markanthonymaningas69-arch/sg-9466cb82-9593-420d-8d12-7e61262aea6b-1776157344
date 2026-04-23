@@ -1,13 +1,13 @@
 import type { SupportedCountry } from "@/config/pricing";
 
-export type PaymentProvider = "stripe" | "gcash_link";
+export type PaymentProvider = "stripe" | "paymongo_gcash";
 
 export interface CountrySubscriptionConfig {
   country: SupportedCountry;
   paymentProvider: PaymentProvider;
   currencyCode: string;
   currencyLocale: string;
-  paymentLink: string | null;
+  checkoutApiPath: string | null;
   paymentMethodLabel: string;
   checkoutLabel: string;
   helperText: string;
@@ -19,20 +19,20 @@ export const COUNTRY_SUBSCRIPTION_CONFIG: Record<SupportedCountry, CountrySubscr
     paymentProvider: "stripe",
     currencyCode: "AED",
     currencyLocale: "en-AE",
-    paymentLink: null,
+    checkoutApiPath: null,
     paymentMethodLabel: "Card payment via Stripe",
     checkoutLabel: "Confirm & Pay",
     helperText: "Your subscription is processed through the current Stripe billing flow."
   },
   Philippines: {
     country: "Philippines",
-    paymentProvider: "gcash_link",
+    paymentProvider: "paymongo_gcash",
     currencyCode: "PHP",
     currencyLocale: "en-PH",
-    paymentLink: null,
-    paymentMethodLabel: "GCash payment link",
-    checkoutLabel: "Open GCash Payment",
-    helperText: "Philippines accounts use a country-specific GCash payment flow. Add-on numeric values stay the same and only the currency presentation changes to Peso."
+    checkoutApiPath: "/api/paymongo/checkout",
+    paymentMethodLabel: "GCash payment via PayMongo",
+    checkoutLabel: "Continue to GCash",
+    helperText: "Philippines accounts use a dedicated PayMongo + GCash subscription flow. Add-on numeric values stay the same and only the currency presentation changes to Peso."
   }
 };
 
@@ -45,5 +45,5 @@ export function usesStripeSubscription(country: SupportedCountry): boolean {
 }
 
 export function usesManualPaymentLink(country: SupportedCountry): boolean {
-  return getCountrySubscriptionConfig(country).paymentProvider === "gcash_link";
+  return getCountrySubscriptionConfig(country).paymentProvider === "paymongo_gcash";
 }
