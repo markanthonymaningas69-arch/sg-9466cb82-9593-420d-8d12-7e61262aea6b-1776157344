@@ -28,7 +28,6 @@ interface WindowState {
   y: number;
   width: number;
   height: number;
-  dock: DockMode;
   collapsed: boolean;
 }
 
@@ -37,7 +36,6 @@ const MIN_WIDTH = 360;
 const MIN_HEIGHT = 420;
 const DEFAULT_WIDTH = 420;
 const DEFAULT_HEIGHT = 620;
-const SNAP_DISTANCE = 24;
 const MAX_THREADS = 20;
 
 function getModuleLabel(pathname: string) {
@@ -124,6 +122,26 @@ function getSnapDock(state: WindowState): DockMode {
   return "float";
 }
 
+function getDefaultWindowState(): WindowState {
+  if (typeof window === "undefined") {
+    return {
+      x: 0,
+      y: 0,
+      width: DEFAULT_WIDTH,
+      height: DEFAULT_HEIGHT,
+      collapsed: true,
+    };
+  }
+
+  return constrainWindow({
+    x: window.innerWidth - DEFAULT_WIDTH - MARGIN,
+    y: window.innerHeight - DEFAULT_HEIGHT - MARGIN,
+    width: DEFAULT_WIDTH,
+    height: DEFAULT_HEIGHT,
+    collapsed: true,
+  });
+}
+
 export function AIChatAssistant() {
   const router = useRouter();
   const isMobile = useIsMobile();
@@ -134,7 +152,7 @@ export function AIChatAssistant() {
 
   const [storageKey, setStorageKey] = useState("ai_assistant_window_anon");
   const [threadKey, setThreadKey] = useState("ai_threads_anon");
-  const [windowState, setWindowState] = useState<WindowState>({ x: 0, y: 0, width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT, dock: "bottom-right", collapsed: true });
+  const [windowState, setWindowState] = useState<WindowState>(getDefaultWindowState);
   const [isReady, setIsReady] = useState(false);
   const [showThreads, setShowThreads] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -162,7 +180,7 @@ export function AIChatAssistant() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const saved = localStorage.getItem(storageKey);
-    const base = getDockedState("bottom-right", { x: 0, y: 0, width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT, dock: "bottom-right", collapsed: true });
+    const base = getDefaultWindowState();
 
     if (!saved) {
       setWindowState(base);
@@ -171,9 +189,16 @@ export function AIChatAssistant() {
     }
 
     try {
-      const parsed = JSON.parse(saved) as WindowState;
-      const nextState = parsed.dock === "float" ? constrainWindow(parsed) : getDockedState(parsed.dock, parsed);
-      setWindowState(nextState);
+      const parsed = JSON.parse(saved) as Partial<WindowState>;
+      setWindowState(
+        constrainWindow({
+          x: typeof parsed.x === "number" ? parsed.x : base.x,
+          y: typeof parsed.y === "number" ? parsed.y : base.y,
+          width: typeof parsed.width === "number" ? parsed.width : base.width,
+          height: typeof parsed.height === "number" ? parsed.height : base.height,
+          collapsed: typeof parsed.collapsed === "boolean" ? parsed.collapsed : base.collapsed,
+        })
+      );
     } catch {
       setWindowState(base);
     } finally {
@@ -228,7 +253,7 @@ export function AIChatAssistant() {
 
   useEffect(() => {
     if (typeof window === "undefined" || isMobile) return;
-    const handleResize = () => setWindowState((current) => (current.dock === "float" ? constrainWindow(current) : getDockedState(current.dock, current)));
+    const handleResize = () => setWindowState((current) => constrainWindow(current));
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [isMobile]);
@@ -327,15 +352,17 @@ export function AIChatAssistant() {
     setIsDragging(true);
 
     const move = (moveEvent: PointerEvent) => {
-      setWindowState((current) => constrainWindow({ ...current, dock: "float", x: moveEvent.clientX - dragRef.current.offsetX, y: moveEvent.clientY - dragRef.current.offsetY }));
+      setWindowState((current) =>
+        constrainWindow({
+          ...current,
+          x: moveEvent.clientX - dragRef.current.offsetX,
+          y: moveEvent.clientY - dragRef.current.offsetY,
+        })
+      );
     };
 
     const up = () => {
       setIsDragging(false);
-      setWindowState((current) => {
-        const nextDock = getSnapDock(current);
-        return nextDock === "float" ? current : getDockedState(nextDock, current);
-      });
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
     };
@@ -352,7 +379,13 @@ export function AIChatAssistant() {
     const move = (moveEvent: PointerEvent) => {
       const widthDelta = moveEvent.clientX - resizeRef.current.x;
       const heightDelta = moveEvent.clientY - resizeRef.current.y;
-      setWindowState((current) => constrainWindow({ ...current, dock: "float", width: resizeRef.current.width + (mode === "bottom" ? 0 : widthDelta), height: resizeRef.current.height + (mode === "right" ? 0 : heightDelta) }));
+      setWindowState((current) =>
+        constrainWindow({
+          ...current,
+          width: resizeRef.current.width + (mode === "bottom" ? 0 : widthDelta),
+          height: resizeRef.current.height + (mode === "right" ? 0 : heightDelta),
+        })
+      );
     };
 
     const up = () => {
@@ -386,14 +419,6 @@ export function AIChatAssistant() {
           {isDragging ? <span className="text-[10px] opacity-80">Dragging</span> : null}
         </div>
         <div className="flex items-center gap-1">
-          {!isMobile ? (
-            <>
-              <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-white hover:bg-white/20" onClick={() => applyDock("left")}>L</Button>
-              <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-white hover:bg-white/20" onClick={() => applyDock("right")}>R</Button>
-              <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-white hover:bg-white/20" onClick={() => applyDock("bottom-left")}>BL</Button>
-              <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-white hover:bg-white/20" onClick={() => applyDock("bottom-right")}>BR</Button>
-            </>
-          ) : null}
           <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-white hover:bg-white/20" onClick={() => setShowThreads((current) => !current)}><List className="h-4 w-4" /></Button>
           <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-white hover:bg-white/20" onClick={() => setWindowState((current) => ({ ...current, collapsed: true }))}><Minus className="h-4 w-4" /></Button>
           <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-white hover:bg-white/20" onClick={() => setWindowState((current) => ({ ...current, collapsed: true }))}><X className="h-4 w-4" /></Button>
