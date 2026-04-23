@@ -1,6 +1,6 @@
 ---
 title: Schedule view refinements
-status: done
+status: in_progress
 priority: high
 type: feature
 tags:
@@ -25,6 +25,7 @@ Latest follow-up changes:
 - correct the Gantt activity bar layout when bars render out of place
 - correct dependency arrow placement so the line connects at the proper bar edge
 - tighten the task title text inside each bar with a smaller, better-fitting label style
+- align dependency lines exactly to the middle end points of each task bar
 
 ## Checklist
 - [x] Remove background gridlines from the Gantt view while keeping task bars and dependency paths readable
@@ -36,6 +37,7 @@ Latest follow-up changes:
 - [x] Correct misplaced activity bar layout in the Gantt view
 - [x] Correct dependency arrow placement in the Gantt view
 - [x] Improve task label fit inside each Gantt bar using smaller typography
+- [ ] Align dependency lines exactly to the middle end points of each task bar
 
 ## Acceptance
 The Gantt view no longer shows timeline gridlines behind the bars.
