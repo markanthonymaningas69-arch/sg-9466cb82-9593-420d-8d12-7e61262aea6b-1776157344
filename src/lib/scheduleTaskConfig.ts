@@ -70,7 +70,7 @@ export function normalizeTaskConfiguration(rawValue: unknown, scopeDefaults?: Sc
 
   const normalizedRoles = Array.isArray(typedValue.teamRoles)
     ? typedValue.teamRoles
-        .filter((role): role is Partial<TeamRoleAllocation> => Boolean(role && typeof role === "object"))
+        .filter((role): role is Record<string, unknown> => Boolean(role && typeof role === "object"))
         .map((role, index) => ({
           id: typeof role.id === "string" && role.id ? role.id : createRoleId(typeof role.role === "string" ? role.role : "worker-" + index),
           role: typeof role.role === "string" && role.role.trim() ? role.role.trim() : "Worker",

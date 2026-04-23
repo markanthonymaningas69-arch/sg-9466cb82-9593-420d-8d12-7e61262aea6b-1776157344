@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Calendar as CalendarIcon } from "lucide-react";
+import type { TaskFormData } from "@/lib/schedule";
 import {
   calculateRequiredDurationDays,
   createDefaultTaskConfiguration,
@@ -13,7 +14,7 @@ import {
 } from "@/lib/scheduleTaskConfig";
 import { useToast } from "@/hooks/use-toast";
 import { projectService } from "@/services/projectService";
-import { scheduleService, type ProjectTask } from "@/services/scheduleService";
+import { scheduleService } from "@/services/scheduleService";
 
 function toDateOnly(value: Date) {
   return value.toISOString().split("T")[0];
@@ -25,7 +26,38 @@ function addDays(dateValue: string, days: number) {
   return toDateOnly(date);
 }
 
-function normalizeEditableTask(task: ProjectTask): EditableProjectTask {
+function extractDependencyIds(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((dependency) => {
+      if (typeof dependency === "string") {
+        return dependency;
+      }
+
+      if (dependency && typeof dependency === "object") {
+        const typedDependency = dependency as { taskId?: unknown; id?: unknown };
+        if (typeof typedDependency.taskId === "string") {
+          return typedDependency.taskId;
+        }
+        if (typeof typedDependency.id === "string") {
+          return typedDependency.id;
+        }
+      }
+
+      return null;
+    })
+    .filter((dependencyId): dependencyId is string => Boolean(dependencyId));
+}
+
+type ScheduleTaskRecord = TaskFormData & {
+  task_config?: unknown;
+  bom_scope?: EditableProjectTask["bom_scope"];
+};
+
+function normalizeEditableTask(task: ScheduleTaskRecord): EditableProjectTask {
   const taskConfig = normalizeTaskConfiguration(task.task_config, {
     quantity: task.bom_scope?.quantity,
     unit: task.bom_scope?.unit,
@@ -37,13 +69,14 @@ function normalizeEditableTask(task: ProjectTask): EditableProjectTask {
 
   return {
     ...task,
-    dependencies: Array.isArray(task.dependencies) ? task.dependencies : [],
+    dependencies: extractDependencyIds(task.dependencies),
     assigned_team: taskConfig.assignedTeamName || task.assigned_team || null,
     task_config: taskConfig,
     duration_days: durationDays,
     end_date: task.start_date
       ? addDays(task.start_date, durationDays)
       : task.end_date,
+    bom_scope: task.bom_scope || null,
   };
 }
 
@@ -136,7 +169,7 @@ export default function SchedulePage() {
     try {
       setLoading(true);
       const data = await scheduleService.getTasksByProject(projectId);
-      const normalizedTasks = (data || []).map(normalizeEditableTask);
+      const normalizedTasks = (data || []).map((task) => normalizeEditableTask(task as ScheduleTaskRecord));
       setTasks(normalizedTasks);
 
       setSelectedTask((currentTask) => {
@@ -194,30 +227,12 @@ export default function SchedulePage() {
 
     try {
       setSaving(true);
-      const taskPayload = {
-        name: syncedTask.name,
-        project_id: syncedTask.project_id,
-        description: syncedTask.description,
-        start_date: syncedTask.start_date,
-        end_date: syncedTask.end_date,
-        duration_days: syncedTask.duration_days,
-        progress: syncedTask.progress,
-        status: syncedTask.status,
-        priority: syncedTask.priority,
-        dependencies: Array.isArray(syncedTask.dependencies) ? syncedTask.dependencies : [],
-        assigned_team: syncedTask.task_config.assignedTeamName || syncedTask.assigned_team || null,
-        task_config: syncedTask.task_config,
-        bom_scope_id: syncedTask.bom_scope_id,
-        constraint_type: syncedTask.constraint_type,
-        sort_order: syncedTask.sort_order,
-        parent_id: syncedTask.parent_id,
-      };
 
       if (syncedTask.id) {
-        await scheduleService.updateTask(syncedTask.id, taskPayload);
+        await scheduleService.updateTask(syncedTask.id, syncedTask);
         toast({ title: "Success", description: "Task updated successfully" });
       } else {
-        await scheduleService.createTask(taskPayload);
+        await scheduleService.createTask(syncedTask);
         toast({ title: "Success", description: "Task created successfully" });
         setSelectedTask(null);
       }

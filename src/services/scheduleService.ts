@@ -1,18 +1,25 @@
+import type { Database } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 import { calculateEndDate, hydrateTask, serializeTask, syncTaskDerivedFields, type TaskFormData } from "@/lib/schedule";
 
 type SyncMode = "merge" | "resync";
+type ProjectTaskInsert = Database["public"]["Tables"]["project_tasks"]["Insert"];
 
 const taskSelect = `
   *,
   bom_scope:bom_scope_id (
     id,
     name,
+    description,
     quantity,
     unit,
-    completion_percentage
+    completion_percentage,
+    total_materials,
+    total_labor
   )
 `;
+
+export type ProjectTask = TaskFormData;
 
 export const scheduleService = {
   async getTasksByProject(projectId: string) {
@@ -30,17 +37,16 @@ export const scheduleService = {
   },
 
   async createTask(taskData: TaskFormData) {
-    const { data: { user } } = await supabase.auth.getUser();
-    const payload = {
-      ...serializeTask(taskData),
-      created_by: user?.id || null
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const payload: ProjectTaskInsert = {
+      ...serializeTask(syncTaskDerivedFields(taskData)),
+      created_by: user?.id || null,
     };
 
-    const { data, error } = await supabase
-      .from("project_tasks")
-      .insert(payload)
-      .select(taskSelect)
-      .single();
+    const { data, error } = await supabase.from("project_tasks").insert(payload).select(taskSelect).single();
 
     if (error) {
       throw error;
@@ -50,13 +56,8 @@ export const scheduleService = {
   },
 
   async updateTask(taskId: string, taskData: TaskFormData) {
-    const payload = serializeTask(taskData);
-    const { data, error } = await supabase
-      .from("project_tasks")
-      .update(payload)
-      .eq("id", taskId)
-      .select(taskSelect)
-      .single();
+    const payload = serializeTask(syncTaskDerivedFields(taskData));
+    const { data, error } = await supabase.from("project_tasks").update(payload).eq("id", taskId).select(taskSelect).single();
 
     if (error) {
       throw error;
@@ -66,10 +67,7 @@ export const scheduleService = {
   },
 
   async deleteTask(taskId: string) {
-    const { error } = await supabase
-      .from("project_tasks")
-      .delete()
-      .eq("id", taskId);
+    const { error } = await supabase.from("project_tasks").delete().eq("id", taskId);
 
     if (error) {
       throw error;
@@ -97,7 +95,7 @@ export const scheduleService = {
 
     const { data: scopes, error: scopeError } = await supabase
       .from("bom_scope_of_work")
-      .select("id, name, description, order_number, quantity, unit, completion_percentage")
+      .select("id, name, description, order_number, quantity, unit, completion_percentage, total_materials, total_labor")
       .eq("bom_id", bomData.id)
       .order("order_number", { ascending: true });
 
@@ -124,24 +122,33 @@ export const scheduleService = {
         .map((task) => [String(task.bom_scope_id), hydrateTask(task)])
     );
 
-    const inserts = [];
+    const inserts: ProjectTaskInsert[] = [];
     const updates = [];
 
     for (const scope of scopes) {
       const matchedTask = existingByScope.get(scope.id);
 
       if (!matchedTask) {
-        inserts.push({
+        const nextTask = syncTaskDerivedFields({
+          id: "",
           project_id: projectId,
           bom_scope_id: scope.id,
+          parent_id: null,
           name: scope.name,
           description: scope.description || `Generated from BOM scope: ${scope.name}`,
           start_date: new Date().toISOString().split("T")[0],
           end_date: calculateEndDate(new Date().toISOString().split("T")[0], 1),
           duration_days: 1,
-          progress: 0,
+          progress: Number(scope.completion_percentage || 0),
+          dependencies: [],
+          assigned_team: null,
+          priority: "medium",
+          constraint_type: "ASAP",
           status: "not_started",
           sort_order: scope.order_number || 0,
+          created_by: null,
+          created_at: null,
+          updated_at: null,
           scope_quantity: Number(scope.quantity || 1),
           scope_unit: scope.unit || "lot",
           productivity_rate_per_hour: 0,
@@ -149,47 +156,57 @@ export const scheduleService = {
           working_hours_per_day: 8,
           team_composition: [
             { id: "mason", role: "Mason", count: 1 },
-            { id: "helper", role: "Helper", count: 1 }
+            { id: "helper", role: "Helper", count: 1 },
           ],
           resource_labor: [
             { id: "mason", role: "Mason", count: 1 },
-            { id: "helper", role: "Helper", count: 1 }
+            { id: "helper", role: "Helper", count: 1 },
           ],
           equipment: [],
           cost_links: [],
           duration_source: "auto",
-          dependencies: [],
-          assigned_team: null,
-          priority: "medium",
-          constraint_type: "ASAP",
-          notes: null
-        });
-        continue;
-      }
-
-      if (syncMode === "resync") {
-        const syncedTask = syncTaskDerivedFields({
-          ...matchedTask,
-          name: scope.name,
-          description: scope.description || matchedTask.description || `Generated from BOM scope: ${scope.name}`,
-          scope_quantity: Number(scope.quantity || matchedTask.scope_quantity || 1),
-          scope_unit: scope.unit || matchedTask.scope_unit || "lot",
-          sort_order: scope.order_number || matchedTask.sort_order || 0,
+          notes: "",
+          task_config: {},
           bom_scope: {
             id: scope.id,
             name: scope.name,
             quantity: Number(scope.quantity || 1),
             unit: scope.unit || "lot",
-            completion_percentage: scope.completion_percentage ?? null
-          }
-        }, matchedTask.duration_source !== "manual");
+            completion_percentage: scope.completion_percentage ?? null,
+            description: scope.description,
+            total_materials: scope.total_materials ?? null,
+            total_labor: scope.total_labor ?? null,
+          },
+        });
 
-        updates.push(
-          supabase
-            .from("project_tasks")
-            .update(serializeTask(syncedTask))
-            .eq("id", matchedTask.id)
+        inserts.push(serializeTask(nextTask));
+        continue;
+      }
+
+      if (syncMode === "resync") {
+        const syncedTask = syncTaskDerivedFields(
+          {
+            ...matchedTask,
+            name: scope.name,
+            description: scope.description || matchedTask.description || `Generated from BOM scope: ${scope.name}`,
+            scope_quantity: Number(scope.quantity || matchedTask.scope_quantity || 1),
+            scope_unit: scope.unit || matchedTask.scope_unit || "lot",
+            sort_order: scope.order_number || matchedTask.sort_order || 0,
+            bom_scope: {
+              id: scope.id,
+              name: scope.name,
+              quantity: Number(scope.quantity || 1),
+              unit: scope.unit || "lot",
+              completion_percentage: scope.completion_percentage ?? null,
+              description: scope.description,
+              total_materials: scope.total_materials ?? null,
+              total_labor: scope.total_labor ?? null,
+            },
+          },
+          matchedTask.duration_source !== "manual"
         );
+
+        updates.push(supabase.from("project_tasks").update(serializeTask(syncedTask)).eq("id", matchedTask.id));
       }
     }
 
@@ -209,5 +226,5 @@ export const scheduleService = {
     }
 
     return this.getTasksByProject(projectId);
-  }
+  },
 };

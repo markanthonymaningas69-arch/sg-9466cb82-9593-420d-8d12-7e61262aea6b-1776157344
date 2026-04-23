@@ -15,11 +15,15 @@ import {
   normalizeTaskConfiguration,
   type TaskConfiguration,
 } from "@/lib/scheduleTaskConfig";
-import type { ProjectTask } from "@/services/scheduleService";
+import type { TaskFormData } from "@/lib/schedule";
 import { AlignLeft, Clock, DollarSign, Plus, Save, Settings2, Trash2, Users, X } from "lucide-react";
 
-export interface EditableProjectTask extends ProjectTask {
+type EditableTaskScope = NonNullable<TaskFormData["bom_scope"]>;
+
+export interface EditableProjectTask extends Omit<TaskFormData, "bom_scope" | "task_config" | "dependencies"> {
+  bom_scope: EditableTaskScope | null;
   task_config: TaskConfiguration;
+  dependencies: string[];
 }
 
 interface TaskConfigurationPanelProps {

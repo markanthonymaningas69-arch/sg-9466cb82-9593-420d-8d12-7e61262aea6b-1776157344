@@ -1,6 +1,8 @@
+import type { Json } from "@/integrations/supabase/database.types";
 import type { Database } from "@/integrations/supabase/types";
 
 type ProjectTaskRow = Database["public"]["Tables"]["project_tasks"]["Row"];
+type ProjectTaskInsert = Database["public"]["Tables"]["project_tasks"]["Insert"];
 type ScopeRow = Database["public"]["Tables"]["bom_scope_of_work"]["Row"];
 
 export type DependencyType = "FS" | "SS" | "FF" | "SF";
@@ -24,9 +26,13 @@ export interface TaskScopeSummary {
   quantity: number;
   unit: string;
   completion_percentage: number | null;
+  description?: string | null;
+  total_materials?: number | null;
+  total_labor?: number | null;
 }
 
-export interface TaskFormData extends Omit<ProjectTaskRow, "dependencies" | "team_composition" | "resource_labor" | "equipment" | "cost_links"> {
+export interface TaskFormData
+  extends Omit<ProjectTaskRow, "dependencies" | "team_composition" | "resource_labor" | "equipment" | "cost_links"> {
   dependencies: TaskDependency[];
   team_composition: TaskRoleAllocation[];
   resource_labor: TaskRoleAllocation[];
@@ -37,7 +43,7 @@ export interface TaskFormData extends Omit<ProjectTaskRow, "dependencies" | "tea
 
 const DEFAULT_ROLE_ALLOCATION: TaskRoleAllocation[] = [
   { id: "mason", role: "Mason", count: 1 },
-  { id: "helper", role: "Helper", count: 1 }
+  { id: "helper", role: "Helper", count: 1 },
 ];
 
 export function toNumber(value: unknown, fallback = 0): number {
@@ -55,11 +61,11 @@ function parseRoleAllocations(value: unknown, fallback = DEFAULT_ROLE_ALLOCATION
   }
 
   return value.map((item, index) => {
-    const typed = typeof item === "object" && item !== null ? item as Record<string, unknown> : {};
+    const typed = typeof item === "object" && item !== null ? (item as Record<string, unknown>) : {};
     return {
       id: String(typed.id || `${String(typed.role || "role").toLowerCase()}-${index}`),
       role: String(typed.role || `Role ${index + 1}`),
-      count: Math.max(0, Math.round(toNumber(typed.count, 0)))
+      count: Math.max(0, Math.round(toNumber(typed.count, 0))),
     };
   });
 }
@@ -71,7 +77,7 @@ function parseDependencies(value: unknown): TaskDependency[] {
 
   return value
     .map((item, index) => {
-      const typed = typeof item === "object" && item !== null ? item as Record<string, unknown> : {};
+      const typed = typeof item === "object" && item !== null ? (item as Record<string, unknown>) : {};
       const taskId = String(typed.taskId || typed.id || "");
       if (!taskId) {
         return null;
@@ -81,7 +87,7 @@ function parseDependencies(value: unknown): TaskDependency[] {
         id: String(typed.id || `dependency-${index}`),
         taskId,
         type: (typed.type === "SS" || typed.type === "FF" || typed.type === "SF" ? typed.type : "FS") as DependencyType,
-        lagDays: Math.max(0, Math.round(toNumber(typed.lagDays, 0)))
+        lagDays: Math.max(0, Math.round(toNumber(typed.lagDays, 0))),
       };
     })
     .filter((item): item is TaskDependency => Boolean(item));
@@ -97,7 +103,30 @@ function parseStringArray(value: unknown): string[] {
     .filter(Boolean);
 }
 
-export function calculateDailyOutput(task: Pick<TaskFormData, "productivity_rate_per_day" | "productivity_rate_per_hour" | "working_hours_per_day">) {
+function serializeDependencies(value: TaskDependency[]): Json {
+  return value.map((item) => ({
+    id: item.id,
+    taskId: item.taskId,
+    type: item.type,
+    lagDays: item.lagDays,
+  })) as Json;
+}
+
+function serializeRoleAllocations(value: TaskRoleAllocation[]): Json {
+  return value.map((item) => ({
+    id: item.id,
+    role: item.role,
+    count: item.count,
+  })) as Json;
+}
+
+function serializeStringArray(value: string[]): Json {
+  return value.map((item) => item) as Json;
+}
+
+export function calculateDailyOutput(
+  task: Pick<TaskFormData, "productivity_rate_per_day" | "productivity_rate_per_hour" | "working_hours_per_day">
+) {
   const dailyOverride = toNumber(task.productivity_rate_per_day, 0);
   if (dailyOverride > 0) {
     return dailyOverride;
@@ -108,7 +137,9 @@ export function calculateDailyOutput(task: Pick<TaskFormData, "productivity_rate
   return hourlyRate > 0 ? hourlyRate * workingHours : 0;
 }
 
-export function calculateDurationDays(task: Pick<TaskFormData, "scope_quantity" | "productivity_rate_per_day" | "productivity_rate_per_hour" | "working_hours_per_day">) {
+export function calculateDurationDays(
+  task: Pick<TaskFormData, "scope_quantity" | "productivity_rate_per_day" | "productivity_rate_per_hour" | "working_hours_per_day">
+) {
   const quantity = Math.max(0, toNumber(task.scope_quantity, 0));
   const dailyOutput = calculateDailyOutput(task);
   if (quantity <= 0 || dailyOutput <= 0) {
@@ -130,6 +161,7 @@ export function syncTaskDerivedFields(task: TaskFormData, forceAuto = false): Ta
   const durationSource = forceAuto ? "auto" : task.duration_source || "auto";
   const normalizedTask: TaskFormData = {
     ...task,
+    task_config: task.task_config ?? {},
     scope_quantity: Math.max(0, toNumber(task.scope_quantity, task.bom_scope?.quantity || 0)),
     scope_unit: task.scope_unit || task.bom_scope?.unit || "lot",
     productivity_rate_per_hour: Math.max(0, toNumber(task.productivity_rate_per_hour, 0)),
@@ -142,23 +174,25 @@ export function syncTaskDerivedFields(task: TaskFormData, forceAuto = false): Ta
     dependencies: parseDependencies(task.dependencies),
     duration_source: durationSource,
     start_date: task.start_date || todayDate(),
-    notes: task.notes || ""
+    notes: task.notes || "",
   };
 
-  const nextDuration = durationSource === "manual"
-    ? Math.max(1, Math.round(toNumber(normalizedTask.duration_days, 1)))
-    : calculateDurationDays(normalizedTask);
+  const nextDuration =
+    durationSource === "manual"
+      ? Math.max(1, Math.round(toNumber(normalizedTask.duration_days, 1)))
+      : calculateDurationDays(normalizedTask);
 
   return {
     ...normalizedTask,
     duration_days: nextDuration,
-    end_date: calculateEndDate(normalizedTask.start_date, nextDuration)
+    end_date: calculateEndDate(normalizedTask.start_date, nextDuration),
   };
 }
 
 export function hydrateTask(task: ProjectTaskRow & { bom_scope?: Partial<ScopeRow> | null }): TaskFormData {
   return syncTaskDerivedFields({
     ...task,
+    task_config: task.task_config ?? {},
     scope_quantity: toNumber(task.scope_quantity, toNumber(task.bom_scope?.quantity, 1)),
     scope_unit: task.scope_unit || String(task.bom_scope?.unit || "lot"),
     productivity_rate_per_hour: toNumber(task.productivity_rate_per_hour, 0),
@@ -175,13 +209,16 @@ export function hydrateTask(task: ProjectTaskRow & { bom_scope?: Partial<ScopeRo
           name: String(task.bom_scope.name || task.name),
           quantity: toNumber(task.bom_scope.quantity, 1),
           unit: String(task.bom_scope.unit || "lot"),
-          completion_percentage: task.bom_scope.completion_percentage ?? null
+          completion_percentage: task.bom_scope.completion_percentage ?? null,
+          description: task.bom_scope.description ?? null,
+          total_materials: toNumber(task.bom_scope.total_materials, 0),
+          total_labor: toNumber(task.bom_scope.total_labor, 0),
         }
-      : null
+      : null,
   });
 }
 
-export function serializeTask(task: TaskFormData) {
+export function serializeTask(task: TaskFormData): ProjectTaskInsert {
   return {
     project_id: task.project_id,
     bom_scope_id: task.bom_scope_id,
@@ -192,7 +229,7 @@ export function serializeTask(task: TaskFormData) {
     end_date: calculateEndDate(task.start_date, task.duration_days),
     duration_days: Math.max(1, Math.round(toNumber(task.duration_days, 1))),
     progress: Math.max(0, Math.min(100, toNumber(task.progress, 0))),
-    dependencies: task.dependencies,
+    dependencies: serializeDependencies(task.dependencies),
     assigned_team: task.assigned_team || null,
     priority: task.priority || "medium",
     constraint_type: task.constraint_type || "ASAP",
@@ -203,12 +240,13 @@ export function serializeTask(task: TaskFormData) {
     productivity_rate_per_hour: Math.max(0, toNumber(task.productivity_rate_per_hour, 0)),
     productivity_rate_per_day: Math.max(0, toNumber(task.productivity_rate_per_day, 0)),
     working_hours_per_day: Math.max(1, toNumber(task.working_hours_per_day, 8)),
-    team_composition: task.team_composition,
-    resource_labor: task.resource_labor,
-    equipment: task.equipment,
-    cost_links: task.cost_links,
+    team_composition: serializeRoleAllocations(task.team_composition),
+    resource_labor: serializeRoleAllocations(task.resource_labor),
+    equipment: serializeStringArray(task.equipment),
+    cost_links: serializeStringArray(task.cost_links),
     duration_source: task.duration_source || "auto",
-    notes: task.notes || null
+    notes: task.notes || null,
+    task_config: task.task_config ?? {},
   };
 }
 
@@ -244,6 +282,7 @@ export function createDraftTask(projectId: string): TaskFormData {
     cost_links: [],
     duration_source: "auto",
     notes: "",
-    bom_scope: null
+    task_config: {},
+    bom_scope: null,
   });
 }
