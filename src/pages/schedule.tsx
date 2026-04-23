@@ -277,6 +277,22 @@ export default function SchedulePage() {
     () => projects.find((project) => project.id === selectedProject)?.name || "Project schedule",
     [projects, selectedProject]
   );
+  const sortedTasks = useMemo(
+    () => [...tasks].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)),
+    [tasks]
+  );
+  const dependentTaskCount = useMemo(
+    () => sortedTasks.filter((task) => task.dependencies.length > 0).length,
+    [sortedTasks]
+  );
+  const activeViewLabel =
+    viewMode === "gantt"
+      ? "Gantt"
+      : viewMode === "calendar"
+        ? "Calendar"
+        : viewMode === "scurve"
+          ? "S-Curve"
+          : "Task List";
 
   useEffect(() => { void loadProjects(); void loadManpowerRates(); }, []);
   useEffect(() => { if (selectedProject) { void loadTasks(selectedProject); } else { setTasks([]); setSelectedTask(null); setLoading(false); } }, [selectedProject]);
