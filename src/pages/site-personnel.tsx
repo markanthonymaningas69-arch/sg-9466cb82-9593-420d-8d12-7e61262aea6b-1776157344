@@ -891,12 +891,16 @@ export default function SitePersonnel() {
   const openRequestDialog = (type: string, prefix: string) => {
     const randomNum = Math.floor(100000 + Math.random() * 900000);
     setRequestForm({
-      ...requestForm,
       request_type: type,
       form_number: `${prefix}-${randomNum}`,
+      bom_scope_id: "unassigned",
+      request_date: todayStr,
       item_name: "",
+      personnel_id: "",
       quantity: 0,
+      unit: "",
       amount: 0,
+      requested_by: "",
       notes: ""
     });
     setRequestItems([]);
@@ -922,6 +926,16 @@ export default function SitePersonnel() {
 
   const standardUnits = ["pcs", "bags", "m2", "m3", "kg", "ton", "L", "rolls", "length", "box", "set", "lot", "cu.m", "sq.m"];
   const availableUnits = Array.from(new Set([...standardUnits, ...bomMaterials.map(m => m.unit).filter(Boolean)]));
+  const scopedRequestMaterials = bomMaterials.filter(
+    (material) => requestForm.bom_scope_id !== "unassigned" && material.scope_id === requestForm.bom_scope_id
+  );
+  const toolRequestOptions = masterItems.filter((item) => {
+    const category = String(item.category || "").toLowerCase();
+    return category.includes("tool") || category.includes("equip");
+  });
+  const toolRequestUnits = Array.from(new Set(["unit", "pcs", "set", "kit", "day", "lot", ...availableUnits]));
+  const isCashRequest = requestForm.request_type === "Petty Cash" || requestForm.request_type === "Cash Advance";
+  const isToolRequest = requestForm.request_type === "Tools & Equipments";
 
   return (
     <Layout>
