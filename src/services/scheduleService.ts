@@ -82,8 +82,14 @@ async function fetchScopeMaterials(scopeIds: string[]) {
   return (data || []) as MaterialRow[];
 }
 
-async function fetchTasksWithMaterials(query: ReturnType<typeof supabase.from<"project_tasks", never>>) {
-  const { data, error } = await query.select(taskSelect);
+async function fetchTasksWithMaterials(projectId?: string) {
+  let query = supabase.from("project_tasks").select(taskSelect);
+
+  if (projectId) {
+    query = query.eq("project_id", projectId);
+  }
+
+  const { data, error } = await query.order("sort_order", { ascending: true });
 
   if (error) {
     throw error;
@@ -104,9 +110,7 @@ async function fetchTasksWithMaterials(query: ReturnType<typeof supabase.from<"p
 
 export const scheduleService = {
   async getTasksByProject(projectId: string) {
-    const tasks = await fetchTasksWithMaterials(
-      supabase.from("project_tasks").eq("project_id", projectId).order("sort_order", { ascending: true })
-    );
+    const tasks = await fetchTasksWithMaterials(projectId);
 
     return tasks.map((task) => hydrateTask(task));
   },
@@ -186,9 +190,7 @@ export const scheduleService = {
       throw new Error("The current Bill of Materials has no scopes to generate.");
     }
 
-    const existingTasks = await fetchTasksWithMaterials(
-      supabase.from("project_tasks").eq("project_id", projectId)
-    );
+    const existingTasks = await fetchTasksWithMaterials(projectId);
 
     const existingByScope = new Map(
       existingTasks
