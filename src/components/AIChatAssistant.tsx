@@ -8,6 +8,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
+interface AIChatAssistantProps {
+  contained?: boolean;
+}
+
 interface Message {
   role: "user" | "assistant";
   content: string;
@@ -21,8 +25,6 @@ interface ChatThread {
   updatedAt: string;
 }
 
-type ResizeMode = "right" | "bottom" | "corner";
-
 interface WindowState {
   x: number;
   y: number;
@@ -30,6 +32,15 @@ interface WindowState {
   height: number;
   collapsed: boolean;
 }
+
+interface Bounds {
+  width: number;
+  height: number;
+  originX: number;
+  originY: number;
+}
+
+type ResizeMode = "right" | "bottom" | "corner";
 
 const MARGIN = 16;
 const MIN_WIDTH = 360;
@@ -65,48 +76,42 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
-function getViewport() {
+function getViewportBounds(): Bounds {
   return {
     width: window.innerWidth,
     height: window.innerHeight,
+    originX: 0,
+    originY: 0,
   };
 }
 
-function constrainWindow(state: WindowState): WindowState {
-  const viewport = getViewport();
-  const width = clamp(state.width, MIN_WIDTH, Math.max(MIN_WIDTH, viewport.width - MARGIN * 2));
-  const height = clamp(state.height, MIN_HEIGHT, Math.max(MIN_HEIGHT, viewport.height - MARGIN * 2));
+function constrainWindow(state: WindowState, bounds: Bounds): WindowState {
+  const width = clamp(state.width, MIN_WIDTH, Math.max(MIN_WIDTH, bounds.width - MARGIN * 2));
+  const height = clamp(state.height, MIN_HEIGHT, Math.max(MIN_HEIGHT, bounds.height - MARGIN * 2));
 
   return {
     ...state,
     width,
     height,
-    x: clamp(state.x, MARGIN, Math.max(MARGIN, viewport.width - width - MARGIN)),
-    y: clamp(state.y, MARGIN, Math.max(MARGIN, viewport.height - height - MARGIN)),
+    x: clamp(state.x, MARGIN, Math.max(MARGIN, bounds.width - width - MARGIN)),
+    y: clamp(state.y, MARGIN, Math.max(MARGIN, bounds.height - height - MARGIN)),
   };
 }
 
-function getDefaultWindowState(): WindowState {
-  if (typeof window === "undefined") {
-    return {
-      x: 0,
-      y: 0,
+function getDefaultWindowState(bounds: Bounds): WindowState {
+  return constrainWindow(
+    {
+      x: bounds.width - DEFAULT_WIDTH - MARGIN,
+      y: bounds.height - DEFAULT_HEIGHT - MARGIN,
       width: DEFAULT_WIDTH,
       height: DEFAULT_HEIGHT,
       collapsed: true,
-    };
-  }
-
-  return constrainWindow({
-    x: window.innerWidth - DEFAULT_WIDTH - MARGIN,
-    y: window.innerHeight - DEFAULT_HEIGHT - MARGIN,
-    width: DEFAULT_WIDTH,
-    height: DEFAULT_HEIGHT,
-    collapsed: true,
-  });
+    },
+    bounds
+  );
 }
 
-export function AIChatAssistant() {
+export function AIChatAssistant({ contained = false }: AIChatAssistantProps) {
   const router = useRouter();
   const isMobile = useIsMobile();
   const currentTab = typeof router.query.tab === "string" ? router.query.tab : null;
@@ -119,9 +124,21 @@ export function AIChatAssistant() {
   const currentModule = getModuleLabel(router.pathname);
   const routeContextKey = [router.pathname, currentTab || "", currentProjectId || ""].join("::");
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef({ offsetX: 0, offsetY: 0 });
+  const resizeRef = useRef({ mode: "corner" as ResizeMode, width: 0, height: 0, x: 0, y: 0 });
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const [storageKey, setStorageKey] = useState("ai_assistant_window_anon");
   const [threadKey, setThreadKey] = useState("ai_threads_anon");
-  const [windowState, setWindowState] = useState<WindowState>(getDefaultWindowState);
+  const [windowState, setWindowState] = useState<WindowState>({
+    x: 0,
+    y: 0,
+    width: DEFAULT_WIDTH,
+    height: DEFAULT_HEIGHT,
+    collapsed: true,
+  });
   const [isReady, setIsReady] = useState(false);
   const [showThreads, setShowThreads] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -133,23 +150,33 @@ export function AIChatAssistant() {
   const [projectData, setProjectData] = useState<Record<string, unknown>>({});
   const [isDataLoaded, setIsDataLoaded] = useState(false);
 
-  const dragRef = useRef({ offsetX: 0, offsetY: 0 });
-  const resizeRef = useRef({ mode: "corner" as ResizeMode, width: 0, height: 0, x: 0, y: 0 });
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  function resolveBounds(): Bounds {
+    if (contained && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      return {
+        width: Math.max(rect.width, MIN_WIDTH + MARGIN * 2),
+        height: Math.max(rect.height, MIN_HEIGHT + MARGIN * 2),
+        originX: rect.left,
+        originY: rect.top,
+      };
+    }
+
+    return getViewportBounds();
+  }
 
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => {
       const userId = data.session?.user?.id || "anon";
-      setStorageKey(`ai_assistant_window_${userId}`);
+      setStorageKey(`ai_assistant_window_${userId}_${contained ? "contained" : "global"}`);
       setThreadKey(`ai_threads_${userId}`);
     });
-  }, []);
+  }, [contained]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    const bounds = resolveBounds();
+    const base = getDefaultWindowState(bounds);
     const saved = localStorage.getItem(storageKey);
-    const base = getDefaultWindowState();
 
     if (!saved) {
       setWindowState(base);
@@ -160,20 +187,23 @@ export function AIChatAssistant() {
     try {
       const parsed = JSON.parse(saved) as Partial<WindowState>;
       setWindowState(
-        constrainWindow({
-          x: typeof parsed.x === "number" ? parsed.x : base.x,
-          y: typeof parsed.y === "number" ? parsed.y : base.y,
-          width: typeof parsed.width === "number" ? parsed.width : base.width,
-          height: typeof parsed.height === "number" ? parsed.height : base.height,
-          collapsed: typeof parsed.collapsed === "boolean" ? parsed.collapsed : base.collapsed,
-        })
+        constrainWindow(
+          {
+            x: typeof parsed.x === "number" ? parsed.x : base.x,
+            y: typeof parsed.y === "number" ? parsed.y : base.y,
+            width: typeof parsed.width === "number" ? parsed.width : base.width,
+            height: typeof parsed.height === "number" ? parsed.height : base.height,
+            collapsed: typeof parsed.collapsed === "boolean" ? parsed.collapsed : base.collapsed,
+          },
+          bounds
+        )
       );
     } catch {
       setWindowState(base);
     } finally {
       setIsReady(true);
     }
-  }, [storageKey]);
+  }, [storageKey, contained]);
 
   useEffect(() => {
     if (!isReady || typeof window === "undefined" || isMobile) return;
@@ -227,12 +257,12 @@ export function AIChatAssistant() {
     if (typeof window === "undefined" || isMobile) return;
 
     const handleResize = () => {
-      setWindowState((current) => constrainWindow(current));
+      setWindowState((current) => constrainWindow(current, resolveBounds()));
     };
 
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [isMobile]);
+  }, [isMobile, contained]);
 
   async function loadData() {
     const [
@@ -288,14 +318,6 @@ export function AIChatAssistant() {
     });
     setIsDataLoaded(true);
   }
-
-  const floatingButtonStyle = useMemo(() => {
-    if (isMobile) return undefined;
-    return {
-      left: windowState.x,
-      top: windowState.y,
-    };
-  }, [isMobile, windowState.x, windowState.y]);
 
   function persistThread(newMessages: Message[]) {
     setThreads((current) => {
@@ -370,19 +392,23 @@ export function AIChatAssistant() {
     const target = event.target as HTMLElement;
     if (target.closest("button, input, textarea, [data-no-drag='true']")) return;
 
+    const bounds = resolveBounds();
     dragRef.current = {
-      offsetX: event.clientX - windowState.x,
-      offsetY: event.clientY - windowState.y,
+      offsetX: event.clientX - bounds.originX - windowState.x,
+      offsetY: event.clientY - bounds.originY - windowState.y,
     };
     setIsDragging(true);
 
     const move = (moveEvent: PointerEvent) => {
       setWindowState((current) =>
-        constrainWindow({
-          ...current,
-          x: moveEvent.clientX - dragRef.current.offsetX,
-          y: moveEvent.clientY - dragRef.current.offsetY,
-        })
+        constrainWindow(
+          {
+            ...current,
+            x: moveEvent.clientX - bounds.originX - dragRef.current.offsetX,
+            y: moveEvent.clientY - bounds.originY - dragRef.current.offsetY,
+          },
+          bounds
+        )
       );
     };
 
@@ -400,6 +426,7 @@ export function AIChatAssistant() {
     event.preventDefault();
     event.stopPropagation();
 
+    const bounds = resolveBounds();
     resizeRef.current = {
       mode,
       width: windowState.width,
@@ -413,11 +440,14 @@ export function AIChatAssistant() {
       const heightDelta = moveEvent.clientY - resizeRef.current.y;
 
       setWindowState((current) =>
-        constrainWindow({
-          ...current,
-          width: resizeRef.current.width + (mode === "bottom" ? 0 : widthDelta),
-          height: resizeRef.current.height + (mode === "right" ? 0 : heightDelta),
-        })
+        constrainWindow(
+          {
+            ...current,
+            width: resizeRef.current.width + (mode === "bottom" ? 0 : widthDelta),
+            height: resizeRef.current.height + (mode === "right" ? 0 : heightDelta),
+          },
+          bounds
+        )
       );
     };
 
@@ -443,8 +473,26 @@ export function AIChatAssistant() {
     setShowThreads(false);
   }
 
+  const desktopPositionStyle = useMemo(
+    () => ({
+      left: windowState.x,
+      top: windowState.y,
+      width: windowState.width,
+      height: windowState.height,
+    }),
+    [windowState.x, windowState.y, windowState.width, windowState.height]
+  );
+
+  const floatingButtonStyle = useMemo(
+    () => ({
+      left: windowState.x,
+      top: windowState.y,
+    }),
+    [windowState.x, windowState.y]
+  );
+
   const panel = (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl pointer-events-auto">
       <div
         className={cn(
           "flex h-12 items-center justify-between border-b bg-gradient-to-r from-blue-600 to-purple-600 px-3 text-white",
@@ -459,31 +507,13 @@ export function AIChatAssistant() {
         </div>
 
         <div className="flex items-center gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-white hover:bg-white/20"
-            onClick={() => setShowThreads((current) => !current)}
-          >
+          <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-white hover:bg-white/20" onClick={() => setShowThreads((current) => !current)}>
             <List className="h-4 w-4" />
           </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-white hover:bg-white/20"
-            onClick={() => setWindowState((current) => ({ ...current, collapsed: true }))}
-          >
+          <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-white hover:bg-white/20" onClick={() => setWindowState((current) => ({ ...current, collapsed: true }))}>
             <Minus className="h-4 w-4" />
           </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-white hover:bg-white/20"
-            onClick={() => setWindowState((current) => ({ ...current, collapsed: true }))}
-          >
+          <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-white hover:bg-white/20" onClick={() => setWindowState((current) => ({ ...current, collapsed: true }))}>
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -505,17 +535,9 @@ export function AIChatAssistant() {
                   <div key={thread.id} className="rounded-lg border p-3 hover:border-primary">
                     <button type="button" className="w-full text-left" onClick={() => openThread(thread)}>
                       <p className="truncate text-sm font-medium">{thread.title}</p>
-                      <p className="mt-1 text-[10px] text-muted-foreground">
-                        {new Date(thread.updatedAt).toLocaleString()}
-                      </p>
+                      <p className="mt-1 text-[10px] text-muted-foreground">{new Date(thread.updatedAt).toLocaleString()}</p>
                     </button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="mt-2 h-7 w-7"
-                      onClick={() => setThreads((current) => current.filter((item) => item.id !== thread.id))}
-                    >
+                    <Button type="button" variant="ghost" size="icon" className="mt-2 h-7 w-7" onClick={() => setThreads((current) => current.filter((item) => item.id !== thread.id))}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
@@ -534,36 +556,18 @@ export function AIChatAssistant() {
               ) : (
                 <div className="space-y-4">
                   {messages.map((message, index) => (
-                    <div
-                      key={`${message.timestamp}-${index}`}
-                      className={cn("flex gap-3", message.role === "user" ? "justify-end" : "justify-start")}
-                    >
+                    <div key={`${message.timestamp}-${index}`} className={cn("flex gap-3", message.role === "user" ? "justify-end" : "justify-start")}>
                       {message.role === "assistant" ? (
                         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
                           <Bot className="h-4 w-4" />
                         </div>
                       ) : null}
-
-                      <div
-                        className={cn(
-                          "max-w-[85%] rounded-lg p-3 text-sm shadow-sm",
-                          message.role === "user" ? "bg-primary text-primary-foreground" : "border bg-card"
-                        )}
-                      >
+                      <div className={cn("max-w-[85%] rounded-lg p-3 text-sm shadow-sm", message.role === "user" ? "bg-primary text-primary-foreground" : "border bg-card")}>
                         <p className="whitespace-pre-wrap">{message.content}</p>
-                        <p
-                          className={cn(
-                            "mt-1 text-[10px]",
-                            message.role === "user" ? "text-primary-foreground/80" : "text-muted-foreground"
-                          )}
-                        >
-                          {new Date(message.timestamp).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
+                        <p className={cn("mt-1 text-[10px]", message.role === "user" ? "text-primary-foreground/80" : "text-muted-foreground")}>
+                          {new Date(message.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                         </p>
                       </div>
-
                       {message.role === "user" ? (
                         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
                           <User className="h-4 w-4" />
@@ -571,7 +575,6 @@ export function AIChatAssistant() {
                       ) : null}
                     </div>
                   ))}
-
                   {isLoading ? (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -608,18 +611,9 @@ export function AIChatAssistant() {
 
         {!isMobile ? (
           <>
-            <div
-              className="absolute right-0 top-12 h-[calc(100%-3rem)] w-1 cursor-ew-resize"
-              onPointerDown={(event) => startResize("right", event)}
-            />
-            <div
-              className="absolute bottom-0 left-0 h-1 w-full cursor-ns-resize"
-              onPointerDown={(event) => startResize("bottom", event)}
-            />
-            <div
-              className="absolute bottom-0 right-0 h-4 w-4 cursor-nwse-resize"
-              onPointerDown={(event) => startResize("corner", event)}
-            />
+            <div className="absolute right-0 top-12 h-[calc(100%-3rem)] w-1 cursor-ew-resize" onPointerDown={(event) => startResize("right", event)} />
+            <div className="absolute bottom-0 left-0 h-1 w-full cursor-ns-resize" onPointerDown={(event) => startResize("bottom", event)} />
+            <div className="absolute bottom-0 right-0 h-4 w-4 cursor-nwse-resize" onPointerDown={(event) => startResize("corner", event)} />
           </>
         ) : null}
       </div>
@@ -627,18 +621,13 @@ export function AIChatAssistant() {
   );
 
   if (!isReady) {
-    return null;
+    return contained && !isMobile ? <div ref={containerRef} className="pointer-events-none absolute inset-0" /> : null;
   }
 
   if (isMobile) {
     return (
       <>
-        <Button
-          type="button"
-          onClick={() => setWindowState((current) => ({ ...current, collapsed: false }))}
-          size="lg"
-          className="fixed bottom-4 right-4 z-50 h-12 rounded-full px-4 shadow-xl"
-        >
+        <Button type="button" onClick={() => setWindowState((current) => ({ ...current, collapsed: false }))} size="lg" className="fixed bottom-4 right-4 z-50 h-12 rounded-full px-4 shadow-xl">
           <Bot className="mr-2 h-4 w-4" />
           AI Assistant
         </Button>
@@ -651,14 +640,26 @@ export function AIChatAssistant() {
     );
   }
 
+  if (contained) {
+    return (
+      <div ref={containerRef} className="pointer-events-none absolute inset-0 z-20">
+        {windowState.collapsed ? (
+          <Button type="button" onClick={() => setWindowState((current) => ({ ...current, collapsed: false }))} className="absolute h-12 rounded-full px-4 shadow-xl pointer-events-auto" style={floatingButtonStyle}>
+            <Bot className="mr-2 h-4 w-4" />
+            AI Expert
+          </Button>
+        ) : (
+          <div className="absolute pointer-events-auto" style={desktopPositionStyle}>
+            {panel}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (windowState.collapsed) {
     return (
-      <Button
-        type="button"
-        onClick={() => setWindowState((current) => ({ ...current, collapsed: false }))}
-        className="fixed z-50 h-12 rounded-full px-4 shadow-xl"
-        style={floatingButtonStyle}
-      >
+      <Button type="button" onClick={() => setWindowState((current) => ({ ...current, collapsed: false }))} className="fixed z-50 h-12 rounded-full px-4 shadow-xl" style={floatingButtonStyle}>
         <Bot className="mr-2 h-4 w-4" />
         AI Expert
       </Button>
@@ -666,15 +667,7 @@ export function AIChatAssistant() {
   }
 
   return (
-    <div
-      className="fixed z-50"
-      style={{
-        left: windowState.x,
-        top: windowState.y,
-        width: windowState.width,
-        height: windowState.height,
-      }}
-    >
+    <div className="fixed z-50 pointer-events-auto" style={desktopPositionStyle}>
       {panel}
     </div>
   );

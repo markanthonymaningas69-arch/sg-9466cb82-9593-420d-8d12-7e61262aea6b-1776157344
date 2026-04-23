@@ -1,6 +1,6 @@
 ---
 title: AI assistant floating workspace
-status: done
+status: in_progress
 priority: high
 type: feature
 tags:
@@ -22,6 +22,7 @@ Follow-up fix:
 - simplify the desktop assistant controls so the window is draggable only
 - remove docking and manual positioning options from the visible UI while preserving saved drag position
 - remove the last stale dock helpers so the drag-only implementation compiles cleanly
+- anchor the assistant to the module body area so it appears at the bottom-right of the module content instead of the full viewport
 
 ## Checklist
 - [x] Inspect the existing AI assistant component and where it is mounted in the app shell
@@ -35,6 +36,7 @@ Follow-up fix:
 - [x] Support responsive mobile overlay behavior
 - [x] Validate interaction smoothness and app stability
 - [x] Remove docking and positioning controls from the AI assistant while keeping drag-to-move behavior
+- [ ] Anchor the assistant inside the module body at the bottom-right and preserve drag behavior there
 
 ## Acceptance
 Users can drag, resize, collapse, and restore the AI assistant without blocking the main workspace.

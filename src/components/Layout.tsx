@@ -1249,8 +1249,9 @@ export function Layout({ children }: LayoutProps) {
         )}
 
         {/* Page content */}
-        <main className={cn("p-6 relative min-h-[calc(100vh-4rem)]", isLocked && "pt-4")}>
+        <main className={cn("p-6 relative min-h-[calc(100vh-4rem)] overflow-visible", isLocked && "pt-4")}>
           {children}
+          <AIChatAssistant contained />
         </main>
       </div>
 
