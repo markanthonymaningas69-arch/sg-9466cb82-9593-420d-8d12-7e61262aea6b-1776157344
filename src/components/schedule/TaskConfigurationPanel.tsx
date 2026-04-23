@@ -1,5 +1,4 @@
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -18,7 +17,7 @@ import {
   type TaskConfiguration,
 } from "@/lib/scheduleTaskConfig";
 import type { MasterTeamTemplate } from "@/services/masterCatalogService";
-import { AlignLeft, Clock, Package, Save, Settings2, Trash2, Users, Wrench } from "lucide-react";
+import { AlignLeft, Clock, Package, Settings2, Wrench } from "lucide-react";
 
 type EditableTaskScope = NonNullable<TaskFormData["bom_scope"]>;
 
@@ -34,8 +33,6 @@ interface TaskConfigurationPanelProps {
   teamTemplates?: MasterTeamTemplate[];
   saving: boolean;
   onTaskChange: (task: EditableProjectTask) => void;
-  onSave: () => void;
-  onDelete: () => void;
 }
 
 function getDependencyIds(task: EditableProjectTask) {
@@ -48,8 +45,6 @@ export function TaskConfigurationPanel({
   teamTemplates = [],
   saving,
   onTaskChange,
-  onSave,
-  onDelete,
 }: TaskConfigurationPanelProps) {
   if (!task) {
     return (
@@ -389,18 +384,9 @@ export function TaskConfigurationPanel({
         </Tabs>
       </div>
 
-      <div className="p-4 border-t bg-muted/10 shrink-0 flex gap-2">
-        <Button className="flex-1 h-9 text-xs" onClick={onSave} disabled={saving || !validation.isValid}>
-          {saving ? (
-            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>
-          ) : (
-            <Save className="h-3 w-3 mr-1.5" />
-          )}
-          Save Task
-        </Button>
-        <Button variant="outline" className="h-9 w-9 p-0 shrink-0 text-destructive hover:bg-destructive/10" onClick={onDelete}>
-          <Trash2 className="h-4 w-4" />
-        </Button>
+      <div className="p-4 border-t bg-muted/10 shrink-0">
+        <p className="text-xs font-medium text-foreground">{saving ? "Auto-saving task changes..." : "Changes save automatically."}</p>
+        <p className="text-[11px] text-muted-foreground mt-1">Delete tasks from the main task list only.</p>
       </div>
     </Card>
   );

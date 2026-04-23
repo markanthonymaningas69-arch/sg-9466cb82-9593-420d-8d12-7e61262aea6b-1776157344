@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Layout } from "@/components/Layout";
 import { CalendarView } from "@/components/schedule/CalendarView";
 import { TaskConfigurationPanel, type EditableProjectTask } from "@/components/schedule/TaskConfigurationPanel";
@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Calendar as CalendarIcon } from "lucide-react";
+import { Plus, Calendar as CalendarIcon, Trash2 } from "lucide-react";
 import { createDraftTask, type TaskDependency, type TaskFormData, type TaskRoleAllocation } from "@/lib/schedule";
 import {
   calculateRequiredDurationDays,
@@ -72,6 +72,10 @@ function createTaskRoleAllocations(task: EditableProjectTask): TaskRoleAllocatio
     role: role.role,
     count: Math.max(1, Math.round(role.quantity)),
   }));
+}
+
+function getTaskPersistenceSignature(task: EditableProjectTask) {
+  return JSON.stringify(toTaskFormData(syncTaskWithConfiguration(task)));
 }
 
 type ScheduleTaskRecord = TaskFormData & {
@@ -205,6 +209,8 @@ export default function SchedulePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "gantt" | "calendar">("list");
+  const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedSignatureRef = useRef("");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -244,6 +250,9 @@ export default function SchedulePage() {
         }
 
         const refreshedTask = normalizedTasks.find((task) => task.id === currentTask.id);
+        if (refreshedTask) {
+          lastSavedSignatureRef.current = getTaskPersistenceSignature(refreshedTask);
+        }
         return refreshedTask || null;
       });
     } catch (error) {
@@ -276,53 +285,99 @@ export default function SchedulePage() {
   };
 
   const handleTaskChange = (task: EditableProjectTask) => {
-    setSelectedTask(syncTaskWithConfiguration(task));
+    const syncedTask = syncTaskWithConfiguration(task);
+    setSelectedTask(syncedTask);
+    if (syncedTask.id) {
+      setTasks((currentTasks) => currentTasks.map((item) => (item.id === syncedTask.id ? syncedTask : item)));
+    }
+  };
+
+  const handleSelectTask = (task: EditableProjectTask) => {
+    lastSavedSignatureRef.current = getTaskPersistenceSignature(task);
+    setSelectedTask(task);
   };
 
   const handleAddTask = () => {
+    lastSavedSignatureRef.current = "";
     setSelectedTask(createNewTask(selectedProject));
   };
 
-  const handleUpdateTask = async () => {
-    if (!selectedTask) {
+  const persistTask = async (taskToPersist: EditableProjectTask) => {
+    const syncedTask = syncTaskWithConfiguration(taskToPersist);
+    const signature = getTaskPersistenceSignature(syncedTask);
+
+    if (!selectedProject || signature === lastSavedSignatureRef.current) {
       return;
     }
 
-    const syncedTask = syncTaskWithConfiguration(selectedTask);
-    const taskPayload = toTaskFormData(syncedTask);
-
     try {
       setSaving(true);
+      const savedTask = syncedTask.id
+        ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask))
+        : await scheduleService.createTask(toTaskFormData(syncedTask));
 
-      if (syncedTask.id) {
-        await scheduleService.updateTask(syncedTask.id, taskPayload);
-        toast({ title: "Success", description: "Task updated successfully" });
-      } else {
-        await scheduleService.createTask(taskPayload);
-        toast({ title: "Success", description: "Task created successfully" });
-        setSelectedTask(null);
-      }
+      const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
 
-      await loadTasks(selectedProject);
+      setTasks((currentTasks) => {
+        const existingTask = currentTasks.some((item) => item.id === normalizedSavedTask.id);
+        const nextTasks = existingTask
+          ? currentTasks.map((item) => (item.id === normalizedSavedTask.id ? normalizedSavedTask : item))
+          : [...currentTasks, normalizedSavedTask];
+
+        return [...nextTasks].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      });
+
+      setSelectedTask((currentTask) => {
+        if (currentTask?.id && currentTask.id !== normalizedSavedTask.id) {
+          return currentTask;
+        }
+        return normalizedSavedTask;
+      });
     } catch (error) {
       console.error(error);
-      toast({ title: "Error", description: "Failed to save task", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to auto-save task", variant: "destructive" });
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDeleteTask = async () => {
-    if (!selectedTask?.id) {
-      setSelectedTask(null);
+  useEffect(() => {
+    if (!selectedTask || !selectedProject) {
       return;
     }
 
+    const nextSignature = getTaskPersistenceSignature(selectedTask);
+    if (nextSignature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      void persistTask(selectedTask);
+    }, 700);
+
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, [selectedProject, selectedTask]);
+
+  const handleDeleteTask = async (taskId: string) => {
     try {
       setSaving(true);
-      await scheduleService.deleteTask(selectedTask.id);
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+      await scheduleService.deleteTask(taskId);
       toast({ title: "Success", description: "Task deleted successfully" });
-      setSelectedTask(null);
+      lastSavedSignatureRef.current = "";
+      setSelectedTask((currentTask) => (currentTask?.id === taskId ? null : currentTask));
+      setTasks((currentTasks) => currentTasks.filter((task) => task.id !== taskId));
       await loadTasks(selectedProject);
     } catch (error) {
       console.error(error);
@@ -444,13 +499,14 @@ export default function SchedulePage() {
                           <th className="px-4 py-3 font-medium min-w-[100px]">Duration</th>
                           <th className="px-4 py-3 font-medium min-w-[120px]">Progress</th>
                           <th className="px-4 py-3 font-medium min-w-[100px]">Status</th>
+                          <th className="px-4 py-3 font-medium min-w-[72px] text-right">Action</th>
                         </tr>
                       </thead>
                       <tbody>
                         {tasks.map((task) => (
                           <tr
                             key={task.id || task.name}
-                            onClick={() => setSelectedTask(task)}
+                            onClick={() => handleSelectTask(task)}
                             className={`border-b cursor-pointer transition-colors ${selectedTask?.id === task.id ? "bg-primary/10 border-primary/20" : "bg-card hover:bg-muted/50"}`}
                           >
                             <td className="px-4 py-3 font-medium">
@@ -485,6 +541,23 @@ export default function SchedulePage() {
                               >
                                 {task.status?.replace("_", " ") || "Pending"}
                               </Badge>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  if (task.id) {
+                                    void handleDeleteTask(task.id);
+                                  }
+                                }}
+                                disabled={saving || !task.id}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </td>
                           </tr>
                         ))}
@@ -533,7 +606,7 @@ export default function SchedulePage() {
                             <div
                               key={task.id || task.name}
                               className={`flex border-b hover:bg-muted/50 cursor-pointer ${isSelected ? "bg-primary/10" : ""}`}
-                              onClick={() => setSelectedTask(task)}
+                              onClick={() => handleSelectTask(task)}
                             >
                               <div className={`w-[250px] shrink-0 border-r p-2 text-xs truncate bg-card text-foreground sticky left-0 z-10 ${isSelected ? "border-primary/30 font-medium" : ""}`}>{task.name}</div>
                               <div className="flex-1 relative h-10 flex border-l border-border/50" style={{ backgroundImage: "linear-gradient(to right, hsl(var(--border) / 0.5) 1px, transparent 1px)", backgroundSize: "30px 100%" }}>
@@ -584,8 +657,6 @@ export default function SchedulePage() {
               tasks={tasks}
               saving={saving}
               onTaskChange={handleTaskChange}
-              onSave={handleUpdateTask}
-              onDelete={handleDeleteTask}
             />
           </div>
         )}
