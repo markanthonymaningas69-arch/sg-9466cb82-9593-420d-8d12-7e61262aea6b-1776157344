@@ -1074,7 +1074,7 @@ export default function BillOfMaterials() {
               return (
                 <Card key={scope.id} className="text-foreground">
                   <CardHeader className={isCollapsed || reorderMode ? "py-1 px-4" : "pt-2 px-6 pb-1"}>
-                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between space-y-0">
                       <div className="flex items-center gap-2">
                         {reorderMode && (
                           <div className="flex items-center gap-1">
@@ -1683,7 +1683,7 @@ export default function BillOfMaterials() {
                                   </>
                                 )}
 
-                                <div className="flex items-center gap-1">
+                                <div className="flex flex-wrap items-center justify-end gap-2">
                                   <Button
                                     size="sm"
                                     className="bg-green-600 hover:bg-green-700 text-white h-6 px-2 text-xs"
