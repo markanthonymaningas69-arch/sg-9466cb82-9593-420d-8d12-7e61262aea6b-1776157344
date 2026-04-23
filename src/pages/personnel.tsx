@@ -1169,7 +1169,7 @@ export default function Personnel() {
                 </Table>
               </CardContent>
             </Card>
-          </TabsContent>
+          )}
         </Tabs>
       </div>
     </Layout>
