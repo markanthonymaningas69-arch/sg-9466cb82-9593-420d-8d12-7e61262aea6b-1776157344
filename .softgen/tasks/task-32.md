@@ -16,17 +16,23 @@ position: 32
 ## Notes
 Update the Project Manager module so it matches the requested workflow. Remove the export button, make the Auto generate from BOM action pull the current scopes from the active BOM, and upgrade Task configuration into a functional setup with Parameters, Schedule, and Resources.
 
-In Parameters, users should be able to define a team productivity rate such as 1 mason + 1 helper per hour or per day. That configuration should be used to calculate the required number of days to finish a selected scope.
+In Parameters, users should be able to define productivity using structured team composition from the Master Catalog Engine. Task name and scope quantity must stay locked to the linked BOM scope and update only from the BOM module. Priority and progress should no longer appear in the Parameters workflow. Duration must be calculated from output per team per day multiplied by number of teams, rounded up to the nearest whole day.
 
-Current follow-up: add a fully functional Calendar View to Project Manager alongside List View and Gantt View. The calendar must aggregate active tasks by day and show required workforce, material names from BOM-linked scope data, and tools/equipment. Clicking a day should open a detail panel with that day’s tasks and full breakdowns. Filters are required for project, phase, team, and resource type. The aggregation must stay efficient for large task sets and update instantly when task data changes.
+Current follow-up: extend the task and catalog data model so tasks can store `team_template_id`, `number_of_teams`, productivity settings, and calculated duration while reading team composition templates from the Master Catalog Engine.
 
 ## Checklist
 - [ ] Remove the export action from the Project Manager toolbar
 - [ ] Connect Auto generate from BOM to the current project scopes in the active BOM
 - [ ] Refactor Task configuration into Parameters, Schedule, and Resources sections
-- [ ] Add functional productivity inputs for team composition and rate unit
-- [ ] Calculate required duration for a scope from the configured productivity rate
+- [ ] Lock Task Name and Scope Quantity to BOM-linked scope data and auto-sync them
+- [ ] Remove priority and progress from the Parameters UI and related schedule editing flow
+- [ ] Add Master Catalog-driven Team Type selection in Parameters
+- [ ] Auto-populate team member breakdown from the selected team template
+- [ ] Add Number of Teams input with validation
+- [ ] Update productivity logic to use output per team per day multiplied by number of teams
+- [ ] Calculate required duration from scope quantity and total daily output
 - [ ] Persist and load task configuration through the existing project_tasks data model
+- [ ] Extend the Master Catalog data model to support team composition templates if missing
 - [ ] Fix current schedule typing/runtime issues caused by mismatched task shapes
 - [x] Add a new Calendar View tab beside List View and Gantt View
 - [x] Build month, week, and day calendar layouts with efficient daily task aggregation
