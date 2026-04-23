@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -1265,6 +1265,7 @@ export type Database = {
           assigned_project_ids: string[] | null
           avatar_url: string | null
           company_id: string | null
+          country: string | null
           created_at: string | null
           email: string | null
           full_name: string | null
@@ -1282,6 +1283,7 @@ export type Database = {
           assigned_project_ids?: string[] | null
           avatar_url?: string | null
           company_id?: string | null
+          country?: string | null
           created_at?: string | null
           email?: string | null
           full_name?: string | null
@@ -1299,6 +1301,7 @@ export type Database = {
           assigned_project_ids?: string[] | null
           avatar_url?: string | null
           company_id?: string | null
+          country?: string | null
           created_at?: string | null
           email?: string | null
           full_name?: string | null
