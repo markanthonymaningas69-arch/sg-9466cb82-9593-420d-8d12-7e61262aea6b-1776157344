@@ -1,11 +1,11 @@
 ---
 title: Country-based pricing
-status: todo
+status: done
 priority: high
 type: feature
 tags:
   - pricing
-  - subscription
+  - billing
   - country
 created_by: agent
 created_at: 2026-04-23
@@ -13,16 +13,16 @@ position: 29
 ---
 
 ## Notes
-Apply pricing by country. UAE should keep the current pricing. Philippines pricing should be Starter 299/month and Professional 499/month. Pricing surfaces should reflect the selected country where relevant so the user sees the correct plans.
+Implement country-based pricing for supported countries. UAE keeps the existing pricing. Philippines should use Starter 299/month and Professional 499/month. Unsupported countries should not be allowed to continue account creation, and pricing-related flows should respect the selected or stored country.
 
 ## Checklist
-- [ ] Inspect current pricing source and pricing-related pages
-- [ ] Add country-based pricing configuration for UAE and Philippines
-- [ ] Update pricing/subscription surfaces to use the selected country pricing
-- [ ] Ensure unsupported countries are not shown as purchasable in signup flow
-- [ ] Validate pricing display and checkout logic
+- [x] Add country-aware pricing configuration for UAE and Philippines
+- [x] Update pricing page display to use selected country pricing
+- [x] Update subscription page totals to use the account country
+- [x] Update checkout API flow to enforce supported countries and correct pricing
+- [x] Validate pricing and billing flows
 
 ## Acceptance
-UAE users see the current pricing.
+UAE users see the existing pricing.
 Philippines users see Starter 299/month and Professional 499/month.
-Pricing shown in the app matches the selected country.
+Pricing shown in the app matches the selected or stored country.

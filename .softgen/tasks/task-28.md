@@ -1,29 +1,27 @@
 ---
 title: Country-aware account creation
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
   - auth
-  - registration
+  - signup
   - country
-  - pricing
 created_by: agent
 created_at: 2026-04-23
 position: 28
 ---
 
 ## Notes
-Add a required country selector to account creation so users can be segmented by country in the database. Supported countries are UAE and Philippines only. If the selected country is not UAE or Philippines, account creation must be blocked with the exact message: "The selected Country is out of Service". Persist the selected country to the database for the created user.
+Add country selection to account creation so users can be isolated in the database by country. Only UAE and Philippines are supported. If the selected country is not UAE or Philippines, account creation must not proceed and should show "The selected Country is out of Service". Save the selected country in profiles for downstream pricing and access rules.
 
 ## Checklist
-- [ ] Inspect the current signup flow and profile persistence
-- [ ] Update the registration form to require a country selection
-- [ ] Block signup for unsupported countries with the exact out-of-service message
-- [ ] Save the selected country for supported users in the database
-- [ ] Validate the registration flow end to end
+- [x] Add country selector to the registration form
+- [x] Block signup for unsupported countries with the required out-of-service message
+- [x] Persist the selected country to the profiles table
+- [x] Validate the signup flow and error handling
 
 ## Acceptance
-Users must choose a country during account creation.
-Signup succeeds only for UAE and Philippines.
+Users can select a country during account creation.
 Unsupported countries show "The selected Country is out of Service" and do not create an account.
+The selected country is stored in the user's profile for later filtering and pricing.
