@@ -3609,16 +3609,11 @@ export default function SitePersonnel() {
                           </div>
                         </div>
                       ) : isToolRequest ? (
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <div className="space-y-2">
-                            <Label>Date Required</Label>
-                            <Input
-                              type="date"
-                              value={requestForm.request_date}
-                              onChange={(e) => setRequestForm({ ...requestForm, request_date: e.target.value })}
-                              required
-                            />
-                          </div>
+                        <div className="rounded-md border border-dashed bg-muted/10 px-4 py-10 text-center">
+                          <p className="text-sm font-medium text-foreground">Tools & Equipments Request</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            This modal is intentionally blank for now. Final input fields will be added once provided.
+                          </p>
                         </div>
                       ) : (
                         <div className="grid gap-4 md:grid-cols-2">

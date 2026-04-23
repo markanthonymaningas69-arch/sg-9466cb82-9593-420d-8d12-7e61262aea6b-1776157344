@@ -1,6 +1,6 @@
 ---
 title: Site request form refinement
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -26,8 +26,8 @@ Additional follow-up: remove any remaining input boxes from the Tools & Equipmen
 - [x] Update the Material Request dropdown to use only scope-linked BOQ/BOM items for the selected scope
 - [x] Validate that changing the selected scope updates the available material choices correctly
 - [x] Remove extra fields from the Tools & Equipments request modal
-- [ ] Remove any remaining input boxes from the Tools & Equipments modal
-- [ ] Preserve the Material Request behavior while the tools modal remains blank
+- [x] Remove any remaining input boxes from the Tools & Equipments modal
+- [x] Preserve the Material Request behavior while the tools modal remains blank
 
 ## Acceptance
 In Material Request, only materials linked to the selected scope appear in the material dropdown.
