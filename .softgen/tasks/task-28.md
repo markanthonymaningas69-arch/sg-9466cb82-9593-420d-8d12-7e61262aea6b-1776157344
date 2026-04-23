@@ -1,6 +1,6 @@
 ---
 title: Country-aware account creation
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -26,10 +26,10 @@ Latest feedback: replace the country dropdown with a selector that allows typing
 - [x] Validate the signup flow and error handling
 - [x] Remove the duplicated email input from the registration form
 - [x] Update the country selector choices to show Asian countries, UAE, and Australia
-- [ ] Replace the country field with a searchable type-to-filter selector
-- [ ] Make the country field blank by default
-- [ ] Remove placeholder suggestions from the full name and email inputs
-- [ ] Revalidate the signup form behavior
+- [x] Replace the country field with a searchable type-to-filter selector
+- [x] Make the country field blank by default
+- [x] Remove placeholder suggestions from the full name and email inputs
+- [x] Revalidate the signup form behavior
 
 ## Acceptance
 Users can select a country during account creation.
