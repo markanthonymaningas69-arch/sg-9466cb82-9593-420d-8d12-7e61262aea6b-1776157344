@@ -1,6 +1,6 @@
 ---
 title: S-Curve module integration
-status: todo
+status: in_progress
 priority: high
 type: feature
 tags:
@@ -18,11 +18,17 @@ Integrate the S-Curve module with Project Manager, Resources, HR, and Site Perso
 
 This task covers wiring the calculation pipeline into the existing modules and exposing the new module in the app.
 
+Progress update:
+- the S-Curve module is exposed inside Project Manager per selected project
+- schedule changes, BOM sync, delivery planning changes, labor cost summary updates, and site execution changes already trigger recalculation
+- remaining verification is the HR-side manpower rate maintenance flow
+
 ## Checklist
-- [ ] Inspect existing module navigation and project-specific page structure
-- [ ] Wire S-Curve recalculation triggers into schedule, resource, labor cost, and actual progress updates
-- [ ] Expose the S-Curve module in the appropriate project-facing navigation or page flow
+- [x] Inspect existing module navigation and project-specific page structure
+- [x] Wire S-Curve recalculation triggers into schedule, resource, labor cost, and actual progress updates
+- [x] Expose the S-Curve module in the appropriate project-facing navigation or page flow
 - [ ] Validate end-to-end updates from planned and actual data changes into the chart
+- [ ] Verify the HR manpower rate maintenance flow also refreshes project S-Curve data when rate inputs change
 
 ## Acceptance
 The S-Curve module is reachable from the project workflow.
