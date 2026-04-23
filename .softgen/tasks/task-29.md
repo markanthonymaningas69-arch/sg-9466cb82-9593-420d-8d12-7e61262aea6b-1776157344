@@ -1,6 +1,6 @@
 ---
 title: Country-based pricing
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -23,10 +23,10 @@ Latest feedback: implement the exact pricing behavior now using the values the u
 - [x] Update subscription page totals to use the account country
 - [x] Update checkout API flow to enforce supported countries and correct pricing
 - [x] Validate pricing and billing flows
-- [ ] Verify the current UAE pricing values in the shared pricing config
-- [ ] Enforce Philippines monthly pricing: Starter 299, Professional 499
-- [ ] Verify pricing display and checkout use the same country-based values
-- [ ] Revalidate the billing flow after the pricing update
+- [x] Verify the current UAE pricing values in the shared pricing config
+- [x] Enforce Philippines monthly pricing: Starter 299, Professional 499
+- [x] Verify pricing display and checkout use the same country-based values
+- [x] Revalidate the billing flow after the pricing update
 
 ## Acceptance
 UAE users see the existing pricing.
