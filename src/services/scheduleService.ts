@@ -4,6 +4,17 @@ import { calculateEndDate, hydrateTask, serializeTask, syncTaskDerivedFields, ty
 
 type SyncMode = "merge" | "resync";
 type ProjectTaskInsert = Database["public"]["Tables"]["project_tasks"]["Insert"];
+type ProjectTaskRow = Database["public"]["Tables"]["project_tasks"]["Row"];
+type ScopeRow = Database["public"]["Tables"]["bom_scope_of_work"]["Row"];
+
+type TaskWithScope = ProjectTaskRow & {
+  bom_scope?: Partial<ScopeRow> | null;
+};
+
+type MaterialRow = {
+  scope_id: string | null;
+  material_name: string | null;
+};
 
 const taskSelect = `
   *,
@@ -15,28 +26,89 @@ const taskSelect = `
     unit,
     completion_percentage,
     total_materials,
-    total_labor,
-    bom_materials (
-      material_name
-    )
+    total_labor
   )
 `;
 
 export type ProjectTask = TaskFormData;
 
-export const scheduleService = {
-  async getTasksByProject(projectId: string) {
-    const { data, error } = await supabase
-      .from("project_tasks")
-      .select(taskSelect)
-      .eq("project_id", projectId)
-      .order("sort_order", { ascending: true });
+function attachScopeMaterials(tasks: TaskWithScope[], materials: MaterialRow[]) {
+  const materialsByScopeId = new Map<string, string[]>();
 
-    if (error) {
-      throw error;
+  materials.forEach((material) => {
+    if (!material.scope_id || !material.material_name) {
+      return;
     }
 
-    return (data || []).map((task) => hydrateTask(task));
+    const materialName = material.material_name.trim();
+    if (!materialName) {
+      return;
+    }
+
+    const existing = materialsByScopeId.get(material.scope_id) || [];
+    if (!existing.includes(materialName)) {
+      existing.push(materialName);
+      materialsByScopeId.set(material.scope_id, existing);
+    }
+  });
+
+  return tasks.map((task) => ({
+    ...task,
+    bom_scope: task.bom_scope
+      ? {
+          ...task.bom_scope,
+          bom_materials: (materialsByScopeId.get(task.bom_scope_id || "") || []).map((material_name) => ({
+            material_name,
+          })),
+        }
+      : null,
+  }));
+}
+
+async function fetchScopeMaterials(scopeIds: string[]) {
+  if (scopeIds.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("bom_materials")
+    .select("scope_id, material_name")
+    .in("scope_id", scopeIds);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data || []) as MaterialRow[];
+}
+
+async function fetchTasksWithMaterials(query: ReturnType<typeof supabase.from<"project_tasks", never>>) {
+  const { data, error } = await query.select(taskSelect);
+
+  if (error) {
+    throw error;
+  }
+
+  const tasks = (data || []) as TaskWithScope[];
+  const scopeIds = Array.from(
+    new Set(
+      tasks
+        .map((task) => task.bom_scope_id)
+        .filter((scopeId): scopeId is string => typeof scopeId === "string" && scopeId.length > 0)
+    )
+  );
+  const materials = await fetchScopeMaterials(scopeIds);
+
+  return attachScopeMaterials(tasks, materials);
+}
+
+export const scheduleService = {
+  async getTasksByProject(projectId: string) {
+    const tasks = await fetchTasksWithMaterials(
+      supabase.from("project_tasks").eq("project_id", projectId).order("sort_order", { ascending: true })
+    );
+
+    return tasks.map((task) => hydrateTask(task));
   },
 
   async createTask(taskData: TaskFormData) {
@@ -55,7 +127,9 @@ export const scheduleService = {
       throw error;
     }
 
-    return hydrateTask(data);
+    const scopeIds = data?.bom_scope_id ? [data.bom_scope_id] : [];
+    const materials = await fetchScopeMaterials(scopeIds);
+    return hydrateTask(attachScopeMaterials([data as TaskWithScope], materials)[0]);
   },
 
   async updateTask(taskId: string, taskData: TaskFormData) {
@@ -66,7 +140,9 @@ export const scheduleService = {
       throw error;
     }
 
-    return hydrateTask(data);
+    const scopeIds = data?.bom_scope_id ? [data.bom_scope_id] : [];
+    const materials = await fetchScopeMaterials(scopeIds);
+    return hydrateTask(attachScopeMaterials([data as TaskWithScope], materials)[0]);
   },
 
   async deleteTask(taskId: string) {
@@ -110,17 +186,12 @@ export const scheduleService = {
       throw new Error("The current Bill of Materials has no scopes to generate.");
     }
 
-    const { data: existingTasks, error: existingError } = await supabase
-      .from("project_tasks")
-      .select(taskSelect)
-      .eq("project_id", projectId);
-
-    if (existingError) {
-      throw existingError;
-    }
+    const existingTasks = await fetchTasksWithMaterials(
+      supabase.from("project_tasks").eq("project_id", projectId)
+    );
 
     const existingByScope = new Map(
-      (existingTasks || [])
+      existingTasks
         .filter((task) => task.bom_scope_id)
         .map((task) => [String(task.bom_scope_id), hydrateTask(task)])
     );
