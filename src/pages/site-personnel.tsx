@@ -4064,11 +4064,13 @@ export default function SitePersonnel() {
                             resetRequestForm();
                           }}
                         >
-                          Cancel
+                          {isToolRequest ? "Close" : "Cancel"}
                         </Button>
-                        <Button type="submit">
-                          Submit Request
-                        </Button>
+                        {!isToolRequest ? (
+                          <Button type="submit">
+                            Submit Request
+                          </Button>
+                        ) : null}
                       </div>
                     </form>
                   </DialogContent>

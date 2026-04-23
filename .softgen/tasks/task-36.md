@@ -1,6 +1,6 @@
 ---
 title: Site request form refinement
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -24,8 +24,8 @@ Latest follow-up change: keep the Tools & Equipments modal blank for now. Do not
 - [x] Update the Material Request dropdown to use only scope-linked BOQ/BOM items for the selected scope
 - [x] Validate that changing the selected scope updates the available material choices correctly
 - [x] Remove extra fields from the Tools & Equipments request modal
-- [ ] Clear the Tools & Equipments modal so it shows no inputs
-- [ ] Preserve the Material Request behavior while the tools modal remains blank
+- [x] Clear the Tools & Equipments modal so it shows no inputs
+- [x] Preserve the Material Request behavior while the tools modal remains blank
 
 ## Acceptance
 In Material Request, only materials linked to the selected scope appear in the material dropdown.
