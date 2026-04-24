@@ -54,6 +54,7 @@ Latest correction:
 Current evidence:
 - `src/pages/analytics.tsx` previously contained the page-level assistant mount and should no longer own the placement
 - code search shows the shared GM module labels including `Project Profile`, `Human Resources`, and `Analytics` are defined in `src/components/Layout.tsx`
+- code search also shows the shared modules list rendering is in `src/components/Layout.tsx:1202` with `assignedModules.map(...)`
 - the assistant therefore needs to be mounted in the shared GM modules area in the layout after the Analytics entry, not inside analytics page content
 
 Next move:
