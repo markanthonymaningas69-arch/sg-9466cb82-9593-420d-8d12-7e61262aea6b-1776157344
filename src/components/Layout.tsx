@@ -50,8 +50,8 @@ interface LayoutProps {
 
 const navigation = [
 { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-{ name: "Project Manager", href: "/schedule", icon: CalendarDays },
 { name: "Project Profile", href: "/projects", icon: FolderKanban },
+{ name: "Project Manager", href: "/schedule", icon: CalendarDays },
 { name: "Site Personnel", href: "/site-personnel", icon: ClipboardList },
 { name: "Purchasing", href: "/purchasing", icon: ShoppingCart },
 { name: "Accounting", href: "/accounting", icon: Calculator },
