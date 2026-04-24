@@ -33,11 +33,10 @@ Implementation completed:
 - schema validation confirms `approval_actions` supports the required audit trail with `approval_request_id`, `actor_user_id`, `actor_name`, `action_status`, `comments`, `company_id`, and `created_at`
 - request-level GM approval handling was removed from the shared notification flow so approval work stays inside Approval Center
 
-Follow-up refinement:
-- verify every approval-capable module still creates Approval Center records after the recent notification changes
-- reconnect any missing Accounting, Purchasing, HR, Site Personnel, or Project Manager source flow to Approval Center
-- validate that Approval Center status changes keep source records synchronized in both directions
-- validate that only Approval Center owns the approval action lifecycle
+Confirmed remaining gaps from opened files:
+- `src/components/accounting/LiquidationsTab.tsx` still creates and approves liquidation records directly without creating Approval Center requests
+- `src/services/accountingService.ts` still inserts vouchers directly with no Approval Center request hook
+- search results confirm voucher creation paths still exist in `src/components/accounting/PayrollTab.tsx` and `src/components/accounting/VouchersTab.tsx`, which need review for Approval Center routing
 
 ## Checklist
 - [x] Inspect existing request tables and source module submission flows
@@ -45,8 +44,8 @@ Follow-up refinement:
 - [x] Build shared approval services for create, list, update, and history logging
 - [x] Connect source modules so new approval-worthy requests create Approval Center entries
 - [x] Ensure requester-facing status updates stay in sync with Approval Center actions
-- [ ] Audit all approval-capable module submission paths
-- [ ] Reconnect missing module flows to Approval Center
+- [x] Audit all approval-capable module submission paths
+- [ ] Reconnect missing Accounting module flows to Approval Center
 - [ ] Verify source record synchronization after Approval Center actions
 - [ ] Validate the centralized approval lifecycle end to end
 
