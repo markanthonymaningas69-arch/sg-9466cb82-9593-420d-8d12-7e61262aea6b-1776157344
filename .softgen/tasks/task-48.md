@@ -1,6 +1,6 @@
 ---
 title: Fixed AI assistant placement
-status: in_progress
+status: done
 priority: high
 type: bug
 tags:
@@ -45,11 +45,11 @@ New follow-up:
 - [x] Fix chat body and input alignment inside the assistant panel
 - [x] Verify the active module and project data are loaded and passed into the AI chat request
 - [x] Validate that the assistant no longer drags and appears only once
-- [ ] Reposition the assistant below the analytics tab at the bottom-right of the module card body
-- [ ] Restore thread history UI with list of previous conversations
-- [ ] Add rename and delete controls for each saved thread
-- [ ] Store assistant history in cache memory and restore it in the UI
-- [ ] Validate placement and thread management behavior
+- [x] Reposition the assistant below the analytics tab at the bottom-right of the module card body
+- [x] Restore thread history UI with list of previous conversations
+- [x] Add rename and delete controls for each saved thread
+- [x] Store assistant history in cache memory and restore it in the UI
+- [x] Validate placement and thread management behavior
 
 ## Acceptance
 The AI assistant appears only once in the module body.
