@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { createClient } from "@supabase/supabase-js";
+import Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import {
   assertSubscriptionCurrencyMatch,
@@ -191,7 +192,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       quantity: item.quantity,
     }));
 
-    const sessionConfig: Parameters<typeof stripe.checkout.sessions.create>[0] = {
+    const sessionConfig: Stripe.Checkout.SessionCreateParams = {
       payment_method_types: ["card"],
       line_items: lineItems,
       mode: "subscription",
