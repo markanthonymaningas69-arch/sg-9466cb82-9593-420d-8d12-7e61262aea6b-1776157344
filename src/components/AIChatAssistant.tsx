@@ -18,29 +18,6 @@ interface AIChatAssistantProps {
   contained?: boolean;
 }
 
-function getModuleLabel(pathname: string) {
-  const routeMap: Record<string, string> = {
-    "/dashboard": "Dashboard",
-    "/projects": "Project Profile",
-    "/schedule": "Project Manager",
-    "/site-personnel": "Site Personnel",
-    "/purchasing": "Purchasing",
-    "/accounting": "Accounting",
-    "/personnel": "Human Resources",
-    "/warehouse": "Warehouse",
-    "/analytics": "Analytics",
-    "/settings": "Settings",
-    "/subscription": "Subscription",
-    "/account": "Account Settings",
-  };
-
-  if (pathname.startsWith("/bom/")) {
-    return "Project BOM";
-  }
-
-  return routeMap[pathname] || "Module";
-}
-
 function buildThreadTitle(content: string) {
   const trimmed = content.trim();
   return trimmed.length > 30 ? trimmed.slice(0, 30) + "..." : trimmed || "New thread";
@@ -57,8 +34,8 @@ export function AIChatAssistant({ contained = false }: AIChatAssistantProps) {
         ? router.query.id
         : null;
 
-  const currentModule = getModuleLabel(router.pathname);
-  const routeContextKey = [router.pathname, currentTab || "", currentProjectId || ""].join("::");
+  const currentModule = "GM";
+  const globalContextKey = "gm-global";
 
   const [userId, setUserId] = useState("anon");
   const [collapsed, setCollapsed] = useState(false);
@@ -84,23 +61,26 @@ export function AIChatAssistant({ contained = false }: AIChatAssistantProps) {
   }, []);
 
   useEffect(() => {
-    const cachedThreads = getAssistantThreads(userId, routeContextKey);
-    const nextThreads = cachedThreads && cachedThreads.length > 0 ? cachedThreads : [createAssistantThread(currentModule + " thread")];
+    const cachedThreads = getAssistantThreads(userId, globalContextKey);
+    const nextThreads =
+      cachedThreads && cachedThreads.length > 0
+        ? cachedThreads
+        : [createAssistantThread("GM thread")];
     setThreads(nextThreads);
     setActiveThreadId(nextThreads[0].id);
     setEditingThreadId(null);
     setRenameValue("");
-  }, [currentModule, routeContextKey, userId]);
+  }, [globalContextKey, userId]);
 
   useEffect(() => {
     if (threads.length > 0) {
-      setAssistantThreads(userId, routeContextKey, threads);
+      setAssistantThreads(userId, globalContextKey, threads);
     }
-  }, [routeContextKey, threads, userId]);
+  }, [globalContextKey, threads, userId]);
 
   useEffect(() => {
     void loadData();
-  }, [routeContextKey]);
+  }, [currentProjectId]);
 
   useEffect(() => {
     if (!scrollRef.current) return;
@@ -181,7 +161,7 @@ export function AIChatAssistant({ contained = false }: AIChatAssistantProps) {
   }
 
   function handleCreateThread() {
-    const nextThread = createAssistantThread(currentModule + " thread");
+    const nextThread = createAssistantThread("GM thread");
     setThreads((current) => [nextThread, ...current].slice(0, 20));
     setActiveThreadId(nextThread.id);
     setEditingThreadId(null);
@@ -203,7 +183,7 @@ export function AIChatAssistant({ contained = false }: AIChatAssistantProps) {
 
   function handleDeleteThread(threadId: string) {
     const remaining = threads.filter((thread) => thread.id !== threadId);
-    const nextThreads = remaining.length > 0 ? remaining : [createAssistantThread(currentModule + " thread")];
+    const nextThreads = remaining.length > 0 ? remaining : [createAssistantThread("GM thread")];
     setThreads(nextThreads);
     setActiveThreadId(nextThreads[0].id);
     setEditingThreadId(null);
@@ -292,7 +272,7 @@ export function AIChatAssistant({ contained = false }: AIChatAssistantProps) {
           </div>
           <div>
             <p className="text-sm font-semibold leading-none">AI Project Assistant</p>
-            <p className="mt-1 text-[11px] text-primary-foreground/80">{currentModule} module analysis</p>
+            <p className="mt-1 text-[11px] text-primary-foreground/80">GM global analysis</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -365,7 +345,7 @@ export function AIChatAssistant({ contained = false }: AIChatAssistantProps) {
                     void sendMessage();
                   }
                 }}
-                placeholder={"Ask about " + currentModule.toLowerCase() + "..."}
+                placeholder="Ask about GM projects, costs, manpower, or risks..."
                 disabled={isLoading || isDataLoading || !activeThread}
                 className="h-11"
               />
@@ -380,7 +360,7 @@ export function AIChatAssistant({ contained = false }: AIChatAssistantProps) {
               </Button>
             </div>
             <p className="mt-2 text-[11px] text-muted-foreground">
-              {isDataLoading ? "Loading module data..." : "Ready with " + currentModule + " data"}
+              {isDataLoading ? "Loading GM data..." : "Ready with GM-wide project data"}
             </p>
           </div>
         </div>

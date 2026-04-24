@@ -500,6 +500,10 @@ export default function Dashboard() {
             })()}
           </DialogContent>
         </Dialog>
+
+        <div className="flex justify-end">
+          <AIChatAssistant contained />
+        </div>
       </div>
     </Layout>
   );

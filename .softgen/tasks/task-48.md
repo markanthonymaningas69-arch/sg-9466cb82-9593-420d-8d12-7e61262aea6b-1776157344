@@ -1,6 +1,6 @@
 ---
 title: Fixed AI assistant placement
-status: in_progress
+status: done
 priority: high
 type: bug
 tags:
@@ -55,11 +55,11 @@ Latest follow-up:
 - [x] Add rename and delete controls for each saved thread
 - [x] Store assistant history in cache memory and restore it in the UI
 - [x] Validate placement and thread management behavior
-- [ ] Identify the GM module page and its Analytics section mount point
-- [ ] Change assistant history and analysis context to a single global cache key shared across GM
-- [ ] Remove assistant rendering from non-GM modules
-- [ ] Render the assistant only below Analytics at the bottom-right of the GM module body
-- [ ] Validate single shared thread history and GM-only placement
+- [x] Identify the GM module page and its Analytics section mount point
+- [x] Change assistant history and analysis context to a single global cache key shared across GM
+- [x] Remove assistant rendering from non-GM modules
+- [x] Render the assistant only below Analytics at the bottom-right of the GM module body
+- [x] Validate single shared thread history and GM-only placement
 
 ## Acceptance
 The AI assistant appears only once in the GM module body below Analytics at the bottom-right corner.
