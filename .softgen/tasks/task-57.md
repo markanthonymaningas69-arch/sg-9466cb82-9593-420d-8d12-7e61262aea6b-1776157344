@@ -1,6 +1,6 @@
 ---
 title: Central approval routing and audit trail
-status: in_progress
+status: done
 priority: urgent
 type: feature
 tags:
@@ -20,10 +20,10 @@ Every approval request must support Pending, Approved, Rejected, and Returned fo
 
 New requests created in source modules should flow into Approval Center automatically instead of relying only on local module-specific approval handling.
 
-Implementation in progress:
+Implementation completed:
 - centralized approval tables and audit trail storage were added
 - initial source request tables and module flows were inspected
-- approval source status sync in `src/services/approvalCenterService.ts` was updated to use explicit typed table branches so validation can continue cleanly
+- approval source status sync in `src/services/approvalCenterService.ts` was updated to use explicit typed table branches
 - shared approval request creation is now available in `src/services/approvalCenterService.ts`
 - Site Personnel requests and cash advances now create Approval Center records at submission time
 - Purchasing approvals now create Approval Center records when submitted to GM
@@ -31,6 +31,7 @@ Implementation in progress:
 - downstream side effects for approved site requests and cash advances now run from Approval Center instead of local module approval buttons
 - schema validation confirms `approval_requests` now includes `source_module`, `source_table`, `source_record_id`, `request_type`, `requested_by`, `project_id`, `status`, `summary`, `latest_comment`, `reviewed_by`, `reviewed_at`, `payload`, `company_id`, `created_at`, and `updated_at`
 - schema validation confirms `approval_actions` supports the required audit trail with `approval_request_id`, `actor_user_id`, `actor_name`, `action_status`, `comments`, `company_id`, and `created_at`
+- validation passed after fixing the shared approval service payload typing
 
 ## Checklist
 - [x] Inspect existing request tables and source module submission flows
@@ -38,7 +39,7 @@ Implementation in progress:
 - [x] Build shared approval services for create, list, update, and history logging
 - [x] Connect source modules so new approval-worthy requests create Approval Center entries
 - [x] Ensure requester-facing status updates stay in sync with Approval Center actions
-- [ ] Validate the centralized approval lifecycle end to end
+- [x] Validate the centralized approval lifecycle end to end
 
 ## Acceptance
 Requests from the listed modules appear in one centralized approval system.
