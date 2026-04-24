@@ -1,6 +1,6 @@
 ---
 title: Central approval routing and audit trail
-status: todo
+status: in_progress
 priority: urgent
 type: feature
 tags:
@@ -20,9 +20,14 @@ Every approval request must support Pending, Approved, Rejected, and Returned fo
 
 New requests created in source modules should flow into Approval Center automatically instead of relying only on local module-specific approval handling.
 
+Implementation in progress:
+- centralized approval tables and audit trail storage were added
+- initial source request tables and module flows were inspected
+- approval source status sync in `src/services/approvalCenterService.ts` was updated to use explicit typed table branches so validation can continue cleanly
+
 ## Checklist
-- [ ] Inspect existing request tables and source module submission flows
-- [ ] Add or update database structures for centralized approval records and action history
+- [x] Inspect existing request tables and source module submission flows
+- [x] Add or update database structures for centralized approval records and action history
 - [ ] Build shared approval services for create, list, update, and history logging
 - [ ] Connect source modules so new approval-worthy requests create Approval Center entries
 - [ ] Ensure requester-facing status updates stay in sync with Approval Center actions

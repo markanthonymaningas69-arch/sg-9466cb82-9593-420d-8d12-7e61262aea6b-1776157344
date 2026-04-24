@@ -85,7 +85,29 @@ async function syncSourceRecord(sourceTable: string, sourceRecordId: string, sta
     return;
   }
 
-  await supabase.from(sourceTable).update({ status: mappedStatus }).eq("id", sourceRecordId);
+  if (sourceTable === "purchases") {
+    await supabase.from("purchases").update({ status: mappedStatus }).eq("id", sourceRecordId);
+    return;
+  }
+
+  if (sourceTable === "site_requests") {
+    await supabase.from("site_requests").update({ status: mappedStatus }).eq("id", sourceRecordId);
+    return;
+  }
+
+  if (sourceTable === "cash_advance_requests") {
+    await supabase.from("cash_advance_requests").update({ status: mappedStatus }).eq("id", sourceRecordId);
+    return;
+  }
+
+  if (sourceTable === "leave_requests") {
+    await supabase.from("leave_requests").update({ status: mappedStatus }).eq("id", sourceRecordId);
+    return;
+  }
+
+  if (sourceTable === "liquidations") {
+    await supabase.from("liquidations").update({ status: mappedStatus }).eq("id", sourceRecordId);
+  }
 }
 
 export const approvalCenterService = {
