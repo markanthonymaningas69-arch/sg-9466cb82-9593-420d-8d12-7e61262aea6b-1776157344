@@ -18,9 +18,9 @@ Add the missing input fields to the tools and equipment request flow.
 The form should include user-editable fields for Date needed, Item description, Quantity, and Notes, while preserving the rest of the request behavior.
 
 ## Checklist
-- [ ] Find the tools and equipment request form component or page
-- [ ] Add Date needed, Item description, Quantity, and Notes inputs to the form
-- [ ] Make sure the new fields are wired to the existing request state and submission flow
+- [x] Find the tools and equipment request form component or page
+- [x] Add Date needed, Item description, Quantity, and Notes inputs to the form
+- [x] Make sure the new fields are wired to the existing request state and submission flow
 - [ ] Validate the tools and equipment request form renders the new fields correctly
 
 ## Acceptance

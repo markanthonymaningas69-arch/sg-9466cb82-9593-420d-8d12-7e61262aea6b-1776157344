@@ -774,6 +774,20 @@ export default function SitePersonnel() {
         quantity: 1,
         unit: 'lot'
       });
+    } else if (requestForm.request_type === "Tools & Equipments") {
+      await supabase.from('site_requests').insert({
+        project_id: selectedProject,
+        request_date: requestForm.request_date,
+        item_name: requestForm.item_name,
+        quantity: parseFloat(requestForm.quantity.toString()) || 0,
+        unit: "unit",
+        amount: 0,
+        request_type: requestForm.request_type,
+        form_number: requestForm.form_number,
+        requested_by: requestForm.requested_by,
+        notes: requestForm.notes,
+        status: 'pending'
+      });
     } else {
       if (requestItems.length === 0) {
         alert("Please add at least one item to the list before submitting.");
@@ -3098,7 +3112,7 @@ export default function SitePersonnel() {
 
                       <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-2">
-                          <Label>Date</Label>
+                          <Label>{isToolRequest ? "Date Needed" : "Date"}</Label>
                           <Input
                             type="date"
                             value={requestForm.request_date}
@@ -3154,12 +3168,47 @@ export default function SitePersonnel() {
                           </div>
                         </div>
                       ) : isToolRequest ? (
-                        <div className="rounded-md border border-dashed bg-muted/10 px-4 py-10 text-center">
-                          <p className="text-sm font-medium text-foreground">Tools & Equipments Request</p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            This modal is intentionally blank for now. Final input fields will be added once provided.
-                          </p>
-                        </div>
+                        <>
+                          <div className="rounded-md border bg-muted/20 p-3">
+                            <p className="text-sm font-medium text-foreground">Tools & Equipments Request</p>
+                            <p className="text-xs text-muted-foreground">
+                              Enter the needed tool or equipment details and submit the request directly.
+                            </p>
+                          </div>
+
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2 md:col-span-2">
+                              <Label>Item Description</Label>
+                              <Input
+                                value={requestForm.item_name}
+                                onChange={(e) => setRequestForm({ ...requestForm, item_name: e.target.value })}
+                                placeholder="Enter tool or equipment description"
+                                required
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>Quantity</Label>
+                              <Input
+                                type="number"
+                                min="1"
+                                step="1"
+                                value={requestForm.quantity}
+                                onChange={(e) => setRequestForm({ ...requestForm, quantity: parseFloat(e.target.value) || 0 })}
+                                required
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Notes</Label>
+                            <Textarea
+                              value={requestForm.notes}
+                              onChange={(e) => setRequestForm({ ...requestForm, notes: e.target.value })}
+                              placeholder="Optional details such as brand, size, intended use, or urgency"
+                            />
+                          </div>
+                        </>
                       ) : (
                         <>
                           <div className="rounded-md border bg-muted/20 p-3">
