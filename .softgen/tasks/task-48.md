@@ -1,6 +1,6 @@
 ---
 title: Fixed AI assistant placement
-status: done
+status: in_progress
 priority: high
 type: bug
 tags:
@@ -31,6 +31,12 @@ Resolved:
 - the chat panel layout has been normalized
 - the AI API now accepts the module data keys sent by the assistant
 
+New follow-up:
+- place the assistant specifically below the analytics tab at the bottom-right corner of the module card body
+- restore chat history threads
+- allow thread rename and delete
+- store thread history in cache memory
+
 ## Checklist
 - [x] Review the current AI assistant component and module-body mount location
 - [x] Remove drag-related behavior and state from the assistant
@@ -39,9 +45,15 @@ Resolved:
 - [x] Fix chat body and input alignment inside the assistant panel
 - [x] Verify the active module and project data are loaded and passed into the AI chat request
 - [x] Validate that the assistant no longer drags and appears only once
+- [ ] Reposition the assistant below the analytics tab at the bottom-right of the module card body
+- [ ] Restore thread history UI with list of previous conversations
+- [ ] Add rename and delete controls for each saved thread
+- [ ] Store assistant history in cache memory and restore it in the UI
+- [ ] Validate placement and thread management behavior
 
 ## Acceptance
 The AI assistant appears only once in the module body.
 The assistant is fixed at the bottom-right below the analytics area.
 Users can no longer drag the assistant.
 The chat panel layout is aligned and the assistant can analyze the current module data.
+Thread history can be viewed, renamed, and deleted, and it persists through the cache layer.
