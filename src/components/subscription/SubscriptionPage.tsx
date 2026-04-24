@@ -223,6 +223,15 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
   };
 
   const handleCheckout = async () => {
+    if (!selectedPlan || totalAmountDueToday <= 0) {
+      toast({
+        title: "Nothing to checkout",
+        description: "Select a plan or add billable items before proceeding.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsCheckingOut(true);
 
     try {
@@ -732,7 +741,7 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
                   disabled={
                     isCheckingOut ||
                     !selectedPlan ||
-                    (totalAmountDueToday === 0 && !isSelectingSamePlanAndCycle)
+                    totalAmountDueToday <= 0
                   }
                 >
                   {isCheckingOut ? (

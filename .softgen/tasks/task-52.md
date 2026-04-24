@@ -1,6 +1,6 @@
 ---
 title: Automatic country subscription routing
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -41,8 +41,8 @@ Follow-up bug:
 - [x] Identify available country or locale detection sources already present in the app
 - [x] Replace the manual region selector with automatic country routing
 - [x] Keep UAE and Philippines pages directly editable for pricing and currency
-- [ ] Disable checkout when no plan or add-ons are selected
-- [ ] Validate the subscription flow and fallback behavior
+- [x] Disable checkout when no plan or add-ons are selected
+- [x] Validate the subscription flow and fallback behavior
 
 ## Acceptance
 Users are not asked to manually choose a country on the subscription page.
