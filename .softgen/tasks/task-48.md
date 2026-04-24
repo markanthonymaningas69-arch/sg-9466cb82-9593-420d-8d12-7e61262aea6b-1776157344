@@ -1,6 +1,6 @@
 ---
 title: Fixed AI assistant placement
-status: in_progress
+status: done
 priority: high
 type: bug
 tags:
@@ -64,8 +64,8 @@ Newest refinement:
 - [x] Remove assistant rendering from non-GM modules
 - [x] Render the assistant only below Analytics at the bottom-right of the GM module body
 - [x] Remove the dashboard assistant mount
-- [ ] Move the assistant so it sits directly below the Analytics module and right-aligned in that section
-- [ ] Validate final GM placement in preview structure
+- [x] Move the assistant so it sits directly below the Analytics module and right-aligned in that section
+- [x] Validate final GM placement in preview structure
 
 ## Acceptance
 The AI assistant appears only once in the GM module body below Analytics at the bottom-right corner.

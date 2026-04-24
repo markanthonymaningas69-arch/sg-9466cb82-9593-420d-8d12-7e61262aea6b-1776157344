@@ -17,6 +17,7 @@ import { ClipboardList, Package, DollarSign, AlertCircle, TrendingUp, BarChart3 
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type { Database } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
+import { AIChatAssistant } from "@/components/AIChatAssistant";
 
 type Project = Database["public"]["Tables"]["projects"]["Row"];
 
@@ -551,353 +552,354 @@ export default function Analytics() {
             </CardContent>
           </Card>
         ) : (
-          <Tabs defaultValue="swa" className="space-y-6">
-            <TabsList className="shrink-0 flex flex-wrap w-full gap-1 h-auto bg-transparent p-0 pb-4">
-              <TabsTrigger value="swa" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-blue-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-blue-700 bg-blue-50 text-blue-700 hover:bg-blue-100">
-                <ClipboardList className="h-3 w-3 mr-1.5 hidden sm:inline" />
-                SWA
-              </TabsTrigger>
-              <TabsTrigger value="materials" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-indigo-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-indigo-700 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
-                <Package className="h-3 w-3 mr-1.5 hidden sm:inline" />
-                Materials
-              </TabsTrigger>
-              <TabsTrigger value="spent" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-emerald-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-emerald-700 bg-emerald-50 text-emerald-700 hover:bg-emerald-100">
-                <DollarSign className="h-3 w-3 mr-1.5 hidden sm:inline" />
-                Spent vs Alloc.
-              </TabsTrigger>
-              <TabsTrigger value="ocm" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-amber-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-amber-700 bg-amber-50 text-amber-700 hover:bg-amber-100">
-                <AlertCircle className="h-3 w-3 mr-1.5 hidden sm:inline" />
-                OCM
-              </TabsTrigger>
-              <TabsTrigger value="visual" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-orange-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-orange-700 bg-orange-50 text-orange-700 hover:bg-orange-100">
-                <BarChart3 className="h-3 w-3 mr-1.5 hidden sm:inline" />
-                Visuals
-              </TabsTrigger>
-            </TabsList>
+          <>
+            <Tabs defaultValue="swa" className="space-y-6">
+              <TabsList className="shrink-0 flex flex-wrap w-full gap-1 h-auto bg-transparent p-0 pb-4">
+                <TabsTrigger value="swa" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-blue-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-blue-700 bg-blue-50 text-blue-700 hover:bg-blue-100">
+                  <ClipboardList className="h-3 w-3 mr-1.5 hidden sm:inline" />
+                  SWA
+                </TabsTrigger>
+                <TabsTrigger value="materials" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-indigo-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-indigo-700 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
+                  <Package className="h-3 w-3 mr-1.5 hidden sm:inline" />
+                  Materials
+                </TabsTrigger>
+                <TabsTrigger value="spent" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-emerald-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-emerald-700 bg-emerald-50 text-emerald-700 hover:bg-emerald-100">
+                  <DollarSign className="h-3 w-3 mr-1.5 hidden sm:inline" />
+                  Spent vs Alloc.
+                </TabsTrigger>
+                <TabsTrigger value="ocm" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-amber-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-amber-700 bg-amber-50 text-amber-700 hover:bg-amber-100">
+                  <AlertCircle className="h-3 w-3 mr-1.5 hidden sm:inline" />
+                  OCM
+                </TabsTrigger>
+                <TabsTrigger value="visual" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-orange-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-orange-700 bg-orange-50 text-orange-700 hover:bg-orange-100">
+                  <BarChart3 className="h-3 w-3 mr-1.5 hidden sm:inline" />
+                  Visuals
+                </TabsTrigger>
+              </TabsList>
 
-            {/* 1. SWA */}
-            <TabsContent value="swa">
-              <Card>
-                <CardHeader className="flex flex-col sm:flex-row items-start justify-between space-y-2 sm:space-y-0 pb-4">
-                  <div className="space-y-1">
-                    <CardTitle className="text-lg sm:text-xl">Statement of Work Accomplishment</CardTitle>
-                    <CardDescription className="text-xs sm:text-sm">Weighted progress and financial completion status per scope and indirect costs.</CardDescription>
-                  </div>
-                  {latestPersonnelDate && (
-                    <Badge variant="outline" className="ml-auto text-xs font-normal bg-muted/50 whitespace-nowrap">
-                      Latest Site Update: {latestPersonnelDate}
-                    </Badge>
-                  )}
-                </CardHeader>
-                <CardContent className="p-0 sm:p-6">
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="min-w-[150px]">Description</TableHead>
-                          <TableHead className="text-right min-w-[120px]">Total Cost</TableHead>
-                          <TableHead className="text-right min-w-[80px]">Wt. %</TableHead>
-                          <TableHead className="text-right min-w-[100px]">Completed %</TableHead>
-                          <TableHead className="text-right min-w-[120px]">Accomplishment</TableHead>
-                          <TableHead className="text-right min-w-[150px]">Amount of Completion</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {swaData.rows.length === 0 ? (
+              {/* 1. SWA */}
+              <TabsContent value="swa">
+                <Card>
+                  <CardHeader className="flex flex-col sm:flex-row items-start justify-between space-y-2 sm:space-y-0 pb-4">
+                    <div className="space-y-1">
+                      <CardTitle className="text-lg sm:text-xl">Statement of Work Accomplishment</CardTitle>
+                      <CardDescription className="text-xs sm:text-sm">Weighted progress and financial completion status per scope and indirect costs.</CardDescription>
+                    </div>
+                    {latestPersonnelDate && (
+                      <Badge variant="outline" className="ml-auto text-xs font-normal bg-muted/50 whitespace-nowrap">
+                        Latest Site Update: {latestPersonnelDate}
+                      </Badge>
+                    )}
+                  </CardHeader>
+                  <CardContent className="p-0 sm:p-6">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
                           <TableRow>
-                            <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                              No scopes or indirect costs defined in BOM.
-                            </TableCell>
+                            <TableHead className="min-w-[150px]">Description</TableHead>
+                            <TableHead className="text-right min-w-[120px]">Total Cost</TableHead>
+                            <TableHead className="text-right min-w-[80px]">Wt. %</TableHead>
+                            <TableHead className="text-right min-w-[100px]">Completed %</TableHead>
+                            <TableHead className="text-right min-w-[120px]">Accomplishment</TableHead>
+                            <TableHead className="text-right min-w-[150px]">Amount of Completion</TableHead>
                           </TableRow>
-                        ) : (
-                          <>
-                            {swaData.rows.map((row: any) => (
-                              <TableRow key={row.id}>
-                                <TableCell className="font-medium">
-                                  {row.name}
-                                  {row.type === "indirect" && <Badge variant="outline" className="ml-2 text-[10px] h-5">Indirect Cost</Badge>}
-                                </TableCell>
-                                <TableCell className="text-right">{formatCurrency(row.cost)}</TableCell>
-                                <TableCell className="text-right">{row.wtPercentage.toFixed(2)}%</TableCell>
-                                <TableCell className="text-right">{row.completion.toFixed(2)}%</TableCell>
-                                <TableCell className="text-right font-bold text-primary">{row.accomplishment.toFixed(2)}%</TableCell>
-                                <TableCell className="text-right font-bold text-primary">{formatCurrency(row.amountOfCompletion)}</TableCell>
+                        </TableHeader>
+                        <TableBody>
+                          {swaData.rows.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                                No scopes or indirect costs defined in BOM.
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            <>
+                              {swaData.rows.map((row: any) => (
+                                <TableRow key={row.id}>
+                                  <TableCell className="font-medium">
+                                    {row.name}
+                                    {row.type === "indirect" && <Badge variant="outline" className="ml-2 text-[10px] h-5">Indirect Cost</Badge>}
+                                  </TableCell>
+                                  <TableCell className="text-right">{formatCurrency(row.cost)}</TableCell>
+                                  <TableCell className="text-right">{row.wtPercentage.toFixed(2)}%</TableCell>
+                                  <TableCell className="text-right">{row.completion.toFixed(2)}%</TableCell>
+                                  <TableCell className="text-right font-bold text-primary">{row.accomplishment.toFixed(2)}%</TableCell>
+                                  <TableCell className="text-right font-bold text-primary">{formatCurrency(row.amountOfCompletion)}</TableCell>
+                                </TableRow>
+                              ))}
+                              <TableRow className="bg-muted/50 font-bold hover:bg-muted/50">
+                                <TableCell>GRAND TOTAL</TableCell>
+                                <TableCell className="text-right text-primary">{formatCurrency(swaData.totals.cost)}</TableCell>
+                                <TableCell className="text-right text-primary">{swaData.totals.wtPercentage.toFixed(2)}%</TableCell>
+                                <TableCell className="text-right">-</TableCell>
+                                <TableCell className="text-right text-primary">{swaData.totals.accomplishment.toFixed(2)}%</TableCell>
+                                <TableCell className="text-right text-primary">{formatCurrency(swaData.totals.amountOfCompletion)}</TableCell>
                               </TableRow>
-                            ))}
-                            <TableRow className="bg-muted/50 font-bold hover:bg-muted/50">
-                              <TableCell>GRAND TOTAL</TableCell>
-                              <TableCell className="text-right text-primary">{formatCurrency(swaData.totals.cost)}</TableCell>
-                              <TableCell className="text-right text-primary">{swaData.totals.wtPercentage.toFixed(2)}%</TableCell>
-                              <TableCell className="text-right">-</TableCell>
-                              <TableCell className="text-right text-primary">{swaData.totals.accomplishment.toFixed(2)}%</TableCell>
-                              <TableCell className="text-right text-primary">{formatCurrency(swaData.totals.amountOfCompletion)}</TableCell>
-                            </TableRow>
-                          </>
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                            </>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-            {/* 2. Material Usage vs Allocated */}
-            <TabsContent value="materials">
-              <Card>
-                <CardHeader className="flex flex-col sm:flex-row items-start justify-between space-y-2 sm:space-y-0">
-                  <div>
-                    <CardTitle className="text-lg sm:text-xl">Material Usage vs Allocated</CardTitle>
-                    <CardDescription className="text-xs sm:text-sm">Compare planned material quantities against actual site consumption.</CardDescription>
-                  </div>
-                  <Select value={usageScopeFilter} onValueChange={setUsageScopeFilter}>
-                    <SelectTrigger className="w-full sm:w-[200px]">
-                      <SelectValue placeholder="Filter by Scope" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Scopes</SelectItem>
-                      <SelectItem value="unassigned">General/Unassigned</SelectItem>
-                      {bom?.bom_scope_of_work?.map((scope: any) => (
-                        <SelectItem key={scope.id} value={scope.id}>{scope.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </CardHeader>
-                <CardContent className="p-0 sm:p-6">
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="min-w-[120px]">Scope</TableHead>
-                          <TableHead className="min-w-[150px]">Material</TableHead>
-                          <TableHead className="text-right min-w-[100px]">Allocated Qty</TableHead>
-                          <TableHead className="text-right min-w-[100px]">Actual Qty</TableHead>
-                          <TableHead className="text-right min-w-[100px]">Variance</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {materialUsageData.length === 0 ? (
+              {/* 2. Material Usage vs Allocated */}
+              <TabsContent value="materials">
+                <Card>
+                  <CardHeader className="flex flex-col sm:flex-row items-start justify-between space-y-2 sm:space-y-0">
+                    <div>
+                      <CardTitle className="text-lg sm:text-xl">Material Usage vs Allocated</CardTitle>
+                      <CardDescription className="text-xs sm:text-sm">Compare planned material quantities against actual site consumption.</CardDescription>
+                    </div>
+                    <Select value={usageScopeFilter} onValueChange={setUsageScopeFilter}>
+                      <SelectTrigger className="w-full sm:w-[200px]">
+                        <SelectValue placeholder="Filter by Scope" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Scopes</SelectItem>
+                        <SelectItem value="unassigned">General/Unassigned</SelectItem>
+                        {bom?.bom_scope_of_work?.map((scope: any) => (
+                          <SelectItem key={scope.id} value={scope.id}>{scope.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </CardHeader>
+                  <CardContent className="p-0 sm:p-6">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
                           <TableRow>
-                            <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                              No materials found for the selected criteria.
-                            </TableCell>
+                            <TableHead className="min-w-[120px]">Scope</TableHead>
+                            <TableHead className="min-w-[150px]">Material</TableHead>
+                            <TableHead className="text-right min-w-[100px]">Allocated Qty</TableHead>
+                            <TableHead className="text-right min-w-[100px]">Actual Qty</TableHead>
+                            <TableHead className="text-right min-w-[100px]">Variance</TableHead>
                           </TableRow>
-                        ) : (
-                          materialUsageData.map((row: any, idx: number) => (
-                            <TableRow key={idx}>
-                              <TableCell className="text-sm text-muted-foreground">{row.scopeName}</TableCell>
-                              <TableCell className="font-medium">{row.materialName}</TableCell>
-                              <TableCell className="text-right">{row.allocated} {row.unit}</TableCell>
-                              <TableCell className="text-right">{row.actual} {row.unit}</TableCell>
-                              <TableCell className={`text-right font-medium ${row.variance < 0 ? 'text-destructive' : row.variance > 0 ? 'text-success' : ''}`}>
-                                {row.variance > 0 ? '+' : ''}{row.variance} {row.unit}
+                        </TableHeader>
+                        <TableBody>
+                          {materialUsageData.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                                No materials found for the selected criteria.
                               </TableCell>
                             </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                          ) : (
+                            materialUsageData.map((row: any, idx: number) => (
+                              <TableRow key={idx}>
+                                <TableCell className="text-sm text-muted-foreground">{row.scopeName}</TableCell>
+                                <TableCell className="font-medium">{row.materialName}</TableCell>
+                                <TableCell className="text-right">{row.allocated} {row.unit}</TableCell>
+                                <TableCell className="text-right">{row.actual} {row.unit}</TableCell>
+                                <TableCell className={`text-right font-medium ${row.variance < 0 ? 'text-destructive' : row.variance > 0 ? 'text-success' : ''}`}>
+                                  {row.variance > 0 ? '+' : ''}{row.variance} {row.unit}
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-            {/* 3. Spent vs Allocated */}
-            <TabsContent value="spent">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg sm:text-xl">Spent vs Allocated per Scope</CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">Financial breakdown of materials and labor allocated vs actuals.</CardDescription>
-                </CardHeader>
-                <CardContent className="p-0 sm:p-6">
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="min-w-[150px]">Scope</TableHead>
-                          <TableHead className="text-right min-w-[120px]">Allocated Materials</TableHead>
-                          <TableHead className="text-right min-w-[120px]">Allocated Labor</TableHead>
-                          <TableHead className="text-right border-r min-w-[120px]">Total Allocated</TableHead>
-                          <TableHead className="text-right bg-muted/30 min-w-[120px]">Actual Materials</TableHead>
-                          <TableHead className="text-right bg-muted/30 min-w-[120px]">Actual Labor</TableHead>
-                          <TableHead className="text-right bg-muted/30 min-w-[120px]">Total Actual</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {scopeSpendingData.length === 0 ? (
+              {/* 3. Spent vs Allocated */}
+              <TabsContent value="spent">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg sm:text-xl">Spent vs Allocated per Scope</CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">Financial breakdown of materials and labor allocated vs actuals.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-0 sm:p-6">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
                           <TableRow>
-                            <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                              No scope data available.
-                            </TableCell>
+                            <TableHead className="min-w-[150px]">Scope</TableHead>
+                            <TableHead className="text-right min-w-[120px]">Allocated Materials</TableHead>
+                            <TableHead className="text-right min-w-[120px]">Allocated Labor</TableHead>
+                            <TableHead className="text-right border-r min-w-[120px]">Total Allocated</TableHead>
+                            <TableHead className="text-right bg-muted/30 min-w-[120px]">Actual Materials</TableHead>
+                            <TableHead className="text-right bg-muted/30 min-w-[120px]">Actual Labor</TableHead>
+                            <TableHead className="text-right bg-muted/30 min-w-[120px]">Total Actual</TableHead>
                           </TableRow>
-                        ) : (
-                          scopeSpendingData.map((row: any, idx: number) => (
-                            <TableRow key={idx}>
-                              <TableCell className="font-medium">{row.scopeName}</TableCell>
-                              <TableCell className="text-right">{formatCurrency(row.allocatedMatCost)}</TableCell>
-                              <TableCell className="text-right">{formatCurrency(row.allocatedLabCost)}</TableCell>
-                              <TableCell className="text-right font-bold text-primary border-r">{formatCurrency(row.totalAllocated)}</TableCell>
-                              <TableCell className={`text-right bg-muted/10 font-medium ${row.actualMatCost > row.allocatedMatCost ? 'text-destructive' : ''}`}>
-                                {formatCurrency(row.actualMatCost)}
-                              </TableCell>
-                              <TableCell className={`text-right bg-muted/10 font-medium ${row.actualLabCost > row.allocatedLabCost ? 'text-destructive' : ''}`}>
-                                {formatCurrency(row.actualLabCost)}
-                              </TableCell>
-                              <TableCell className={`text-right bg-muted/10 font-bold ${row.totalActual > row.totalAllocated ? 'text-destructive' : 'text-primary'}`}>
-                                {formatCurrency(row.totalActual)}
+                        </TableHeader>
+                        <TableBody>
+                          {scopeSpendingData.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                                No scope data available.
                               </TableCell>
                             </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                          ) : (
+                            scopeSpendingData.map((row: any, idx: number) => (
+                              <TableRow key={idx}>
+                                <TableCell className="font-medium">{row.scopeName}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(row.allocatedMatCost)}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(row.allocatedLabCost)}</TableCell>
+                                <TableCell className="text-right font-bold text-primary border-r">{formatCurrency(row.totalAllocated)}</TableCell>
+                                <TableCell className={`text-right bg-muted/10 font-medium ${row.actualMatCost > row.allocatedMatCost ? 'text-destructive' : ''}`}>
+                                  {formatCurrency(row.actualMatCost)}
+                                </TableCell>
+                                <TableCell className={`text-right bg-muted/10 font-medium ${row.actualLabCost > row.allocatedLabCost ? 'text-destructive' : ''}`}>
+                                  {formatCurrency(row.actualLabCost)}
+                                </TableCell>
+                                <TableCell className={`text-right bg-muted/10 font-bold ${row.totalActual > row.totalAllocated ? 'text-destructive' : 'text-primary'}`}>
+                                  {formatCurrency(row.totalActual)}
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-            {/* 4. OCM (Out of BOM Materials) */}
-            <TabsContent value="ocm">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-                    <AlertCircle className="h-5 w-5 text-warning" />
-                    Overhead & Contingency Materials (OCM)
-                  </CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">Materials consumed on site that were not included in the original BOM for their respective scopes.</CardDescription>
-                </CardHeader>
-                <CardContent className="p-0 sm:p-6">
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="min-w-[100px]">Date Used</TableHead>
-                          <TableHead className="min-w-[120px]">Scope</TableHead>
-                          <TableHead className="min-w-[150px]">Material</TableHead>
-                          <TableHead className="text-right min-w-[100px]">Qty Used</TableHead>
-                          <TableHead className="text-right min-w-[100px]">Total Cost</TableHead>
-                          <TableHead className="min-w-[120px]">Remarks</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {ocmData.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                              No OCM materials detected. All usage matches BOM.
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          ocmData.map((row: any, idx: number) => (
-                            <TableRow key={idx}>
-                              <TableCell>{new Date(row.date).toLocaleDateString()}</TableCell>
-                              <TableCell className="text-sm text-muted-foreground">{row.scopeName}</TableCell>
-                              <TableCell className="font-medium">{row.materialName}</TableCell>
-                              <TableCell className="text-right font-bold text-warning">{row.quantity} {row.unit}</TableCell>
-                              <TableCell className="text-right font-medium">{formatCurrency(row.cost)}</TableCell>
-                              <TableCell className="text-sm italic">{row.remarks || "-"}</TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* 5. Visual Analytics */}
-            <TabsContent value="visual">
-              <div className="space-y-6">
-                {/* Cost Burn Rate */}
+              {/* 4. OCM (Out of BOM Materials) */}
+              <TabsContent value="ocm">
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-                      <TrendingUp className="h-5 w-5 text-primary" />
-                      Cumulative Cost Burn Rate
+                      <AlertCircle className="h-5 w-5 text-warning" />
+                      Overhead & Contingency Materials (OCM)
                     </CardTitle>
-                    <CardDescription className="text-xs sm:text-sm">Track how project costs accumulate over time</CardDescription>
+                    <CardDescription className="text-xs sm:text-sm">Materials consumed on site that were not included in the original BOM for their respective scopes.</CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    {visualAnalyticsData.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        No cost data available yet. Start logging site activities to see trends.
-                      </div>
-                    ) : (
-                      <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={visualAnalyticsData}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                          <YAxis tick={{ fontSize: 10 }} />
-                          <Tooltip formatter={(value: any) => formatCurrency(Number(value))} />
-                          <Legend wrapperStyle={{ fontSize: '12px' }} />
-                          <Line type="monotone" dataKey="cumulativeCost" stroke="#8884d8" strokeWidth={2} name="Cumulative Cost" />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    )}
+                  <CardContent className="p-0 sm:p-6">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="min-w-[100px]">Date Used</TableHead>
+                            <TableHead className="min-w-[120px]">Scope</TableHead>
+                            <TableHead className="min-w-[150px]">Material</TableHead>
+                            <TableHead className="text-right min-w-[100px]">Qty Used</TableHead>
+                            <TableHead className="text-right min-w-[100px]">Total Cost</TableHead>
+                            <TableHead className="min-w-[120px]">Remarks</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {ocmData.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                                No OCM materials detected. All usage matches BOM.
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            ocmData.map((row: any, idx: number) => (
+                              <TableRow key={idx}>
+                                <TableCell>{new Date(row.date).toLocaleDateString()}</TableCell>
+                                <TableCell className="text-sm text-muted-foreground">{row.scopeName}</TableCell>
+                                <TableCell className="font-medium">{row.materialName}</TableCell>
+                                <TableCell className="text-right font-bold text-warning">{row.quantity} {row.unit}</TableCell>
+                                <TableCell className="text-right font-medium">{formatCurrency(row.cost)}</TableCell>
+                                <TableCell className="text-sm italic">{row.remarks || "-"}</TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
                   </CardContent>
                 </Card>
+              </TabsContent>
 
-                {/* Daily Material Consumption */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-                      <Package className="h-5 w-5 text-primary" />
-                      Daily Material Consumption Cost
-                    </CardTitle>
-                    <CardDescription className="text-xs sm:text-sm">Material costs consumed each day</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {visualAnalyticsData.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        No material consumption data available.
-                      </div>
-                    ) : (
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={visualAnalyticsData}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                          <YAxis tick={{ fontSize: 10 }} />
-                          <Tooltip formatter={(value: any) => formatCurrency(Number(value))} />
-                          <Legend wrapperStyle={{ fontSize: '12px' }} />
-                          <Bar dataKey="materialCost" fill="#82ca9d" name="Material Cost" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    )}
-                  </CardContent>
-                </Card>
+              {/* 5. Visual Analytics */}
+              <TabsContent value="visual">
+                <div className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                        <TrendingUp className="h-5 w-5 text-primary" />
+                        Cumulative Cost Burn Rate
+                      </CardTitle>
+                      <CardDescription className="text-xs sm:text-sm">Track how project costs accumulate over time</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {visualAnalyticsData.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          No cost data available yet. Start logging site activities to see trends.
+                        </div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={visualAnalyticsData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                            <YAxis tick={{ fontSize: 10 }} />
+                            <Tooltip formatter={(value: any) => formatCurrency(Number(value))} />
+                            <Legend wrapperStyle={{ fontSize: "12px" }} />
+                            <Line type="monotone" dataKey="cumulativeCost" stroke="#8884d8" strokeWidth={2} name="Cumulative Cost" />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      )}
+                    </CardContent>
+                  </Card>
 
-                {/* Overall Progress Chart */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-                      <BarChart3 className="h-5 w-5 text-primary" />
-                      Overall Project Progress
-                    </CardTitle>
-                    <CardDescription className="text-xs sm:text-sm">Track overall completion percentage over time based on scope updates</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {progressChartData.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        No progress updates available yet.
-                      </div>
-                    ) : (
-                      <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={progressChartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                          <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                          <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} tickFormatter={(val) => `${val}%`} />
-                          <Tooltip formatter={(value: any) => [`${value}%`, 'Overall Completion']} />
-                          <Line type="monotone" dataKey="completion" stroke="#22c55e" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                        <Package className="h-5 w-5 text-primary" />
+                        Daily Material Consumption Cost
+                      </CardTitle>
+                      <CardDescription className="text-xs sm:text-sm">Material costs consumed each day</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {visualAnalyticsData.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          No material consumption data available.
+                        </div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height={300}>
+                          <BarChart data={visualAnalyticsData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                            <YAxis tick={{ fontSize: 10 }} />
+                            <Tooltip formatter={(value: any) => formatCurrency(Number(value))} />
+                            <Legend wrapperStyle={{ fontSize: "12px" }} />
+                            <Bar dataKey="materialCost" fill="#82ca9d" name="Material Cost" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      )}
+                    </CardContent>
+                  </Card>
 
-          </Tabs>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                        <BarChart3 className="h-5 w-5 text-primary" />
+                        Overall Project Progress
+                      </CardTitle>
+                      <CardDescription className="text-xs sm:text-sm">Track overall completion percentage over time based on scope updates</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {progressChartData.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          No progress updates available yet.
+                        </div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={progressChartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                            <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} tickFormatter={(val) => `${val}%`} />
+                            <Tooltip formatter={(value: any) => [`${value}%`, "Overall Completion"]} />
+                            <Line type="monotone" dataKey="completion" stroke="#22c55e" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+            </Tabs>
+
+            <div className="flex justify-end">
+              <AIChatAssistant contained />
+            </div>
+          </>
         )}
-
       </div>
     </Layout>
   );
