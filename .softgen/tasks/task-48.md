@@ -52,8 +52,9 @@ Latest correction:
 - make the assistant panel open upward instead of downward
 
 Current evidence:
-- `src/pages/analytics.tsx` still contains the only live `<AIChatAssistant contained />` mount
-- the assistant must be moved off the Analytics page and into the GM dashboard modules card area instead
+- `src/pages/analytics.tsx` still contained the page-level assistant mount before removal
+- the user clarified the target area is the shared GM module list area containing Dashboard, Project Manager, Project Profile, Site Personnel, Purchasing, Accounting, Human Resources, Warehouse, and Analytics
+- the assistant should therefore be moved into the shared GM modules area after the Analytics entry rather than any analytics page content
 
 ## Checklist
 - [x] Review the current AI assistant component and module-body mount location
@@ -76,10 +77,11 @@ Current evidence:
 - [x] Move the assistant so it sits directly below the Analytics module and right-aligned in that section
 - [x] Move the assistant out of Analytics tab content and into the modules card body after the Analytics module
 - [x] Change the assistant expansion direction so the chat opens upward
-- [ ] Move the assistant off the Analytics page and into the GM modules card body after the Analytics module
-- [ ] Validate final placement and expansion behavior
+- [ ] Mount the assistant after the shared GM module list entry for Analytics
+- [ ] Keep the assistant GM-only in the shared modules area
+- [ ] Validate final placement and upward expansion behavior
 
 ## Acceptance
-The AI assistant appears only once in the GM module body after the Analytics module, aligned to the bottom-right of the modules card body.
-The assistant is not rendered inside the Analytics tab content.
+The AI assistant appears only once in the GM shared modules area after the Analytics entry, aligned to the bottom-right of the modules card body.
+The assistant is not rendered inside Analytics page content.
 The assistant opens upward when expanded, and shared thread history remains available.
