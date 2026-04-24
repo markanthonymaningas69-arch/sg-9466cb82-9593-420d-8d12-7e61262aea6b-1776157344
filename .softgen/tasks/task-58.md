@@ -1,6 +1,6 @@
 ---
 title: Approval notifications and GM badge logic
-status: done
+status: in_progress
 priority: high
 type: feature
 tags:
@@ -27,14 +27,19 @@ Implementation completed:
 - Purchasing copy and status labels now point users to Approval Center instead of a GM-specific approval flow
 - final Layout cleanup removed leftover GM purchase references so approval requests no longer surface outside Approval Center
 
+Follow-up refinement:
+- when a user opens a module from its notification, mark that module notification set as seen
+- opened modules should not immediately show the same notification badge again for the same items unless new activity arrives
+
 ## Checklist
 - [x] Inspect the current notification system and identify GM-specific notification paths
 - [x] Restrict GM notifications to approval-related alerts
 - [x] Add or connect real-time badge counts for Approval Center and category counts
 - [x] Remove any remaining GM-direct request approval items from the notification feed
-- [x] Validate badge counts and GM notification behavior
+- [ ] Clear module notifications after the related module is opened
+- [ ] Validate badge counts and GM notification behavior
 
 ## Acceptance
 GM only receives approval-related alerts instead of general system notifications.
 Approval Center badges show pending approval counts per category.
-Badge counts and approval notifications update immediately when request status changes.
+Opened module notifications do not immediately reappear for the same items unless new activity is created.
