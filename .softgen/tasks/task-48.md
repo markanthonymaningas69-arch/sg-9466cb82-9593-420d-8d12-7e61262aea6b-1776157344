@@ -44,6 +44,7 @@ Latest follow-up:
 
 Newest refinement:
 - place the AI assistant directly below the Analytics module itself, right-aligned to the bottom-right of that module area
+- remove the remaining dashboard mount before moving it to the analytics page
 
 ## Checklist
 - [x] Review the current AI assistant component and module-body mount location
@@ -62,6 +63,7 @@ Newest refinement:
 - [x] Change assistant history and analysis context to a single global cache key shared across GM
 - [x] Remove assistant rendering from non-GM modules
 - [x] Render the assistant only below Analytics at the bottom-right of the GM module body
+- [x] Remove the dashboard assistant mount
 - [ ] Move the assistant so it sits directly below the Analytics module and right-aligned in that section
 - [ ] Validate final GM placement in preview structure
 
