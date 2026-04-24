@@ -1,6 +1,6 @@
 ---
 title: Fixed AI assistant placement
-status: done
+status: in_progress
 priority: high
 type: bug
 tags:
@@ -46,6 +46,11 @@ Newest refinement:
 - place the AI assistant directly below the Analytics module itself, right-aligned to the bottom-right of that module area
 - remove the remaining dashboard mount before moving it to the analytics page
 
+Latest correction:
+- do not place the assistant inside the Analytics tab content
+- place it after the Analytics module in the modules card body, bottom-right aligned
+- make the assistant panel open upward instead of downward
+
 ## Checklist
 - [x] Review the current AI assistant component and module-body mount location
 - [x] Remove drag-related behavior and state from the assistant
@@ -65,9 +70,11 @@ Newest refinement:
 - [x] Render the assistant only below Analytics at the bottom-right of the GM module body
 - [x] Remove the dashboard assistant mount
 - [x] Move the assistant so it sits directly below the Analytics module and right-aligned in that section
-- [x] Validate final GM placement in preview structure
+- [ ] Move the assistant out of Analytics tab content and into the modules card body after the Analytics module
+- [ ] Change the assistant expansion direction so the chat opens upward
+- [ ] Validate final placement and expansion behavior
 
 ## Acceptance
-The AI assistant appears only once in the GM module body below Analytics at the bottom-right corner.
-The assistant uses one shared thread history and data context instead of separate module-specific threads.
-Users can no longer drag the assistant, and thread history can be viewed, renamed, and deleted from the shared cache layer.
+The AI assistant appears only once in the GM module body after the Analytics module, aligned to the bottom-right of the modules card body.
+The assistant is not rendered inside the Analytics tab content.
+The assistant opens upward when expanded, and shared thread history remains available.
