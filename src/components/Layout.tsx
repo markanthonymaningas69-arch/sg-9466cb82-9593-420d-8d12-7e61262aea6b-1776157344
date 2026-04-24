@@ -563,27 +563,27 @@ export function Layout({ children }: LayoutProps) {
                       <Icon className="h-5 w-5 shrink-0" />
                       {!sidebarCollapsed && <span className="truncate">{item.name}</span>}
                       {!sidebarCollapsed && item.name === "Accounting" && acctCount > 0 &&
-                      <Badge variant="destructive" className="ml-auto h-5 px-1.5 flex items-center justify-center text-[10px] shrink-0">
+                      <Badge variant="destructive" className="ml-auto h-4.5 min-w-[18px] px-1 flex items-center justify-center text-[9px] shrink-0">
                           {acctCount}
                         </Badge>
                       }
                       {!sidebarCollapsed && item.name === "Warehouse" && whseCount > 0 &&
-                      <Badge variant="destructive" className="ml-auto h-5 px-1.5 flex items-center justify-center text-[10px] shrink-0">
+                      <Badge variant="destructive" className="ml-auto h-4.5 min-w-[18px] px-1 flex items-center justify-center text-[9px] shrink-0">
                           {whseCount}
                         </Badge>
                       }
                       {!sidebarCollapsed && item.name === "Human Resources" && hrCount > 0 &&
-                      <Badge variant="destructive" className="ml-auto h-5 px-1.5 flex items-center justify-center text-[10px] shrink-0">
+                      <Badge variant="destructive" className="ml-auto h-4.5 min-w-[18px] px-1 flex items-center justify-center text-[9px] shrink-0">
                           {hrCount}
                         </Badge>
                       }
                       {!sidebarCollapsed && item.name === "Purchasing" && purchCount > 0 &&
-                      <Badge variant="destructive" className="ml-auto h-5 px-1.5 flex items-center justify-center text-[10px] shrink-0">
+                      <Badge variant="destructive" className="ml-auto h-4.5 min-w-[18px] px-1 flex items-center justify-center text-[9px] shrink-0">
                           {purchCount}
                         </Badge>
                       }
                       {!sidebarCollapsed && item.name === "Approval Center" && approvalCount > 0 &&
-                      <Badge variant="destructive" className="ml-auto h-5 px-1.5 flex items-center justify-center text-[10px] shrink-0">
+                      <Badge variant="destructive" className="ml-auto h-4.5 min-w-[18px] px-1 flex items-center justify-center text-[9px] shrink-0">
                           {approvalCount}
                         </Badge>
                       }
@@ -607,7 +607,7 @@ export function Layout({ children }: LayoutProps) {
             <Link 
               href="/settings" 
               title={sidebarCollapsed ? (assignedModules.includes("GM") ? "Company Settings" : "Settings") : undefined}
-              className={cn("flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors", router.pathname === "/settings" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground", sidebarCollapsed && "justify-center")} 
+              className={cn("flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors relative", router.pathname === "/settings" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground", sidebarCollapsed && "justify-center")} 
               onClick={() => setSidebarOpen(false)}>
               <Settings className="h-4 w-4 shrink-0" />
               {!sidebarCollapsed && <span className="truncate">{assignedModules.includes("GM") ? "Company Settings" : "Settings"}</span>}
@@ -616,9 +616,9 @@ export function Layout({ children }: LayoutProps) {
               <Link 
                 href="/subscription" 
                 title={sidebarCollapsed ? "Subscription" : undefined}
-                className={cn("flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors", router.pathname === "/subscription" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground", sidebarCollapsed && "justify-center")} 
+                className={cn("flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors relative", router.pathname === "/subscription" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground", sidebarCollapsed && "justify-center")} 
                 onClick={() => setSidebarOpen(false)}>
-                <CreditCard className="h-4 w-4 shrink-0" />
+                <CreditCard className="h-4.5 w-4.5 shrink-0" />
                 {!sidebarCollapsed && <span className="truncate">Subscription</span>}
               </Link>
             )}
