@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 
 export type ApprovalStatus = "pending" | "approved" | "rejected" | "returned_for_revision";
 
@@ -36,7 +37,7 @@ export interface CreateApprovalRequestInput {
   projectId?: string | null;
   summary?: string | null;
   latestComment?: string | null;
-  payload?: Record<string, unknown> | null;
+  payload?: Json | null;
 }
 
 function mapApprovalStatus(sourceTable: string, status: ApprovalStatus) {
@@ -249,7 +250,7 @@ export const approvalCenterService = {
           status: "pending",
           summary: input.summary || null,
           latest_comment: input.latestComment || null,
-          payload: input.payload || null,
+          payload: input.payload ?? null,
           updated_at: timestamp,
         },
         { onConflict: "source_table,source_record_id" }
