@@ -17,8 +17,13 @@ Fix the material request form where the date input and the requested by input ap
 
 The goal is to keep only one correct instance of each field in the material request flow and preserve the rest of the form behavior.
 
+Current evidence from search:
+- `src/pages/site-personnel.tsx` contains the Material Request flow
+- `Requested By` appears multiple times there, including around lines 3131 and 3186
+- earlier task history also notes that the Requested By field was supposed to be removed from the Material Request modal
+
 ## Checklist
-- [ ] Find the material request form component or page that renders the duplicated fields
+- [x] Find the material request form component or page that renders the duplicated fields
 - [ ] Remove the extra date input and extra requested by input without changing the intended form submission behavior
 - [ ] Validate the material request form renders each field only once
 
