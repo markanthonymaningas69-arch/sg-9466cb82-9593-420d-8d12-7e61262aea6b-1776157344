@@ -17,7 +17,6 @@ import { ClipboardList, Package, DollarSign, AlertCircle, TrendingUp, BarChart3 
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type { Database } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
-import { AIChatAssistant } from "@/components/AIChatAssistant";
 
 type Project = Database["public"]["Tables"]["projects"]["Row"];
 
