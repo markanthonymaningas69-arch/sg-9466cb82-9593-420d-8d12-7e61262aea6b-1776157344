@@ -703,7 +703,8 @@ export function Layout({ children }: LayoutProps) {
               const isWarehouse = assignedModules.includes("Warehouse");
               const isSitePersonnel = assignedModules.includes("Site Personnel");
               const isPurchasing = assignedModules.includes("Purchasing");
-              
+              const displayApprovalRequests = isGM ? pendingApprovalRequests : [];
+
               // Pending Actions
               const displayPendingAdvances = (isGM || isAccounting) ? pendingCashAdvances : [];
               const displayPendingLeaves = (isGM || isHR) ? pendingLeaves : [];

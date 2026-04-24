@@ -1,5 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { Json } from "@/integrations/supabase/types";
+
+type JsonPrimitive = string | number | boolean | null;
+type JsonValue = JsonPrimitive | { [key: string]: JsonValue } | JsonValue[];
 
 export type ApprovalStatus = "pending" | "approved" | "rejected" | "returned_for_revision";
 
@@ -37,7 +39,7 @@ export interface CreateApprovalRequestInput {
   projectId?: string | null;
   summary?: string | null;
   latestComment?: string | null;
-  payload?: Json | null;
+  payload?: JsonValue | null;
 }
 
 function mapApprovalStatus(sourceTable: string, status: ApprovalStatus) {
