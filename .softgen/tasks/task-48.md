@@ -1,6 +1,6 @@
 ---
 title: Fixed AI assistant placement
-status: in_progress
+status: done
 priority: high
 type: bug
 tags:
@@ -25,14 +25,20 @@ Follow-up issues from preview:
 - the chat message area and input layout are visually misaligned
 - the assistant is not accessing module data correctly, so responses are missing project context
 
+Resolved:
+- the assistant is now rendered once inside the module body at the bottom-right
+- drag behavior has been removed
+- the chat panel layout has been normalized
+- the AI API now accepts the module data keys sent by the assistant
+
 ## Checklist
-- [ ] Review the current AI assistant component and module-body mount location
-- [ ] Remove drag-related behavior and state from the assistant
-- [ ] Keep the assistant fixed at the bottom-right of the module body
-- [ ] Preserve single-instance rendering inside the intended layout location
-- [ ] Fix chat body and input alignment inside the assistant panel
-- [ ] Verify the active module and project data are loaded and passed into the AI chat request
-- [ ] Validate that the assistant no longer drags and appears only once
+- [x] Review the current AI assistant component and module-body mount location
+- [x] Remove drag-related behavior and state from the assistant
+- [x] Keep the assistant fixed at the bottom-right of the module body
+- [x] Preserve single-instance rendering inside the intended layout location
+- [x] Fix chat body and input alignment inside the assistant panel
+- [x] Verify the active module and project data are loaded and passed into the AI chat request
+- [x] Validate that the assistant no longer drags and appears only once
 
 ## Acceptance
 The AI assistant appears only once in the module body.
