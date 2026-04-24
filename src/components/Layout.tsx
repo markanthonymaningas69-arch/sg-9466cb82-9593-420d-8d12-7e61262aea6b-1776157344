@@ -83,6 +83,13 @@ export function Layout({ children }: LayoutProps) {
   
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [lastSeenNotificationIds, setLastSeenNotificationIds] = useState<string>(() => typeof window !== 'undefined' ? localStorage.getItem('lastSeenNotificationIds') || "" : "");
+  const [lastSeenModuleNotificationIds, setLastSeenModuleNotificationIds] = useState<Record<string, string>>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("app_seen_module_notifications");
+      return saved ? JSON.parse(saved) : {};
+    }
+    return {};
+  });
   const [clearedUpdateIds, setClearedUpdateIds] = useState<string[]>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('app_cleared_updates');
@@ -434,6 +441,95 @@ export function Layout({ children }: LayoutProps) {
     localStorage.setItem('app_cleared_updates', JSON.stringify(newCleared));
   };
 
+  const buildNotificationSignature = (entries: string[]) => entries.slice().sort().join(",");
+
+  const hasUnseenModuleNotifications = (moduleKey: string, signature: string) =>
+    Boolean(signature) && lastSeenModuleNotificationIds[moduleKey] !== signature;
+
+  const markModuleNotificationsSeen = (moduleKey: string, signature: string) => {
+    if (!signature) {
+      return;
+    }
+
+    setLastSeenModuleNotificationIds((prev) => {
+      const next = { ...prev, [moduleKey]: signature };
+      localStorage.setItem("app_seen_module_notifications", JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const openModuleFromNotification = (path: string, moduleKey: string, signature: string) => {
+    markModuleNotificationsSeen(moduleKey, signature);
+    setNotificationOpen(false);
+    void router.push(path);
+  };
+
+  const accountingPendingRequests = pendingRequests.filter((request) =>
+    ["Equipment (Rentals)", "PPE", "Petty Cash"].includes(request.request_type)
+  );
+  const warehousePendingRequests = pendingRequests.filter((request) =>
+    ["Tools", "Equipment (Warehouse)", "PPE", "Materials"].includes(request.request_type) || !request.request_type
+  );
+  const siteResolvedAdvances = resolvedCashAdvances.filter((advance) => !clearedUpdateIds.includes(`adv-${advance.id}`));
+  const accountingResolvedAdvances = siteResolvedAdvances.filter((advance) => advance.status === "approved");
+  const siteResolvedLeaves = resolvedLeaves.filter((leave) => !clearedUpdateIds.includes(`leave-${leave.id}`));
+  const hrResolvedLeaves = siteResolvedLeaves.filter((leave) => leave.status === "approved");
+  const warehouseReceivedDeliveries = recentReceivedDeliveries.filter((delivery) => !clearedUpdateIds.includes(`del-${delivery.id}`));
+  const siteResolvedRequests = resolvedRequests.filter((request) => !clearedUpdateIds.includes(`req-${request.id}`));
+  const accountingResolvedRequests = siteResolvedRequests.filter((request) =>
+    ["Equipment (Rentals)", "PPE", "Petty Cash"].includes(request.request_type) && request.status === "approved"
+  );
+  const warehouseResolvedRequests = siteResolvedRequests.filter((request) =>
+    (["Tools", "Equipment (Warehouse)", "PPE", "Materials"].includes(request.request_type) || !request.request_type) &&
+    request.status === "approved"
+  );
+
+  const approvalCenterSignature = buildNotificationSignature(
+    pendingApprovalRequests.map((request) => `approval-${request.id}-${request.status || "pending"}`)
+  );
+  const accountingSignature = buildNotificationSignature([
+    ...pendingCashAdvances.map((advance) => `adv-${advance.id}-${advance.status || "pending"}`),
+    ...accountingPendingRequests.map((request) => `req-${request.id}-${request.status || "pending"}`),
+    ...approvedVouchers.map((voucher) => `voucher-${voucher.id}-${voucher.status || "approved"}`),
+    ...accountingResolvedAdvances.map((advance) => `adv-${advance.id}-${advance.status || "pending"}`),
+    ...accountingResolvedRequests.map((request) => `req-${request.id}-${request.status || "pending"}`),
+  ]);
+  const hrSignature = buildNotificationSignature([
+    ...pendingLeaves.map((leave) => `leave-${leave.id}-${leave.status || "pending"}`),
+    ...expiringDocuments.map((document) => `doc-${document.id}-${document.passport_expiry_date || ""}-${document.visa_expiry_date || ""}`),
+    ...hrResolvedLeaves.map((leave) => `leave-${leave.id}-${leave.status || "pending"}`),
+  ]);
+  const warehouseSignature = buildNotificationSignature([
+    ...warehousePendingRequests.map((request) => `req-${request.id}-${request.status || "pending"}`),
+    ...warehouseReceivedDeliveries.map((delivery) => `del-${delivery.id}-${delivery.status || "received"}`),
+    ...warehouseResolvedRequests.map((request) => `req-${request.id}-${request.status || "pending"}`),
+  ]);
+  const purchasingSignature = buildNotificationSignature(
+    pendingPurchases.map((purchase) => `purchase-${purchase.id}-${purchase.status || "pending"}`)
+  );
+  const sitePersonnelSignature = buildNotificationSignature([
+    ...pendingDeliveries.map((delivery) => `del-${delivery.id}-${delivery.status || "pending"}`),
+    ...siteResolvedAdvances.map((advance) => `adv-${advance.id}-${advance.status || "pending"}`),
+    ...siteResolvedLeaves.map((leave) => `leave-${leave.id}-${leave.status || "pending"}`),
+    ...siteResolvedRequests.map((request) => `req-${request.id}-${request.status || "pending"}`),
+  ]);
+
+  const acctCount = hasUnseenModuleNotifications("accounting", accountingSignature)
+    ? pendingCashAdvances.length + accountingPendingRequests.length + approvedVouchers.length
+    : 0;
+  const whseCount = hasUnseenModuleNotifications("warehouse", warehouseSignature)
+    ? warehousePendingRequests.length
+    : 0;
+  const hrCount = hasUnseenModuleNotifications("personnel", hrSignature)
+    ? pendingLeaves.length + expiringDocuments.length
+    : 0;
+  const purchCount = hasUnseenModuleNotifications("purchasing", purchasingSignature)
+    ? pendingPurchases.length
+    : 0;
+  const approvalCount = hasUnseenModuleNotifications("approval-center", approvalCenterSignature)
+    ? pendingApprovalRequests.length
+    : 0;
+
   return (
     <div className="min-h-screen bg-background">
       {/* Mobile sidebar backdrop */}
@@ -500,11 +596,110 @@ export function Layout({ children }: LayoutProps) {
                 const Icon = item.icon;
                 const isActive = router.pathname === item.href;
 
-                const acctCount = pendingCashAdvances.length + pendingRequests.filter((r) => ['Equipment (Rentals)', 'PPE', 'Petty Cash'].includes(r.request_type)).length + approvedVouchers.length;
-                const whseCount = pendingRequests.filter((r) => ['Tools', 'Equipment (Warehouse)', 'PPE', 'Materials'].includes(r.request_type) || !r.request_type).length;
-                const hrCount = pendingLeaves.length + expiringDocuments.length;
-                const purchCount = pendingPurchases.length;
-                const approvalCount = pendingApprovalRequests.length;
+                const displayPendingAdvances = isGM ? [] : (isAccounting ? pendingCashAdvances : []);
+                const displayPendingLeaves = isGM ? [] : (isHR ? pendingLeaves : []);
+                const displayExpiring = isGM ? [] : (isHR ? expiringDocuments : []);
+                const displayPendingRequests = isGM ? [] : pendingRequests.filter(req => {
+                  const isAcctReq = ['Equipment (Rentals)', 'PPE', 'Petty Cash'].includes(req.request_type);
+                  const isWhseReq = ['Tools', 'Equipment (Warehouse)', 'PPE', 'Materials'].includes(req.request_type) || !req.request_type;
+                  if (isAccounting && isAcctReq) return true;
+                  if (isWarehouse && isWhseReq) return true;
+                  return false;
+                });
+
+                const displayPendingDeliveries = isGM ? [] : (isSitePersonnel ? pendingDeliveries : []);
+                const displayPendingPurchases = isGM ? [] : (isPurchasing ? pendingPurchases : []);
+                const displayApprovedVouchers = isGM ? [] : (isAccounting ? approvedVouchers : []);
+
+                const displayResolvedAdvances = isGM ? [] : resolvedCashAdvances.filter(adv => {
+                  if (clearedUpdateIds.includes(`adv-${adv.id}`)) return false;
+                  if (isSitePersonnel) return true;
+                  if (isAccounting && adv.status === 'approved') return true;
+                  return false;
+                });
+
+                const displayResolvedLeaves = isGM ? [] : resolvedLeaves.filter(leave => {
+                  if (clearedUpdateIds.includes(`leave-${leave.id}`)) return false;
+                  if (isSitePersonnel) return true;
+                  if (isHR && leave.status === 'approved') return true;
+                  return false;
+                });
+
+                const displayReceivedDeliveries = isGM ? [] : recentReceivedDeliveries.filter(del => {
+                  if (clearedUpdateIds.includes(`del-${del.id}`)) return false;
+                  if (isWarehouse) return true;
+                  return false;
+                });
+
+                const displayResolvedRequests = isGM ? [] : resolvedRequests.filter(req => {
+                  if (clearedUpdateIds.includes(`req-${req.id}`)) return false;
+                  if (isSitePersonnel) return true;
+                  const isAcctReq = ['Equipment (Rentals)', 'PPE', 'Petty Cash'].includes(req.request_type);
+                  const isWhseReq = ['Tools', 'Equipment (Warehouse)', 'PPE', 'Materials'].includes(req.request_type) || !req.request_type;
+                  if (isAccounting && isAcctReq && req.status === 'approved') return true;
+                  if (isWarehouse && isWhseReq && req.status === 'approved') return true;
+                  return false;
+                });
+
+                const totalNotifications =
+                  displayApprovalRequests.length +
+                  displayPendingAdvances.length +
+                  displayPendingLeaves.length +
+                  displayExpiring.length +
+                  displayPendingRequests.length +
+                  displayPendingDeliveries.length +
+                  displayPendingPurchases.length +
+                  displayApprovedVouchers.length +
+                  displayResolvedAdvances.length +
+                  displayResolvedLeaves.length +
+                  displayResolvedRequests.length +
+                  displayReceivedDeliveries.length;
+                const hasActionRequired =
+                  displayApprovalRequests.length > 0 ||
+                  displayPendingAdvances.length > 0 ||
+                  displayPendingLeaves.length > 0 ||
+                  displayExpiring.length > 0 ||
+                  displayPendingRequests.length > 0 ||
+                  displayPendingDeliveries.length > 0 ||
+                  displayPendingPurchases.length > 0 ||
+                  displayApprovedVouchers.length > 0;
+                const hasRecentUpdates =
+                  !isGM &&
+                  (displayResolvedAdvances.length > 0 ||
+                    displayResolvedLeaves.length > 0 ||
+                    displayResolvedRequests.length > 0 ||
+                    displayReceivedDeliveries.length > 0);
+
+                const currentNotificationIds = [
+                  ...displayApprovalRequests,
+                  ...displayPendingAdvances,
+                  ...displayPendingLeaves,
+                  ...displayExpiring,
+                  ...displayPendingRequests,
+                  ...displayPendingDeliveries,
+                  ...displayPendingPurchases,
+                  ...displayApprovedVouchers,
+                  ...displayResolvedAdvances,
+                  ...displayResolvedLeaves,
+                  ...displayResolvedRequests,
+                  ...displayReceivedDeliveries
+                ].map((item: any) => `${item.id}-${item.status || 'pending'}`).sort().join(',');
+
+                const hasUnseenNotifications = totalNotifications > 0 && currentNotificationIds !== lastSeenNotificationIds;
+
+                const handleClearRecent = (e: React.MouseEvent) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const newCleared = [
+                    ...clearedUpdateIds,
+                    ...displayResolvedAdvances.map(a => `adv-${a.id}`),
+                    ...displayResolvedLeaves.map(l => `leave-${l.id}`),
+                    ...displayResolvedRequests.map(r => `req-${r.id}`),
+                    ...displayReceivedDeliveries.map(d => `del-${d.id}`),
+                  ];
+                  setClearedUpdateIds(newCleared);
+                  localStorage.setItem('app_cleared_updates', JSON.stringify(newCleared));
+                };
 
                 return (
                   <li key={item.name}>
@@ -665,12 +860,10 @@ export function Layout({ children }: LayoutProps) {
               const isPurchasing = assignedModules.includes("Purchasing");
               const displayApprovalRequests = isGM ? pendingApprovalRequests : [];
 
-              // Pending Actions
-              const displayPendingAdvances = (isGM || isAccounting) ? pendingCashAdvances : [];
-              const displayPendingLeaves = (isGM || isHR) ? pendingLeaves : [];
-              const displayExpiring = (isGM || isHR) ? expiringDocuments : [];
-              const displayPendingRequests = pendingRequests.filter(req => {
-                if (isGM) return true;
+              const displayPendingAdvances = isGM ? [] : (isAccounting ? pendingCashAdvances : []);
+              const displayPendingLeaves = isGM ? [] : (isHR ? pendingLeaves : []);
+              const displayExpiring = isGM ? [] : (isHR ? expiringDocuments : []);
+              const displayPendingRequests = isGM ? [] : pendingRequests.filter(req => {
                 const isAcctReq = ['Equipment (Rentals)', 'PPE', 'Petty Cash'].includes(req.request_type);
                 const isWhseReq = ['Tools', 'Equipment (Warehouse)', 'PPE', 'Materials'].includes(req.request_type) || !req.request_type;
                 if (isAccounting && isAcctReq) return true;
@@ -681,6 +874,7 @@ export function Layout({ children }: LayoutProps) {
               const displayPendingDeliveries = isGM ? [] : (isSitePersonnel ? pendingDeliveries : []);
               const displayPendingPurchases = isGM ? [] : (isPurchasing ? pendingPurchases : []);
               const displayApprovedVouchers = isGM ? [] : (isAccounting ? approvedVouchers : []);
+
               const displayResolvedAdvances = isGM ? [] : resolvedCashAdvances.filter(adv => {
                 if (clearedUpdateIds.includes(`adv-${adv.id}`)) return false;
                 if (isSitePersonnel) return true;
