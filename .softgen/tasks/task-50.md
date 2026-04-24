@@ -1,6 +1,6 @@
 ---
 title: Tools and equipment request form fields
-status: in_progress
+status: done
 priority: medium
 type: feature
 tags:
@@ -21,7 +21,7 @@ The form should include user-editable fields for Date needed, Item description, 
 - [x] Find the tools and equipment request form component or page
 - [x] Add Date needed, Item description, Quantity, and Notes inputs to the form
 - [x] Make sure the new fields are wired to the existing request state and submission flow
-- [ ] Validate the tools and equipment request form renders the new fields correctly
+- [x] Validate the tools and equipment request form renders the new fields correctly
 
 ## Acceptance
 The tools and equipment request form shows Date needed, Item description, Quantity, and Notes inputs.
