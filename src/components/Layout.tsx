@@ -75,6 +75,7 @@ export function Layout({ children }: LayoutProps) {
   
   const [pendingPurchases, setPendingPurchases] = useState<any[]>([]);
   const [pendingGmPurchases, setPendingGmPurchases] = useState<any[]>([]);
+  const [pendingApprovalRequests, setPendingApprovalRequests] = useState<any[]>([]);
   const [approvedVouchers, setApprovedVouchers] = useState<any[]>([]);
   
   const [resolvedRequests, setResolvedRequests] = useState<any[]>([]);
@@ -109,6 +110,26 @@ export function Layout({ children }: LayoutProps) {
     // Poll for new requests every 30 seconds
     const interval = setInterval(loadPendingRequests, 30000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    void loadUserProfile();
+    void loadPendingRequests();
+    const interval = setInterval(() => {
+      void loadPendingRequests();
+    }, 30000);
+
+    const approvalChannel = supabase
+      .channel("layout_approval_notifications")
+      .on("postgres_changes", { event: "*", schema: "public", table: "approval_requests" }, () => {
+        void loadPendingRequests();
+      })
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(approvalChannel);
+    };
   }, []);
 
   const loadUserProfile = async () => {
@@ -199,6 +220,14 @@ export function Layout({ children }: LayoutProps) {
       .order('id', { ascending: false })
       .limit(10);
     setPendingGmPurchases(gmPurchases || []);
+
+    const { data: approvals } = await supabase
+      .from('approval_requests')
+      .select('id, source_module, request_type, requested_by, requested_at, status, summary, projects(name)')
+      .eq('status', 'pending')
+      .order('requested_at', { ascending: false })
+      .limit(10);
+    setPendingApprovalRequests(approvals || []);
 
     const { data: aVouchers } = await supabase
       .from('vouchers')
@@ -515,6 +544,7 @@ export function Layout({ children }: LayoutProps) {
                 const whseCount = pendingRequests.filter((r) => ['Tools', 'Equipment (Warehouse)', 'PPE', 'Materials'].includes(r.request_type) || !r.request_type).length;
                 const hrCount = pendingLeaves.length + expiringDocuments.length;
                 const purchCount = pendingPurchases.length;
+                const approvalCount = pendingApprovalRequests.length;
 
                 return (
                   <li key={item.name}>
@@ -552,7 +582,12 @@ export function Layout({ children }: LayoutProps) {
                           {purchCount}
                         </Badge>
                       }
-                      {sidebarCollapsed && (acctCount > 0 || whseCount > 0 || hrCount > 0 || purchCount > 0) && ['Accounting', 'Warehouse', 'Human Resources', 'Purchasing'].includes(item.name) && (
+                      {!sidebarCollapsed && item.name === "Approval Center" && approvalCount > 0 &&
+                      <Badge variant="destructive" className="ml-auto h-5 px-1.5 flex items-center justify-center text-[10px] shrink-0">
+                          {approvalCount}
+                        </Badge>
+                      }
+                      {sidebarCollapsed && (acctCount > 0 || whseCount > 0 || hrCount > 0 || purchCount > 0 || approvalCount > 0) && ['Accounting', 'Warehouse', 'Human Resources', 'Purchasing', 'Approval Center'].includes(item.name) && (
                         <div className="absolute right-2 top-2 h-2 w-2 rounded-full bg-destructive border-2 border-card"></div>
                       )}
                     </Link>
@@ -795,6 +830,41 @@ export function Layout({ children }: LayoutProps) {
                           </div>
                         )}
 
+                        {displayApprovalRequests.map((approval) => {
+                          const projectName = Array.isArray(approval.projects)
+                            ? approval.projects[0]?.name
+                            : approval.projects?.name;
+
+                          return (
+                            <DropdownMenuItem
+                              key={`approval-${approval.id}`}
+                              className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-muted"
+                              onClick={() => {
+                                router.push("/approval-center");
+                                setNotificationOpen(false);
+                              }}>
+                              <div className="flex items-start justify-between w-full gap-3">
+                                <div className="min-w-0">
+                                  <span className="font-medium text-sm text-blue-700">{approval.source_module}</span>
+                                  <p className="text-xs text-muted-foreground truncate">{approval.request_type}</p>
+                                </div>
+                                <Badge variant="destructive" className="text-[10px]">
+                                  NEW
+                                </Badge>
+                              </div>
+                              <span className="text-xs text-muted-foreground">
+                                By: {approval.requested_by}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {projectName || "No project"} • {new Date(approval.requested_at).toLocaleDateString()}
+                              </span>
+                              <span className="text-xs text-muted-foreground italic truncate max-w-full">
+                                {approval.summary || "Pending approval request"}
+                              </span>
+                            </DropdownMenuItem>
+                          );
+                        })}
+
                         {/* Approved Vouchers (Accounting) */}
                         {displayApprovedVouchers.map((voucher) => (
                           <DropdownMenuItem
@@ -841,11 +911,11 @@ export function Layout({ children }: LayoutProps) {
                               Cost: {formatCurrency(Number(purchase.quantity || 0) * Number(purchase.unit_cost || 0))}
                             </span>
                             <div className="flex gap-2 w-full mt-1" onClick={(e) => e.stopPropagation()}>
-                              <Button size="sm" variant="default" disabled={isLocked} className="flex-1 h-8 bg-green-600 hover:bg-green-700 text-white" onClick={(e) => handleApprovePurchaseGM(purchase, e)}>
+                              <Button size="sm" variant="default" disabled={isLocked} className="flex-1 h-8 bg-green-600 hover:bg-green-700 text-white" onClick={(e) => handleApproveCashAdvance(purchase.id, purchase.personnel?.name, purchase.amount, purchase.project_id, purchase.reason, e)}>
                                 <Check className="h-3 w-3 mr-1" />
                                 Approve
                               </Button>
-                              <Button size="sm" variant="destructive" disabled={isLocked} className="flex-1 h-8" onClick={(e) => handleRejectPurchaseGM(purchase.id, purchase.item_name, e)}>
+                              <Button size="sm" variant="destructive" disabled={isLocked} className="flex-1 h-8" onClick={(e) => handleRejectCashAdvance(purchase.id, purchase.personnel?.name, e)}>
                                 <XCircle className="h-3 w-3 mr-1" />
                                 Reject
                               </Button>
