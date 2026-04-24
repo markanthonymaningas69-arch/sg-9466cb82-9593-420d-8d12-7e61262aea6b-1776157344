@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ManpowerRateCatalogTab } from "@/components/personnel/ManpowerRateCatalogTab";
 import { PositionRateSelector } from "@/components/personnel/PositionRateSelector";
 import { manpowerRateCatalogService, type ManpowerRateCatalogItem } from "@/services/manpowerRateCatalogService";
+import { approvalCenterService } from "@/services/approvalCenterService";
 
 type Personnel = Database["public"]["Tables"]["personnel"]["Row"];
 type Project = Database["public"]["Tables"]["projects"]["Row"];
@@ -222,11 +223,36 @@ export default function Personnel() {
     const start = new Date(leaveForm.start_date);
     const end = new Date(leaveForm.end_date);
     const days_requested = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+    const requestedPerson = filteredPersonnel.find((person) => person.id === leaveForm.personnel_id);
 
-    await personnelService.createLeaveRequest({ 
-      ...leaveForm, 
-      days_requested 
+    const { data: leaveRequest, error } = await supabase
+      .from("leave_requests")
+      .insert({
+        personnel_id: leaveForm.personnel_id,
+        leave_type: leaveForm.leave_type,
+        start_date: leaveForm.start_date,
+        end_date: leaveForm.end_date,
+        reason: leaveForm.reason,
+        status: leaveForm.status,
+        days_requested,
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    await approvalCenterService.createRequest({
+      sourceModule: "HR",
+      sourceTable: "leave_requests",
+      sourceRecordId: leaveRequest.id,
+      requestType: "Leave Request",
+      requestedBy: requestedPerson?.name || "HR Personnel",
+      projectId: requestedPerson?.project_id || null,
+      summary: `${leaveForm.leave_type} leave: ${leaveForm.start_date} to ${leaveForm.end_date}`,
     });
+
     setLeaveDialogOpen(false);
     resetLeaveForm();
     loadData();

@@ -27,6 +27,18 @@ export interface ApprovalAction {
   createdAt: string;
 }
 
+export interface CreateApprovalRequestInput {
+  sourceModule: string;
+  sourceTable: string;
+  sourceRecordId: string;
+  requestType: string;
+  requestedBy: string;
+  projectId?: string | null;
+  summary?: string | null;
+  latestComment?: string | null;
+  payload?: Record<string, unknown> | null;
+}
+
 function mapApprovalStatus(sourceTable: string, status: ApprovalStatus) {
   if (sourceTable === "purchases") {
     if (status === "approved") {
@@ -110,7 +122,148 @@ async function syncSourceRecord(sourceTable: string, sourceRecordId: string, sta
   }
 }
 
+function createVoucherNumber() {
+  return `PV-${Math.floor(10000 + Math.random() * 90000)}`;
+}
+
+async function processApprovedRequest(request: {
+  sourceTable: string;
+  sourceRecordId: string;
+  requestType: string;
+  requestedBy: string;
+  projectId: string | null;
+}) {
+  if (request.sourceTable === "site_requests") {
+    const { data: source } = await supabase
+      .from("site_requests")
+      .select("id, form_number, request_date, item_name, quantity, unit, amount, request_type, project_id")
+      .eq("id", request.sourceRecordId)
+      .maybeSingle();
+
+    if (!source) {
+      return;
+    }
+
+    if (source.request_type === "Materials" || source.request_type === "Tools & Equipments") {
+      const orderNumber = source.form_number || `PR-${Math.floor(10000 + Math.random() * 90000)}`;
+      const { data: existingPurchase } = await supabase
+        .from("purchases")
+        .select("id")
+        .eq("order_number", orderNumber)
+        .eq("item_name", source.item_name)
+        .maybeSingle();
+
+      if (!existingPurchase) {
+        await supabase.from("purchases").insert({
+          order_number: orderNumber,
+          order_date: source.request_date,
+          supplier: "Pending Selection",
+          item_name: source.item_name,
+          category: source.request_type === "Materials" ? "Construction Materials" : "Tools",
+          quantity: Number(source.quantity || 0),
+          unit: source.unit || "unit",
+          unit_cost: 0,
+          destination_type: "project_warehouse",
+          project_id: source.project_id,
+          status: "pending",
+        });
+      }
+
+      return;
+    }
+
+    if (source.request_type === "Petty Cash") {
+      const description = `${source.request_type} - ${source.form_number || source.item_name}`;
+      const { data: existingVoucher } = await supabase
+        .from("vouchers")
+        .select("id")
+        .eq("project_id", source.project_id)
+        .eq("description", description.substring(0, 200))
+        .maybeSingle();
+
+      if (!existingVoucher) {
+        await supabase.from("vouchers").insert({
+          voucher_number: createVoucherNumber(),
+          date: source.request_date,
+          type: "payment",
+          payee: request.requestedBy || "TBD",
+          amount: Number(source.amount || 0),
+          description: description.substring(0, 200),
+          project_id: source.project_id,
+          status: "approved",
+        });
+      }
+    }
+
+    return;
+  }
+
+  if (request.sourceTable === "cash_advance_requests") {
+    const { data: source } = await supabase
+      .from("cash_advance_requests")
+      .select("id, form_number, request_date, amount, project_id")
+      .eq("id", request.sourceRecordId)
+      .maybeSingle();
+
+    if (!source) {
+      return;
+    }
+
+    const description = `Cash Advance - ${source.form_number || request.sourceRecordId}`;
+    const { data: existingVoucher } = await supabase
+      .from("vouchers")
+      .select("id")
+      .eq("project_id", source.project_id)
+      .eq("description", description.substring(0, 200))
+      .maybeSingle();
+
+    if (!existingVoucher) {
+      await supabase.from("vouchers").insert({
+        voucher_number: createVoucherNumber(),
+        date: source.request_date,
+        type: "payment",
+        payee: request.requestedBy || "TBD",
+        amount: Number(source.amount || 0),
+        description: description.substring(0, 200),
+        project_id: source.project_id,
+        status: "approved",
+      });
+    }
+  }
+}
+
 export const approvalCenterService = {
+  async createRequest(input: CreateApprovalRequestInput) {
+    const timestamp = new Date().toISOString();
+    const { data, error } = await supabase
+      .from("approval_requests")
+      .upsert(
+        {
+          source_module: input.sourceModule,
+          source_table: input.sourceTable,
+          source_record_id: input.sourceRecordId,
+          request_type: input.requestType,
+          requested_by: input.requestedBy,
+          requested_at: timestamp,
+          project_id: input.projectId || null,
+          status: "pending",
+          summary: input.summary || null,
+          latest_comment: input.latestComment || null,
+          payload: input.payload || null,
+          updated_at: timestamp,
+        },
+        { onConflict: "source_table,source_record_id" }
+      )
+      .select("id")
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    return data;
+  },
+
   async listRequests() {
     const { data, error } = await supabase
       .from("approval_requests")
@@ -176,7 +329,7 @@ export const approvalCenterService = {
 
     const { data: request, error: requestError } = await supabase
       .from("approval_requests")
-      .select("id, source_table, source_record_id")
+      .select("id, source_table, source_record_id, request_type, requested_by, project_id")
       .eq("id", approvalRequestId)
       .single();
 
@@ -214,5 +367,15 @@ export const approvalCenterService = {
     }
 
     await syncSourceRecord(request.source_table, request.source_record_id, status);
+
+    if (status === "approved") {
+      await processApprovedRequest({
+        sourceTable: request.source_table,
+        sourceRecordId: request.source_record_id,
+        requestType: request.request_type,
+        requestedBy: request.requested_by,
+        projectId: request.project_id,
+      });
+    }
   },
 };

@@ -22,6 +22,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer } from "recharts";
 import { toast } from "@/hooks/use-toast";
 import { useSettings } from "@/contexts/SettingsProvider";
+import { approvalCenterService } from "@/services/approvalCenterService";
 
 type Project = { id: string; name: string; location: string; status: string };
 type Personnel = { id: string; name: string; role: string; daily_rate: number; overtime_rate: number; created_source?: string; updated_source?: string };
@@ -750,50 +751,108 @@ export default function SitePersonnel() {
 
   const handleRequestSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (requestForm.request_type === "Cash Advance") {
-      await siteService.createCashAdvance({
-        project_id: selectedProject,
-        personnel_id: requestForm.personnel_id,
-        amount: parseFloat(requestForm.amount.toString()) || 0,
-        reason: "",
-        request_date: requestForm.request_date,
-        form_number: requestForm.form_number,
-        status: 'pending'
+      const personName = projectPersonnelList.find((p) => p.id === requestForm.personnel_id)?.name || "Site Worker";
+      const { data: cashAdvance, error } = await supabase
+        .from("cash_advance_requests")
+        .insert({
+          project_id: selectedProject,
+          personnel_id: requestForm.personnel_id,
+          amount: parseFloat(requestForm.amount.toString()) || 0,
+          reason: requestForm.notes || "",
+          request_date: requestForm.request_date,
+          form_number: requestForm.form_number,
+          status: "pending",
+        })
+        .select("id, project_id")
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      await approvalCenterService.createRequest({
+        sourceModule: "Site Personnel",
+        sourceTable: "cash_advance_requests",
+        sourceRecordId: cashAdvance.id,
+        requestType: "Cash Advance",
+        requestedBy: personName,
+        projectId: cashAdvance.project_id,
+        summary: `Cash Advance - ${requestForm.form_number}`,
       });
     } else if (requestForm.request_type === "Petty Cash") {
-      const personName = projectPersonnelList.find(p => p.id === requestForm.personnel_id)?.name || "Site Worker";
-      await supabase.from('site_requests').insert({
-        project_id: selectedProject,
-        request_date: requestForm.request_date,
-        item_name: "Petty Cash",
-        amount: parseFloat(requestForm.amount.toString()) || 0,
-        request_type: requestForm.request_type,
-        form_number: requestForm.form_number,
-        requested_by: personName,
-        status: 'pending',
-        quantity: 1,
-        unit: 'lot'
+      const personName = projectPersonnelList.find((p) => p.id === requestForm.personnel_id)?.name || requestForm.requested_by || "Site Worker";
+      const { data: pettyCash, error } = await supabase
+        .from("site_requests")
+        .insert({
+          project_id: selectedProject,
+          request_date: requestForm.request_date,
+          item_name: "Petty Cash",
+          amount: parseFloat(requestForm.amount.toString()) || 0,
+          request_type: requestForm.request_type,
+          form_number: requestForm.form_number,
+          requested_by: personName,
+          status: "pending",
+          quantity: 1,
+          unit: "lot",
+        })
+        .select("id, project_id, request_type, form_number, item_name")
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      await approvalCenterService.createRequest({
+        sourceModule: "Site Personnel",
+        sourceTable: "site_requests",
+        sourceRecordId: pettyCash.id,
+        requestType: pettyCash.request_type,
+        requestedBy: personName,
+        projectId: pettyCash.project_id,
+        summary: `${pettyCash.request_type} - ${pettyCash.form_number}: ${pettyCash.item_name}`,
       });
     } else if (requestForm.request_type === "Tools & Equipments") {
-      await supabase.from('site_requests').insert({
-        project_id: selectedProject,
-        request_date: requestForm.request_date,
-        item_name: requestForm.item_name,
-        quantity: parseFloat(requestForm.quantity.toString()) || 0,
-        unit: "unit",
-        amount: 0,
-        request_type: requestForm.request_type,
-        form_number: requestForm.form_number,
-        requested_by: requestForm.requested_by,
-        notes: requestForm.notes,
-        status: 'pending'
+      const requestedBy = requestForm.requested_by || "Site Personnel";
+      const { data: toolRequest, error } = await supabase
+        .from("site_requests")
+        .insert({
+          project_id: selectedProject,
+          request_date: requestForm.request_date,
+          item_name: requestForm.item_name,
+          quantity: parseFloat(requestForm.quantity.toString()) || 0,
+          unit: "unit",
+          amount: 0,
+          request_type: requestForm.request_type,
+          form_number: requestForm.form_number,
+          requested_by: requestedBy,
+          notes: requestForm.notes,
+          status: "pending",
+        })
+        .select("id, project_id, request_type, form_number, item_name")
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      await approvalCenterService.createRequest({
+        sourceModule: "Site Personnel",
+        sourceTable: "site_requests",
+        sourceRecordId: toolRequest.id,
+        requestType: toolRequest.request_type,
+        requestedBy,
+        projectId: toolRequest.project_id,
+        summary: `${toolRequest.request_type} - ${toolRequest.form_number}: ${toolRequest.item_name}`,
       });
     } else {
       if (requestItems.length === 0) {
         alert("Please add at least one item to the list before submitting.");
         return;
       }
-      const inserts = requestItems.map(item => ({
+
+      const inserts = requestItems.map((item) => ({
         project_id: selectedProject,
         bom_scope_id: item.bom_scope_id === "unassigned" ? null : item.bom_scope_id,
         request_date: requestForm.request_date,
@@ -805,10 +864,33 @@ export default function SitePersonnel() {
         form_number: requestForm.form_number,
         requested_by: requestForm.requested_by,
         notes: item.notes,
-        status: 'pending'
+        status: "pending",
       }));
-      await supabase.from('site_requests').insert(inserts);
+
+      const { data: createdRequests, error } = await supabase
+        .from("site_requests")
+        .insert(inserts)
+        .select("id, project_id, request_type, form_number, item_name");
+
+      if (error) {
+        throw error;
+      }
+
+      await Promise.all(
+        (createdRequests || []).map((createdRequest) =>
+          approvalCenterService.createRequest({
+            sourceModule: "Site Personnel",
+            sourceTable: "site_requests",
+            sourceRecordId: createdRequest.id,
+            requestType: createdRequest.request_type,
+            requestedBy: requestForm.requested_by,
+            projectId: createdRequest.project_id,
+            summary: `${createdRequest.request_type} - ${createdRequest.form_number}: ${createdRequest.item_name}`,
+          })
+        )
+      );
     }
+
     setRequestDialogOpen(false);
     resetRequestForm();
     loadRequests();
@@ -874,6 +956,13 @@ export default function SitePersonnel() {
 
     loadRequests();
     loadCashAdvances();
+  };
+
+  const handleOpenApprovalCenter = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (typeof window !== "undefined") {
+      window.location.href = "/approval-center";
+    }
   };
 
   const handleAdvanceSubmit = async (e: React.FormEvent) => {
@@ -3053,8 +3142,8 @@ export default function SitePersonnel() {
                                   <TableCell className="text-right">
                                     <div className="flex justify-end gap-1">
                                       {group.status === 'pending' && (
-                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={(e) => handleApproveRequest(group, e)} title="Approve Request" disabled={isLocked}>
-                                          <CheckCircle2 className="h-4 w-4" />
+                                        <Button size="sm" variant="outline" className="h-8 text-xs border-blue-200 text-blue-700 hover:bg-blue-50" onClick={handleOpenApprovalCenter}>
+                                          Review
                                         </Button>
                                       )}
                                       <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-500 hover:bg-blue-50" onClick={() => {

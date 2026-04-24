@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { projectService } from "@/services/projectService";
 import { useSettings } from "@/contexts/SettingsProvider";
 import { cn } from "@/lib/utils";
+import { approvalCenterService } from "@/services/approvalCenterService";
 
 const STANDARD_CATEGORIES = [
   "Construction Materials",
@@ -217,6 +218,31 @@ export default function Purchasing() {
       alert("Failed to save PO: " + error.message);
       return;
     }
+
+    const { data: createdPurchases, error: insertError } = await supabase
+      .from("purchases")
+      .insert(payloadArray)
+      .select("id, order_number, item_name, project_id");
+
+    if (insertError) {
+      console.error("Error saving PO items:", insertError);
+      alert("Failed to save PO: " + insertError.message);
+      return;
+    }
+
+    await Promise.all(
+      (createdPurchases || []).map((purchase) =>
+        approvalCenterService.createRequest({
+          sourceModule: "Purchasing",
+          sourceTable: "purchases",
+          sourceRecordId: purchase.id,
+          requestType: "Purchase Order",
+          requestedBy: "Purchasing Team",
+          projectId: purchase.project_id,
+          summary: `${purchase.order_number}: ${purchase.item_name}`,
+        })
+      )
+    );
 
     setDialogOpen(false);
     loadData();
