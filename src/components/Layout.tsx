@@ -687,20 +687,6 @@ export function Layout({ children }: LayoutProps) {
 
                 const hasUnseenNotifications = totalNotifications > 0 && currentNotificationIds !== lastSeenNotificationIds;
 
-                const handleClearRecent = (e: React.MouseEvent) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const newCleared = [
-                    ...clearedUpdateIds,
-                    ...displayResolvedAdvances.map(a => `adv-${a.id}`),
-                    ...displayResolvedLeaves.map(l => `leave-${l.id}`),
-                    ...displayResolvedRequests.map(r => `req-${r.id}`),
-                    ...displayReceivedDeliveries.map(d => `del-${d.id}`),
-                  ];
-                  setClearedUpdateIds(newCleared);
-                  localStorage.setItem('app_cleared_updates', JSON.stringify(newCleared));
-                };
-
                 return (
                   <li key={item.name}>
                     <Link
