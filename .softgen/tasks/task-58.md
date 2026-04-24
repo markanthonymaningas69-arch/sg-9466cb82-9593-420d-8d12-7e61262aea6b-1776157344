@@ -1,6 +1,6 @@
 ---
 title: Approval notifications and GM badge logic
-status: done
+status: in_progress
 priority: high
 type: feature
 tags:
@@ -25,11 +25,16 @@ Implementation completed:
 - shared layout subscribes to `approval_requests` realtime changes so counts and alerts refresh immediately
 - Approval Center navigation item now shows the current pending approval count
 
+Follow-up refinement:
+- verify no remaining request workflow still surfaces as a GM-direct approval item outside Approval Center
+- keep GM notifications as Approval Center summaries instead of individual workflow destinations when possible
+
 ## Checklist
 - [x] Inspect the current notification system and identify GM-specific notification paths
 - [x] Restrict GM notifications to approval-related alerts
 - [x] Add or connect real-time badge counts for Approval Center and category counts
-- [x] Validate badge counts and GM notification behavior
+- [ ] Remove any remaining GM-direct request approval items from the notification feed
+- [ ] Validate badge counts and GM notification behavior
 
 ## Acceptance
 GM only receives approval-related alerts instead of general system notifications.

@@ -1,6 +1,6 @@
 ---
 title: Central approval routing and audit trail
-status: done
+status: in_progress
 priority: urgent
 type: feature
 tags:
@@ -33,13 +33,20 @@ Implementation completed:
 - schema validation confirms `approval_actions` supports the required audit trail with `approval_request_id`, `actor_user_id`, `actor_name`, `action_status`, `comments`, `company_id`, and `created_at`
 - validation passed after fixing the shared approval service payload typing
 
+Follow-up refinement:
+- verify that Accounting and Project Manager approval-capable requests also create Approval Center records
+- remove any remaining GM-direct approval routing so requests appear in Approval Center instead of the GM notification workflow
+- keep GM notifications limited to Approval Center summary alerts only
+
 ## Checklist
 - [x] Inspect existing request tables and source module submission flows
 - [x] Add or update database structures for centralized approval records and action history
 - [x] Build shared approval services for create, list, update, and history logging
 - [x] Connect source modules so new approval-worthy requests create Approval Center entries
 - [x] Ensure requester-facing status updates stay in sync with Approval Center actions
-- [x] Validate the centralized approval lifecycle end to end
+- [ ] Route remaining Accounting and Project Manager approval flows into Approval Center
+- [ ] Remove any remaining GM-direct approval notifications for request workflows
+- [ ] Validate the centralized approval lifecycle end to end
 
 ## Acceptance
 Requests from the listed modules appear in one centralized approval system.
