@@ -68,7 +68,7 @@ function validateCheckoutItems(items: unknown, currencyCode: string) {
     const item = rawItem as CheckoutItemInput;
     const amount = validateSnapshotAmount(Number(item.amount));
     const quantity = Number(item.quantity || 1);
-    const interval = item.interval === "year" ? "year" : "month";
+    const interval: Stripe.PriceData.Recurring.Interval = item.interval === "year" ? "year" : "month";
 
     if (!item.name || typeof item.name !== "string") {
       throw new Error("Invalid checkout item name");
@@ -177,7 +177,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     snapshotId = snapshotRow.id;
 
-    const lineItems = validatedItems.map((item) => ({
+    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = validatedItems.map((item) => ({
       price_data: {
         currency: snapshot.currencyCode.toLowerCase(),
         product_data: {
