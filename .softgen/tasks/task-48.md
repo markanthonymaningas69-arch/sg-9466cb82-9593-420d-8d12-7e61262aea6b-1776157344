@@ -1,6 +1,6 @@
 ---
 title: Fixed AI assistant placement
-status: done
+status: in_progress
 priority: high
 type: bug
 tags:
@@ -42,6 +42,9 @@ Latest follow-up:
 - make the assistant available only in the GM module
 - place it below Analytics at the bottom-right corner of the GM module body
 
+Newest refinement:
+- place the AI assistant directly below the Analytics module itself, right-aligned to the bottom-right of that module area
+
 ## Checklist
 - [x] Review the current AI assistant component and module-body mount location
 - [x] Remove drag-related behavior and state from the assistant
@@ -59,7 +62,8 @@ Latest follow-up:
 - [x] Change assistant history and analysis context to a single global cache key shared across GM
 - [x] Remove assistant rendering from non-GM modules
 - [x] Render the assistant only below Analytics at the bottom-right of the GM module body
-- [x] Validate single shared thread history and GM-only placement
+- [ ] Move the assistant so it sits directly below the Analytics module and right-aligned in that section
+- [ ] Validate final GM placement in preview structure
 
 ## Acceptance
 The AI assistant appears only once in the GM module body below Analytics at the bottom-right corner.
