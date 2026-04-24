@@ -419,36 +419,6 @@ export function Layout({ children }: LayoutProps) {
     }
   };
 
-  const handleApprovePurchaseGM = async (purchase: any, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isLocked) return;
-    const { error } = await supabase.from('purchases').update({ status: 'approved', voucher_number: 'Pending Issue' }).eq('id', purchase.id);
-    
-    if (!error) {
-      await supabase.from('vouchers').insert({
-        voucher_number: `PV-${Math.floor(10000 + Math.random() * 90000)}`,
-        date: new Date().toISOString().split("T")[0],
-        type: 'payment',
-        payee: purchase.supplier,
-        amount: purchase.quantity * (purchase.unit_cost || 0),
-        description: `Approved PO ${purchase.order_number}: ${purchase.item_name} (${purchase.quantity} ${purchase.unit})`,
-        project_id: purchase.project_id,
-        status: 'approved'
-      });
-
-      toast({ title: "PO Approved", description: `Purchase Order approved and Payment Voucher generated.` });
-      loadPendingRequests();
-    }
-  };
-
-  const handleRejectPurchaseGM = async (purchaseId: string, itemName: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isLocked) return;
-    await supabase.from('purchases').update({ status: 'pending' }).eq('id', purchaseId);
-    toast({ title: "PO Rejected", description: `${itemName} returned to Purchasing for revision.`, variant: "destructive" });
-    loadPendingRequests();
-  };
-
   const handleLogout = async () => {
     localStorage.removeItem('app_assigned_modules');
     localStorage.removeItem('app_assigned_module');
@@ -910,40 +880,6 @@ export function Layout({ children }: LayoutProps) {
                             <span className="text-xs text-muted-foreground">
                               Amount: {formatCurrency(Number(voucher.amount || 0))}
                             </span>
-                          </DropdownMenuItem>
-                        ))}
-
-                        {/* GM Purchase Approvals */}
-                        {displayGmPurchases.map((purchase) => (
-                          <DropdownMenuItem
-                            key={`gm-purchase-${purchase.id}`}
-                            className="flex flex-col items-start gap-2 p-3 cursor-pointer hover:bg-muted"
-                            onClick={() => {
-                              router.push('/purchasing');
-                              setNotificationOpen(false);
-                            }}>
-                            <div className="flex items-start justify-between w-full">
-                              <span className="font-medium text-sm text-purple-700">GM Approval Required</span>
-                              <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-600 border-purple-200">
-                                {purchase.supplier}
-                              </Badge>
-                            </div>
-                            <span className="text-xs text-muted-foreground font-semibold">
-                              {purchase.item_name} ({purchase.quantity} {purchase.unit})
-                            </span>
-                            <span className="text-xs text-muted-foreground font-bold">
-                              Cost: {formatCurrency(Number(purchase.quantity || 0) * Number(purchase.unit_cost || 0))}
-                            </span>
-                            <div className="flex gap-2 w-full mt-1" onClick={(e) => e.stopPropagation()}>
-                              <Button size="sm" variant="default" disabled={isLocked} className="flex-1 h-8 bg-green-600 hover:bg-green-700 text-white" onClick={(e) => handleApproveCashAdvance(purchase.id, purchase.personnel?.name, purchase.amount, purchase.project_id, purchase.reason, e)}>
-                                <Check className="h-3 w-3 mr-1" />
-                                Approve
-                              </Button>
-                              <Button size="sm" variant="destructive" disabled={isLocked} className="flex-1 h-8" onClick={(e) => handleRejectCashAdvance(purchase.id, purchase.personnel?.name, e)}>
-                                <XCircle className="h-3 w-3 mr-1" />
-                                Reject
-                              </Button>
-                            </div>
                           </DropdownMenuItem>
                         ))}
 
