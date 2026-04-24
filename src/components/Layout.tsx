@@ -212,14 +212,6 @@ export function Layout({ children }: LayoutProps) {
       .limit(10);
     setPendingPurchases(pPurchases || []);
 
-    const { data: gmPurchases } = await supabase
-      .from('purchases')
-      .select('*, projects(name)')
-      .eq('status', 'pending_approval')
-      .order('id', { ascending: false })
-      .limit(10);
-    setPendingGmPurchases(gmPurchases || []);
-
     const { data: approvals } = await supabase
       .from('approval_requests')
       .select('id, source_module, request_type, requested_by, requested_at, status, summary, projects(name)')
@@ -689,7 +681,6 @@ export function Layout({ children }: LayoutProps) {
               const displayPendingDeliveries = isGM ? [] : (isSitePersonnel ? pendingDeliveries : []);
               const displayPendingPurchases = isGM ? [] : (isPurchasing ? pendingPurchases : []);
               const displayApprovedVouchers = isGM ? [] : (isAccounting ? approvedVouchers : []);
-              const displayGmPurchases = isGM ? pendingGmPurchases : [];
               const displayResolvedAdvances = isGM ? [] : resolvedCashAdvances.filter(adv => {
                 if (clearedUpdateIds.includes(`adv-${adv.id}`)) return false;
                 if (isSitePersonnel) return true;
