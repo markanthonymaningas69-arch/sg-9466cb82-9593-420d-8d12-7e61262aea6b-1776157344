@@ -52,13 +52,14 @@ Latest correction:
 - make the assistant panel open upward instead of downward
 
 Current evidence:
-- `src/pages/analytics.tsx` previously contained the page-level assistant mount
-- the user clarified the target area is the shared GM module list area containing Dashboard, Project Manager, Project Profile, Site Personnel, Purchasing, Accounting, Human Resources, Warehouse, and Analytics
-- the assistant belongs after the Analytics item in that shared modules card body, not inside analytics page content and not in sidebar navigation
+- `src/pages/analytics.tsx` previously contained the page-level assistant mount and should no longer own the placement
+- code search shows the shared GM module labels including `Project Profile`, `Human Resources`, and `Analytics` are defined in `src/components/Layout.tsx`
+- the assistant therefore needs to be mounted in the shared GM modules area in the layout after the Analytics entry, not inside analytics page content
 
 Next move:
-- inspect the GM dashboard modules card markup and mount the assistant in that shared card after the Analytics item
-- keep the upward-opening contained behavior from that shared card slot
+- inspect the shared GM modules card markup in `src/components/Layout.tsx`
+- add the single GM-only assistant mount after the Analytics entry in that card body
+- preserve the upward-opening contained behavior from that shared slot
 
 ## Checklist
 - [x] Review the current AI assistant component and module-body mount location
@@ -81,6 +82,7 @@ Next move:
 - [x] Move the assistant so it sits directly below the Analytics module and right-aligned in that section
 - [x] Move the assistant out of Analytics tab content and into the modules card body after the Analytics module
 - [x] Change the assistant expansion direction so the chat opens upward
+- [ ] Inspect the shared GM modules card markup in Layout
 - [ ] Mount the assistant after the shared GM module list entry for Analytics
 - [ ] Keep the assistant GM-only in the shared modules area
 - [ ] Validate final placement and upward expansion behavior
