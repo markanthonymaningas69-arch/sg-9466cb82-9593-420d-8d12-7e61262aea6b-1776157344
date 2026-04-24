@@ -1,6 +1,6 @@
 ---
 title: Fixed AI assistant placement
-status: done
+status: in_progress
 priority: high
 type: bug
 tags:
@@ -37,6 +37,11 @@ New follow-up:
 - allow thread rename and delete
 - store thread history in cache memory
 
+Latest follow-up:
+- use one global thread history and analysis context instead of separate thread sets per module
+- make the assistant available only in the GM module
+- place it below Analytics at the bottom-right corner of the GM module body
+
 ## Checklist
 - [x] Review the current AI assistant component and module-body mount location
 - [x] Remove drag-related behavior and state from the assistant
@@ -50,10 +55,13 @@ New follow-up:
 - [x] Add rename and delete controls for each saved thread
 - [x] Store assistant history in cache memory and restore it in the UI
 - [x] Validate placement and thread management behavior
+- [ ] Identify the GM module page and its Analytics section mount point
+- [ ] Change assistant history and analysis context to a single global cache key shared across GM
+- [ ] Remove assistant rendering from non-GM modules
+- [ ] Render the assistant only below Analytics at the bottom-right of the GM module body
+- [ ] Validate single shared thread history and GM-only placement
 
 ## Acceptance
-The AI assistant appears only once in the module body.
-The assistant is fixed at the bottom-right below the analytics area.
-Users can no longer drag the assistant.
-The chat panel layout is aligned and the assistant can analyze the current module data.
-Thread history can be viewed, renamed, and deleted, and it persists through the cache layer.
+The AI assistant appears only once in the GM module body below Analytics at the bottom-right corner.
+The assistant uses one shared thread history and data context instead of separate module-specific threads.
+Users can no longer drag the assistant, and thread history can be viewed, renamed, and deleted from the shared cache layer.
