@@ -1908,6 +1908,119 @@ export type Database = {
           },
         ]
       }
+      stripe_subscription_transactions: {
+        Row: {
+          amount: number
+          country: string
+          created_at: string
+          currency_code: string
+          id: string
+          plan_id: string
+          snapshot_id: string | null
+          status: string
+          stripe_payment_intent_id: string | null
+          stripe_session_id: string
+          stripe_subscription_id: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          country: string
+          created_at?: string
+          currency_code: string
+          id?: string
+          plan_id: string
+          snapshot_id?: string | null
+          status?: string
+          stripe_payment_intent_id?: string | null
+          stripe_session_id: string
+          stripe_subscription_id?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          country?: string
+          created_at?: string
+          currency_code?: string
+          id?: string
+          plan_id?: string
+          snapshot_id?: string | null
+          status?: string
+          stripe_payment_intent_id?: string | null
+          stripe_session_id?: string
+          stripe_subscription_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stripe_subscription_transactions_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_billing_snapshots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stripe_subscription_transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscription_billing_snapshots: {
+        Row: {
+          billing_cycle: string
+          country: string
+          created_at: string
+          currency_code: string
+          features: Json
+          id: string
+          plan_id: string
+          price_amount: number
+          status: string
+          stripe_session_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          billing_cycle: string
+          country: string
+          created_at?: string
+          currency_code: string
+          features?: Json
+          id?: string
+          plan_id: string
+          price_amount: number
+          status?: string
+          stripe_session_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          billing_cycle?: string
+          country?: string
+          created_at?: string
+          currency_code?: string
+          features?: Json
+          id?: string
+          plan_id?: string
+          price_amount?: number
+          status?: string
+          stripe_session_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_billing_snapshots_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscriptions: {
         Row: {
           amount: number

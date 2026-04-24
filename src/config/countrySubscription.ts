@@ -1,6 +1,6 @@
 import type { SupportedCountry } from "@/config/pricing";
 
-export type PaymentProvider = "stripe" | "paymongo_gcash";
+export type PaymentProvider = "stripe";
 
 export interface CountrySubscriptionConfig {
   country: SupportedCountry;
@@ -45,5 +45,5 @@ export function usesStripeSubscription(country: SupportedCountry): boolean {
 }
 
 export function usesPayMongoCheckout(country: SupportedCountry): boolean {
-  return getCountrySubscriptionConfig(country).paymentProvider === "paymongo_gcash";
+  return false;
 }

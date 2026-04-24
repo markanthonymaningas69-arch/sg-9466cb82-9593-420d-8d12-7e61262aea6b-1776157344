@@ -1,6 +1,6 @@
 ---
 title: Stripe transaction logging
-status: todo
+status: in_progress
 priority: high
 type: feature
 tags:
@@ -18,10 +18,15 @@ Log all Stripe subscription transactions with user_id, plan_id, amount, currency
 
 The logging should happen through the existing checkout and verification flow so successful billing records are consistent with the active subscription state.
 
+Implementation in progress:
+- added `stripe_subscription_transactions` in Supabase
+- Stripe verification now inserts a transaction log tied to the immutable snapshot
+- logged values use the snapshot amount, currency, country, and Stripe session id instead of recalculating from other sources
+
 ## Checklist
-- [ ] Inspect current subscription success flow and available transaction storage tables
-- [ ] Add database support for Stripe transaction logging if missing
-- [ ] Persist Stripe session identifiers and transaction records on successful checkout verification
+- [x] Inspect current subscription success flow and available transaction storage tables
+- [x] Add database support for Stripe transaction logging if missing
+- [x] Persist Stripe session identifiers and transaction records on successful checkout verification
 - [ ] Validate logged values match the stored subscription snapshot exactly
 
 ## Acceptance

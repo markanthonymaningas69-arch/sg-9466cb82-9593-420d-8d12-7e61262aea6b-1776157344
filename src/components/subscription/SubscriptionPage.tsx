@@ -9,6 +9,7 @@ import { useSettings } from "@/contexts/SettingsProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/router";
+import { formatSubscriptionCurrency } from "@/lib/subscriptionBilling";
 
 export type BillingCycle = "monthly" | "annual";
 
@@ -187,7 +188,7 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
 
   const selectedPlanConfig = pricing[selectedPlan];
   const formatAccountCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency, minimumFractionDigits: 0 }).format(value);
+    return formatSubscriptionCurrency(value, currency);
   };
 
   const updateAddOnQuantity = (id: string, delta: number) => {
@@ -284,13 +285,20 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
           proratedDiscount,
           userId: session.user.id,
           email: session.user.email,
-          returnUrl: window.location.href.split('?')[0],
+          returnUrl: window.location.href.split("?")[0],
+          planSnapshot: {
+            planId: selectedPlan,
+            priceAmount: totalAmountDueToday,
+            currencyCode: currency,
+            country,
+            billingCycle,
+          },
           metadata: {
             userId: session.user.id,
             planId: selectedPlan,
             billingCycle,
             country,
-            features: JSON.stringify(finalFeatures)
+            features: JSON.stringify(finalFeatures),
           }
         })
       });
