@@ -376,8 +376,24 @@ export function AIChatAssistant({ contained = false }: AIChatAssistantProps) {
       </Button>
     );
 
-    return contained ? <div className="ml-auto flex justify-end">{collapsedButton}</div> : <div className="fixed bottom-4 right-4 z-50">{collapsedButton}</div>;
+    return contained ? (
+      <div className="relative min-h-11 w-full">
+        <div className="absolute bottom-0 right-0 z-20">
+          {collapsedButton}
+        </div>
+      </div>
+    ) : (
+      <div className="fixed bottom-4 right-4 z-50">{collapsedButton}</div>
+    );
   }
 
-  return contained ? <div className="ml-auto flex justify-end">{panel}</div> : <div className="fixed bottom-4 right-4 z-50">{panel}</div>;
+  return contained ? (
+    <div className="relative min-h-11 w-full">
+      <div className="absolute bottom-0 right-0 z-20">
+        {panel}
+      </div>
+    </div>
+  ) : (
+    <div className="fixed bottom-4 right-4 z-50">{panel}</div>
+  );
 }

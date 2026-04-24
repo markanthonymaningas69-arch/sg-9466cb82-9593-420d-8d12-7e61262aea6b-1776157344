@@ -70,8 +70,8 @@ Latest correction:
 - [x] Render the assistant only below Analytics at the bottom-right of the GM module body
 - [x] Remove the dashboard assistant mount
 - [x] Move the assistant so it sits directly below the Analytics module and right-aligned in that section
-- [ ] Move the assistant out of Analytics tab content and into the modules card body after the Analytics module
-- [ ] Change the assistant expansion direction so the chat opens upward
+- [x] Move the assistant out of Analytics tab content and into the modules card body after the Analytics module
+- [x] Change the assistant expansion direction so the chat opens upward
 - [ ] Validate final placement and expansion behavior
 
 ## Acceptance

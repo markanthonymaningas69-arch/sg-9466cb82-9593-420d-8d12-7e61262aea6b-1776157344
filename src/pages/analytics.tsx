@@ -895,8 +895,10 @@ export default function Analytics() {
               </TabsContent>
             </Tabs>
 
-            <div className="flex justify-end">
-              <AIChatAssistant contained />
+            <div className="mt-6 border-t border-border/50 pt-6">
+              <div className="flex justify-end">
+                <AIChatAssistant contained />
+              </div>
             </div>
           </>
         )}
