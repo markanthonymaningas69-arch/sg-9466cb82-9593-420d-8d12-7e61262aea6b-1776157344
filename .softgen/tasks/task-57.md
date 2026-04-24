@@ -29,6 +29,8 @@ Implementation in progress:
 - Purchasing approvals now create Approval Center records when submitted to GM
 - HR leave requests now create Approval Center records at submission time
 - downstream side effects for approved site requests and cash advances now run from Approval Center instead of local module approval buttons
+- schema validation confirms `approval_requests` now includes `source_module`, `source_table`, `source_record_id`, `request_type`, `requested_by`, `project_id`, `status`, `summary`, `latest_comment`, `reviewed_by`, `reviewed_at`, `payload`, `company_id`, `created_at`, and `updated_at`
+- schema validation confirms `approval_actions` supports the required audit trail with `approval_request_id`, `actor_user_id`, `actor_name`, `action_status`, `comments`, `company_id`, and `created_at`
 
 ## Checklist
 - [x] Inspect existing request tables and source module submission flows
