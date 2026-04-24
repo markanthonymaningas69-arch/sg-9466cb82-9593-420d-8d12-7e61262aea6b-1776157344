@@ -33,14 +33,19 @@ Implementation:
 - unsupported detections fall back safely to the Philippines subscription page
 - Philippines config now matches the Stripe-only flow used by UAE
 
+Follow-up bug:
+- disable the Proceed to Checkout button when no plan or billable items are selected so users cannot trigger an empty checkout error
+
 ## Checklist
 - [x] Inspect the current subscription root page and country pages
 - [x] Identify available country or locale detection sources already present in the app
 - [x] Replace the manual region selector with automatic country routing
 - [x] Keep UAE and Philippines pages directly editable for pricing and currency
+- [ ] Disable checkout when no plan or add-ons are selected
 - [ ] Validate the subscription flow and fallback behavior
 
 ## Acceptance
 Users are not asked to manually choose a country on the subscription page.
 The subscription page automatically routes supported users to the correct country-specific page.
+Proceed to Checkout stays disabled until a valid plan or billable items are selected.
 UAE and Philippines pricing remain editable in their own page files.
