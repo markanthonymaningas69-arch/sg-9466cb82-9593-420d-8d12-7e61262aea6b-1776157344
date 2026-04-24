@@ -13,11 +13,13 @@ import { useSettings } from "@/contexts/SettingsProvider";
 import { accountingService } from "@/services/accountingService";
 import { projectService } from "@/services/projectService";
 import { personnelService } from "@/services/personnelService";
-import { Plus, Receipt, CheckCircle, Clock, Trash2, Pencil, Filter } from "lucide-react";
+import { Plus, Receipt, CheckCircle, Trash2, Pencil, Filter } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { useRouter } from "next/router";
 
 export function LiquidationsTab() {
   const { formatCurrency, isLocked } = useSettings();
+  const router = useRouter();
   const [liquidations, setLiquidations] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [personnel, setPersonnel] = useState<any[]>([]);
@@ -73,9 +75,8 @@ export function LiquidationsTab() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Fallback for the required submitted_by column
-    const person = personnel.find(p => p.id === form.personnel_id);
+
+    const person = personnel.find((item) => item.id === form.personnel_id);
     const submittedBy = person ? person.name : "Unknown Employee";
 
     const payload = {
@@ -84,20 +85,32 @@ export function LiquidationsTab() {
       project_id: form.project_id === "office" ? null : form.project_id,
       advance_amount: parseFloat(form.advance_amount) || 0,
       actual_amount: parseFloat(form.actual_amount) || 0,
-      purpose: form.particulars, // Mapped to correct DB column
+      purpose: form.particulars,
       status: form.status,
       receipt_attached: form.receipt_attached,
-      submitted_by: submittedBy
+      submitted_by: submittedBy,
     };
 
-    if (editingId) {
-      await accountingService.updateLiquidation(editingId, payload);
-      toast({ title: "Updated", description: "Record updated successfully." });
-    } else {
-      await accountingService.createLiquidation(payload);
-      toast({ title: "Created", description: "Record logged successfully." });
+    const response = editingId
+      ? await accountingService.updateLiquidation(editingId, payload)
+      : await accountingService.createLiquidation(payload);
+
+    if (response.error) {
+      toast({
+        title: "Unable to save",
+        description: response.error.message || "Approval Center routing failed.",
+        variant: "destructive",
+      });
+      return;
     }
-    
+
+    toast({
+      title: editingId ? "Updated" : "Submitted",
+      description: editingId
+        ? "Record updated and synced with Approval Center."
+        : "Liquidation request sent to Approval Center.",
+    });
+
     setDialogOpen(false);
     setEditingId(null);
     setForm({
@@ -108,7 +121,7 @@ export function LiquidationsTab() {
       actual_amount: "",
       particulars: "",
       status: "pending",
-      receipt_attached: false
+      receipt_attached: false,
     });
     loadData();
   };
@@ -221,6 +234,12 @@ export function LiquidationsTab() {
                         <SelectItem value="approved">Approved & Cleared</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Approval Status</Label>
+                    <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                      Pending requests are reviewed in Approval Center. Approved records remain read-only here.
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label>Cash Advance Given (AED)</Label>
@@ -345,8 +364,14 @@ export function LiquidationsTab() {
                             <CheckCircle className="h-3 w-3 mr-1" /> Cleared
                           </Badge>
                         ) : (
-                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleApprove(liq.id)} disabled={isLocked}>
-                            <Clock className="h-3 w-3 mr-1" /> Approve
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs"
+                            onClick={() => void router.push("/approval-center")}
+                            disabled={isLocked}
+                          >
+                            Approval Center
                           </Button>
                         )}
                       </TableCell>

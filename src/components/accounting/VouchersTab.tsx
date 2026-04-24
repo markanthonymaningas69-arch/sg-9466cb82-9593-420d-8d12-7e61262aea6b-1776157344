@@ -14,10 +14,12 @@ import { projectService } from "@/services/projectService";
 import { Plus, ReceiptText, Printer, CheckCircle, Archive, Filter, FilterX } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useRouter } from "next/router";
 
 export function VouchersTab() {
   const { formatCurrency, company, currency, isLocked } = useSettings();
   const { toast } = useToast();
+  const router = useRouter();
   const [vouchers, setVouchers] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -208,16 +210,31 @@ export function VouchersTab() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await accountingService.createVoucher({
+
+    const { error } = await accountingService.createVoucher({
       type: form.type,
       voucher_number: form.voucher_number,
       date: form.date,
       amount: parseFloat(form.amount) || 0,
       payee: form.payee,
-      description: form.particulars, // Mapped to correct DB column
-      project_id: form.project_id === "office" ? null : form.project_id
+      description: form.particulars,
+      project_id: form.project_id === "office" ? null : form.project_id,
     });
-    
+
+    if (error) {
+      toast({
+        title: "Unable to create voucher",
+        description: error.message || "Approval Center routing failed.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: "Voucher submitted",
+      description: "Voucher request created and sent to Approval Center.",
+    });
+
     setDialogOpen(false);
     setForm({
       type: "payment",
@@ -450,8 +467,15 @@ export function VouchersTab() {
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         {v.status === 'pending' && (
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50" onClick={() => handleApproveVoucher(v)} title="Approve Voucher (GM Only)" disabled={isLocked}>
-                            <CheckCircle className="h-4 w-4" />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-2 text-xs text-orange-700 hover:bg-orange-50"
+                            onClick={() => void router.push("/approval-center")}
+                            title="Open Approval Center"
+                            disabled={isLocked}
+                          >
+                            Approval Center
                           </Button>
                         )}
                         {v.status === 'approved' && (

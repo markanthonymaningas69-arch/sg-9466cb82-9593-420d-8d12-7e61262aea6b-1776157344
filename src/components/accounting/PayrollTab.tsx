@@ -123,7 +123,7 @@ export function PayrollTab() {
     } else {
       toast({ 
         title: "Voucher Created!", 
-        description: `A pending payment voucher for ${formatCurrency(totalPayrollCost)} has been sent to Accounting.`,
+        description: `A pending payment voucher for ${formatCurrency(totalPayrollCost)} has been created and sent to Approval Center.`,
         className: "bg-emerald-600 text-white border-emerald-700" 
       });
     }

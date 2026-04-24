@@ -90,6 +90,13 @@ function mapApprovalStatus(sourceTable: string, status: ApprovalStatus) {
     return "pending";
   }
 
+  if (sourceTable === "vouchers") {
+    if (status === "approved") {
+      return "approved";
+    }
+    return "pending";
+  }
+
   return null;
 }
 
@@ -122,6 +129,11 @@ async function syncSourceRecord(sourceTable: string, sourceRecordId: string, sta
 
   if (sourceTable === "liquidations") {
     await supabase.from("liquidations").update({ status: mappedStatus }).eq("id", sourceRecordId);
+    return;
+  }
+
+  if (sourceTable === "vouchers") {
+    await supabase.from("vouchers").update({ status: mappedStatus }).eq("id", sourceRecordId);
   }
 }
 
