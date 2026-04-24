@@ -686,12 +686,10 @@ export function Layout({ children }: LayoutProps) {
                 return false;
               });
 
-              const displayPendingDeliveries = (isGM || isSitePersonnel) ? pendingDeliveries : [];
-              const displayPendingPurchases = (isGM || isPurchasing) ? pendingPurchases : [];
+              const displayPendingDeliveries = isGM ? [] : (isSitePersonnel ? pendingDeliveries : []);
+              const displayPendingPurchases = isGM ? [] : (isPurchasing ? pendingPurchases : []);
+              const displayApprovedVouchers = isGM ? [] : (isAccounting ? approvedVouchers : []);
               const displayGmPurchases = isGM ? pendingGmPurchases : [];
-              const displayApprovedVouchers = isAccounting ? approvedVouchers : [];
-
-              // Resolved Updates
               const displayResolvedAdvances = isGM ? [] : resolvedCashAdvances.filter(adv => {
                 if (clearedUpdateIds.includes(`adv-${adv.id}`)) return false;
                 if (isSitePersonnel) return true;
