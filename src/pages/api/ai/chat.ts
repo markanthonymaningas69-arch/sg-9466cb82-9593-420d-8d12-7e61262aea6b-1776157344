@@ -79,32 +79,30 @@ export default async function handler(
 }
 
 function buildSystemPrompt(projectData: any, uiContext?: { module?: string; tab?: string | null; pathname?: string; projectId?: string | null }): string {
-  const { 
-    projectName, 
-    swaData, 
-    materialUsageData, 
-    scopeSpendingData, 
-    ocmData,
-    accounting,
-    ledger,
-    liquidations,
-    personnel,
-    warehouse,
-    purchases,
-    allProjects,
-    deliveries,
-    materialConsumption,
-    siteRequests,
-    cashAdvances,
-    leaveRequests,
-    scheduleTasks,
-    siteAttendance,
-    progressUpdates,
-    bomScopes,
-    bomMaterials,
-    bomIndirectCosts,
-    focusedProject
-  } = projectData;
+  const projectName = projectData.projectName;
+  const swaData = projectData.swaData;
+  const materialUsageData = projectData.materialUsageData;
+  const scopeSpendingData = projectData.scopeSpendingData;
+  const ocmData = projectData.ocmData;
+  const accounting = projectData.accounting;
+  const ledger = projectData.ledger;
+  const liquidations = projectData.liquidations;
+  const personnel = projectData.personnel;
+  const warehouse = projectData.warehouse;
+  const purchases = projectData.purchases;
+  const allProjects = projectData.allProjects || projectData.projects || [];
+  const deliveries = projectData.deliveries || [];
+  const materialConsumption = projectData.materialConsumption || [];
+  const siteRequests = projectData.siteRequests || [];
+  const cashAdvances = projectData.cashAdvances || [];
+  const leaveRequests = projectData.leaveRequests || [];
+  const scheduleTasks = projectData.scheduleTasks || projectData.tasks || [];
+  const siteAttendance = projectData.siteAttendance || projectData.attendance || [];
+  const progressUpdates = projectData.progressUpdates || projectData.progress || [];
+  const bomScopes = projectData.bomScopes;
+  const bomMaterials = projectData.bomMaterials;
+  const bomIndirectCosts = projectData.bomIndirectCosts;
+  const focusedProject = projectData.focusedProject;
 
   let prompt = `You are an AI assistant analyzing construction management system data. You have access to data across all modules and all major tabs in the application.\n\n`;
 
