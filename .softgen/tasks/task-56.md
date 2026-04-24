@@ -20,12 +20,20 @@ The module must include tabs for All Requests, Purchasing, Accounting, HR, Site 
 
 Approval Center should replace scattered module-level approval handling and become the single place where GM reviews and acts on requests.
 
+Implementation in progress:
+- created Approval Center page at `/approval-center`
+- added tabs for All Requests, Purchasing, Accounting, HR, Site Personnel, and Project Manager
+- added centralized request rows with source module, request type, requester, timestamp, project, and status
+- added review actions for Approve, Reject, and Return with comments
+- added audit trail panel using centralized action history
+- added Approval Center to shared navigation
+
 ## Checklist
-- [ ] Add Approval Center to the shared module navigation
-- [ ] Create the Approval Center page with tab-based category views
-- [ ] Show unified request cards or rows with module, type, requester, timestamp, related project, and status
-- [ ] Add action controls for Approve, Reject, and Return for revision with comments
-- [ ] Show audit history and latest status changes in the request detail area
+- [x] Add Approval Center to the shared module navigation
+- [x] Create the Approval Center page with tab-based category views
+- [x] Show unified request cards or rows with module, type, requester, timestamp, related project, and status
+- [x] Add action controls for Approve, Reject, and Return for revision with comments
+- [x] Show audit history and latest status changes in the request detail area
 - [ ] Validate the Approval Center UI and navigation flow
 
 ## Acceptance

@@ -99,6 +99,143 @@ export type Database = {
         }
         Relationships: []
       }
+      approval_actions: {
+        Row: {
+          action_status: string
+          actor_name: string
+          actor_user_id: string | null
+          approval_request_id: string
+          comments: string | null
+          company_id: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          action_status: string
+          actor_name: string
+          actor_user_id?: string | null
+          approval_request_id: string
+          comments?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          action_status?: string
+          actor_name?: string
+          actor_user_id?: string | null
+          approval_request_id?: string
+          comments?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_actions_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_actions_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_actions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      approval_requests: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          latest_comment: string | null
+          payload: Json
+          project_id: string | null
+          request_type: string
+          requested_at: string
+          requested_by: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source_module: string
+          source_record_id: string
+          source_table: string
+          status: string
+          summary: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          latest_comment?: string | null
+          payload?: Json
+          project_id?: string | null
+          request_type: string
+          requested_at?: string
+          requested_by: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_module: string
+          source_record_id: string
+          source_table: string
+          status?: string
+          summary?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          latest_comment?: string | null
+          payload?: Json
+          project_id?: string | null
+          request_type?: string
+          requested_at?: string
+          requested_by?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_module?: string
+          source_record_id?: string
+          source_table?: string
+          status?: string
+          summary?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_requests_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bill_of_materials: {
         Row: {
           bom_number: string

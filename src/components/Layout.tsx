@@ -40,7 +40,7 @@ import { authService } from "@/services/authService";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { useSettings } from "@/contexts/SettingsProvider";
-import { AlertCircle, Lock } from "lucide-react";
+import { AlertCircle, Lock, ShieldCheck } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AIChatAssistant } from "@/components/AIChatAssistant";
 
@@ -52,6 +52,7 @@ const navigation = [
 { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
 { name: "Project Profile", href: "/projects", icon: FolderKanban },
 { name: "Project Manager", href: "/schedule", icon: CalendarDays },
+{ name: "Approval Center", href: "/approval-center", icon: ShieldCheck },
 { name: "Site Personnel", href: "/site-personnel", icon: ClipboardList },
 { name: "Purchasing", href: "/purchasing", icon: ShoppingCart },
 { name: "Accounting", href: "/accounting", icon: Calculator },
