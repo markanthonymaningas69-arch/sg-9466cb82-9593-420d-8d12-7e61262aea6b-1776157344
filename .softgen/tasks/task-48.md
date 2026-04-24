@@ -52,9 +52,13 @@ Latest correction:
 - make the assistant panel open upward instead of downward
 
 Current evidence:
-- `src/pages/analytics.tsx` still contained the page-level assistant mount before removal
+- `src/pages/analytics.tsx` previously contained the page-level assistant mount
 - the user clarified the target area is the shared GM module list area containing Dashboard, Project Manager, Project Profile, Site Personnel, Purchasing, Accounting, Human Resources, Warehouse, and Analytics
-- the assistant should therefore be moved into the shared GM modules area after the Analytics entry rather than any analytics page content
+- the assistant belongs after the Analytics item in that shared modules card body, not inside analytics page content and not in sidebar navigation
+
+Next move:
+- inspect the GM dashboard modules card markup and mount the assistant in that shared card after the Analytics item
+- keep the upward-opening contained behavior from that shared card slot
 
 ## Checklist
 - [x] Review the current AI assistant component and module-body mount location
