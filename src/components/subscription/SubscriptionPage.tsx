@@ -44,11 +44,11 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
   const { currentPlan, setCurrentPlan, isTrial, isLocked } = useSettings();
   const { toast } = useToast();
   const router = useRouter();
-  
+
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
   const [billingHistory, setBillingHistory] = useState<any[]>([]);
   const [subscriptionDetails, setSubscriptionDetails] = useState<any>(null);
-  
+
   const [selectedPlan, setSelectedPlan] = useState<string>("");
   const [addOnQuantities, setAddOnQuantities] = useState<Record<string, number>>({});
   const [isCheckingOut, setIsCheckingOut] = useState(false);
@@ -102,7 +102,7 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
       if (data.success) {
         toast({
           title: "Payment Successful!",
-          description: `Your account has been upgraded successfully.`,
+          description: `Your account has been upgraded successfully.`
         });
         window.location.reload();
       } else {
@@ -127,7 +127,7 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
 
   const loadBillingHistory = async () => {
     const { data: { session } } = await supabase.auth.getSession();
-    
+
     const localFeatures = localStorage.getItem("app_subscription_features");
     if (localFeatures) {
       try {
@@ -135,27 +135,27 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
           ...(prev || {}),
           features: JSON.parse(localFeatures)
         }));
-      } catch(e) {}
+      } catch (e) {}
     }
 
     if (session?.user) {
-      const { data } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .order('created_at', { ascending: false });
-        
+      const { data } = await supabase.
+      from('subscriptions').
+      select('*').
+      eq('user_id', session.user.id).
+      order('created_at', { ascending: false });
+
       if (data && data.length > 0) {
         const sub = data[0];
         if (!sub.end_date && sub.start_date) {
           const d = new Date(sub.start_date);
-          if (sub.amount > 1000) d.setFullYear(d.getFullYear() + 1);
-          else d.setMonth(d.getMonth() + 1);
+          if (sub.amount > 1000) d.setFullYear(d.getFullYear() + 1);else
+          d.setMonth(d.getMonth() + 1);
           sub.end_date = d.toISOString();
         }
         setBillingHistory(data);
         setSubscriptionDetails(sub);
-        
+
         if (sub.features) {
           localStorage.setItem("app_subscription_features", JSON.stringify(sub.features));
         }
@@ -163,7 +163,7 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
         const now = new Date();
         const end = new Date(now);
         end.setMonth(end.getMonth() + 1);
-        
+
         setSubscriptionDetails({
           start_date: now.toISOString(),
           end_date: end.toISOString(),
@@ -193,15 +193,15 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
 
   const updateAddOnQuantity = (id: string, delta: number) => {
     const limit = selectedPlanConfig?.limits?.[id] || 0;
-    const activeQty = (subscriptionDetails?.features && subscriptionDetails.features[id]) || 0;
-    
-    setAddOnQuantities(prev => {
+    const activeQty = subscriptionDetails?.features && subscriptionDetails.features[id] || 0;
+
+    setAddOnQuantities((prev) => {
       const currentNew = prev[id] || 0;
       const nextNew = currentNew + delta;
-      
+
       if (nextNew < 0) return prev;
       if (activeQty + nextNew > limit) return prev;
-      
+
       if (nextNew === 0) {
         const newQs = { ...prev };
         delete newQs[id];
@@ -219,7 +219,7 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
     }, 100);
     toast({
       title: "Plan Selected",
-      description: `You have selected the ${pricing[planId]?.name || planId} plan. Please review your summary below and proceed to checkout.`,
+      description: `You have selected the ${pricing[planId]?.name || planId} plan. Please review your summary below and proceed to checkout.`
     });
   };
 
@@ -250,7 +250,7 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
 
       const items = [];
       const interval = billingCycle === "annual" ? "year" : "month";
-      
+
       if (basePriceToCharge > 0 && selectedPlanConfig) {
         items.push({
           name: `${selectedPlanConfig.name} Plan`,
@@ -291,14 +291,14 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
             priceAmount: totalAmountDueToday,
             currencyCode: currency,
             country,
-            billingCycle,
+            billingCycle
           },
           metadata: {
             userId: session.user.id,
             planId: selectedPlan,
             billingCycle,
             country,
-            features: JSON.stringify(finalFeatures),
+            features: JSON.stringify(finalFeatures)
           }
         })
       });
@@ -328,14 +328,14 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) throw new Error("Not logged in");
-      
+
       const response = await fetch('/api/stripe/portal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: session.user.id,
-          returnUrl: window.location.href.split('?')[0],
-        }),
+          returnUrl: window.location.href.split('?')[0]
+        })
       });
 
       const data = await response.json();
@@ -356,9 +356,9 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
     }
   };
 
-  const isCurrentlyTrial = (currentPlan as string) === "trial" || isTrial;
+  const isCurrentlyTrial = currentPlan as string === "trial" || isTrial;
   const hasActiveSub = subscriptionDetails?.status === "active" && !isCurrentlyTrial && !isLocked;
-  const isActuallyAnnual = billingHistory.some(b => Number(b.amount) >= 1000) || (billingCycle === "annual" && hasActiveSub && Number(subscriptionDetails?.amount) > 1000);
+  const isActuallyAnnual = billingHistory.some((b) => Number(b.amount) >= 1000) || billingCycle === "annual" && hasActiveSub && Number(subscriptionDetails?.amount) > 1000;
   const isActiveAnnual = isActuallyAnnual;
 
   const activePlanId = subscriptionDetails?.plan || currentPlan;
@@ -375,10 +375,10 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
     });
   }
 
-  const trueActiveAmount = hasActiveSub ? (activeBasePrice + activeAddonsTotal) : activePlanObj[billingCycle];
-  const isSelectingSamePlanAndCycle = subscriptionDetails?.plan === selectedPlan && (billingCycle === "annual") === isActiveAnnual;
+  const trueActiveAmount = hasActiveSub ? activeBasePrice + activeAddonsTotal : activePlanObj[billingCycle];
+  const isSelectingSamePlanAndCycle = subscriptionDetails?.plan === selectedPlan && billingCycle === "annual" === isActiveAnnual;
   const basePrice = selectedPlanConfig ? selectedPlanConfig[billingCycle] : 0;
-  const basePriceToCharge = (!hasActiveSub || !isSelectingSamePlanAndCycle || isLocked) ? basePrice : 0;
+  const basePriceToCharge = !hasActiveSub || !isSelectingSamePlanAndCycle || isLocked ? basePrice : 0;
 
   let proratedDiscount = 0;
   let daysRemaining = 0;
@@ -387,7 +387,7 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
     const end = new Date(subscriptionDetails.end_date);
     const start = new Date(subscriptionDetails.start_date);
     const now = new Date();
-    
+
     if (end > now) {
       daysRemaining = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
       const totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) || 30;
@@ -402,25 +402,25 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
   const addOnsToChargeTotal = Object.values(addons).reduce((total, addon) => {
     const newQty = Number(addOnQuantities[addon.id] || 0);
     const price = addon[billingCycle];
-    return total + (price * newQty);
+    return total + price * newQty;
   }, 0);
 
   const totalAmountDueToday = Math.max(0, basePriceToCharge - proratedDiscount) + addOnsToChargeTotal;
-  
+
   let newItemsExpiryDate = '';
   if (hasActiveSub && isSelectingSamePlanAndCycle && subscriptionDetails?.end_date && !isLocked) {
     newItemsExpiryDate = new Date(subscriptionDetails.end_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   } else {
     const d = new Date();
-    if (billingCycle === 'monthly') d.setMonth(d.getMonth() + 1);
-    else d.setFullYear(d.getFullYear() + 1);
+    if (billingCycle === 'monthly') d.setMonth(d.getMonth() + 1);else
+    d.setFullYear(d.getFullYear() + 1);
     newItemsExpiryDate = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   }
-  
-  const addOnUsersCount = subscriptionDetails?.features 
-    ? Number(Object.values(subscriptionDetails.features).reduce((a: any, b: any) => Number(a) + Number(b), 0))
-    : 0;
-    
+
+  const addOnUsersCount = subscriptionDetails?.features ?
+  Number(Object.values(subscriptionDetails.features).reduce((a: any, b: any) => Number(a) + Number(b), 0)) :
+  0;
+
   const isStarterTier = currentPlan === 'starter' || currentPlan === 'trial' || isTrial;
   const baseUsersCount = isStarterTier ? 3 : 8;
   const totalUsersCount = baseUsersCount + addOnUsersCount;
@@ -433,19 +433,19 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
             <h1 className="text-3xl font-heading font-bold">{country} Subscription</h1>
             <p className="text-muted-foreground mt-1">Manage your plan, add-ons, and payment methods via Stripe.</p>
           </div>
-          {subscriptionDetails?.stripe_customer_id && (
-            <Button variant="outline" onClick={handleManageBilling} disabled={isManagingBilling}>
+          {subscriptionDetails?.stripe_customer_id &&
+          <Button variant="outline" onClick={handleManageBilling} disabled={isManagingBilling}>
               {isManagingBilling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ExternalLink className="mr-2 h-4 w-4" />}
               Manage Billing Settings
             </Button>
-          )}
+          }
         </div>
 
         <Card className="bg-card/50">
           <CardHeader>
             <CardTitle>Current Plan Status</CardTitle>
             <CardDescription>
-              You are currently on the {isTrial ? "7-Day Trial" : (currentPlan === "starter" ? "Starter" : "Professional")} plan
+              You are currently on the {isTrial ? "7-Day Trial" : currentPlan === "starter" ? "Starter" : "Professional"} plan
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -512,69 +512,69 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
               </div>
             </div>
 
-            {subscriptionDetails?.features && Object.keys(subscriptionDetails.features).length > 0 && (
-              <>
+            {subscriptionDetails?.features && Object.keys(subscriptionDetails.features).length > 0 &&
+            <>
                 <Separator className="my-4" />
                 <div className="space-y-3">
                   <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Active Add-on Seats</h4>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {Object.entries(subscriptionDetails.features).map(([id, qty]) => {
-                      const addonInfo = addons[id];
-                      if (!addonInfo || !qty) return null;
-                      return (
-                        <div key={id} className="bg-primary/5 border border-primary/10 rounded-lg p-3 flex flex-col items-center justify-center text-center">
+                    const addonInfo = addons[id];
+                    if (!addonInfo || !qty) return null;
+                    return (
+                      <div key={id} className="bg-primary/5 border border-primary/10 rounded-lg p-3 flex flex-col items-center justify-center text-center">
                           <span className="text-2xl font-bold text-primary">{String(qty)}</span>
                           <span className="text-xs font-medium text-muted-foreground mt-1">{addonInfo.name}</span>
-                        </div>
-                      );
-                    })}
+                        </div>);
+
+                  })}
                   </div>
                 </div>
               </>
-            )}
+            }
           </CardContent>
         </Card>
 
-        {availableCycles.includes("annual") && (
-          <div className="flex items-center justify-center gap-4 bg-muted/30 py-4 rounded-xl border border-border/50">
+        {availableCycles.includes("annual") &&
+        <div className="flex items-center justify-center gap-4 bg-muted/30 py-4 rounded-xl border border-border/50">
             <span className={`text-sm font-semibold ${billingCycle === "monthly" ? "text-primary" : "text-muted-foreground"}`}>
               Monthly Billing
             </span>
             <button
-              onClick={() => setBillingCycle(billingCycle === "monthly" ? "annual" : "monthly")}
-              className="relative inline-flex h-7 w-12 items-center rounded-full bg-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1"
-            >
+            onClick={() => setBillingCycle(billingCycle === "monthly" ? "annual" : "monthly")}
+            className="relative inline-flex h-7 w-12 items-center rounded-full bg-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1">
+            
               <span
-                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
-                  billingCycle === "annual" ? "translate-x-6" : "translate-x-1"
-                }`}
-              />
+              className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
+              billingCycle === "annual" ? "translate-x-6" : "translate-x-1"}`
+              } />
+            
             </button>
             <span className={`text-sm font-semibold flex items-center gap-2 ${billingCycle === "annual" ? "text-primary" : "text-muted-foreground"}`}>
               Annual Billing
               <Badge variant="secondary" className="bg-success/15 text-success hover:bg-success/25 border-success/30">Save up to 20%</Badge>
             </span>
           </div>
-        )}
+        }
 
         <div className="grid gap-6 md:grid-cols-3">
-          {Object.values(pricing).map((plan) => (
-            <Card key={plan.id} className={`relative flex flex-col ${plan.id === selectedPlan ? "border-primary shadow-md ring-2 ring-primary ring-offset-1 z-10" : "border-border shadow-sm"} ${plan.popular ? "border-primary/60" : ""}`}>
-              {plan.popular && plan.id !== selectedPlan && plan.id !== currentPlan && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20">
+          {Object.values(pricing).map((plan) =>
+          <Card key={plan.id} className={`relative flex flex-col ${plan.id === selectedPlan ? "border-primary shadow-md ring-2 ring-primary ring-offset-1 z-10" : "border-border shadow-sm"} ${plan.popular ? "border-primary/60" : ""}`}>
+              {plan.popular && plan.id !== selectedPlan && plan.id !== currentPlan &&
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20">
                   <Badge className="bg-primary text-primary-foreground">Most Popular</Badge>
                 </div>
-              )}
-              {plan.id === currentPlan && !isTrial && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20">
+            }
+              {plan.id === currentPlan && !isTrial &&
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20">
                   <Badge className="bg-success text-success-foreground">Current Plan</Badge>
                 </div>
-              )}
-              {plan.id === selectedPlan && plan.id !== currentPlan && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20">
+            }
+              {plan.id === selectedPlan && plan.id !== currentPlan &&
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20">
                   <Badge className="bg-foreground text-background">Selected to Buy</Badge>
                 </div>
-              )}
+            }
               <CardHeader>
                 <CardTitle>{plan.name}</CardTitle>
                 <CardDescription>{plan.description}</CardDescription>
@@ -583,39 +583,39 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
                     <span className="text-4xl font-bold tracking-tight">{formatAccountCurrency(plan[billingCycle])}</span>
                     <span className="text-muted-foreground font-medium">/{billingCycle === "monthly" ? "mo" : "yr"}</span>
                   </div>
-                  {billingCycle === "annual" && plan.id !== "trial" && (
-                    <p className="text-sm text-success mt-1 font-medium">Save {formatAccountCurrency((plan.monthly * 12) - plan.annual)}/year</p>
-                  )}
+                  {billingCycle === "annual" && plan.id !== "trial" &&
+                <p className="text-sm text-success mt-1 font-medium">Save {formatAccountCurrency(plan.monthly * 12 - plan.annual)}/year</p>
+                }
                 </div>
               </CardHeader>
               <CardContent className="flex-1">
                 <ul className="space-y-3">
-                  {plan.features.map((feature, index) => (
-                    <li key={index} className="flex items-start gap-2">
-                      {!feature.startsWith('❌') ? (
-                        <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                      ) : (
-                        <div className="w-1" />
-                      )}
-                      <span className="text-sm text-muted-foreground">{feature}</span>
+                  {plan.features.map((feature, index) =>
+                <li key={index} className="flex items-start gap-2">
+                      {!feature.startsWith('❌') ?
+                  <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" /> :
+
+                  <div className="w-1" />
+                  }
+                      <span className="text-sm text-muted-foreground">4 Total Users (1 GM + 4 Ready-to-assign independent seats)</span>
                     </li>
-                  ))}
+                )}
                 </ul>
               </CardContent>
               <CardFooter>
                 <Button
-                  className="w-full font-semibold"
-                  variant={plan.id === currentPlan && !isTrial && !isLocked ? "default" : (plan.id === selectedPlan ? "secondary" : "outline")}
-                  disabled={plan.id === "trial"}
-                  onClick={() => handleUpgrade(plan.id)}
-                >
-                  {plan.id === "trial" 
-                    ? (isTrial ? (isLocked ? "Expired" : "Active Trial") : "Trial Used") 
-                    : (plan.id === currentPlan && !isTrial && !isLocked ? "Active" : (plan.id === selectedPlan ? "Selected" : "Select Plan"))}
+                className="w-full font-semibold"
+                variant={plan.id === currentPlan && !isTrial && !isLocked ? "default" : plan.id === selectedPlan ? "secondary" : "outline"}
+                disabled={plan.id === "trial"}
+                onClick={() => handleUpgrade(plan.id)}>
+                
+                  {plan.id === "trial" ?
+                isTrial ? isLocked ? "Expired" : "Active Trial" : "Trial Used" :
+                plan.id === currentPlan && !isTrial && !isLocked ? "Active" : plan.id === selectedPlan ? "Selected" : "Select Plan"}
                 </Button>
               </CardFooter>
             </Card>
-          ))}
+          )}
         </div>
 
         <div className="mt-12 pt-8 border-t">
@@ -626,11 +626,11 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {Object.values(addons).map((addon) => {
               const newQty = Number(addOnQuantities[addon.id] || 0);
-              const activeQty = Number((subscriptionDetails?.features && subscriptionDetails.features[addon.id]) || 0);
+              const activeQty = Number(subscriptionDetails?.features && subscriptionDetails.features[addon.id] || 0);
               const limit = Number(selectedPlanConfig?.limits?.[addon.id] || 0);
               const isUnavailable = !selectedPlanConfig || limit === 0 || activeQty >= limit;
               const isSelected = newQty > 0;
-              
+
               return (
                 <Card key={addon.id} className={`flex flex-col transition-colors ${isSelected ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : ''} ${isUnavailable ? 'opacity-60 grayscale-[0.5]' : ''}`}>
                   <CardHeader className="pb-3">
@@ -649,31 +649,31 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
                   </CardContent>
                   <CardFooter className="flex-col items-start gap-3">
                     <div className={`flex items-center justify-between w-full border bg-background rounded-lg p-1.5 shadow-sm ${isUnavailable ? 'pointer-events-none opacity-50' : ''}`}>
-                      <Button 
-                        variant={newQty > 0 ? "secondary" : "ghost"} 
-                        size="icon" 
-                        onClick={() => updateAddOnQuantity(addon.id, -1)} 
-                        disabled={newQty === 0 || isUnavailable} 
-                        className="h-8 w-8 shrink-0"
-                      >
+                      <Button
+                        variant={newQty > 0 ? "secondary" : "ghost"}
+                        size="icon"
+                        onClick={() => updateAddOnQuantity(addon.id, -1)}
+                        disabled={newQty === 0 || isUnavailable}
+                        className="h-8 w-8 shrink-0">
+                        
                         <Minus className="h-4 w-4" />
                       </Button>
                       <div className="flex flex-col items-center justify-center px-4 min-w-[3rem]">
                         <span className="text-lg font-bold">{newQty}</span>
                         <span className="text-[10px] uppercase text-muted-foreground font-semibold leading-none">Seats</span>
                       </div>
-                      <Button 
-                        variant="secondary" 
-                        size="icon" 
-                        onClick={() => updateAddOnQuantity(addon.id, 1)} 
-                        disabled={(activeQty + newQty) >= limit || isUnavailable}
-                        className="h-8 w-8 shrink-0 bg-primary/10 hover:bg-primary/20 text-primary"
-                      >
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        onClick={() => updateAddOnQuantity(addon.id, 1)}
+                        disabled={activeQty + newQty >= limit || isUnavailable}
+                        className="h-8 w-8 shrink-0 bg-primary/10 hover:bg-primary/20 text-primary">
+                        
                         <Plus className="h-4 w-4" />
                       </Button>
                     </div>
-                    {isSelected && (
-                      <div className="w-full text-center flex flex-col items-center mt-1">
+                    {isSelected &&
+                    <div className="w-full text-center flex flex-col items-center mt-1">
                         <span className="text-sm font-medium text-primary">
                           Subtotal: {formatAccountCurrency(addon[billingCycle] * newQty)}
                         </span>
@@ -681,10 +681,10 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
                           Valid until {newItemsExpiryDate}
                         </span>
                       </div>
-                    )}
+                    }
                   </CardFooter>
-                </Card>
-              );
+                </Card>);
+
             })}
           </div>
         </div>
@@ -697,8 +697,8 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
                 <h3 className="text-2xl font-bold tracking-tight">Order Summary</h3>
                 <div className="mt-3 space-y-2">
                   <div className="flex justify-between text-muted-foreground max-w-sm">
-                    {selectedPlanConfig ? (
-                      <>
+                    {selectedPlanConfig ?
+                    <>
                         <span>
                           {selectedPlanConfig.name} Plan ({billingCycle}) 
                           {isSelectingSamePlanAndCycle && !isLocked && <Badge variant="outline" className="ml-2 text-[10px] bg-success/10 text-success border-success/20">Already Active</Badge>}
@@ -707,13 +707,13 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
                         <span className="font-medium text-foreground">
                           {isSelectingSamePlanAndCycle && !isLocked ? formatAccountCurrency(0) : formatAccountCurrency(basePriceToCharge)}
                         </span>
-                      </>
-                    ) : (
-                      <span className="text-warning font-medium">Please select a plan from above to continue.</span>
-                    )}
+                      </> :
+
+                    <span className="text-warning font-medium">Please select a plan from above to continue.</span>
+                    }
                   </div>
                   
-                  {Object.values(addons).map(addon => {
+                  {Object.values(addons).map((addon) => {
                     const newQty = addOnQuantities[addon.id] || 0;
                     if (newQty === 0) return null;
                     const price = addon[billingCycle];
@@ -724,16 +724,16 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
                           <span className="font-medium text-foreground text-sm">{formatAccountCurrency(price * newQty)}</span>
                         </div>
                         <span className="text-[10px] mt-0.5">Valid until {newItemsExpiryDate}</span>
-                      </div>
-                    );
+                      </div>);
+
                   })}
 
-                  {proratedDiscount > 0 && (
-                    <div className="flex justify-between text-success max-w-sm mt-2 pt-2 border-t border-success/20">
+                  {proratedDiscount > 0 &&
+                  <div className="flex justify-between text-success max-w-sm mt-2 pt-2 border-t border-success/20">
                       <span className="font-medium">Unused Balance Credit ({daysRemaining} days)</span>
                       <span className="font-bold">- {formatAccountCurrency(proratedDiscount)}</span>
                     </div>
-                  )}
+                  }
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row items-center gap-6 w-full md:w-auto border-t md:border-t-0 pt-4 md:pt-0">
@@ -742,21 +742,21 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
                   <div className="text-4xl font-bold text-primary tracking-tight">{formatAccountCurrency(totalAmountDueToday)}</div>
                   <div className="text-sm font-medium text-muted-foreground mt-1">/{billingCycle === "monthly" ? "mo" : "yr"}</div>
                 </div>
-                <Button 
-                  size="lg" 
+                <Button
+                  size="lg"
                   className="h-16 px-8 text-lg font-bold w-full sm:w-auto shadow-md hover:shadow-lg transition-all"
                   onClick={handleCheckout}
                   disabled={
-                    isCheckingOut ||
-                    !selectedPlan ||
-                    totalAmountDueToday <= 0
+                  isCheckingOut ||
+                  !selectedPlan ||
+                  totalAmountDueToday <= 0
+                  }>
+                  
+                  {isCheckingOut ?
+                  <Loader2 className="mr-2 h-6 w-6 animate-spin" /> :
+
+                  <ShoppingCart className="mr-2 h-6 w-6" />
                   }
-                >
-                  {isCheckingOut ? (
-                    <Loader2 className="mr-2 h-6 w-6 animate-spin" />
-                  ) : (
-                    <ShoppingCart className="mr-2 h-6 w-6" />
-                  )}
                   {isCheckingOut ? "Processing..." : "Proceed to Checkout"}
                 </Button>
               </div>
@@ -767,12 +767,12 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
         <div className="mt-12 space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <h2 className="text-2xl font-bold font-heading">Payment History</h2>
-            {subscriptionDetails?.stripe_customer_id && (
-              <Button variant="outline" onClick={handleManageBilling} disabled={isManagingBilling} className="w-full sm:w-auto">
+            {subscriptionDetails?.stripe_customer_id &&
+            <Button variant="outline" onClick={handleManageBilling} disabled={isManagingBilling} className="w-full sm:w-auto">
                 {isManagingBilling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ExternalLink className="mr-2 h-4 w-4" />}
                 Manage Billing Settings
               </Button>
-            )}
+            }
           </div>
           <Card>
             <CardHeader>
@@ -784,8 +784,8 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
             <CardContent>
               <div className="max-h-[420px] overflow-y-auto pr-2">
                 <div className="space-y-4">
-                  {billingHistory && billingHistory.length > 0 ? billingHistory.map((bill, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/30 transition-colors">
+                  {billingHistory && billingHistory.length > 0 ? billingHistory.map((bill, index) =>
+                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/30 transition-colors">
                       <div className="flex items-center gap-4">
                         <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
                           <CreditCard className="h-5 w-5 text-primary" />
@@ -793,11 +793,11 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
                         <div>
                           <div className="font-semibold capitalize">{bill.plan} Plan</div>
                           <div className="text-sm text-muted-foreground">
-                            {new Date(bill.start_date).toLocaleDateString("en-US", { 
-                              month: "long", 
-                              day: "numeric", 
-                              year: "numeric" 
-                            })}
+                            {new Date(bill.start_date).toLocaleDateString("en-US", {
+                            month: "long",
+                            day: "numeric",
+                            year: "numeric"
+                          })}
                           </div>
                         </div>
                       </div>
@@ -810,17 +810,17 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
                         </div>
                       </div>
                     </div>
-                  )) : (
-                    <div className="text-center py-8 text-muted-foreground bg-muted/20 rounded-lg border border-dashed">
+                  ) :
+                  <div className="text-center py-8 text-muted-foreground bg-muted/20 rounded-lg border border-dashed">
                       No billing history available yet.
                     </div>
-                  )}
+                  }
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
       </div>
-    </Layout>
-  );
+    </Layout>);
+
 }
