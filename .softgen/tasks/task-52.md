@@ -22,11 +22,22 @@ Keep Stripe as the only payment method. Pricing must remain directly editable in
 
 If the app cannot reliably detect a supported country, use a safe fallback path from the existing subscription flow instead of showing a broken experience.
 
+Evidence gathered:
+- `src/pages/subscription.tsx` still linked manually to `/subscription/uae` and `/subscription/ph`
+- `src/config/countrySubscription.ts` still had Philippines configured for PayMongo
+- no existing `navigator.language` detection was present in the codebase
+
+Implementation:
+- `/subscription` now auto-detects country from browser locale and timezone
+- supported detections route to UAE or Philippines automatically
+- unsupported detections fall back safely to the Philippines subscription page
+- Philippines config now matches the Stripe-only flow used by UAE
+
 ## Checklist
-- [ ] Inspect the current subscription root page and country pages
-- [ ] Identify available country or locale detection sources already present in the app
-- [ ] Replace the manual region selector with automatic country routing
-- [ ] Keep UAE and Philippines pages directly editable for pricing and currency
+- [x] Inspect the current subscription root page and country pages
+- [x] Identify available country or locale detection sources already present in the app
+- [x] Replace the manual region selector with automatic country routing
+- [x] Keep UAE and Philippines pages directly editable for pricing and currency
 - [ ] Validate the subscription flow and fallback behavior
 
 ## Acceptance

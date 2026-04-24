@@ -26,13 +26,13 @@ export const COUNTRY_SUBSCRIPTION_CONFIG: Record<SupportedCountry, CountrySubscr
   },
   Philippines: {
     country: "Philippines",
-    paymentProvider: "paymongo_gcash",
+    paymentProvider: "stripe",
     currencyCode: "PHP",
     currencyLocale: "en-PH",
-    checkoutApiPath: "/api/paymongo/checkout",
-    paymentMethodLabel: "GCash payment via PayMongo",
-    checkoutLabel: "Continue to GCash",
-    helperText: "Philippines accounts use a dedicated PayMongo + GCash subscription flow. Add-on numeric values stay the same and only the currency presentation changes to Peso."
+    checkoutApiPath: null,
+    paymentMethodLabel: "Card payment via Stripe",
+    checkoutLabel: "Confirm & Pay",
+    helperText: "Your subscription is processed through the current Stripe billing flow."
   }
 };
 
