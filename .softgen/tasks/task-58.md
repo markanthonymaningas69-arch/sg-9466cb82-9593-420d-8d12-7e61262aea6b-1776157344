@@ -25,10 +25,7 @@ Implementation completed:
 - shared layout subscribes to `approval_requests` realtime changes so counts and alerts refresh immediately
 - Approval Center navigation item now shows the current pending approval count
 - Purchasing copy and status labels now point users to Approval Center instead of a GM-specific approval flow
-
-Follow-up refinement completed:
-- no remaining purchase approval workflow is surfaced as a GM-direct approval item outside Approval Center
-- GM notifications stay as Approval Center summaries instead of individual workflow destinations
+- final Layout cleanup removed leftover GM purchase references so approval requests no longer surface outside Approval Center
 
 ## Checklist
 - [x] Inspect the current notification system and identify GM-specific notification paths

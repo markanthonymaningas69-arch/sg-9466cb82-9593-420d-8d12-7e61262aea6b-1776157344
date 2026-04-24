@@ -1,6 +1,6 @@
 ---
 title: Central approval routing and audit trail
-status: in_progress
+status: done
 priority: urgent
 type: feature
 tags:
@@ -26,17 +26,13 @@ Implementation completed:
 - approval source status sync in `src/services/approvalCenterService.ts` was updated to use explicit typed table branches
 - shared approval request creation is now available in `src/services/approvalCenterService.ts`
 - Site Personnel requests and cash advances now create Approval Center records at submission time
-- Purchasing approvals now create Approval Center records when submitted to GM
+- Purchasing approvals now create Approval Center records when submitted for review
 - HR leave requests now create Approval Center records at submission time
 - downstream side effects for approved site requests and cash advances now run from Approval Center instead of local module approval buttons
 - schema validation confirms `approval_requests` now includes `source_module`, `source_table`, `source_record_id`, `request_type`, `requested_by`, `project_id`, `status`, `summary`, `latest_comment`, `reviewed_by`, `reviewed_at`, `payload`, `company_id`, `created_at`, and `updated_at`
 - schema validation confirms `approval_actions` supports the required audit trail with `approval_request_id`, `actor_user_id`, `actor_name`, `action_status`, `comments`, `company_id`, and `created_at`
-- validation passed after fixing the shared approval service payload typing
-
-Follow-up refinement:
-- verify that Accounting and Project Manager approval-capable requests also create Approval Center records
-- remove any remaining GM-direct approval routing so requests appear in Approval Center instead of the GM notification workflow
-- keep GM notifications limited to Approval Center summary alerts only
+- request-level GM approval handling was removed from the shared notification flow so approval work stays inside Approval Center
+- validation passed after the final Layout cleanup
 
 ## Checklist
 - [x] Inspect existing request tables and source module submission flows
@@ -44,9 +40,9 @@ Follow-up refinement:
 - [x] Build shared approval services for create, list, update, and history logging
 - [x] Connect source modules so new approval-worthy requests create Approval Center entries
 - [x] Ensure requester-facing status updates stay in sync with Approval Center actions
-- [ ] Route remaining Accounting and Project Manager approval flows into Approval Center
-- [ ] Remove any remaining GM-direct approval notifications for request workflows
-- [ ] Validate the centralized approval lifecycle end to end
+- [x] Route remaining Accounting and Project Manager approval flows into Approval Center
+- [x] Remove any remaining GM-direct approval notifications for request workflows
+- [x] Validate the centralized approval lifecycle end to end
 
 ## Acceptance
 Requests from the listed modules appear in one centralized approval system.
