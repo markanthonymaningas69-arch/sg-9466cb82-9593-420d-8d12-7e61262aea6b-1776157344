@@ -502,7 +502,7 @@ export function Layout({ children }: LayoutProps) {
 
         <div className="flex flex-col h-full overflow-hidden">
           {/* Logo */}
-          <div className="flex items-center justify-between h-16 px-6 border-b shrink-0">
+          <div className="flex items-center justify-between h-14 px-5 border-b shrink-0">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 shrink-0 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
                 TX
@@ -527,8 +527,8 @@ export function Layout({ children }: LayoutProps) {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 overflow-y-auto py-4">
-            <ul className="space-y-1 px-3">
+          <nav className="flex-1 overflow-y-auto py-2">
+            <ul className="space-y-0 px-2.5">
               {navigation.filter((item) => {
                 if (assignedModules.includes("GM")) {
                   const isRestrictedPlan = currentPlan === "starter" || currentPlan === "trial" || isTrial;
@@ -552,7 +552,7 @@ export function Layout({ children }: LayoutProps) {
                       href={item.href}
                       title={sidebarCollapsed ? item.name : undefined}
                       className={cn(
-                        "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors relative",
+                        "flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors relative",
                         isActive ?
                         "bg-primary text-primary-foreground" :
                         "text-muted-foreground hover:bg-secondary hover:text-foreground",
@@ -560,7 +560,7 @@ export function Layout({ children }: LayoutProps) {
                       )}
                       onClick={() => setSidebarOpen(false)}>
                       
-                      <Icon className="h-5 w-5 shrink-0" />
+                      <Icon className="h-4.5 w-4.5 shrink-0" />
                       {!sidebarCollapsed && <span className="truncate">{item.name}</span>}
                       {!sidebarCollapsed && item.name === "Accounting" && acctCount > 0 &&
                       <Badge variant="destructive" className="ml-auto h-4.5 min-w-[18px] px-1 flex items-center justify-center text-[9px] shrink-0">
@@ -598,9 +598,9 @@ export function Layout({ children }: LayoutProps) {
           </nav>
 
           {/* System Navigation (Separated visually) */}
-          <div className="mt-auto px-3 py-4 border-t space-y-1 shrink-0">
+          <div className="mt-auto px-2.5 py-2 border-t space-y-0.5 shrink-0">
             {!sidebarCollapsed && (
-              <p className="px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 truncate">
+              <p className="px-2.5 text-[9px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 truncate">
                 {assignedModules.includes("GM") ? "System Settings" : "Preferences"}
               </p>
             )}
@@ -609,14 +609,14 @@ export function Layout({ children }: LayoutProps) {
               title={sidebarCollapsed ? (assignedModules.includes("GM") ? "Company Settings" : "Settings") : undefined}
               className={cn("flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors relative", router.pathname === "/settings" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground", sidebarCollapsed && "justify-center")} 
               onClick={() => setSidebarOpen(false)}>
-              <Settings className="h-4 w-4 shrink-0" />
+              <Settings className="h-4.5 w-4.5 shrink-0" />
               {!sidebarCollapsed && <span className="truncate">{assignedModules.includes("GM") ? "Company Settings" : "Settings"}</span>}
             </Link>
             {assignedModules.includes("GM") && (
               <Link 
                 href="/subscription" 
                 title={sidebarCollapsed ? "Subscription" : undefined}
-                className={cn("flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors relative", router.pathname === "/subscription" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground", sidebarCollapsed && "justify-center")} 
+                className={cn("flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors relative leading-tight min-h-[32px]", router.pathname === "/subscription" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground", sidebarCollapsed && "justify-center")} 
                 onClick={() => setSidebarOpen(false)}>
                 <CreditCard className="h-4.5 w-4.5 shrink-0" />
                 {!sidebarCollapsed && <span className="truncate">Subscription</span>}
@@ -625,9 +625,9 @@ export function Layout({ children }: LayoutProps) {
           </div>
 
           {/* Footer */}
-          <div className="border-t p-4 shrink-0">
+          <div className="border-t p-3 shrink-0">
             <div className={cn("flex items-center gap-3", sidebarCollapsed ? "justify-center px-0" : "px-3 py-2")}>
-              <div className="h-8 w-8 shrink-0 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold text-sm">
+              <div className="h-7 w-7 shrink-0 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold text-sm">
                 {userName.charAt(0).toUpperCase()}
               </div>
               {!sidebarCollapsed && (
@@ -668,7 +668,7 @@ export function Layout({ children }: LayoutProps) {
                 {company.name || "Company Name"}
               </h2>
               {company.address &&
-              <p className="text-[10px] text-muted-foreground truncate max-w-[200px] lg:max-w-[300px]">
+              <p className="text-[11px] text-muted-foreground truncate max-w-[200px] lg:max-w-[300px]">
                   {company.address}
                 </p>
               }
