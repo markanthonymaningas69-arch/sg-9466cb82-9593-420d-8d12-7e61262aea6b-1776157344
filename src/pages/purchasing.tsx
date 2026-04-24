@@ -541,7 +541,7 @@ export default function Purchasing() {
                 <DialogHeader>
                   <DialogTitle>Create Purchase Order</DialogTitle>
                   <p className="text-sm text-muted-foreground">
-                    Add multiple items under a single PO Number and submit to GM.
+                    Add multiple items under a single PO Number and send them to Approval Center.
                   </p>
                 </DialogHeader>
                 <div className="space-y-6">
@@ -698,7 +698,7 @@ export default function Purchasing() {
                     </p>
                     <div className="flex gap-2">
                       <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                      <Button type="button" onClick={handleSubmitPO}>Submit PO to GM</Button>
+                      <Button type="button" onClick={handleSubmitPO}>Submit PO for Approval</Button>
                     </div>
                   </div>
                 </div>
@@ -738,7 +738,7 @@ export default function Purchasing() {
                 <div className="flex bg-background border p-0.5 rounded-md w-fit h-9 items-center overflow-x-auto">
                   <Button variant={filterStatus === "all" ? "secondary" : "ghost"} size="sm" className="h-full text-xs" onClick={() => setFilterStatus("all")}>All</Button>
                   <Button variant={filterStatus === "pending" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-orange-600 dark:text-orange-400" onClick={() => setFilterStatus("pending")}>Pending</Button>
-                  <Button variant={filterStatus === "pending_approval" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-purple-600 dark:text-purple-400 whitespace-nowrap" onClick={() => setFilterStatus("pending_approval")}>Pending GM</Button>
+                  <Button variant={filterStatus === "pending_approval" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-purple-600 dark:text-purple-400 whitespace-nowrap" onClick={() => setFilterStatus("pending_approval")}>Pending Approval</Button>
                   <Button variant={filterStatus === "approved" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-blue-600 dark:text-blue-400" onClick={() => setFilterStatus("approved")}>Approved</Button>
                   <Button variant={filterStatus === "received" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-green-600 dark:text-green-400" onClick={() => setFilterStatus("received")}>Received</Button>
                 </div>
@@ -844,7 +844,7 @@ export default function Purchasing() {
                             'bg-orange-500 hover:bg-orange-600 border-transparent text-white'
                           }
                         >
-                          {p.status === 'pending_approval' ? 'PENDING GM' : p.status.toUpperCase()}
+                          {p.status === 'pending_approval' ? 'PENDING APPROVAL' : p.status.toUpperCase()}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
@@ -877,8 +877,8 @@ export default function Purchasing() {
         <Dialog open={gmSubmitDialogOpen} onOpenChange={setGmSubmitDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Submit for GM Approval</DialogTitle>
-              <CardDescription>Enter the unit cost and supplier before sending to the GM for approval.</CardDescription>
+              <DialogTitle>Submit for Approval</DialogTitle>
+              <CardDescription>Enter the unit cost and supplier before routing this purchase to Approval Center.</CardDescription>
             </DialogHeader>
             {gmSubmitForm && (
               <div className="space-y-4 pt-4">
@@ -904,7 +904,7 @@ export default function Purchasing() {
                 </div>
                 <div className="flex justify-end gap-2 pt-4">
                   <Button variant="outline" onClick={() => setGmSubmitDialogOpen(false)}>Cancel</Button>
-                  <Button onClick={handleGmSubmit}>Submit to GM</Button>
+                  <Button onClick={handleGmSubmit}>Send to Approval Center</Button>
                 </div>
               </div>
             )}

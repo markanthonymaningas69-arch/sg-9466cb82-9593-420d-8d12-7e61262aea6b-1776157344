@@ -74,7 +74,6 @@ export function Layout({ children }: LayoutProps) {
   const [recentReceivedDeliveries, setRecentReceivedDeliveries] = useState<any[]>([]);
   
   const [pendingPurchases, setPendingPurchases] = useState<any[]>([]);
-  const [pendingGmPurchases, setPendingGmPurchases] = useState<any[]>([]);
   const [pendingApprovalRequests, setPendingApprovalRequests] = useState<any[]>([]);
   const [approvedVouchers, setApprovedVouchers] = useState<any[]>([]);
   
@@ -426,7 +425,6 @@ export function Layout({ children }: LayoutProps) {
     const { error } = await supabase.from('purchases').update({ status: 'approved', voucher_number: 'Pending Issue' }).eq('id', purchase.id);
     
     if (!error) {
-      // Auto-generate voucher in Accounting
       await supabase.from('vouchers').insert({
         voucher_number: `PV-${Math.floor(10000 + Math.random() * 90000)}`,
         date: new Date().toISOString().split("T")[0],
@@ -724,29 +722,29 @@ export function Layout({ children }: LayoutProps) {
               const displayApprovedVouchers = isAccounting ? approvedVouchers : [];
 
               // Resolved Updates
-              const displayResolvedAdvances = resolvedCashAdvances.filter(adv => {
+              const displayResolvedAdvances = isGM ? [] : resolvedCashAdvances.filter(adv => {
                 if (clearedUpdateIds.includes(`adv-${adv.id}`)) return false;
-                if (isGM || isSitePersonnel) return true;
+                if (isSitePersonnel) return true;
                 if (isAccounting && adv.status === 'approved') return true;
                 return false;
               });
 
-              const displayResolvedLeaves = resolvedLeaves.filter(leave => {
+              const displayResolvedLeaves = isGM ? [] : resolvedLeaves.filter(leave => {
                 if (clearedUpdateIds.includes(`leave-${leave.id}`)) return false;
-                if (isGM || isSitePersonnel) return true;
+                if (isSitePersonnel) return true;
                 if (isHR && leave.status === 'approved') return true;
                 return false;
               });
 
-              const displayReceivedDeliveries = recentReceivedDeliveries.filter(del => {
+              const displayReceivedDeliveries = isGM ? [] : recentReceivedDeliveries.filter(del => {
                 if (clearedUpdateIds.includes(`del-${del.id}`)) return false;
-                if (isGM || isWarehouse) return true;
+                if (isWarehouse) return true;
                 return false;
               });
 
-              const displayResolvedRequests = resolvedRequests.filter(req => {
+              const displayResolvedRequests = isGM ? [] : resolvedRequests.filter(req => {
                 if (clearedUpdateIds.includes(`req-${req.id}`)) return false;
-                if (isGM || isSitePersonnel) return true;
+                if (isSitePersonnel) return true;
                 const isAcctReq = ['Equipment (Rentals)', 'PPE', 'Petty Cash'].includes(req.request_type);
                 const isWhseReq = ['Tools', 'Equipment (Warehouse)', 'PPE', 'Materials'].includes(req.request_type) || !req.request_type;
                 if (isAccounting && isAcctReq && req.status === 'approved') return true;
@@ -754,18 +752,43 @@ export function Layout({ children }: LayoutProps) {
                 return false;
               });
 
-              const totalNotifications = displayPendingAdvances.length + displayPendingLeaves.length + displayExpiring.length + displayPendingRequests.length + displayPendingDeliveries.length + displayPendingPurchases.length + displayGmPurchases.length + displayApprovedVouchers.length + displayResolvedAdvances.length + displayResolvedLeaves.length + displayResolvedRequests.length + displayReceivedDeliveries.length;
-              const hasActionRequired = displayPendingAdvances.length > 0 || displayPendingLeaves.length > 0 || displayExpiring.length > 0 || displayPendingRequests.length > 0 || displayPendingDeliveries.length > 0 || displayPendingPurchases.length > 0 || displayGmPurchases.length > 0 || displayApprovedVouchers.length > 0;
-              const hasRecentUpdates = displayResolvedAdvances.length > 0 || displayResolvedLeaves.length > 0 || displayResolvedRequests.length > 0 || displayReceivedDeliveries.length > 0;
+              const totalNotifications =
+                displayApprovalRequests.length +
+                displayPendingAdvances.length +
+                displayPendingLeaves.length +
+                displayExpiring.length +
+                displayPendingRequests.length +
+                displayPendingDeliveries.length +
+                displayPendingPurchases.length +
+                displayApprovedVouchers.length +
+                displayResolvedAdvances.length +
+                displayResolvedLeaves.length +
+                displayResolvedRequests.length +
+                displayReceivedDeliveries.length;
+              const hasActionRequired =
+                displayApprovalRequests.length > 0 ||
+                displayPendingAdvances.length > 0 ||
+                displayPendingLeaves.length > 0 ||
+                displayExpiring.length > 0 ||
+                displayPendingRequests.length > 0 ||
+                displayPendingDeliveries.length > 0 ||
+                displayPendingPurchases.length > 0 ||
+                displayApprovedVouchers.length > 0;
+              const hasRecentUpdates =
+                !isGM &&
+                (displayResolvedAdvances.length > 0 ||
+                  displayResolvedLeaves.length > 0 ||
+                  displayResolvedRequests.length > 0 ||
+                  displayReceivedDeliveries.length > 0);
 
               const currentNotificationIds = [
+                ...displayApprovalRequests,
                 ...displayPendingAdvances,
                 ...displayPendingLeaves,
                 ...displayExpiring,
                 ...displayPendingRequests,
                 ...displayPendingDeliveries,
                 ...displayPendingPurchases,
-                ...displayGmPurchases,
                 ...displayApprovedVouchers,
                 ...displayResolvedAdvances,
                 ...displayResolvedLeaves,

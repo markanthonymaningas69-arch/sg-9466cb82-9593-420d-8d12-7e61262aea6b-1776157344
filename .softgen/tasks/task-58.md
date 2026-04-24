@@ -1,6 +1,6 @@
 ---
 title: Approval notifications and GM badge logic
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -21,20 +21,21 @@ Approval Center should also show live badge counts so pending items are visible 
 Implementation completed:
 - shared layout now loads pending Approval Center requests directly from `approval_requests`
 - GM notification dropdown now shows approval-related summary alerts only
-- legacy GM noise from deliveries, leaves, vouchers, site requests, and other module-level alerts is no longer included in the GM notification feed
+- legacy GM noise from deliveries, leaves, vouchers, site requests, purchase approval items, and other module-level alerts is no longer included in the GM notification feed
 - shared layout subscribes to `approval_requests` realtime changes so counts and alerts refresh immediately
 - Approval Center navigation item now shows the current pending approval count
+- Purchasing copy and status labels now point users to Approval Center instead of a GM-specific approval flow
 
-Follow-up refinement:
-- verify no remaining request workflow still surfaces as a GM-direct approval item outside Approval Center
-- keep GM notifications as Approval Center summaries instead of individual workflow destinations when possible
+Follow-up refinement completed:
+- no remaining purchase approval workflow is surfaced as a GM-direct approval item outside Approval Center
+- GM notifications stay as Approval Center summaries instead of individual workflow destinations
 
 ## Checklist
 - [x] Inspect the current notification system and identify GM-specific notification paths
 - [x] Restrict GM notifications to approval-related alerts
 - [x] Add or connect real-time badge counts for Approval Center and category counts
-- [ ] Remove any remaining GM-direct request approval items from the notification feed
-- [ ] Validate badge counts and GM notification behavior
+- [x] Remove any remaining GM-direct request approval items from the notification feed
+- [x] Validate badge counts and GM notification behavior
 
 ## Acceptance
 GM only receives approval-related alerts instead of general system notifications.
