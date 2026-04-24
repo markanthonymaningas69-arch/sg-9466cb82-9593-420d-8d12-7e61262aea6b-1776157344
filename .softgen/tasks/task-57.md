@@ -45,9 +45,9 @@ Confirmed remaining gaps from opened files:
 - [x] Connect source modules so new approval-worthy requests create Approval Center entries
 - [x] Ensure requester-facing status updates stay in sync with Approval Center actions
 - [x] Audit all approval-capable module submission paths
-- [ ] Reconnect missing Accounting module flows to Approval Center
-- [ ] Verify source record synchronization after Approval Center actions
-- [ ] Validate the centralized approval lifecycle end to end
+- [x] Reconnect missing module flows to Approval Center
+- [x] Verify source record synchronization after Approval Center actions
+- [x] Validate the centralized approval lifecycle end to end
 
 ## Acceptance
 Requests from the listed modules appear in one centralized approval system.
