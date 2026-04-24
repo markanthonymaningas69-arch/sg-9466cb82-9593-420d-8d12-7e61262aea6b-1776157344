@@ -3142,61 +3142,6 @@ export default function SitePersonnel() {
                       {isCashRequest ? (
                         <div className="grid gap-4 md:grid-cols-2">
                           <div className="space-y-2">
-                            <Label>Date</Label>
-                            <Input
-                              type="date"
-                              value={requestForm.request_date}
-                              onChange={(e) => setRequestForm({ ...requestForm, request_date: e.target.value })}
-                              required
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label>Personnel</Label>
-                            <Select
-                              value={requestForm.personnel_id}
-                              onValueChange={(value) => setRequestForm({ ...requestForm, personnel_id: value })}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select personnel" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {projectPersonnelList.map((person) => (
-                                  <SelectItem key={person.id} value={person.id}>
-                                    {person.name} - {person.role}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                      ) : isToolRequest ? null : (
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <div className="space-y-2">
-                            <Label>Date</Label>
-                            <Input
-                              type="date"
-                              value={requestForm.request_date}
-                              onChange={(e) => setRequestForm({ ...requestForm, request_date: e.target.value })}
-                              required
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label>Requested By</Label>
-                            <Input
-                              value={requestForm.requested_by}
-                              onChange={(e) => setRequestForm({ ...requestForm, requested_by: e.target.value })}
-                              placeholder="Enter requester name"
-                              required
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {isCashRequest ? (
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <div className="space-y-2">
                             <Label>Amount</Label>
                             <Input
                               type="number"

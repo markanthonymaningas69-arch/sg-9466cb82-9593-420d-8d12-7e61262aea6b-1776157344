@@ -1,6 +1,6 @@
 ---
 title: Material request form cleanup
-status: in_progress
+status: done
 priority: medium
 type: bug
 tags:
@@ -24,8 +24,8 @@ Current evidence from search:
 
 ## Checklist
 - [x] Find the material request form component or page that renders the duplicated fields
-- [ ] Remove the extra date input and extra requested by input without changing the intended form submission behavior
-- [ ] Validate the material request form renders each field only once
+- [x] Remove the extra date input and extra requested by input without changing the intended form submission behavior
+- [x] Validate the material request form renders each field only once
 
 ## Acceptance
 The material request form shows only one date input.
