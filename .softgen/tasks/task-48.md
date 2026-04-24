@@ -51,6 +51,10 @@ Latest correction:
 - place it after the Analytics module in the modules card body, bottom-right aligned
 - make the assistant panel open upward instead of downward
 
+Current evidence:
+- `src/pages/analytics.tsx` still contains the only live `<AIChatAssistant contained />` mount
+- the assistant must be moved off the Analytics page and into the GM dashboard modules card area instead
+
 ## Checklist
 - [x] Review the current AI assistant component and module-body mount location
 - [x] Remove drag-related behavior and state from the assistant
@@ -72,6 +76,7 @@ Latest correction:
 - [x] Move the assistant so it sits directly below the Analytics module and right-aligned in that section
 - [x] Move the assistant out of Analytics tab content and into the modules card body after the Analytics module
 - [x] Change the assistant expansion direction so the chat opens upward
+- [ ] Move the assistant off the Analytics page and into the GM modules card body after the Analytics module
 - [ ] Validate final placement and expansion behavior
 
 ## Acceptance
