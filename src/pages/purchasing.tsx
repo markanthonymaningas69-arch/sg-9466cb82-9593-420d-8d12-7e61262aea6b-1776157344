@@ -313,13 +313,24 @@ export default function Purchasing() {
       alert("Please provide a valid supplier and unit cost.");
       return;
     }
+
     const { error } = await supabase.from('purchases').update({
       supplier: gmSubmitForm.supplier,
       unit_cost: uc,
-      status: 'pending_approval' // Triggers GM approval in Layout
+      status: 'pending_approval'
     }).eq('id', gmSubmitForm.id);
 
     if (!error) {
+      await approvalCenterService.createRequest({
+        sourceModule: "Purchasing",
+        sourceTable: "purchases",
+        sourceRecordId: gmSubmitForm.id,
+        requestType: "Purchase Order",
+        requestedBy: "Purchasing Team",
+        projectId: gmSubmitForm.project_id || null,
+        summary: `${gmSubmitForm.order_number}: ${gmSubmitForm.item_name}`,
+      });
+
       setGmSubmitDialogOpen(false);
       setGmSubmitForm(null);
       loadData();
