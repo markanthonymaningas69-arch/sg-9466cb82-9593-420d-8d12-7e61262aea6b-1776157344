@@ -382,6 +382,38 @@ export default function Personnel() {
   const filteredLeaveRequests = leaveRequests.filter(l => (l.personnel?.worker_type || 'construction') === workerFilter);
   const filteredVisas = visas.filter(v => (v.personnel?.worker_type || 'construction') === workerFilter);
 
+  const attendanceSummaryRows = filteredPersonnel.reduce<Array<{
+    id: string;
+    name: string;
+    role: string;
+    daysWorked: number;
+    daysAbsent: number;
+    totalHours: number;
+    totalOvertime: number;
+  }>>((rows, person) => {
+    const records = filteredAttendance.filter(a => a.personnel_id === person.id);
+    const daysWorked = records.filter(a => ["present", "half_day", "late"].includes(a.status)).length;
+    const daysAbsent = records.filter(a => a.status === "absent").length;
+    const totalHours = records.reduce((sum, a) => sum + (Number(a.hours_worked) || 0), 0);
+    const totalOvertime = records.reduce((sum, a) => sum + (Number(a.overtime_hours) || 0), 0);
+
+    if (daysWorked === 0 && daysAbsent === 0) return rows;
+    if (minDaysWorked && daysWorked < parseInt(minDaysWorked)) return rows;
+    if (minDaysAbsent && daysAbsent < parseInt(minDaysAbsent)) return rows;
+
+    rows.push({
+      id: person.id,
+      name: person.name,
+      role: person.role,
+      daysWorked,
+      daysAbsent,
+      totalHours,
+      totalOvertime,
+    });
+
+    return rows;
+  }, []);
+
   const expiringDocuments = visas.filter(record => {
     if (record.status === 'noted') return false;
     const daysToPassportExpiry = record.passport_expiry_date ? Math.ceil((new Date(record.passport_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
@@ -393,6 +425,29 @@ export default function Personnel() {
     await supabase.from('personnel_visas').update({ status: 'noted' }).eq('id', id);
     loadData();
   };
+
+  const workerFilterLabel = workerFilter === "office" ? "Admin Staff" : "Construction Workers";
+
+  const renderWorkerTypeToggle = () => (
+    <div className="bg-muted p-1 rounded-lg flex">
+      <button
+        onClick={() => setWorkerFilter("office")}
+        className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+          workerFilter === "office" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+        }`}
+      >
+        Admin Staff
+      </button>
+      <button
+        onClick={() => setWorkerFilter("construction")}
+        className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+          workerFilter === "construction" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+        }`}
+      >
+        Construction Workers
+      </button>
+    </div>
+  );
 
   if (loading) {
     return (
@@ -829,7 +884,7 @@ export default function Personnel() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Attendance Summary</CardTitle>
+                <CardTitle>Attendance Summary - {workerFilterLabel}</CardTitle>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -846,8 +901,8 @@ export default function Personnel() {
                   <TableBody>
                     {filteredPersonnel.map((person) => {
                       const records = filteredAttendance.filter(a => a.personnel_id === person.id);
-                      const daysWorked = records.filter(a => ['present', 'half_day', 'late'].includes(a.status)).length;
-                      const daysAbsent = records.filter(a => a.status === 'absent').length;
+                      const daysWorked = records.filter(a => ["present", "half_day", "late"].includes(a.status)).length;
+                      const daysAbsent = records.filter(a => a.status === "absent").length;
                       const totalHours = records.reduce((sum, a) => sum + (Number(a.hours_worked) || 0), 0);
                       const totalOvertime = records.reduce((sum, a) => sum + (Number(a.overtime_hours) || 0), 0);
 
@@ -870,7 +925,7 @@ export default function Personnel() {
                     {filteredAttendance.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
-                          No attendance records found for this period.
+                          No attendance records found for {workerFilterLabel.toLowerCase()} in this period.
                         </TableCell>
                       </TableRow>
                     )}
@@ -967,7 +1022,7 @@ export default function Personnel() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Leave Requests</CardTitle>
+                <CardTitle>Leave Requests - {workerFilterLabel}</CardTitle>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -1007,7 +1062,7 @@ export default function Personnel() {
                     {filteredLeaveRequests.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
-                          No leave requests found.
+                          No leave requests found for {workerFilterLabel.toLowerCase()}.
                         </TableCell>
                       </TableRow>
                     )}
@@ -1123,7 +1178,7 @@ export default function Personnel() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Visa & Passport Tracking</CardTitle>
+                  <CardTitle>Visa & Passport Tracking - {workerFilterLabel}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <Table>
@@ -1201,7 +1256,7 @@ export default function Personnel() {
                       {filteredVisas.length === 0 && (
                         <TableRow>
                           <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
-                            No documents found.
+                            No visa or passport records found for {workerFilterLabel.toLowerCase()}.
                           </TableCell>
                         </TableRow>
                       )}

@@ -1,6 +1,6 @@
 ---
 title: Human resource staff labels and rate catalog switch
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -27,10 +27,10 @@ Keep the change scoped to the Human Resource tab and the related personnel secti
 - [x] Rename Office Staff to Admin Staff in the relevant HR UI
 - [x] Add a clear switch or filter so the Manpower Rate Catalog can toggle between Admin Staff and Construction Workers
 - [x] Ensure the catalog data and empty states reflect the selected staff type
-- [ ] Extend the worker-type toggle behavior to Attendance Summary
-- [ ] Extend the worker-type toggle behavior to Leave Request
-- [ ] Extend the worker-type toggle behavior to Visa & Passport
-- [ ] Validate lint, type, CSS, and runtime behavior
+- [x] Extend the worker-type toggle behavior to Attendance Summary
+- [x] Extend the worker-type toggle behavior to Leave Request
+- [x] Extend the worker-type toggle behavior to Visa & Passport
+- [x] Validate lint, type, CSS, and runtime behavior
 
 ## Acceptance
 The Human Resource tab shows Admin Staff instead of Office Staff.
