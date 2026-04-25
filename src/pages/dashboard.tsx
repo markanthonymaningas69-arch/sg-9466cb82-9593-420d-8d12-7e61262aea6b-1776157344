@@ -379,14 +379,13 @@ export default function Dashboard() {
                     <TableHead className="text-right min-w-[120px]">Cost to Date</TableHead>
                     <TableHead className="text-right min-w-[100px]">Profit Margin</TableHead>
                     <TableHead className="w-48 text-right min-w-[150px]">Accomplishment</TableHead>
-                    <TableHead className="min-w-[120px] text-center">BOM Access</TableHead>
                     <TableHead className="w-40 text-right min-w-[180px]">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {portfolio.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         No projects found.
                       </TableCell>
                     </TableRow>
@@ -418,18 +417,6 @@ export default function Dashboard() {
                             <span className="text-sm font-semibold">{project.completion.toFixed(2)}%</span>
                             <Progress value={project.completion} className="h-1.5 w-full bg-muted" />
                           </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge
-                            variant="outline"
-                            className={
-                              project.bom_edit_locked
-                                ? "border-amber-300 bg-amber-50 text-amber-700"
-                                : "border-emerald-300 bg-emerald-50 text-emerald-700"
-                            }
-                          >
-                            {project.bom_edit_locked ? "Locked" : "Editable"}
-                          </Badge>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex flex-col items-stretch justify-end gap-2 sm:flex-row sm:items-center">
