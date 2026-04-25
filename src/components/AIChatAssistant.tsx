@@ -264,7 +264,7 @@ export function AIChatAssistant({ contained = false }: AIChatAssistantProps) {
   }
 
   const panel = (
-    <div className={cn("overflow-hidden rounded-2xl border bg-card shadow-xl flex flex-col", showThreads ? "w-[calc(100vw-2rem)] sm:w-[640px]" : "w-[calc(100vw-2rem)] sm:w-[440px]")}>
+    <div className={cn("overflow-hidden rounded-2xl border bg-card shadow-2xl flex flex-col max-h-[calc(100vh-6rem)]", showThreads ? "w-[calc(100vw-2rem)] sm:w-[640px]" : "w-[calc(100vw-2rem)] sm:w-[440px]")}>
       <div className="flex h-12 shrink-0 items-center justify-between border-b bg-primary px-4 text-primary-foreground">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15">
@@ -285,7 +285,7 @@ export function AIChatAssistant({ contained = false }: AIChatAssistantProps) {
         </div>
       </div>
 
-      <div className="flex h-[calc(100vh-10rem)] max-h-[540px] min-h-[300px]">
+      <div className="flex flex-1 min-h-[300px] h-[500px] overflow-hidden">
         {showThreads ? (
           <AssistantThreadList
             threads={threads}
@@ -376,24 +376,16 @@ export function AIChatAssistant({ contained = false }: AIChatAssistantProps) {
       </Button>
     );
 
-    return contained ? (
-      <div className="relative min-h-11 w-full">
-        <div className="absolute bottom-0 right-0 z-20">
-          {collapsedButton}
-        </div>
+    return (
+      <div className="fixed bottom-6 right-6 z-[100]">
+        {collapsedButton}
       </div>
-    ) : (
-      <div className="fixed bottom-4 right-4 z-50">{collapsedButton}</div>
     );
   }
 
-  return contained ? (
-    <div className="relative min-h-11 w-full">
-      <div className="absolute bottom-0 right-0 z-20">
-        {panel}
-      </div>
+  return (
+    <div className="fixed bottom-6 right-6 z-[100]">
+      {panel}
     </div>
-  ) : (
-    <div className="fixed bottom-4 right-4 z-50">{panel}</div>
   );
 }
