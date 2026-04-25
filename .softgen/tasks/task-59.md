@@ -1,6 +1,6 @@
 ---
 title: Weighted accomplishment dashboard summary
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -36,12 +36,12 @@ UI requirements:
 - optionally include a progress bar
 - recalculate dynamically when project cost or accomplishment data changes
 
-The implementation must use real project data already available in the app and keep the dashboard readable in both light and dark mode.
+The implementation uses the existing GM dashboard project cost fallback and SWA accomplishment calculation already present in the app, then derives per-project weight and contribution values for display.
 
 ## Checklist
-- [ ] Inspect the current dashboard accomplishment calculation and related data sources
-- [ ] Replace overall accomplishment logic with cost-weighted computation
-- [ ] Add per-project summary rows for cost, weight, accomplishment, and contribution
-- [ ] Add highlighted overall accomplishment display and supporting visual cue
-- [ ] Validate zero-cost and missing-accomplishment edge cases
-- [ ] Verify the dashboard updates correctly with live project data
+- [x] Inspect the current dashboard accomplishment calculation and related data sources
+- [x] Replace overall accomplishment logic with cost-weighted computation
+- [x] Add per-project summary rows for cost, weight, accomplishment, and contribution
+- [x] Add highlighted overall accomplishment display and supporting visual cue
+- [x] Validate zero-cost and missing-accomplishment edge cases
+- [x] Verify the dashboard updates correctly with live project data

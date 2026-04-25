@@ -25,7 +25,8 @@ export default function Dashboard() {
     totalValue: 0,
     totalCost: 0,
     avgMargin: 0,
-    avgCompletion: 0
+    avgCompletion: 0,
+    weightedProjectCost: 0
   });
 
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -89,7 +90,6 @@ export default function Dashboard() {
     
     let totalVal = 0;
     let totalCst = 0;
-    let totalWeightedCompletion = 0;
 
     const projectsDataResult = projects.map(p => {
       const budget = Number(p.budget) || 0;
@@ -158,24 +158,46 @@ export default function Dashboard() {
 
       totalVal += activeBudget;
       totalCst += totalActualCost;
-      totalWeightedCompletion += (accomplishmentPct * activeBudget);
 
       return {
         ...p,
         contractAmount: activeBudget,
+        projectCost: activeBudget,
         costToDate: totalActualCost,
         margin: margin,
-        completion: accomplishmentPct,
-        amountOfCompletion: accomplishmentAmount
+        completion: accomplishmentPct || 0,
+        amountOfCompletion: accomplishmentAmount,
+        weightPercent: 0,
+        weightedContribution: 0
       };
     });
 
-    setPortfolio(projectsDataResult);
+    const totalProjectCost = projectsDataResult.reduce((sum, project) => sum + (Number(project.projectCost) || 0), 0);
+    const weightedPortfolio = projectsDataResult.map((project) => {
+      const projectCost = Number(project.projectCost) || 0;
+      const accomplishment = Number(project.completion) || 0;
+      const projectWeight = totalProjectCost > 0 ? projectCost / totalProjectCost : 0;
+      const weightedContribution = projectWeight * accomplishment;
+
+      return {
+        ...project,
+        weightPercent: projectWeight * 100,
+        weightedContribution,
+      };
+    });
+
+    const overallAccomplishment = weightedPortfolio.reduce(
+      (sum, project) => sum + (Number(project.weightedContribution) || 0),
+      0
+    );
+
+    setPortfolio(weightedPortfolio);
     setSummary({
       totalValue: totalVal,
       totalCost: totalCst,
       avgMargin: totalVal > 0 ? ((totalVal - totalCst) / totalVal) * 100 : 0,
-      avgCompletion: totalVal > 0 ? (totalWeightedCompletion / totalVal) : 0
+      avgCompletion: totalProjectCost > 0 ? overallAccomplishment : 0,
+      weightedProjectCost: totalProjectCost
     });
     
     setLoading(false);
@@ -348,6 +370,85 @@ export default function Dashboard() {
                       </TableRow>
                     ))
                   )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle>Cost-Weighted Accomplishment Summary</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Overall accomplishment is based on each project&apos;s share of total project cost.
+              </p>
+            </div>
+            <div className="rounded-xl border bg-primary/5 px-4 py-3 sm:min-w-[240px]">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Overall Accomplishment</p>
+              <p className="mt-1 text-2xl font-bold text-primary">{summary.avgCompletion.toFixed(2)}%</p>
+              <Progress value={summary.avgCompletion} className="mt-3 h-2" />
+              <p className="mt-2 text-xs text-muted-foreground">
+                Based on {formatCurrency(summary.weightedProjectCost)} total project cost
+              </p>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0 sm:p-6">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead className="min-w-[170px]">Project Name</TableHead>
+                    <TableHead className="text-right min-w-[130px]">Cost</TableHead>
+                    <TableHead className="text-right min-w-[110px]">Weight (%)</TableHead>
+                    <TableHead className="text-right min-w-[140px]">Accomplishment (%)</TableHead>
+                    <TableHead className="text-right min-w-[130px]">Contribution (%)</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {portfolio.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                        No project cost and accomplishment data found.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    portfolio.map((project) => (
+                      <TableRow key={`${project.id}-weighted`}>
+                        <TableCell>
+                          <div className="font-semibold">{project.name}</div>
+                          <div className="text-xs text-muted-foreground">{project.location}</div>
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(project.projectCost)}
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {project.weightPercent.toFixed(2)}%
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span className="font-semibold text-primary">{project.completion.toFixed(2)}%</span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span className="font-semibold">{project.weightedContribution.toFixed(2)}%</span>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                  <TableRow className="bg-muted/30">
+                    <TableCell className="font-semibold">Overall Accomplishment</TableCell>
+                    <TableCell className="text-right font-medium">
+                      {formatCurrency(summary.weightedProjectCost)}
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {summary.weightedProjectCost > 0 ? "100.00%" : "0.00%"}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold text-primary">
+                      {summary.avgCompletion.toFixed(2)}%
+                    </TableCell>
+                    <TableCell className="text-right font-semibold text-primary">
+                      {summary.avgCompletion.toFixed(2)}%
+                    </TableCell>
+                  </TableRow>
                 </TableBody>
               </Table>
             </div>
