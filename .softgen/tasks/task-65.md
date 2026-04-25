@@ -1,6 +1,6 @@
 ---
 title: Admin staff attendance defaults in time tab
-status: done
+status: in_progress
 priority: high
 type: feature
 tags:
@@ -27,6 +27,7 @@ Keep this scoped to the Time tab and the attendance save logic it uses. Preserve
 Evidence:
 - `site_attendance` did not contain a `time_in` field in the database schema, so a nullable `time_in` column was added before wiring the UI.
 - `site_attendance.project_id` is required, so Admin Staff without an assigned project are shown clearly and skipped from attendance saves until assigned.
+- TypeScript currently reports duplicate handler declarations in `src/pages/personnel.tsx` and unresolved references to `adminStaffWithoutProjectCount`, so the page needs one cleanup pass before the task is complete.
 
 ## Checklist
 - [x] Inspect the current Time tab UI and attendance save flow
@@ -34,7 +35,7 @@ Evidence:
 - [x] Add Admin Staff attendance controls with default present/full-hours behavior
 - [x] Add absent override and late time input for Admin Staff
 - [x] Ensure saved attendance reflects default present status unless marked absent
-- [x] Validate lint, type, CSS, and runtime behavior
+- [ ] Validate lint, type, CSS, and runtime behavior
 
 ## Acceptance
 Admin Staff can be managed from the Time tab with default present attendance.
