@@ -3272,16 +3272,7 @@ export default function SitePersonnel() {
                               </SelectContent>
                             </Select>
                           </div>
-                        ) : isToolRequest ? null : (
-                          <div className="space-y-2">
-                            <Label>Requested By</Label>
-                            <Input
-                              value={requestForm.requested_by}
-                              onChange={(e) => setRequestForm({ ...requestForm, requested_by: e.target.value })}
-                              placeholder={currentRequesterName ? "Auto-filled from logged-in user" : "Enter requester name"}
-                            />
-                          </div>
-                        )}
+                        ) : null}
                       </div>
 
                       {isCashRequest ? (

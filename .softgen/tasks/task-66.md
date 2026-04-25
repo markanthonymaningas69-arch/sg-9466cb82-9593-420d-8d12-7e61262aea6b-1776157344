@@ -25,6 +25,8 @@ Follow-up:
 - auto-fill the Requested By input in material requests using the logged-in user name for the site personnel assigned to the selected project
 - fix the browser validation that still blocks submit with "please fill out this field" on Requested By
 - remove the Requested By input from the material request form UI while preserving automatic submit behavior
+- when Others (Manual Input) is selected in the material request form, do not show Estimated Amount
+- rename the material request label from Date to Date Needed
 
 Keep the work scoped to the Site Personnel module and the specific request form it already uses.
 
@@ -36,7 +38,9 @@ Keep the work scoped to the Site Personnel module and the specific request form 
 - [x] Allow the material request form to submit with a General or Unassigned scope of work
 - [x] Auto-fill Requested By in material requests from the logged-in assigned site personnel user
 - [x] Fix Requested By so submit no longer gets blocked by browser required-field validation
-- [ ] Remove the Requested By input from the material request form UI
+- [x] Remove the Requested By input from the material request form UI
+- [ ] Remove Estimated Amount from manual material request entry flow
+- [ ] Rename Date to Date Needed in the material request form
 - [ ] Validate lint, type, CSS, and runtime behavior
 
 ## Acceptance
@@ -45,3 +49,5 @@ The affected card and text remain readable in dark mode.
 Users can submit the Tools & Equipment request form with a visible Submit Request button.
 The material request form can be submitted with scope of work set to General or Unassigned.
 The Requested By field no longer appears in the material request form UI, and submit still uses the logged-in assigned site personnel user automatically.
+Manual material request entry no longer shows Estimated Amount.
+The material request form uses Date Needed instead of Date.
