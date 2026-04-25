@@ -1,6 +1,6 @@
 ---
 title: BOM edit access lock control
-status: done
+status: in_progress
 priority: high
 type: feature
 tags:
@@ -28,6 +28,7 @@ The implementation should:
 Follow-up validation:
 - fix the remaining missing Alert component imports in the BOM page
 - rerun validation after the import fix
+- remove the BOM Access column from the dashboard table while keeping the lock/unlock action control
 
 ## Checklist
 - [x] Inspect the current dashboard project controls and BOM editing entry points
@@ -37,6 +38,7 @@ Follow-up validation:
 - [x] Block BOM add/edit access in the BOM page and related entry buttons when locked
 - [x] Show a clear locked-state message to users
 - [x] Validate lint, type, CSS, and runtime behavior
+- [ ] Remove the BOM Access column from the dashboard table
 
 ## Acceptance
 A GM can lock or unlock BOM editing for a specific project from the dashboard.
