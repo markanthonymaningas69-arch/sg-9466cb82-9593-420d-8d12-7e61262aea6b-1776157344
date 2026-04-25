@@ -395,6 +395,68 @@ export default function Personnel() {
     });
   };
 
+  const handleAdminAttendanceDraftChange = (
+    personnelId: string,
+    updates: Partial<AdminAttendanceDraft>
+  ) => {
+    setAdminAttendanceDrafts((current) => {
+      const existing = current[personnelId] || { absent: false, timeIn: "" };
+      const nextAbsent = updates.absent ?? existing.absent;
+
+      return {
+        ...current,
+        [personnelId]: {
+          absent: nextAbsent,
+          timeIn: nextAbsent ? "" : (updates.timeIn ?? existing.timeIn),
+        },
+      };
+    });
+  };
+
+  const handleAdminAttendanceSave = async () => {
+    const attendancePayload = filteredPersonnel.flatMap((person) => {
+      if (!person.project_id) {
+        return [];
+      }
+
+      const draft = adminAttendanceDrafts[person.id] || { absent: false, timeIn: "" };
+      const status = draft.absent ? "absent" : draft.timeIn ? "late" : "present";
+
+      return [
+        {
+          project_id: person.project_id,
+          personnel_id: person.id,
+          date: adminAttendanceDate,
+          status,
+          hours_worked: draft.absent ? 0 : 8,
+          overtime_hours: 0,
+          notes: draft.absent
+            ? "Marked absent from HR Time tab"
+            : draft.timeIn
+              ? `Late arrival recorded at ${draft.timeIn}`
+              : "Auto-present from HR Time tab",
+          time_in: draft.absent ? null : draft.timeIn || null,
+        },
+      ];
+    });
+
+    if (attendancePayload.length === 0) {
+      window.alert("Assign projects to Admin Staff first before saving attendance.");
+      return;
+    }
+
+    setSavingAdminAttendance(true);
+    const { error } = await personnelService.markAttendanceBatch(attendancePayload);
+    setSavingAdminAttendance(false);
+
+    if (error) {
+      window.alert(error.message);
+      return;
+    }
+
+    await Promise.all([loadData(), loadAdminAttendanceForDate(adminAttendanceDate)]);
+  };
+
   const statusColors: Record<string, string> = {
     active: "bg-green-100 text-green-800",
     on_leave: "bg-yellow-100 text-yellow-800",
