@@ -14,7 +14,6 @@ import {
   X,
   ClipboardList,
   ShoppingCart,
-  Bell,
   User,
   LogOut,
   Check,
@@ -937,7 +936,6 @@ export function Layout({ children }: LayoutProps) {
                           );
                         })}
 
-                        {/* Approved Vouchers (Accounting) */}
                         {displayApprovedVouchers.map((voucher) => (
                           <DropdownMenuItem
                             key={`approved-voucher-${voucher.id}`}
@@ -961,7 +959,6 @@ export function Layout({ children }: LayoutProps) {
                           </DropdownMenuItem>
                         ))}
 
-                        {/* Pending Purchases */}
                         {displayPendingPurchases.map((purchase) => (
                           <DropdownMenuItem
                             key={`pending-purchase-${purchase.id}`}
@@ -985,7 +982,6 @@ export function Layout({ children }: LayoutProps) {
                           </DropdownMenuItem>
                         ))}
 
-                        {/* Pending Deliveries from Warehouse */}
                         {displayPendingDeliveries.map((delivery) => {
                           const isFromPO = delivery.notes && delivery.notes.includes('From PO: PO-');
                           return (
@@ -1012,7 +1008,6 @@ export function Layout({ children }: LayoutProps) {
                           );
                         })}
 
-                        {/* Pending Cash Advances */}
                         {displayPendingAdvances.map((adv) =>
                       <DropdownMenuItem
                         key={`pending-adv-${adv.id}`}
@@ -1203,7 +1198,6 @@ export function Layout({ children }: LayoutProps) {
                           </div>
                         )}
 
-                        {/* Received Deliveries */}
                         {displayReceivedDeliveries.map((delivery) => (
                           <DropdownMenuItem
                             key={`received-delivery-${delivery.id}`}
@@ -1230,7 +1224,6 @@ export function Layout({ children }: LayoutProps) {
                           </DropdownMenuItem>
                         ))}
 
-                        {/* Resolved Cash Advances */}
                         {displayResolvedAdvances.map((adv) => (
                           <DropdownMenuItem
                             key={`res-adv-${adv.id}`}
@@ -1249,7 +1242,6 @@ export function Layout({ children }: LayoutProps) {
                           </DropdownMenuItem>
                         ))}
 
-                        {/* Resolved Site Requests */}
                         {displayResolvedRequests.map((req) => (
                           <DropdownMenuItem
                             key={`res-req-${req.id}`}
@@ -1268,7 +1260,6 @@ export function Layout({ children }: LayoutProps) {
                           </DropdownMenuItem>
                         ))}
 
-                        {/* Resolved Leaves */}
                         {displayResolvedLeaves.map((leave) => (
                           <DropdownMenuItem
                             key={`res-leave-${leave.id}`}
