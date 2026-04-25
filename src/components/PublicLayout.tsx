@@ -34,9 +34,6 @@ export function PublicLayout({
           </Link>
           
           <nav className="hidden md:flex items-center gap-6">
-            <Link href="/pricing" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
-              Pricing
-            </Link>
             <Link href="/about" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
               About
             </Link>
@@ -86,11 +83,6 @@ export function PublicLayout({
           <div>
             <h3 className="font-semibold mb-4 text-sm tracking-tight">Company</h3>
             <ul className="space-y-3">
-              <li>
-                <Link href="/pricing" className="text-sm text-muted-foreground hover:text-primary transition-colors">
-                  Pricing
-                </Link>
-              </li>
               <li>
                 <Link href="/about" className="text-sm text-muted-foreground hover:text-primary transition-colors">
                   About Us

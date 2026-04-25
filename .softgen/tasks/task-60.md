@@ -18,9 +18,9 @@ Remove the public `/pricing` page from the app and clean up any visible links or
 Keep the removal scoped to the pricing route and related user-facing navigation references only.
 
 ## Checklist
-- [ ] Find all references to the pricing page route and page title
-- [ ] Remove the `/pricing` page file
-- [ ] Remove or update navigation links that point to `/pricing`
+- [x] Find all references to the pricing page route and page title
+- [x] Remove the `/pricing` page file
+- [x] Remove or update navigation links that point to `/pricing`
 - [ ] Validate that the app no longer exposes the pricing page
 - [ ] Confirm the project still passes checks
 
