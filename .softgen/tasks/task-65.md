@@ -1,6 +1,6 @@
 ---
 title: Admin staff attendance defaults in time tab
-status: done
+status: in_progress
 priority: high
 type: feature
 tags:
@@ -27,10 +27,7 @@ Keep this scoped to the Time tab and the attendance save logic it uses. Preserve
 Evidence:
 - `site_attendance` did not contain a `time_in` field in the database schema, so a nullable `time_in` column was added before wiring the UI.
 - `site_attendance.project_id` is required, so Admin Staff without an assigned project are shown clearly and skipped from attendance saves until assigned.
-- The remaining missing admin-attendance handlers in `src/pages/personnel.tsx` were restored and validation passed afterward.
-
-Follow-up:
-- remove the duplicate worker-type toggle inside the Time tab so only one toggle remains visible in that section
+- A remaining duplicate `Admin Staff / Construction Workers` toggle is still visible inside the Time tab and needs one more targeted cleanup pass.
 
 ## Checklist
 - [x] Inspect the current Time tab UI and attendance save flow
@@ -38,8 +35,8 @@ Follow-up:
 - [x] Add Admin Staff attendance controls with default present/full-hours behavior
 - [x] Add absent override and late time input for Admin Staff
 - [x] Ensure saved attendance reflects default present status unless marked absent
-- [x] Remove the duplicate worker-type toggle inside the Time tab
-- [x] Validate lint, type, CSS, and runtime behavior
+- [ ] Remove the remaining duplicate worker-type toggle inside the Time tab
+- [ ] Validate lint, type, CSS, and runtime behavior
 
 ## Acceptance
 Admin Staff can be managed from the Time tab with default present attendance.
