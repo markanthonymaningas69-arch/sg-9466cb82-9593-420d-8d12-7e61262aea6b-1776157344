@@ -856,7 +856,7 @@ export default function SitePersonnel() {
         summary: `${pettyCash.request_type} - ${pettyCash.form_number}: ${pettyCash.item_name}`,
       });
     } else if (requestForm.request_type === "Tools & Equipments") {
-      const requestedBy = requestForm.requested_by || "Site Personnel";
+      const requestedBy = requestForm.requested_by || currentRequesterName || "Site Personnel";
       const { data: toolRequest, error } = await supabase
         .from("site_requests")
         .insert({
@@ -894,6 +894,8 @@ export default function SitePersonnel() {
         return;
       }
 
+      const requestedBy = requestForm.requested_by || currentRequesterName || "Site Personnel";
+
       const inserts = requestItems.map((item) => ({
         project_id: selectedProject,
         bom_scope_id: item.bom_scope_id === "unassigned" ? null : item.bom_scope_id,
@@ -904,7 +906,7 @@ export default function SitePersonnel() {
         amount: parseFloat(item.amount.toString()) || 0,
         request_type: requestForm.request_type,
         form_number: requestForm.form_number,
-        requested_by: requestForm.requested_by,
+        requested_by: requestedBy,
         notes: item.notes,
         status: "pending",
       }));
@@ -925,7 +927,7 @@ export default function SitePersonnel() {
             sourceTable: "site_requests",
             sourceRecordId: createdRequest.id,
             requestType: createdRequest.request_type,
-            requestedBy: requestForm.requested_by,
+            requestedBy,
             projectId: createdRequest.project_id,
             summary: `${createdRequest.request_type} - ${createdRequest.form_number}: ${createdRequest.item_name}`,
           })
@@ -3276,8 +3278,7 @@ export default function SitePersonnel() {
                             <Input
                               value={requestForm.requested_by}
                               onChange={(e) => setRequestForm({ ...requestForm, requested_by: e.target.value })}
-                              placeholder="Enter requester name"
-                              required
+                              placeholder={currentRequesterName ? "Auto-filled from logged-in user" : "Enter requester name"}
                             />
                           </div>
                         )}
