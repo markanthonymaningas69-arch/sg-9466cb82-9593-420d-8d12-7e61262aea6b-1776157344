@@ -30,6 +30,7 @@ export default function Dashboard() {
   });
 
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [overallAccomplishmentOpen, setOverallAccomplishmentOpen] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(true);
   const [selectedProjectDetails, setSelectedProjectDetails] = useState<any>(null);
   
@@ -296,14 +297,28 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card
+            className="cursor-pointer border-primary/40 bg-primary/5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            role="button"
+            tabIndex={0}
+            onClick={() => setOverallAccomplishmentOpen(true)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                setOverallAccomplishmentOpen(true);
+              }
+            }}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Overall Accomplishment</CardTitle>
-              <Activity className="h-4 w-4 text-purple-600" />
+              <div>
+                <CardTitle className="text-sm font-medium text-primary">Overall Accomplishment</CardTitle>
+                <p className="mt-1 text-xs text-primary/80">Click to view weighted breakdown</p>
+              </div>
+              <Activity className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
               <div className="text-xl sm:text-2xl font-bold text-primary">{summary.avgCompletion.toFixed(2)}%</div>
-              <Progress value={summary.avgCompletion} className="h-2 mt-2" />
+              <Progress value={summary.avgCompletion} className="mt-2 h-2" />
             </CardContent>
           </Card>
         </div>
@@ -455,6 +470,86 @@ export default function Dashboard() {
           </CardContent>
         </Card>
         <ArchiveViewer open={archiveOpen} onOpenChange={setArchiveOpen} />
+
+        <Dialog open={overallAccomplishmentOpen} onOpenChange={setOverallAccomplishmentOpen}>
+          <DialogContent className="max-w-5xl">
+            <DialogHeader>
+              <DialogTitle>Cost-Weighted Accomplishment Summary</DialogTitle>
+              <p className="pr-8 text-sm text-muted-foreground">
+                Overall accomplishment is based on each project&apos;s share of total project cost.
+              </p>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="rounded-xl border bg-primary/5 px-4 py-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Overall Accomplishment</p>
+                <p className="mt-1 text-2xl font-bold text-primary">{summary.avgCompletion.toFixed(2)}%</p>
+                <Progress value={summary.avgCompletion} className="mt-3 h-2" />
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Based on {formatCurrency(summary.weightedProjectCost)} total project cost
+                </p>
+              </div>
+
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead className="min-w-[170px]">Project Name</TableHead>
+                      <TableHead className="text-right min-w-[130px]">Cost</TableHead>
+                      <TableHead className="text-right min-w-[110px]">Weight (%)</TableHead>
+                      <TableHead className="text-right min-w-[140px]">Accomplishment (%)</TableHead>
+                      <TableHead className="text-right min-w-[130px]">Contribution (%)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {portfolio.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                          No project cost and accomplishment data found.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      portfolio.map((project) => (
+                        <TableRow key={`${project.id}-weighted`}>
+                          <TableCell>
+                            <div className="font-semibold">{project.name}</div>
+                            <div className="text-xs text-muted-foreground">{project.location}</div>
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            {formatCurrency(project.projectCost)}
+                          </TableCell>
+                          <TableCell className="text-right text-muted-foreground">
+                            {project.weightPercent.toFixed(2)}%
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span className="font-semibold text-primary">{project.completion.toFixed(2)}%</span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span className="font-semibold">{project.weightedContribution.toFixed(2)}%</span>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                    <TableRow className="bg-muted/30">
+                      <TableCell className="font-semibold">Overall Accomplishment</TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatCurrency(summary.weightedProjectCost)}
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {summary.weightedProjectCost > 0 ? "100.00%" : "0.00%"}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold text-primary">
+                        {summary.avgCompletion.toFixed(2)}%
+                      </TableCell>
+                      <TableCell className="text-right font-semibold text-primary">
+                        {summary.avgCompletion.toFixed(2)}%
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
           <DialogContent className={`flex flex-col transition-all duration-200 ${isFullScreen ? 'max-w-[100vw] w-screen h-[100dvh] m-0 rounded-none border-0' : 'max-w-5xl h-[85vh]'}`}>

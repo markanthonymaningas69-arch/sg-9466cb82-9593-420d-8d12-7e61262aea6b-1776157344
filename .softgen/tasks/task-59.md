@@ -33,15 +33,17 @@ Validation rules:
 UI requirements:
 - show a clean per-project summary table with project name, cost, weight, accomplishment, and contribution
 - highlight the overall accomplishment percentage
+- use the highlighted dashboard card as the click target for the weighted accomplishment breakdown
 - optionally include a progress bar
 - recalculate dynamically when project cost or accomplishment data changes
 
-The implementation uses the existing GM dashboard project cost fallback and SWA accomplishment calculation already present in the app, then derives per-project weight and contribution values for display.
+The implementation uses the existing GM dashboard project cost fallback and SWA accomplishment calculation already present in the app, then derives per-project weight and contribution values for display. The weighted breakdown is now opened from the highlighted Overall Accomplishment metric card.
 
 ## Checklist
 - [x] Inspect the current dashboard accomplishment calculation and related data sources
 - [x] Replace overall accomplishment logic with cost-weighted computation
 - [x] Add per-project summary rows for cost, weight, accomplishment, and contribution
 - [x] Add highlighted overall accomplishment display and supporting visual cue
+- [x] Make the highlighted Overall Accomplishment card open the weighted breakdown
 - [x] Validate zero-cost and missing-accomplishment edge cases
 - [x] Verify the dashboard updates correctly with live project data
