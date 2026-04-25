@@ -1,6 +1,6 @@
 ---
 title: Project profile table and modal cleanup
-status: in_progress
+status: done
 priority: medium
 type: feature
 tags:
@@ -18,12 +18,12 @@ Adjust the Project Profile page so the All Projects table fits better inside the
 Keep the rest of the project creation flow unchanged unless those fields are required by the current implementation. If the data layer still needs fallback values, preserve compatibility without showing the inputs in the UI.
 
 ## Checklist
-- [ ] Inspect the All Projects table and new project modal implementation
-- [ ] Reduce table text size and related spacing so project rows fit better inside the card
-- [ ] Remove Status, Plan Start, and Plan Finish columns from the table
-- [ ] Remove Status, Plan Start, and Plan Finish inputs from the new project modal
-- [ ] Preserve project creation behavior if hidden defaults are still required
-- [ ] Validate the page for lint, type, CSS, and runtime issues
+- [x] Inspect the All Projects table and new project modal implementation
+- [x] Reduce table text size and related spacing so project rows fit better inside the card
+- [x] Remove Status, Plan Start, and Plan Finish columns from the table
+- [x] Remove Status, Plan Start, and Plan Finish inputs from the new project modal
+- [x] Preserve project creation behavior if hidden defaults are still required
+- [x] Validate the page for lint, type, CSS, and runtime issues
 
 ## Acceptance
 The All Projects table fits more comfortably inside the Project Profile body card with smaller text.

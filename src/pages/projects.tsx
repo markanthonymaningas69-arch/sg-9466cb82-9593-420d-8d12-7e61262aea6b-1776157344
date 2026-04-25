@@ -35,9 +35,6 @@ export default function Projects() {
     name: "",
     location: "",
     client: "",
-    start_date: "",
-    end_date: "",
-    status: "planning" as const,
     budget: ""
   });
 
@@ -119,9 +116,9 @@ export default function Projects() {
       name: formData.name,
       location: formData.location,
       client: formData.client,
-      start_date: formData.start_date || null,
-      end_date: formData.end_date || null,
-      status: formData.status,
+      start_date: editingProject?.start_date || null,
+      end_date: editingProject?.end_date || null,
+      status: editingProject?.status || "planning",
       budget: parseFloat(formData.budget) || 0,
       spent: editingProject ? editingProject.spent : 0
     };
@@ -263,9 +260,6 @@ export default function Projects() {
       name: project.name,
       location: project.location || "",
       client: project.client || "",
-      start_date: project.start_date || "",
-      end_date: project.end_date || "",
-      status: project.status as any,
       budget: project.budget ? project.budget.toString() : ""
     });
     setDialogOpen(true);
@@ -288,9 +282,6 @@ export default function Projects() {
       name: "",
       location: "",
       client: "",
-      start_date: "",
-      end_date: "",
-      status: "planning",
       budget: ""
     });
     setEditingProject(null);
@@ -345,7 +336,7 @@ export default function Projects() {
                   <DialogTitle>{editingProject ? "Edit Project" : "Create New Project"}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="name">Project Name</Label>
                       <Input
@@ -372,20 +363,6 @@ export default function Projects() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="status">Status</Label>
-                      <Select value={formData.status} onValueChange={(value: any) => setFormData({ ...formData, status: value })}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="planning">Planning</SelectItem>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="on_hold">On Hold</SelectItem>
-                          <SelectItem value="completed">Completed</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
                       <Label htmlFor="budget">Contract Amount</Label>
                       <Input
                         id="budget"
@@ -394,24 +371,6 @@ export default function Projects() {
                         value={formData.budget}
                         onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
                         disabled
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="start_date">Plan Start (Start Date)</Label>
-                      <Input
-                        id="start_date"
-                        type="date"
-                        value={formData.start_date}
-                        onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="end_date">Plan Finish (End Date)</Label>
-                      <Input
-                        id="end_date"
-                        type="date"
-                        value={formData.end_date}
-                        onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
                       />
                     </div>
                   </div>
@@ -435,47 +394,37 @@ export default function Projects() {
           </CardHeader>
           <CardContent className="p-0 sm:p-6">
             <div className="overflow-x-auto">
-              <Table>
+              <Table className="text-[11px] sm:text-xs">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-[150px]">Project Name</TableHead>
-                    <TableHead className="min-w-[120px]">Location</TableHead>
-                    <TableHead className="min-w-[120px]">Client</TableHead>
-                    <TableHead className="min-w-[100px]">Status</TableHead>
-                    <TableHead className="text-right min-w-[120px]">Contract Amount</TableHead>
-                    <TableHead className="min-w-[100px]">Plan Start</TableHead>
-                    <TableHead className="min-w-[100px]">Plan Finish</TableHead>
-                    <TableHead className="text-right min-w-[200px]">Actions</TableHead>
+                    <TableHead className="min-w-[150px] px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Project Name</TableHead>
+                    <TableHead className="min-w-[120px] px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Location</TableHead>
+                    <TableHead className="min-w-[120px] px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Client</TableHead>
+                    <TableHead className="min-w-[120px] px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Contract Amount</TableHead>
+                    <TableHead className="min-w-[180px] px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {projects.map((project) => (
                     <TableRow key={project.id}>
-                      <TableCell className="font-medium">{project.name}</TableCell>
-                      <TableCell>{project.location || "-"}</TableCell>
-                      <TableCell>{project.client || "-"}</TableCell>
-                      <TableCell>
-                        <Badge className={statusColors[project.status] || "bg-gray-100 text-gray-800"}>
-                          {project.status.replace("_", " ")}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-medium">{formatCurrency(project.budget || 0)}</TableCell>
-                      <TableCell>{project.start_date || "-"}</TableCell>
-                      <TableCell>{project.end_date || "-"}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex flex-col sm:flex-row justify-end gap-2 items-stretch sm:items-center">
+                      <TableCell className="px-3 py-2 font-medium text-[11px] sm:text-xs">{project.name}</TableCell>
+                      <TableCell className="px-3 py-2 text-[11px] sm:text-xs">{project.location || "-"}</TableCell>
+                      <TableCell className="px-3 py-2 text-[11px] sm:text-xs">{project.client || "-"}</TableCell>
+                      <TableCell className="px-3 py-2 text-right font-medium text-[11px] sm:text-xs">{formatCurrency(project.budget || 0)}</TableCell>
+                      <TableCell className="px-3 py-2 text-right">
+                        <div className="flex flex-col items-stretch justify-end gap-1.5 sm:flex-row sm:items-center">
                           <Button 
                             size="sm" 
-                            className="bg-green-600 hover:bg-green-700 text-white h-8 w-full sm:w-auto whitespace-nowrap" 
+                            className="h-7 w-full whitespace-nowrap bg-green-600 px-2 text-[10px] text-white hover:bg-green-700 sm:w-auto" 
                             onClick={() => handleBOM(project.id)}
                           >
-                            <FileText className="h-3.5 w-3.5 sm:mr-1" /> <span className="sm:inline">Add/Edit BOM</span>
+                            <FileText className="mr-1 h-3 w-3" /> <span>Add/Edit BOM</span>
                           </Button>
-                          <Button size="icon" variant="outline" className="h-8 w-8 text-amber-600 border-amber-200 hover:bg-amber-50" onClick={() => handleEdit(project)} disabled={isLocked}>
-                            <Pencil className="h-3.5 w-3.5" />
+                          <Button size="icon" variant="outline" className="h-7 w-7 text-amber-600 border-amber-200 hover:bg-amber-50" onClick={() => handleEdit(project)} disabled={isLocked}>
+                            <Pencil className="h-3 w-3" />
                           </Button>
-                          <Button size="icon" variant="outline" className="h-8 w-8 text-orange-600 border-orange-200 hover:bg-orange-50" onClick={() => handleDelete(project.id)} title="Archive" disabled={isLocked}>
-                            <Archive className="h-3.5 w-3.5" />
+                          <Button size="icon" variant="outline" className="h-7 w-7 text-orange-600 border-orange-200 hover:bg-orange-50" onClick={() => handleDelete(project.id)} title="Archive" disabled={isLocked}>
+                            <Archive className="h-3 w-3" />
                           </Button>
                         </div>
                       </TableCell>
