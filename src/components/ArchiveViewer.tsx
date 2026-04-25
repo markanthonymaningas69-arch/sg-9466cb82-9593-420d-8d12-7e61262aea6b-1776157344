@@ -138,22 +138,42 @@ export function ArchiveViewer({ open, onOpenChange }: { open: boolean, onOpenCha
           </p>
         </DialogHeader>
         
-        <Tabs defaultValue="projects" className="flex-1 overflow-hidden flex flex-col mt-4">
-          <ScrollArea className="w-full shrink-0 border-b pb-2">
-            <TabsList className="flex w-max space-x-1 h-10">
-              <TabsTrigger value="projects">Projects</TabsTrigger>
-              <TabsTrigger value="personnel">Personnel</TabsTrigger>
-              <TabsTrigger value="visas">Visas & Passports</TabsTrigger>
-              <TabsTrigger value="requests">Site Requests</TabsTrigger>
-              <TabsTrigger value="cash_advances">Cash Advances</TabsTrigger>
-              <TabsTrigger value="leave_requests">Leave Requests</TabsTrigger>
-              <TabsTrigger value="inventory">Warehouse</TabsTrigger>
-              <TabsTrigger value="purchases">Purchasing</TabsTrigger>
-              <TabsTrigger value="deliveries">Deliveries</TabsTrigger>
-              <TabsTrigger value="consumptions">Material Consumption</TabsTrigger>
+        <Tabs defaultValue="projects" className="mt-4 flex flex-1 flex-col overflow-hidden">
+          <div className="shrink-0 border-b pb-3">
+            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 bg-muted/60 p-1 sm:grid-cols-3 lg:grid-cols-5">
+              <TabsTrigger value="projects" className="h-auto px-2 py-2 text-[11px] leading-tight sm:text-xs">
+                Projects
+              </TabsTrigger>
+              <TabsTrigger value="personnel" className="h-auto px-2 py-2 text-[11px] leading-tight sm:text-xs">
+                Personnel
+              </TabsTrigger>
+              <TabsTrigger value="visas" className="h-auto px-2 py-2 text-[11px] leading-tight sm:text-xs">
+                Visas & Passports
+              </TabsTrigger>
+              <TabsTrigger value="requests" className="h-auto px-2 py-2 text-[11px] leading-tight sm:text-xs">
+                Site Requests
+              </TabsTrigger>
+              <TabsTrigger value="cash_advances" className="h-auto px-2 py-2 text-[11px] leading-tight sm:text-xs">
+                Cash Advances
+              </TabsTrigger>
+              <TabsTrigger value="leave_requests" className="h-auto px-2 py-2 text-[11px] leading-tight sm:text-xs">
+                Leave Requests
+              </TabsTrigger>
+              <TabsTrigger value="inventory" className="h-auto px-2 py-2 text-[11px] leading-tight sm:text-xs">
+                Warehouse
+              </TabsTrigger>
+              <TabsTrigger value="purchases" className="h-auto px-2 py-2 text-[11px] leading-tight sm:text-xs">
+                Purchasing
+              </TabsTrigger>
+              <TabsTrigger value="deliveries" className="h-auto px-2 py-2 text-[11px] leading-tight sm:text-xs">
+                Deliveries
+              </TabsTrigger>
+              <TabsTrigger value="consumptions" className="h-auto px-2 py-2 text-[11px] leading-tight sm:text-xs">
+                Material Consumption
+              </TabsTrigger>
             </TabsList>
-          </ScrollArea>
-          
+          </div>
+
           <div className="flex-1 overflow-hidden">
             <TabsContent value="projects" className="h-full mt-0">
               {renderTable('projects', data.projects, [{ key: 'name', label: 'Project Name' }, { key: 'status', label: 'Status' }, { key: 'location', label: 'Location' }])}
