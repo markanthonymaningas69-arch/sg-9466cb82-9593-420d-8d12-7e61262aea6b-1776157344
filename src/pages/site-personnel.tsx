@@ -50,6 +50,7 @@ export default function SitePersonnel() {
   
   const [assignedProjectIds, setAssignedProjectIds] = useState<string[]>([]);
   const [userRole, setUserRole] = useState<string>("");
+  const [currentRequesterName, setCurrentRequesterName] = useState<string>("");
   
   // Site Attendance (Roll Call)
   const [attendanceList, setAttendanceList] = useState<AttendanceRow[]>([]);
@@ -185,7 +186,18 @@ export default function SitePersonnel() {
   const checkUserAssignment = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+      const profileRecord = (profile ?? {}) as Record<string, unknown>;
+      const metadataRecord = (user.user_metadata ?? {}) as Record<string, unknown>;
+      const resolvedName =
+        (typeof profileRecord.full_name === "string" && profileRecord.full_name) ||
+        (typeof profileRecord.name === "string" && profileRecord.name) ||
+        (typeof metadataRecord.full_name === "string" && metadataRecord.full_name) ||
+        (typeof metadataRecord.name === "string" && metadataRecord.name) ||
+        (typeof user.email === "string" && user.email ? user.email.split("@")[0] : "");
+
+      setCurrentRequesterName(resolvedName);
+
       if (profile) {
         setUserRole(profile.assigned_module);
         if (profile.assigned_project_ids && profile.assigned_project_ids.length > 0) {
@@ -313,6 +325,36 @@ export default function SitePersonnel() {
       supabase.removeChannel(channel);
     };
   }, [selectedProject, requestDate]);
+
+  useEffect(() => {
+    if (selectedProject) {
+      loadDeliveries();
+      loadConsumptions();
+      loadRequests();
+      loadCashAdvances();
+    }
+  }, [selectedProject, deliveriesDate, consumptionDate, requestDate]);
+
+  useEffect(() => {
+    if (!requestDialogOpen || requestForm.request_type !== "Materials") {
+      return;
+    }
+
+    if (!currentRequesterName || !assignedProjectIds.includes(selectedProject)) {
+      return;
+    }
+
+    setRequestForm((prev) => {
+      if (prev.requested_by) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        requested_by: currentRequesterName,
+      };
+    });
+  }, [assignedProjectIds, currentRequesterName, requestDialogOpen, requestForm.request_type, selectedProject]);
 
   const loadProjects = async () => {
     const { data } = await projectService.getAll();
@@ -1024,6 +1066,9 @@ export default function SitePersonnel() {
 
   const openRequestDialog = (type: string, prefix: string) => {
     const randomNum = Math.floor(100000 + Math.random() * 900000);
+    const shouldAutoFillRequester =
+      type === "Materials" && !!currentRequesterName && assignedProjectIds.includes(selectedProject);
+
     setRequestForm({
       request_type: type,
       form_number: `${prefix}-${randomNum}`,
@@ -1034,7 +1079,7 @@ export default function SitePersonnel() {
       quantity: 0,
       unit: "",
       amount: 0,
-      requested_by: "",
+      requested_by: shouldAutoFillRequester ? currentRequesterName : "",
       notes: ""
     });
     setRequestItems([]);
