@@ -23,6 +23,7 @@ import { useSettings } from "@/contexts/SettingsProvider";
 import { bomService } from "@/services/bomService";
 import { projectService } from "@/services/projectService";
 import { Plus, Pencil, Trash2, ArrowLeft, ArrowUp, ArrowDown, Lock } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { Database } from "@/integrations/supabase/types";
 
 type BOM = Database["public"]["Tables"]["bill_of_materials"]["Row"];
@@ -46,6 +47,7 @@ const MATERIAL_UNIT_OPTIONS = [
   "L",
   "Length",
   "Lin.m",
+  "Liter",
   "Lot",
   "M",
   "Pail",
@@ -1432,11 +1434,12 @@ export default function BillOfMaterials() {
                                       <div className="flex justify-end items-center gap-1">
                                         <Button
                                           size="sm"
-                                          className="bg-green-600 hover:bg-green-700 text-white h-6 px-2 text-xs"
+                                          className="bg-green-600 hover:bg-green-700 text-white h-6 text-xs"
                                           onClick={() => void handleMaterialSubmitInline()}
                                           disabled={editDisabled}
                                         >
-                                          Update
+                                          <Plus className="h-3 w-3 mr-1" />
+                                          Add
                                         </Button>
                                         <Button
                                           size="sm"
@@ -1547,64 +1550,64 @@ export default function BillOfMaterials() {
                                         }
                                       >
                                         <SelectTrigger className="h-6 w-20 text-xs">
-                                        <SelectValue placeholder="Unit" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {[...MATERIAL_UNIT_OPTIONS, "Other"].map((unitOption) => (
-                                            <SelectItem key={unitOption} value={unitOption} className="text-xs">
-                                              {unitOption === "Other" ? "Others/Input" : unitOption}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                      {materialForm.unit_selection === "Other" && (
-                                        <Input
-                                          placeholder="Unit"
-                                          value={materialForm.unit}
-                                          onChange={(e) => setMaterialForm({ ...materialForm, unit: e.target.value })}
-                                          className="h-6 w-20 text-xs"
-                                        />
-                                      )}
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="py-0.5 text-right">
-                                    <Input
-                                      placeholder="Cost"
-                                      value={materialForm.unit_cost}
-                                      onChange={(e) => setMaterialForm({ ...materialForm, unit_cost: e.target.value })}
-                                      className="h-6 text-xs text-right"
-                                    />
-                                  </TableCell>
-                                  <TableCell className="py-0.5 text-right font-semibold text-sm">
-                                    {formatCurrency((parseFloat(materialForm.quantity.replace(/,/g, "")) || 0) * (parseFloat(materialForm.unit_cost.replace(/,/g, "")) || 0))}
-                                  </TableCell>
-                                  <TableCell className="py-0.5">
-                                    <div className="flex justify-end items-center gap-1">
-                                      <Button
-                                        size="sm"
-                                        className="bg-green-600 hover:bg-green-700 text-white h-6 text-xs"
-                                        onClick={() => void handleMaterialSubmitInline()}
-                                        disabled={editDisabled}
-                                      >
-                                        <Plus className="h-3 w-3 mr-1" />
-                                        Add
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="h-6 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
-                                        onClick={() => {
-                                          resetMaterialForm();
-                                          setSelectedScopeId("");
-                                        }}
-                                        disabled={editDisabled}
-                                      >
-                                        Cancel
-                                      </Button>
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                              )}
+                                            <SelectValue placeholder="Unit" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {[...MATERIAL_UNIT_OPTIONS, "Other"].map((unitOption) => (
+                                              <SelectItem key={unitOption} value={unitOption} className="text-xs">
+                                                {unitOption === "Other" ? "Others/Input" : unitOption}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                        {materialForm.unit_selection === "Other" && (
+                                          <Input
+                                            placeholder="Unit"
+                                            value={materialForm.unit}
+                                            onChange={(e) => setMaterialForm({ ...materialForm, unit: e.target.value })}
+                                            className="h-6 w-20 text-xs"
+                                          />
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="py-0.5 text-right">
+                                      <Input
+                                        placeholder="Cost"
+                                        value={materialForm.unit_cost}
+                                        onChange={(e) => setMaterialForm({ ...materialForm, unit_cost: e.target.value })}
+                                        className="h-6 text-xs text-right"
+                                      />
+                                    </TableCell>
+                                    <TableCell className="py-0.5 text-right font-semibold text-sm">
+                                      {formatCurrency((parseFloat(materialForm.quantity.replace(/,/g, "")) || 0) * (parseFloat(materialForm.unit_cost.replace(/,/g, "")) || 0))}
+                                    </TableCell>
+                                    <TableCell className="py-0.5">
+                                      <div className="flex justify-end items-center gap-1">
+                                        <Button
+                                          size="sm"
+                                          className="bg-green-600 hover:bg-green-700 text-white h-6 text-xs"
+                                          onClick={() => void handleMaterialSubmitInline()}
+                                          disabled={editDisabled}
+                                        >
+                                          <Plus className="h-3 w-3 mr-1" />
+                                          Add
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-6 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                                          onClick={() => {
+                                            resetMaterialForm();
+                                            setSelectedScopeId("");
+                                          }}
+                                          disabled={editDisabled}
+                                        >
+                                          Cancel
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                )}
                             </TableBody>
                           </Table>
 
@@ -1826,6 +1829,7 @@ export default function BillOfMaterials() {
                                   {(() => {
                                     const laborEntry = scope.bom_labor[0] as Labor;
                                     const desc = laborEntry.description || "";
+
                                     const percentageMatch = desc.match(/(\d+(\.\d+)?)\s*%/);
                                     const isPercentage = !!percentageMatch;
                                     const percentageValue = isPercentage && percentageMatch ? percentageMatch[1] : "";
