@@ -32,6 +32,7 @@ const EMPLOYMENT_TYPE_OPTIONS = [
 ] as const;
 
 const UNASSIGNED_PROJECT_VALUE = "__unassigned_project__";
+const MANUAL_RATE_VALUE = "__manual_rate__";
 
 interface PersonnelFormState {
   name: string;
@@ -177,7 +178,7 @@ export default function Personnel() {
       personnelService.getAttendance(attStartDate, attEndDate),
       personnelService.getLeaveRequests(),
       personnelService.getVisas(),
-      manpowerRateCatalogService.getAll().catch(() => []),
+      manpowerRateCatalogService.getActive().catch(() => []),
     ]);
     
     setPersonnel(personnelData.data || []);
@@ -192,6 +193,47 @@ export default function Personnel() {
   const loadAdminAttendanceForDate = async (date: string) => {
     const attendanceData = await personnelService.getAttendance(date, date);
     setAdminAttendanceRecords(attendanceData.data || []);
+  };
+
+  const filteredRateCatalogItems = rateCatalogItems
+    .filter((item) => item.status === "active" && item.category === (formData.worker_type === "office" ? "office" : "construction"))
+    .sort((a, b) => a.positionName.localeCompare(b.positionName));
+
+  const applyLinkedRate = (item: ManpowerRateCatalogItem) => {
+    if (item.category === "construction") {
+      setIsManualRole(!STANDARD_ROLES.includes(item.positionName));
+    }
+
+    if (item.hourlyRate > 0 && item.overtimeRate > 0) {
+      setOtFactor(Number((item.overtimeRate / item.hourlyRate).toFixed(2)));
+    }
+
+    setFormData((current) => ({
+      ...current,
+      position_id: item.id,
+      role: item.positionName,
+      hourly_rate: item.hourlyRate.toFixed(2),
+      daily_rate: item.dailyRate.toFixed(2),
+      overtime_rate: item.overtimeRate.toFixed(2),
+      rate_currency: item.currency,
+    }));
+  };
+
+  const handleLinkedRateChange = (value: string) => {
+    if (value === MANUAL_RATE_VALUE) {
+      setFormData((current) => ({
+        ...current,
+        position_id: "",
+      }));
+      return;
+    }
+
+    const matchedRate = filteredRateCatalogItems.find((item) => item.id === value);
+    if (!matchedRate) {
+      return;
+    }
+
+    applyLinkedRate(matchedRate);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -601,7 +643,7 @@ export default function Personnel() {
             </TabsTrigger>
             <TabsTrigger value="rates" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-violet-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-violet-700 bg-violet-50 text-violet-700 hover:bg-violet-100">
               <DollarSign className="h-3 w-3 mr-1.5 hidden sm:inline" />
-              Rates
+              Personnel Catalog
             </TabsTrigger>
             <TabsTrigger value="attendance" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-indigo-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-indigo-700 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
               <Clock className="h-3 w-3 mr-1.5 hidden sm:inline" />
@@ -669,45 +711,23 @@ export default function Personnel() {
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="role">Position / Role *</Label>
-                        {formData.worker_type === "construction" && !isManualRole ? (
-                          <Select
+                        <div className="flex gap-2">
+                          <Input
+                            id="role"
                             value={formData.role}
-                            onValueChange={(val) => {
-                              if (val === "others") {
-                                setIsManualRole(true);
-                                setFormData({ ...formData, role: "" });
-                              } else {
-                                setFormData({ ...formData, role: val });
-                              }
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select position" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {STANDARD_ROLES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                              <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <div className="flex gap-2">
-                            <Input
-                              id="role"
-                              value={formData.role}
-                              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                              placeholder={formData.worker_type === "office" ? "e.g., Site Engineer" : "Custom position"}
-                              required
-                            />
-                            {formData.worker_type === "construction" && isManualRole && (
-                              <Button type="button" variant="outline" className="px-2" onClick={() => {
-                                setIsManualRole(false);
-                                setFormData({ ...formData, role: "" });
-                              }}>
-                                List
-                              </Button>
-                            )}
-                          </div>
-                        )}
+                            onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                            placeholder={formData.worker_type === "office" ? "e.g., Site Engineer" : "Custom position"}
+                            required
+                          />
+                          {formData.worker_type === "construction" && isManualRole && (
+                            <Button type="button" variant="outline" className="px-2" onClick={() => {
+                              setIsManualRole(false);
+                              setFormData({ ...formData, role: "" });
+                            }}>
+                              List
+                            </Button>
+                          )}
+                        </div>
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="project_id">Assigned Project</Label>
