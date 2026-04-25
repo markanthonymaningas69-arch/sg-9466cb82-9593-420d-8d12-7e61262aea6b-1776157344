@@ -981,10 +981,6 @@ export default function SitePersonnel() {
   };
 
   const handleAddItem = () => {
-    if (requestForm.request_type === "Materials" && requestForm.bom_scope_id === "unassigned") {
-      alert("Please select a scope of work first.");
-      return;
-    }
     if (!requestForm.item_name) {
       alert("Please enter an item name or select one from the BOQ material list.");
       return;
@@ -3356,7 +3352,7 @@ export default function SitePersonnel() {
                                     <SelectValue
                                       placeholder={
                                         requestForm.bom_scope_id === "unassigned"
-                                          ? "Select a scope first"
+                                          ? "Select material or use Others for general request"
                                           : "Select material"
                                       }
                                     />
@@ -3364,7 +3360,7 @@ export default function SitePersonnel() {
                                   <SelectContent>
                                     {requestForm.bom_scope_id === "unassigned" ? (
                                       <SelectItem value="scope-required" disabled>
-                                        Select a scope first
+                                        Use Others (Manual Input) for General / Unassigned
                                       </SelectItem>
                                     ) : scopedRequestMaterials.length === 0 ? (
                                       <SelectItem value="no-materials" disabled>

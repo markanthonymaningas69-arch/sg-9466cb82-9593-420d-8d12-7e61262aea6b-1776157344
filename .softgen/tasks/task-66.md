@@ -1,6 +1,6 @@
 ---
 title: Site personnel warehouse label and request action
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -30,8 +30,8 @@ Keep the work scoped to the Site Personnel module and the specific request form 
 - [x] Rename Warehouse to Site Warehouse in the relevant Site Personnel UI
 - [x] Fix the affected body card and text contrast so the section is readable in dark mode
 - [x] Add a Submit Request button to the Tools & Equipment request form
-- [ ] Allow the material request form to submit with a General or Unassigned scope of work
-- [ ] Validate lint, type, CSS, and runtime behavior
+- [x] Allow the material request form to submit with a General or Unassigned scope of work
+- [x] Validate lint, type, CSS, and runtime behavior
 
 ## Acceptance
 The Site Personnel module shows Site Warehouse instead of Warehouse in the updated section.
