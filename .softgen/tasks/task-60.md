@@ -1,6 +1,6 @@
 ---
 title: Remove pricing page
-status: in_progress
+status: done
 priority: medium
 type: chore
 tags:
@@ -21,8 +21,8 @@ Keep the removal scoped to the pricing route and related user-facing navigation 
 - [x] Find all references to the pricing page route and page title
 - [x] Remove the `/pricing` page file
 - [x] Remove or update navigation links that point to `/pricing`
-- [ ] Validate that the app no longer exposes the pricing page
-- [ ] Confirm the project still passes checks
+- [x] Validate that the app no longer exposes the pricing page
+- [x] Confirm the project still passes checks
 
 ## Acceptance
 Users can no longer open `/pricing`.

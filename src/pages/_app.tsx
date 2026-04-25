@@ -19,7 +19,7 @@ function AppInner({ Component, pageProps }: AppProps) {
 
   useEffect(() => {
     // Define paths that do not require authentication
-    const publicPaths = ["/", "/auth/login", "/auth/register", "/404", "/system-monitor", "/pricing", "/about", "/privacy", "/terms"];
+    const publicPaths = ["/", "/auth/login", "/auth/register", "/404", "/system-monitor", "/about", "/privacy", "/terms"];
     // Define paths that authenticated users should be instantly redirected away from
     const redirectIfLoggedIn = ["/", "/auth/login", "/auth/register"];
     
@@ -63,7 +63,7 @@ function AppInner({ Component, pageProps }: AppProps) {
         }
       } else if (event === 'SIGNED_OUT') {
         localStorage.removeItem('app_active_user_id');
-        const publicPaths = ["/auth/login", "/auth/register", "/404", "/system-monitor", "/pricing"];
+        const publicPaths = ["/auth/login", "/auth/register", "/404", "/system-monitor"];
         if (!publicPaths.includes(window.location.pathname)) {
           window.location.href = '/auth/login';
         }
