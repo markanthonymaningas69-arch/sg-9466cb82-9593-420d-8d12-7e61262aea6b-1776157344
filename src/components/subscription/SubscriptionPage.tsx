@@ -590,16 +590,20 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
               </CardHeader>
               <CardContent className="flex-1">
                 <ul className="space-y-3">
-                  {plan.features.map((feature, index) =>
-                <li key={index} className="flex items-start gap-2">
-                      {!feature.startsWith('❌') ?
-                  <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" /> :
+                  {plan.features.map((feature, index) => {
+                    const featureText = feature.startsWith("❌") ? feature.replace(/^❌\s*/, "") : feature;
 
-                  <div className="w-1" />
-                  }
-                      <span className="text-sm text-muted-foreground">4 Total Users (1 GM + 4 Ready-to-assign independent seats)</span>
-                    </li>
-                )}
+                    return (
+                      <li key={index} className="flex items-start gap-2">
+                        {!feature.startsWith("❌") ? (
+                          <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                        ) : (
+                          <div className="w-1" />
+                        )}
+                        <span className="text-sm text-muted-foreground">{featureText}</span>
+                      </li>
+                    );
+                  })}
                 </ul>
               </CardContent>
               <CardFooter>
