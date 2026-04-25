@@ -1,6 +1,6 @@
 ---
 title: Approval center layout refinement
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -25,12 +25,12 @@ Requested updates:
 Keep this scoped to the Approval Center page and any directly related approval-center UI components it uses.
 
 ## Checklist
-- [ ] Inspect the current Approval Center page structure, tabs, spacing, and view dialog flow
-- [ ] Reduce typography scale in the approval center UI while keeping readability
-- [ ] Add per-tab color treatment for approval modules
-- [ ] Compress spacing and layout to maximize vertical content space
-- [ ] Move audit trail content into the View action flow
-- [ ] Validate lint, type, CSS, and runtime behavior
+- [x] Inspect the current Approval Center page structure, tabs, spacing, and view dialog flow
+- [x] Reduce typography scale in the approval center UI while keeping readability
+- [x] Add per-tab color treatment for approval modules
+- [x] Compress spacing and layout to maximize vertical content space
+- [x] Move audit trail content into the View action flow
+- [x] Validate lint, type, CSS, and runtime behavior
 
 ## Acceptance
 The Approval Center shows a denser layout with smaller, readable typography.
