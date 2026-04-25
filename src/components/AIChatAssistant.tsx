@@ -271,7 +271,7 @@ export function AIChatAssistant({ contained = false }: AIChatAssistantProps) {
             <Sparkles className="h-4 w-4" />
           </div>
           <div>
-            <p className="text-sm font-semibold leading-none">AI Project Assistant</p>
+            <p className="text-sm font-semibold leading-none">AI Company Consultant</p>
             <p className="mt-1 text-[11px] text-primary-foreground/80">GM global analysis</p>
           </div>
         </div>
