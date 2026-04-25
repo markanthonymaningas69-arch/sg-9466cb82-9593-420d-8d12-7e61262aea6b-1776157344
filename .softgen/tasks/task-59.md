@@ -1,6 +1,6 @@
 ---
 title: Weighted accomplishment dashboard summary
-status: done
+status: in_progress
 priority: high
 type: feature
 tags:
@@ -39,6 +39,10 @@ UI requirements:
 
 The implementation uses the existing GM dashboard project cost fallback and SWA accomplishment calculation already present in the app, then derives per-project weight and contribution values for display. The weighted breakdown is now opened from the highlighted Overall Accomplishment metric card.
 
+Follow-up fix:
+- remove the remaining duplicate on-page "Cost-Weighted Accomplishment Summary" section if it is still rendered in the dashboard body
+- keep the weighted breakdown only inside the highlighted Overall Accomplishment card interaction
+
 ## Checklist
 - [x] Inspect the current dashboard accomplishment calculation and related data sources
 - [x] Replace overall accomplishment logic with cost-weighted computation
@@ -47,3 +51,8 @@ The implementation uses the existing GM dashboard project cost fallback and SWA 
 - [x] Make the highlighted Overall Accomplishment card open the weighted breakdown
 - [x] Validate zero-cost and missing-accomplishment edge cases
 - [x] Verify the dashboard updates correctly with live project data
+- [ ] Remove the duplicate on-page weighted accomplishment summary block
+
+## Acceptance
+The main GM dashboard shows only the highlighted Overall Accomplishment card, not a second weighted summary section.
+Clicking the highlighted card opens the weighted accomplishment breakdown.
