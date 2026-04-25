@@ -1,6 +1,6 @@
 ---
 title: Weighted accomplishment dashboard summary
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -51,7 +51,7 @@ Follow-up fix:
 - [x] Make the highlighted Overall Accomplishment card open the weighted breakdown
 - [x] Validate zero-cost and missing-accomplishment edge cases
 - [x] Verify the dashboard updates correctly with live project data
-- [ ] Remove the duplicate on-page weighted accomplishment summary block
+- [x] Remove the duplicate on-page weighted accomplishment summary block
 
 ## Acceptance
 The main GM dashboard shows only the highlighted Overall Accomplishment card, not a second weighted summary section.
