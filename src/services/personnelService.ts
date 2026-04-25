@@ -12,6 +12,18 @@ type PayrollInsert = Database["public"]["Tables"]["payroll"]["Insert"];
 type Visa = Database["public"]["Tables"]["personnel_visas"]["Row"];
 type VisaInsert = Database["public"]["Tables"]["personnel_visas"]["Insert"];
 
+export interface AttendanceUpsertInput {
+  project_id: string;
+  personnel_id: string;
+  date: string;
+  status: string;
+  hours_worked: number;
+  overtime_hours: number;
+  notes?: string | null;
+  bom_scope_id?: string | null;
+  time_in?: string | null;
+}
+
 export const personnelService = {
   // Personnel CRUD
   async getAll() {
@@ -81,14 +93,23 @@ export const personnelService = {
     return { data: data || [], error };
   },
 
-  async markAttendance(attendance: any) {
+  async markAttendance(attendance: AttendanceUpsertInput) {
     const { data, error } = await supabase
       .from("site_attendance")
-      .upsert(attendance)
+      .upsert(attendance, { onConflict: "project_id,personnel_id,date" })
       .select()
       .single();
     
     return { data, error };
+  },
+
+  async markAttendanceBatch(attendanceRecords: AttendanceUpsertInput[]) {
+    const { data, error } = await supabase
+      .from("site_attendance")
+      .upsert(attendanceRecords, { onConflict: "project_id,personnel_id,date" })
+      .select();
+
+    return { data: data || [], error };
   },
 
   async updateAttendance(id: string, updates: any) {

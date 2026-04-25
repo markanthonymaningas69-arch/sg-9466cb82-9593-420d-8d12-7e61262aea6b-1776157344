@@ -1,6 +1,6 @@
 ---
 title: Admin staff attendance defaults in time tab
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -24,13 +24,17 @@ For Admin Staff:
 
 Keep this scoped to the Time tab and the attendance save logic it uses. Preserve the existing construction worker flow unless a shared part must be adjusted for compatibility.
 
+Evidence:
+- `site_attendance` did not contain a `time_in` field in the database schema, so a nullable `time_in` column was added before wiring the UI.
+- `site_attendance.project_id` is required, so Admin Staff without an assigned project are shown clearly and skipped from attendance saves until assigned.
+
 ## Checklist
-- [ ] Inspect the current Time tab UI and attendance save flow
-- [ ] Verify the attendance table fields available for time-in, status, and hours
-- [ ] Add Admin Staff attendance controls with default present/full-hours behavior
-- [ ] Add absent override and late time input for Admin Staff
-- [ ] Ensure saved attendance reflects default present status unless marked absent
-- [ ] Validate lint, type, CSS, and runtime behavior
+- [x] Inspect the current Time tab UI and attendance save flow
+- [x] Verify the attendance table fields available for time-in, status, and hours
+- [x] Add Admin Staff attendance controls with default present/full-hours behavior
+- [x] Add absent override and late time input for Admin Staff
+- [x] Ensure saved attendance reflects default present status unless marked absent
+- [x] Validate lint, type, CSS, and runtime behavior
 
 ## Acceptance
 Admin Staff can be managed from the Time tab with default present attendance.

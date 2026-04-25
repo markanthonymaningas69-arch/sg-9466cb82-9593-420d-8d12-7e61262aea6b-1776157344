@@ -1911,6 +1911,7 @@ export type Database = {
           personnel_id: string
           project_id: string
           status: string | null
+          time_in: string | null
         }
         Insert: {
           bom_scope_id?: string | null
@@ -1924,6 +1925,7 @@ export type Database = {
           personnel_id: string
           project_id: string
           status?: string | null
+          time_in?: string | null
         }
         Update: {
           bom_scope_id?: string | null
@@ -1937,6 +1939,7 @@ export type Database = {
           personnel_id?: string
           project_id?: string
           status?: string | null
+          time_in?: string | null
         }
         Relationships: [
           {

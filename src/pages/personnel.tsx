@@ -50,6 +50,11 @@ interface PersonnelFormState {
   hire_date: string;
 }
 
+interface AdminAttendanceDraft {
+  absent: boolean;
+  timeIn: string;
+}
+
 function readRateSnapshot(person: any) {
   if (!person?.rate_snapshot || typeof person.rate_snapshot !== "object" || Array.isArray(person.rate_snapshot)) {
     return null;
@@ -120,6 +125,10 @@ export default function Personnel() {
     overtime_hours: "0",
     notes: ""
   });
+  const [adminAttendanceDate, setAdminAttendanceDate] = useState(new Date().toISOString().split("T")[0]);
+  const [adminAttendanceRecords, setAdminAttendanceRecords] = useState<any[]>([]);
+  const [adminAttendanceDrafts, setAdminAttendanceDrafts] = useState<Record<string, AdminAttendanceDraft>>({});
+  const [savingAdminAttendance, setSavingAdminAttendance] = useState(false);
 
   const [leaveForm, setLeaveForm] = useState({
     personnel_id: "",
@@ -155,6 +164,12 @@ export default function Personnel() {
     loadData();
   }, []);
 
+  useEffect(() => {
+    if (workerFilter === "office") {
+      void loadAdminAttendanceForDate(adminAttendanceDate);
+    }
+  }, [adminAttendanceDate, workerFilter]);
+
   const loadData = async () => {
     const [personnelData, projectsData, attendanceData, leaveData, visaData, catalogItems] = await Promise.all([
       personnelService.getAll(),
@@ -172,6 +187,11 @@ export default function Personnel() {
     setVisas(visaData.data || []);
     setRateCatalogItems(catalogItems);
     setLoading(false);
+  };
+
+  const loadAdminAttendanceForDate = async (date: string) => {
+    const attendanceData = await personnelService.getAttendance(date, date);
+    setAdminAttendanceRecords(attendanceData.data || []);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -208,10 +228,22 @@ export default function Personnel() {
 
   const handleAttendanceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const selectedPersonnel = personnel.find((person) => person.id === attendanceForm.personnel_id);
+
+    if (!selectedPersonnel?.project_id) {
+      window.alert("Assign a project before saving attendance for this personnel.");
+      return;
+    }
+
     await personnelService.markAttendance({
-      ...attendanceForm,
+      project_id: selectedPersonnel.project_id,
+      personnel_id: attendanceForm.personnel_id,
+      date: attendanceForm.date,
+      status: attendanceForm.status,
       hours_worked: parseFloat(attendanceForm.hours_worked),
-      overtime_hours: parseFloat(attendanceForm.overtime_hours)
+      overtime_hours: parseFloat(attendanceForm.overtime_hours),
+      notes: attendanceForm.notes,
+      time_in: null
     });
     setAttendanceDialogOpen(false);
     resetAttendanceForm();
@@ -268,6 +300,236 @@ export default function Personnel() {
     setVisaDialogOpen(false);
     resetVisaForm();
     loadData();
+  };
+
+  const handleEdit = (person: any) => {
+    const rateSnapshot = readRateSnapshot(person);
+    const rateCurrency = rateSnapshot?.currency || currency;
+
+    setEditingPersonnel(person);
+    setFormData({
+      name: person.name,
+      role: person.role,
+      position_id: person.position_id || "",
+      project_id: person.project_id || "",
+      phone: person.phone || "",
+      email: person.email || "",
+      hourly_rate: String(rateSnapshot?.hourlyRate ?? person.hourly_rate ?? ""),
+      daily_rate: String(rateSnapshot?.dailyRate ?? person.daily_rate ?? ""),
+      overtime_rate: String(rateSnapshot?.overtimeRate ?? person.overtime_rate ?? ""),
+      rate_currency: rateCurrency,
+      status: (person.status === "on_leave" ? "on-leave" : person.status) as any,
+      worker_type: (rateSnapshot?.category || person.worker_type || "construction") as any,
+      employment_type: (person.employment_type || "full_time") as any,
+      hire_date: person.hire_date || new Date().toISOString().split("T")[0]
+    });
+    setDialogOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (confirm("Are you sure you want to archive this personnel?")) {
+      await personnelService.delete(id);
+      loadData();
+    }
+  };
+
+  const handleDeleteLeave = async (id: string) => {
+    if (confirm("Are you sure you want to archive this leave request?")) {
+      await personnelService.deleteLeaveRequest(id);
+      loadData();
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      role: "",
+      position_id: "",
+      project_id: "",
+      phone: "",
+      email: "",
+      hourly_rate: "",
+      daily_rate: "",
+      overtime_rate: "",
+      rate_currency: currency,
+      status: "active",
+      worker_type: "construction",
+      employment_type: "full_time",
+      hire_date: new Date().toISOString().split("T")[0]
+    });
+    setEditingPersonnel(null);
+  };
+
+  const resetAttendanceForm = () => {
+    setAttendanceForm({
+      personnel_id: "",
+      date: new Date().toISOString().split("T")[0],
+      status: "present",
+      hours_worked: "8",
+      overtime_hours: "0",
+      notes: ""
+    });
+  };
+
+  const resetLeaveForm = () => {
+    setLeaveForm({
+      personnel_id: "",
+      leave_type: "vacation",
+      start_date: new Date().toISOString().split("T")[0],
+      end_date: new Date().toISOString().split("T")[0],
+      reason: "",
+      status: "pending"
+    });
+  };
+
+  const resetVisaForm = () => {
+    setVisaForm({
+      personnel_id: "",
+      visa_number: "",
+      visa_issue_date: "",
+      visa_expiry_date: "",
+      passport_number: "",
+      passport_issue_date: "",
+      passport_expiry_date: "",
+      country: "",
+    });
+  };
+
+  const handleAttendanceSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const selectedPersonnel = personnel.find((person) => person.id === attendanceForm.personnel_id);
+
+    if (!selectedPersonnel?.project_id) {
+      window.alert("Assign a project before saving attendance for this personnel.");
+      return;
+    }
+
+    await personnelService.markAttendance({
+      project_id: selectedPersonnel.project_id,
+      personnel_id: attendanceForm.personnel_id,
+      date: attendanceForm.date,
+      status: attendanceForm.status,
+      hours_worked: parseFloat(attendanceForm.hours_worked),
+      overtime_hours: parseFloat(attendanceForm.overtime_hours),
+      notes: attendanceForm.notes,
+      time_in: null
+    });
+    setAttendanceDialogOpen(false);
+    resetAttendanceForm();
+    loadData();
+  };
+
+  const handleLeaveSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const start = new Date(leaveForm.start_date);
+    const end = new Date(leaveForm.end_date);
+    const days_requested = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+    const requestedPerson = filteredPersonnel.find((person) => person.id === leaveForm.personnel_id);
+
+    const { data: leaveRequest, error } = await supabase
+      .from("leave_requests")
+      .insert({
+        personnel_id: leaveForm.personnel_id,
+        leave_type: leaveForm.leave_type,
+        start_date: leaveForm.start_date,
+        end_date: leaveForm.end_date,
+        reason: leaveForm.reason,
+        status: leaveForm.status,
+        days_requested,
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    await approvalCenterService.createRequest({
+      sourceModule: "HR",
+      sourceTable: "leave_requests",
+      sourceRecordId: leaveRequest.id,
+      requestType: "Leave Request",
+      requestedBy: requestedPerson?.name || "HR Personnel",
+      projectId: requestedPerson?.project_id || null,
+      summary: `${leaveForm.leave_type} leave: ${leaveForm.start_date} to ${leaveForm.end_date}`,
+    });
+
+    setLeaveDialogOpen(false);
+    resetLeaveForm();
+    loadData();
+  };
+
+  const handleVisaSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await personnelService.addVisa({
+      ...visaForm,
+      issue_date: visaForm.visa_issue_date || visaForm.passport_issue_date || new Date().toISOString(),
+      expiry_date: visaForm.visa_expiry_date || visaForm.passport_expiry_date || new Date().toISOString()
+    });
+    setVisaDialogOpen(false);
+    resetVisaForm();
+    loadData();
+  };
+
+  const handleAdminAttendanceDraftChange = (
+    personnelId: string,
+    updates: Partial<AdminAttendanceDraft>
+  ) => {
+    setAdminAttendanceDrafts((current) => {
+      const existing = current[personnelId] || { absent: false, timeIn: "" };
+
+      return {
+        ...current,
+        [personnelId]: {
+          absent: updates.absent ?? existing.absent,
+          timeIn: updates.absent ? "" : (updates.timeIn ?? existing.timeIn),
+        },
+      };
+    });
+  };
+
+  const handleAdminAttendanceSave = async () => {
+    const attendancePayload = filteredPersonnel.flatMap((person) => {
+      if (!person.project_id) {
+        return [];
+      }
+
+      const draft = adminAttendanceDrafts[person.id] || { absent: false, timeIn: "" };
+      const status = draft.absent ? "absent" : draft.timeIn ? "late" : "present";
+
+      return [
+        {
+          project_id: person.project_id,
+          personnel_id: person.id,
+          date: adminAttendanceDate,
+          status,
+          hours_worked: draft.absent ? 0 : 8,
+          overtime_hours: 0,
+          notes: draft.absent
+            ? "Marked absent from HR Time tab"
+            : draft.timeIn
+              ? `Late arrival recorded at ${draft.timeIn}`
+              : "Auto-present from HR Time tab",
+          time_in: draft.absent ? null : draft.timeIn || null,
+        },
+      ];
+    });
+
+    if (attendancePayload.length === 0) {
+      window.alert("Assign projects to Admin Staff first before saving attendance.");
+      return;
+    }
+
+    setSavingAdminAttendance(true);
+    const { error } = await personnelService.markAttendanceBatch(attendancePayload);
+    setSavingAdminAttendance(false);
+
+    if (error) {
+      window.alert(error.message);
+      return;
+    }
+
+    await Promise.all([loadData(), loadAdminAttendanceForDate(adminAttendanceDate)]);
   };
 
   const handleEdit = (person: any) => {
@@ -831,7 +1093,7 @@ export default function Personnel() {
           </TabsContent>
 
           <TabsContent value="attendance" className="space-y-4">
-            <div className="flex flex-col sm:flex-row justify-between gap-4">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div className="flex flex-wrap items-center gap-2 bg-muted/50 p-1 rounded-md">
                 <div className="flex items-center gap-2">
                   <Input
@@ -880,7 +1142,106 @@ export default function Personnel() {
                 )}
                 <Button variant="secondary" onClick={loadData} className="h-9 ml-auto">Refresh</Button>
               </div>
+              <div>{renderWorkerTypeToggle()}</div>
             </div>
+
+            {workerFilter === "office" && (
+              <Card>
+                <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <CardTitle>Admin Staff Attendance Check</CardTitle>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Admin Staff defaults to present with full 8 hours. Only mark absent when needed or enter a late time-in.
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <Input
+                      type="date"
+                      value={adminAttendanceDate}
+                      onChange={(e) => setAdminAttendanceDate(e.target.value)}
+                      className="h-9 w-full sm:w-40"
+                    />
+                    <Button
+                      onClick={() => void handleAdminAttendanceSave()}
+                      disabled={isLocked || savingAdminAttendance || filteredPersonnel.length === 0}
+                    >
+                      {savingAdminAttendance ? "Saving..." : "Save Attendance"}
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {adminStaffWithoutProjectCount > 0 && (
+                    <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+                      <AlertCircle className="h-4 w-4 text-amber-600" />
+                      <AlertTitle>Project assignment required</AlertTitle>
+                      <AlertDescription>
+                        {adminStaffWithoutProjectCount} Admin Staff member(s) do not have an assigned project yet, so their attendance cannot be saved until a project is assigned.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Personnel</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Assigned Project</TableHead>
+                        <TableHead>Late Time In</TableHead>
+                        <TableHead>Absent</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Hours</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredPersonnel.map((person) => {
+                        const draft = adminAttendanceDrafts[person.id] || { absent: false, timeIn: "" };
+                        const displayStatus = draft.absent ? "Absent" : draft.timeIn ? "Late - Present" : "Present";
+                        const displayHours = draft.absent ? "0h" : "8h";
+
+                        return (
+                          <TableRow key={person.id}>
+                            <TableCell className="font-medium">{person.name}</TableCell>
+                            <TableCell>{person.role}</TableCell>
+                            <TableCell>{person.projects?.name || "Unassigned"}</TableCell>
+                            <TableCell>
+                              <Input
+                                type="time"
+                                value={draft.timeIn}
+                                onChange={(e) => handleAdminAttendanceDraftChange(person.id, { timeIn: e.target.value })}
+                                disabled={draft.absent || !person.project_id || isLocked}
+                                className="h-9 w-36"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <input
+                                type="checkbox"
+                                checked={draft.absent}
+                                onChange={(e) => handleAdminAttendanceDraftChange(person.id, { absent: e.target.checked })}
+                                disabled={!person.project_id || isLocked}
+                                className="h-4 w-4 rounded border-border"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={draft.absent ? "bg-red-100 text-red-800" : draft.timeIn ? "bg-yellow-100 text-yellow-800" : "bg-green-100 text-green-800"}>
+                                {displayStatus}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right font-medium">{displayHours}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                      {filteredPersonnel.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
+                            No admin staff found.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
               <CardHeader>
@@ -899,30 +1260,17 @@ export default function Personnel() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredPersonnel.map((person) => {
-                      const records = filteredAttendance.filter(a => a.personnel_id === person.id);
-                      const daysWorked = records.filter(a => ["present", "half_day", "late"].includes(a.status)).length;
-                      const daysAbsent = records.filter(a => a.status === "absent").length;
-                      const totalHours = records.reduce((sum, a) => sum + (Number(a.hours_worked) || 0), 0);
-                      const totalOvertime = records.reduce((sum, a) => sum + (Number(a.overtime_hours) || 0), 0);
-
-                      if (daysWorked === 0 && daysAbsent === 0) return null;
-                      
-                      if (minDaysWorked && daysWorked < parseInt(minDaysWorked)) return null;
-                      if (minDaysAbsent && daysAbsent < parseInt(minDaysAbsent)) return null;
-
-                      return (
-                        <TableRow key={person.id}>
-                          <TableCell className="font-medium">{person.name}</TableCell>
-                          <TableCell>{person.role}</TableCell>
-                          <TableCell className="font-semibold text-green-600">{daysWorked}</TableCell>
-                          <TableCell className="font-semibold text-red-600">{daysAbsent}</TableCell>
-                          <TableCell>{totalHours}h</TableCell>
-                          <TableCell>{totalOvertime}h</TableCell>
-                        </TableRow>
-                      );
-                    })}
-                    {filteredAttendance.length === 0 && (
+                    {attendanceSummaryRows.map((row) => (
+                      <TableRow key={row.id}>
+                        <TableCell className="font-medium">{row.name}</TableCell>
+                        <TableCell>{row.role}</TableCell>
+                        <TableCell className="font-semibold text-green-600">{row.daysWorked}</TableCell>
+                        <TableCell className="font-semibold text-red-600">{row.daysAbsent}</TableCell>
+                        <TableCell>{row.totalHours}h</TableCell>
+                        <TableCell>{row.totalOvertime}h</TableCell>
+                      </TableRow>
+                    ))}
+                    {attendanceSummaryRows.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
                           No attendance records found for {workerFilterLabel.toLowerCase()} in this period.
