@@ -1,6 +1,6 @@
 ---
 title: Admin staff attendance defaults in time tab
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -38,8 +38,8 @@ Follow-up:
 - [x] Add Admin Staff attendance controls with default present/full-hours behavior
 - [x] Add absent override and late time input for Admin Staff
 - [x] Ensure saved attendance reflects default present status unless marked absent
-- [ ] Remove the duplicate worker-type toggle inside the Time tab
-- [ ] Validate lint, type, CSS, and runtime behavior
+- [x] Remove the duplicate worker-type toggle inside the Time tab
+- [x] Validate lint, type, CSS, and runtime behavior
 
 ## Acceptance
 Admin Staff can be managed from the Time tab with default present attendance.
