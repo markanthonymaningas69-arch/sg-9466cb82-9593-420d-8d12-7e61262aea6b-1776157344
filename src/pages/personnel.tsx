@@ -420,7 +420,7 @@ export default function Personnel() {
                 workerFilter === "office" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              Office Staff
+              Admin Staff
             </button>
             <button
               onClick={() => setWorkerFilter("construction")}
@@ -512,7 +512,7 @@ export default function Personnel() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="office">Office Staff</SelectItem>
+                            <SelectItem value="office">Admin Staff</SelectItem>
                             <SelectItem value="construction">Construction Worker</SelectItem>
                           </SelectContent>
                         </Select>
@@ -772,7 +772,7 @@ export default function Personnel() {
           </TabsContent>
 
           <TabsContent value="rates" className="space-y-4">
-            <ManpowerRateCatalogTab />
+            <ManpowerRateCatalogTab defaultCategory={workerFilter} />
           </TabsContent>
 
           <TabsContent value="attendance" className="space-y-4">
