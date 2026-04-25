@@ -234,7 +234,7 @@ export function ManpowerRateCatalogTab({ defaultCategory = "construction" }: Man
               <DialogTrigger asChild>
                 <Button onClick={resetForm} disabled={!canEdit}>
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Rate
+                  New Entry
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-2xl">
