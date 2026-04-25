@@ -1,6 +1,6 @@
 ---
 title: Site personnel warehouse label and request action
-status: done
+status: in_progress
 priority: high
 type: feature
 tags:
@@ -20,6 +20,9 @@ First, rename the visible "Warehouse" label to "Site Warehouse" in the relevant 
 
 Second, add a visible "Submit Request" button inside the Tools & Equipment request form so users can submit the form directly from that section.
 
+Follow-up:
+- in the Site Personnel material request form, allow the scope of work to be submitted as General or Unassigned from the Submit Request flow
+
 Keep the work scoped to the Site Personnel module and the specific request form it already uses.
 
 ## Checklist
@@ -27,9 +30,11 @@ Keep the work scoped to the Site Personnel module and the specific request form 
 - [x] Rename Warehouse to Site Warehouse in the relevant Site Personnel UI
 - [x] Fix the affected body card and text contrast so the section is readable in dark mode
 - [x] Add a Submit Request button to the Tools & Equipment request form
-- [x] Validate lint, type, CSS, and runtime behavior
+- [ ] Allow the material request form to submit with a General or Unassigned scope of work
+- [ ] Validate lint, type, CSS, and runtime behavior
 
 ## Acceptance
 The Site Personnel module shows Site Warehouse instead of Warehouse in the updated section.
 The affected card and text remain readable in dark mode.
 Users can submit the Tools & Equipment request form with a visible Submit Request button.
+The material request form can be submitted with scope of work set to General or Unassigned.
