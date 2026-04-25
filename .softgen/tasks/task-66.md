@@ -23,6 +23,7 @@ Second, add a visible "Submit Request" button inside the Tools & Equipment reque
 Follow-up:
 - in the Site Personnel material request form, allow the scope of work to be submitted as General or Unassigned from the Submit Request flow
 - auto-fill the Requested By input in material requests using the logged-in user name for the site personnel assigned to the selected project
+- fix the browser validation that still blocks submit with "please fill out this field" on Requested By
 
 Keep the work scoped to the Site Personnel module and the specific request form it already uses.
 
@@ -32,7 +33,8 @@ Keep the work scoped to the Site Personnel module and the specific request form 
 - [x] Fix the affected body card and text contrast so the section is readable in dark mode
 - [x] Add a Submit Request button to the Tools & Equipment request form
 - [x] Allow the material request form to submit with a General or Unassigned scope of work
-- [ ] Auto-fill Requested By in material requests from the logged-in assigned site personnel user
+- [x] Auto-fill Requested By in material requests from the logged-in assigned site personnel user
+- [ ] Fix Requested By so submit no longer gets blocked by browser required-field validation
 - [ ] Validate lint, type, CSS, and runtime behavior
 
 ## Acceptance
@@ -40,4 +42,4 @@ The Site Personnel module shows Site Warehouse instead of Warehouse in the updat
 The affected card and text remain readable in dark mode.
 Users can submit the Tools & Equipment request form with a visible Submit Request button.
 The material request form can be submitted with scope of work set to General or Unassigned.
-The Requested By field in material requests is automatically filled from the logged-in assigned site personnel user.
+The Requested By field in material requests is automatically filled from the logged-in assigned site personnel user and does not block submit.
