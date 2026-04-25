@@ -150,9 +150,19 @@ export default function Dashboard() {
       });
 
       let actualLabCost = 0;
+      let dateStarted: string | null = null;
       projAtt.forEach((a: any) => {
         const hrRate = Number(a.personnel?.hourly_rate || (a.personnel?.daily_rate ? a.personnel.daily_rate / 8 : 0));
-        actualLabCost += (Number(a.hours_worked || 0) * hrRate);
+        const hoursWorked = Number(a.hours_worked || 0);
+        const laborCost = hoursWorked * hrRate;
+
+        actualLabCost += laborCost;
+
+        if (laborCost > 0 && a.date) {
+          if (!dateStarted || new Date(a.date).getTime() < new Date(dateStarted).getTime()) {
+            dateStarted = a.date;
+          }
+        }
       });
 
       const totalActualCost = actualMatCost + actualLabCost;
@@ -172,7 +182,8 @@ export default function Dashboard() {
         completion: accomplishmentPct || 0,
         amountOfCompletion: accomplishmentAmount,
         weightPercent: 0,
-        weightedContribution: 0
+        weightedContribution: 0,
+        dateStarted
       };
     });
 
@@ -268,14 +279,16 @@ export default function Dashboard() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch(status?.toLowerCase()) {
-      case 'active': return 'bg-blue-500 hover:bg-blue-600';
-      case 'completed': return 'bg-green-500 hover:bg-green-600';
-      case 'on-hold': return 'bg-orange-500 hover:bg-orange-600';
-      case 'planning': return 'bg-purple-500 hover:bg-purple-600';
-      default: return 'bg-gray-500 hover:bg-gray-600';
+  const formatDateStarted = (value?: string | null) => {
+    if (!value) {
+      return "No labor cost yet";
     }
+
+    return new Date(value).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric"
+    });
   };
 
   if (loading) {
@@ -374,7 +387,7 @@ export default function Dashboard() {
                 <TableHeader className="bg-muted/50">
                   <TableRow>
                     <TableHead className="min-w-[150px]">Project</TableHead>
-                    <TableHead className="min-w-[100px]">Status</TableHead>
+                    <TableHead className="min-w-[120px]">Date Started</TableHead>
                     <TableHead className="text-right min-w-[120px]">Contract Amount</TableHead>
                     <TableHead className="text-right min-w-[120px]">Cost to Date</TableHead>
                     <TableHead className="text-right min-w-[100px]">Profit Margin</TableHead>
@@ -397,9 +410,9 @@ export default function Dashboard() {
                           <div className="text-xs text-muted-foreground">{project.location}</div>
                         </TableCell>
                         <TableCell>
-                          <Badge className={`text-white border-transparent ${getStatusColor(project.status)}`} variant="outline">
-                            {project.status.toUpperCase()}
-                          </Badge>
+                          <span className="text-sm text-muted-foreground">
+                            {formatDateStarted(project.dateStarted)}
+                          </span>
                         </TableCell>
                         <TableCell className="text-right font-medium">
                           {formatCurrency(project.contractAmount)}

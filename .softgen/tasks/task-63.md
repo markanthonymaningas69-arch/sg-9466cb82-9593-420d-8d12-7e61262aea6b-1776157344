@@ -1,6 +1,6 @@
 ---
 title: Dashboard project start date column
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -21,11 +21,11 @@ The displayed date must come from Site Personnel data, specifically the earliest
 Keep the change scoped to the dashboard table and the data loading required to compute the first labor-cost date per project.
 
 ## Checklist
-- [ ] Inspect the dashboard table and current project portfolio data loading
-- [ ] Verify where Site Personnel labor cost records and dates are stored
-- [ ] Replace the Status column with a Date Started column in the dashboard table
-- [ ] Compute the date from the earliest labor-cost entry per project
-- [ ] Validate the dashboard for lint, type, CSS, and runtime issues
+- [x] Inspect the dashboard table and current project portfolio data loading
+- [x] Verify where Site Personnel labor cost records and dates are stored
+- [x] Replace the Status column with a Date Started column in the dashboard table
+- [x] Compute the date from the earliest labor-cost entry per project
+- [x] Validate the dashboard for lint, type, CSS, and runtime issues
 
 ## Acceptance
 The Project Portfolio Status table shows Date Started instead of Status.
