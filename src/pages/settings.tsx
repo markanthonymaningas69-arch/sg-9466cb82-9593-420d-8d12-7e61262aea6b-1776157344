@@ -371,26 +371,6 @@ export default function Settings() {
 
                 <Separator className="my-6" />
 
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-lg flex items-center gap-2">
-                    <Bell className="h-5 w-5 text-primary" />
-                    Automation & Workflows
-                  </h3>
-                  
-                  <div className="flex flex-row items-center justify-between rounded-lg border p-4 bg-muted/20">
-                    <div className="space-y-0.5">
-                      <Label className="text-base font-semibold">Auto-Approve Material Requests</Label>
-                      <p className="text-sm text-muted-foreground">
-                        When enabled, all incoming material requests from Site Personnel will automatically be marked as "Approved", bypassing the manual review step.
-                      </p>
-                    </div>
-                    <Switch
-                      checked={localCompany.auto_approve_materials}
-                      onCheckedChange={(checked) => setLocalCompany({ ...localCompany, auto_approve_materials: checked })}
-                    />
-                  </div>
-                </div>
-
                 <div className="pt-4 border-t">
                   <Button onClick={handleSaveCompany} className="flex items-center gap-2 w-full sm:w-auto">
                     <Save className="h-4 w-4" />
