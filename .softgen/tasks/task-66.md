@@ -1,6 +1,6 @@
 ---
 title: Site personnel warehouse label and request action
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -34,8 +34,8 @@ Keep the work scoped to the Site Personnel module and the specific request form 
 - [x] Add a Submit Request button to the Tools & Equipment request form
 - [x] Allow the material request form to submit with a General or Unassigned scope of work
 - [x] Auto-fill Requested By in material requests from the logged-in assigned site personnel user
-- [ ] Fix Requested By so submit no longer gets blocked by browser required-field validation
-- [ ] Validate lint, type, CSS, and runtime behavior
+- [x] Fix Requested By so submit no longer gets blocked by browser required-field validation
+- [x] Validate lint, type, CSS, and runtime behavior
 
 ## Acceptance
 The Site Personnel module shows Site Warehouse instead of Warehouse in the updated section.
