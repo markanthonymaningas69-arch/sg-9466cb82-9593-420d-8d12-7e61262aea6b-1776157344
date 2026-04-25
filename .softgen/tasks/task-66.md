@@ -1,6 +1,6 @@
 ---
 title: Site personnel warehouse label and request action
-status: done
+status: in_progress
 priority: high
 type: feature
 tags:
@@ -22,6 +22,7 @@ Second, add a visible "Submit Request" button inside the Tools & Equipment reque
 
 Follow-up:
 - in the Site Personnel material request form, allow the scope of work to be submitted as General or Unassigned from the Submit Request flow
+- auto-fill the Requested By input in material requests using the logged-in user name for the site personnel assigned to the selected project
 
 Keep the work scoped to the Site Personnel module and the specific request form it already uses.
 
@@ -31,10 +32,12 @@ Keep the work scoped to the Site Personnel module and the specific request form 
 - [x] Fix the affected body card and text contrast so the section is readable in dark mode
 - [x] Add a Submit Request button to the Tools & Equipment request form
 - [x] Allow the material request form to submit with a General or Unassigned scope of work
-- [x] Validate lint, type, CSS, and runtime behavior
+- [ ] Auto-fill Requested By in material requests from the logged-in assigned site personnel user
+- [ ] Validate lint, type, CSS, and runtime behavior
 
 ## Acceptance
 The Site Personnel module shows Site Warehouse instead of Warehouse in the updated section.
 The affected card and text remain readable in dark mode.
 Users can submit the Tools & Equipment request form with a visible Submit Request button.
 The material request form can be submitted with scope of work set to General or Unassigned.
+The Requested By field in material requests is automatically filled from the logged-in assigned site personnel user.
