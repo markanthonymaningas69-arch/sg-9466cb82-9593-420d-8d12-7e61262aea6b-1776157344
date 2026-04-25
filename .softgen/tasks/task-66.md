@@ -1,6 +1,6 @@
 ---
 title: Site personnel warehouse label and request action
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -23,11 +23,11 @@ Second, add a visible "Submit Request" button inside the Tools & Equipment reque
 Keep the work scoped to the Site Personnel module and the specific request form it already uses.
 
 ## Checklist
-- [ ] Inspect the Site Personnel module sections for Warehouse and Tools & Equipment request form
-- [ ] Rename Warehouse to Site Warehouse in the relevant Site Personnel UI
-- [ ] Fix the affected body card and text contrast so the section is readable in dark mode
-- [ ] Add a Submit Request button to the Tools & Equipment request form
-- [ ] Validate lint, type, CSS, and runtime behavior
+- [x] Inspect the Site Personnel module sections for Warehouse and Tools & Equipment request form
+- [x] Rename Warehouse to Site Warehouse in the relevant Site Personnel UI
+- [x] Fix the affected body card and text contrast so the section is readable in dark mode
+- [x] Add a Submit Request button to the Tools & Equipment request form
+- [x] Validate lint, type, CSS, and runtime behavior
 
 ## Acceptance
 The Site Personnel module shows Site Warehouse instead of Warehouse in the updated section.

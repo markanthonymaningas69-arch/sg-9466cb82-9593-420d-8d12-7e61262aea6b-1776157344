@@ -1160,7 +1160,7 @@ export default function SitePersonnel() {
                 className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-amber-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-amber-700 bg-amber-50 text-amber-700 hover:bg-amber-100"
               >
                 <Warehouse className="h-3 w-3 mr-1.5 hidden sm:inline" />
-                Warehouse
+                Site Warehouse
               </TabsTrigger>
               <TabsTrigger 
                 value="consumption" 
@@ -2362,18 +2362,18 @@ export default function SitePersonnel() {
                     
                     if (finalItems.length === 0) {
                       return (
-                        <div className="flex flex-col h-full bg-white relative rounded-md border">
-                          <div className="p-3 border-b bg-gray-50 flex gap-4 sticky top-0 z-20">
-                            <div className="flex-1 max-w-sm">
+                        <div className="relative flex h-full flex-col rounded-md border bg-card text-card-foreground">
+                          <div className="sticky top-0 z-20 flex gap-4 border-b bg-muted/40 p-3">
+                            <div className="max-w-sm flex-1">
                               <Input 
                                 placeholder="Search item name..." 
                                 value={warehouseSearch} 
                                 onChange={(e) => setWarehouseSearch(e.target.value)} 
-                                className="bg-white"
+                                className="bg-background text-foreground"
                               />
                             </div>
                             <Select value={warehouseTypeFilter} onValueChange={setWarehouseTypeFilter}>
-                              <SelectTrigger className="w-[200px] bg-white">
+                              <SelectTrigger className="w-[200px] bg-background text-foreground">
                                 <SelectValue placeholder="All Types" />
                               </SelectTrigger>
                               <SelectContent>
@@ -2384,9 +2384,9 @@ export default function SitePersonnel() {
                               </SelectContent>
                             </Select>
                           </div>
-                          <div className="text-center py-8 text-muted-foreground bg-gray-50 h-full flex flex-col items-center justify-center">
-                            <Warehouse className="h-12 w-12 text-muted-foreground/30 mb-4" />
-                            <p>No inventory records found matching your filters.</p>
+                          <div className="flex h-full flex-col items-center justify-center bg-muted/20 px-6 py-8 text-center text-foreground">
+                            <Warehouse className="mb-4 h-12 w-12 text-muted-foreground/40" />
+                            <p className="text-sm text-muted-foreground">No inventory records found matching your filters.</p>
                           </div>
                         </div>
                       );
@@ -3557,11 +3557,9 @@ export default function SitePersonnel() {
                         >
                           {isToolRequest ? "Close" : "Cancel"}
                         </Button>
-                        {!isToolRequest ? (
-                          <Button type="submit">
-                            Submit Request
-                          </Button>
-                        ) : null}
+                        <Button type="submit">
+                          Submit Request
+                        </Button>
                       </div>
                     </form>
                   </DialogContent>
