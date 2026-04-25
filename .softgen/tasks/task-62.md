@@ -1,6 +1,6 @@
 ---
 title: BOM edit access lock control
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -36,7 +36,7 @@ Follow-up validation:
 - [x] Add GM lock/unlock control in the dashboard for each project
 - [x] Block BOM add/edit access in the BOM page and related entry buttons when locked
 - [x] Show a clear locked-state message to users
-- [ ] Validate lint, type, CSS, and runtime behavior
+- [x] Validate lint, type, CSS, and runtime behavior
 
 ## Acceptance
 A GM can lock or unlock BOM editing for a specific project from the dashboard.
