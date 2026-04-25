@@ -419,7 +419,7 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  <div className="flex-1 min-h-[250px] border rounded-lg p-4 bg-white shrink-0 flex flex-col">
+                  <div className="flex-1 min-h-[250px] border rounded-lg p-4 bg-card shrink-0 flex flex-col">
                     <div className="flex justify-between items-center mb-4">
                       <h4 className="font-semibold text-sm text-muted-foreground">Project Accomplishment Curve</h4>
                       <div className="flex items-center gap-2">
@@ -442,15 +442,30 @@ export default function Dashboard() {
                       {dynamicChartData.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={dynamicChartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                            <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} tickFormatter={(val) => `${val}%`} />
-                            <ChartTooltip formatter={(value) => [`${value}%`, projectProgressScopeFilter === 'all' ? 'Overall Completion' : 'Scope Completion']} />
-                            <Line type="monotone" dataKey="completion" stroke="#22c55e" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                            <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="date" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} axisLine={{ stroke: "hsl(var(--border))" }} tickLine={{ stroke: "hsl(var(--border))" }} />
+                            <YAxis domain={[0, 100]} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} axisLine={{ stroke: "hsl(var(--border))" }} tickLine={{ stroke: "hsl(var(--border))" }} tickFormatter={(val) => `${val}%`} />
+                            <ChartTooltip
+                              formatter={(value) => [`${value}%`, projectProgressScopeFilter === 'all' ? 'Overall Completion' : 'Scope Completion']}
+                              contentStyle={{
+                                backgroundColor: "hsl(var(--popover))",
+                                borderColor: "hsl(var(--border))",
+                                color: "hsl(var(--popover-foreground))"
+                              }}
+                              labelStyle={{ color: "hsl(var(--popover-foreground))" }}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="completion"
+                              stroke="hsl(var(--primary))"
+                              strokeWidth={3}
+                              dot={{ r: 4, fill: "hsl(var(--primary))" }}
+                              activeDot={{ r: 6, fill: "hsl(var(--primary))" }}
+                            />
                           </LineChart>
                         </ResponsiveContainer>
                       ) : (
-                        <div className="flex items-center justify-center h-full text-muted-foreground border-2 border-dashed rounded-lg bg-gray-50">
+                        <div className="flex items-center justify-center h-full text-muted-foreground border-2 border-dashed rounded-lg bg-muted/30">
                           No progress history recorded yet for this selection.
                         </div>
                       )}
