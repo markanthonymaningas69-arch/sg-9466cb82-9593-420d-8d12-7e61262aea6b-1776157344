@@ -23,7 +23,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useRouter } from "next/router";
 import { 
   Building2, 
-  Bell, 
   Palette, 
   Save,
   Moon,
