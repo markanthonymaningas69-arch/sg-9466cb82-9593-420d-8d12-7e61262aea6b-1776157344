@@ -264,8 +264,8 @@ export function AIChatAssistant({ contained = false }: AIChatAssistantProps) {
   }
 
   const panel = (
-    <div className={cn("overflow-hidden rounded-2xl border bg-card shadow-xl", showThreads ? "w-full max-w-[640px]" : "w-full max-w-[440px]")}>
-      <div className="flex h-12 items-center justify-between border-b bg-primary px-4 text-primary-foreground">
+    <div className={cn("overflow-hidden rounded-2xl border bg-card shadow-xl flex flex-col", showThreads ? "w-[calc(100vw-2rem)] sm:w-[640px]" : "w-[calc(100vw-2rem)] sm:w-[440px]")}>
+      <div className="flex h-12 shrink-0 items-center justify-between border-b bg-primary px-4 text-primary-foreground">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15">
             <Sparkles className="h-4 w-4" />
@@ -276,16 +276,16 @@ export function AIChatAssistant({ contained = false }: AIChatAssistantProps) {
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-primary-foreground hover:bg-white/10 hover:text-primary-foreground" onClick={() => setShowThreads((current) => !current)}>
+          <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-primary-foreground hover:bg-white/20 hover:text-primary-foreground" onClick={() => setShowThreads((current) => !current)}>
             <List className="h-4 w-4" />
           </Button>
-          <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-primary-foreground hover:bg-white/10 hover:text-primary-foreground" onClick={() => setCollapsed(true)}>
+          <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-primary-foreground hover:bg-white/20 hover:text-primary-foreground" onClick={() => setCollapsed(true)}>
             <Minus className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
-      <div className="flex h-[540px] min-h-[540px]">
+      <div className="flex h-[calc(100vh-10rem)] max-h-[540px] min-h-[300px]">
         {showThreads ? (
           <AssistantThreadList
             threads={threads}
