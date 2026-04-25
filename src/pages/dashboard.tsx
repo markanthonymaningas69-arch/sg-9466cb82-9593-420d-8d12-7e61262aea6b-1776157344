@@ -14,10 +14,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer } from "recharts";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useRouter } from "next/router";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Dashboard() {
   const router = useRouter();
   const { formatCurrency } = useSettings();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [portfolio, setPortfolio] = useState<any[]>([]);
@@ -33,6 +35,7 @@ export default function Dashboard() {
   const [overallAccomplishmentOpen, setOverallAccomplishmentOpen] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(true);
   const [selectedProjectDetails, setSelectedProjectDetails] = useState<any>(null);
+  const [updatingBomLockId, setUpdatingBomLockId] = useState<string | null>(null);
   
   const [projectScopes, setProjectScopes] = useState<any[]>([]);
   const [projectProgressScopeFilter, setProjectProgressScopeFilter] = useState<string>("all");
@@ -204,6 +207,44 @@ export default function Dashboard() {
     setLoading(false);
   };
 
+  const handleToggleBomLock = async (projectId: string, nextLocked: boolean) => {
+    setUpdatingBomLockId(projectId);
+
+    const { error } = await supabase
+      .from("projects")
+      .update({ bom_edit_locked: nextLocked })
+      .eq("id", projectId);
+
+    if (error) {
+      toast({
+        title: "Unable to update BOM access",
+        description: error.message,
+        variant: "destructive"
+      });
+      setUpdatingBomLockId(null);
+      return;
+    }
+
+    setPortfolio((current) =>
+      current.map((project) =>
+        project.id === projectId ? { ...project, bom_edit_locked: nextLocked } : project
+      )
+    );
+
+    setSelectedProjectDetails((current: any) =>
+      current?.id === projectId ? { ...current, bom_edit_locked: nextLocked } : current
+    );
+
+    toast({
+      title: nextLocked ? "BOM editing locked" : "BOM editing unlocked",
+      description: nextLocked
+        ? "Users can still view this project's BOM, but add and edit actions are disabled."
+        : "Users can add and edit this project's BOM again."
+    });
+
+    setUpdatingBomLockId(null);
+  };
+
   const openProjectDetails = async (project: any) => {
     setSelectedProjectDetails(project);
     setDetailsOpen(true);
@@ -338,13 +379,14 @@ export default function Dashboard() {
                     <TableHead className="text-right min-w-[120px]">Cost to Date</TableHead>
                     <TableHead className="text-right min-w-[100px]">Profit Margin</TableHead>
                     <TableHead className="w-48 text-right min-w-[150px]">Accomplishment</TableHead>
-                    <TableHead className="w-24 text-right min-w-[100px]">Action</TableHead>
+                    <TableHead className="min-w-[120px] text-center">BOM Access</TableHead>
+                    <TableHead className="w-40 text-right min-w-[180px]">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {portfolio.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                         No projects found.
                       </TableCell>
                     </TableRow>
@@ -377,10 +419,37 @@ export default function Dashboard() {
                             <Progress value={project.completion} className="h-1.5 w-full bg-muted" />
                           </div>
                         </TableCell>
+                        <TableCell className="text-center">
+                          <Badge
+                            variant="outline"
+                            className={
+                              project.bom_edit_locked
+                                ? "border-amber-300 bg-amber-50 text-amber-700"
+                                : "border-emerald-300 bg-emerald-50 text-emerald-700"
+                            }
+                          >
+                            {project.bom_edit_locked ? "Locked" : "Editable"}
+                          </Badge>
+                        </TableCell>
                         <TableCell className="text-right">
-                          <Button size="sm" variant="outline" className="h-8 w-full sm:w-auto" onClick={() => openProjectDetails(project)}>
-                            <Eye className="h-3 w-3 sm:mr-1" /> <span className="hidden sm:inline">View</span>
-                          </Button>
+                          <div className="flex flex-col items-stretch justify-end gap-2 sm:flex-row sm:items-center">
+                            <Button size="sm" variant="outline" className="h-8 w-full sm:w-auto" onClick={() => openProjectDetails(project)}>
+                              <Eye className="h-3 w-3 sm:mr-1" /> <span className="hidden sm:inline">View</span>
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant={project.bom_edit_locked ? "outline" : "destructive"}
+                              className="h-8 w-full sm:w-auto"
+                              disabled={updatingBomLockId === project.id}
+                              onClick={() => void handleToggleBomLock(project.id, !project.bom_edit_locked)}
+                            >
+                              {updatingBomLockId === project.id
+                                ? "Saving..."
+                                : project.bom_edit_locked
+                                  ? "Unlock BOM"
+                                  : "Lock BOM"}
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))

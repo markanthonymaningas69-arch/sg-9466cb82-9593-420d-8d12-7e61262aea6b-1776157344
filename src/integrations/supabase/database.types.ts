@@ -1760,6 +1760,7 @@ export type Database = {
       }
       projects: {
         Row: {
+          bom_edit_locked: boolean
           budget: number
           client: string
           company_id: string | null
@@ -1776,6 +1777,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          bom_edit_locked?: boolean
           budget: number
           client: string
           company_id?: string | null
@@ -1792,6 +1794,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          bom_edit_locked?: boolean
           budget?: number
           client?: string
           company_id?: string | null

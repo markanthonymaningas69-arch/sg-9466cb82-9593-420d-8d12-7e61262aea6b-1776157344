@@ -22,7 +22,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useSettings } from "@/contexts/SettingsProvider";
 import { bomService } from "@/services/bomService";
 import { projectService } from "@/services/projectService";
-import { Plus, Pencil, Trash2, ArrowLeft, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Pencil, Trash2, ArrowLeft, ArrowUp, ArrowDown, Lock } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
 type BOM = Database["public"]["Tables"]["bill_of_materials"]["Row"];
@@ -138,6 +138,24 @@ export default function BillOfMaterials() {
     value: ''
   });
 
+  const isBomEditLocked = Boolean(project?.bom_edit_locked);
+  const editDisabled = isLocked || isBomEditLocked;
+  const showEmptyLockedState = isBomEditLocked && scopes.length === 0;
+  const bomLockMessage = "BOM editing is locked for this project by General Manager control.";
+
+  const ensureBomEditable = () => {
+    if (isBomEditLocked) {
+      window.alert(bomLockMessage);
+      return false;
+    }
+
+    if (isLocked) {
+      return false;
+    }
+
+    return true;
+  };
+
   useEffect(() => {
     if (projectId && typeof projectId === "string") {
       void loadData(projectId);
@@ -147,6 +165,64 @@ export default function BillOfMaterials() {
   // Auto-sync BOM totals and Project Contract Amount
   useEffect(() => {
     if (loading || !project || !bom) return;
+
+    const directCost = scopes.reduce((sum, scope) => {
+      const matTotal = (scope.bom_materials || []).reduce((mSum, m) => {
+        const qty = typeof m.quantity === "number" && Number.isFinite(m.quantity) ? m.quantity : 0;
+        const cost = typeof m.unit_cost === "number" && Number.isFinite(m.unit_cost) ? m.unit_cost : 0;
+        const storedTotal =
+        typeof m.total_cost === "number" && Number.isFinite(m.total_cost)
+          ? m.total_cost
+          : null;
+        const materialTotal = storedTotal != null ? storedTotal : qty * cost;
+        return mSum + materialTotal;
+      }, 0);
+      
+      const labTotal = (scope.bom_labor || []).reduce((lSum, l) => {
+        const lTotal = l.total_cost ?? ((l.hours as number || 0) * (l.hourly_rate as number || 0));
+        return lSum + (typeof lTotal === "number" && Number.isFinite(lTotal) ? lTotal : 0);
+      }, 0);
+      
+      return sum + matTotal + labTotal;
+    }, 0);
+
+    let indirectCost = 0;
+    indirectCostsList.forEach(c => {
+      const val = parseFloat(c.value.replace(/,/g, "") || "0");
+      if (['VAT', 'Tax', 'OCM', 'Profit'].includes(c.type)) {
+        indirectCost += directCost * (val / 100);
+      } else {
+        indirectCost += val;
+      }
+    });
+
+    const grandTotal = directCost + indirectCost;
+
+    const syncToDB = async () => {
+      const bomNeedsUpdate = Math.abs((bom.grand_total || 0) - grandTotal) > 0.01 || 
+                             Math.abs((bom.total_direct_cost || 0) - directCost) > 0.01;
+      const projectNeedsUpdate = Math.abs((project.budget || 0) - grandTotal) > 0.01;
+
+      if (bomNeedsUpdate) {
+        await bomService.update(bom.id as string, {
+          total_direct_cost: directCost,
+          total_indirect_cost: indirectCost,
+          grand_total: grandTotal
+        });
+        setBom(prev => prev ? { ...prev, total_direct_cost: directCost, total_indirect_cost: indirectCost, grand_total: grandTotal } : prev);
+      }
+
+      if (projectNeedsUpdate) {
+        await projectService.update(project.id as string, { budget: grandTotal });
+        setProject(prev => prev ? { ...prev, budget: grandTotal } : prev);
+      }
+    };
+
+    void syncToDB();
+  }, [scopes, indirectCostsList, bom, project, loading]);
+
+  useEffect(() => {
+    if (loading || !project || !bom || project?.bom_edit_locked) return;
 
     const directCost = scopes.reduce((sum, scope) => {
       const matTotal = (scope.bom_materials || []).reduce((mSum, m) => {
@@ -377,6 +453,8 @@ export default function BillOfMaterials() {
   };
 
   const handleAddOrUpdateIndirect = async () => {
+    if (!ensureBomEditable()) return;
+
     const val = parseFloat(indirectRowForm.value.replace(/,/g, "") || "0");
     if (val <= 0 && indirectRowForm.type !== 'Others') {
       alert("Please enter a valid amount or percentage.");
@@ -403,6 +481,8 @@ export default function BillOfMaterials() {
   };
 
   const handleDeleteIndirect = async (id: string) => {
+    if (!ensureBomEditable()) return;
+
     const newList = indirectCostsList.filter(c => c.id !== id);
     setIndirectCostsList(newList);
     await saveIndirectCostsToDB(newList);
@@ -443,6 +523,8 @@ export default function BillOfMaterials() {
   };
 
   const handleSaveOrder = async () => {
+    if (!ensureBomEditable()) return;
+
     const updates = scopes.map((s, idx) => ({ id: s.id as string, order_number: idx + 1 }));
     const { error } = await bomService.updateScopeOrder(updates);
     if (error) {
@@ -464,6 +546,8 @@ export default function BillOfMaterials() {
   };
 
   const handleSaveScopeInline = async () => {
+    if (!ensureBomEditable()) return;
+
     if (!newScopeName.trim()) {
       alert("Please enter a Scope of Work name before adding.");
       return;
@@ -509,6 +593,8 @@ export default function BillOfMaterials() {
   };
 
   const handleDeleteScope = async (id: string) => {
+    if (!ensureBomEditable()) return;
+
     if (!confirm("Delete this scope of work? All materials and labor will be deleted.")) {
       return;
     }
@@ -540,6 +626,7 @@ export default function BillOfMaterials() {
   };
 
   const handleSaveEditScope = async () => {
+    if (!ensureBomEditable()) return;
     if (!editingScopeId) return;
 
     const trimmedName = editingScopeName.trim();
@@ -649,6 +736,7 @@ export default function BillOfMaterials() {
   };
 
   const handleMaterialSubmitInline = async () => {
+    if (!ensureBomEditable()) return;
     if (!selectedScopeId) return;
 
     const quantity = parseFloat(materialForm.quantity.replace(/,/g, "") || "0");
@@ -734,6 +822,7 @@ export default function BillOfMaterials() {
   };
 
   const handleDeleteMaterial = async (id: string) => {
+    if (!ensureBomEditable()) return;
     if (!confirm("Delete this material?")) return;
     const { error } = await bomService.deleteMaterial(id);
     if (error) {
@@ -760,6 +849,8 @@ export default function BillOfMaterials() {
   };
 
   const handleLaborSubmit = async (scopeId: string) => {
+    if (!ensureBomEditable()) return;
+
     const scope = scopes.find((s) => s.id === scopeId);
     const materialTotal = scope ? calculateScopeMaterialTotal(scope) : 0;
 
@@ -870,6 +961,7 @@ export default function BillOfMaterials() {
   };
 
   const handleDeleteLabor = async (id: string) => {
+    if (!ensureBomEditable()) return;
     if (!confirm("Delete this labor entry?")) return;
     const { error } = await bomService.deleteLabor(id);
     if (error) {
@@ -905,7 +997,25 @@ export default function BillOfMaterials() {
           </div>
         </div>
 
-        {scopes.length === 0 ?
+        {isBomEditLocked && (
+          <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+            <Lock className="h-4 w-4" />
+            <AlertTitle>BOM editing locked</AlertTitle>
+            <AlertDescription>
+              This project&apos;s Bill of Materials is view-only. Add and edit actions are disabled because the General Manager locked BOM access for this project.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {showEmptyLockedState ? (
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-muted-foreground">
+                No BOM details are available to edit for this project while GM lock control is enabled.
+              </p>
+            </CardContent>
+          </Card>
+        ) : scopes.length === 0 ?
         <Card>
             <CardContent className="pt-2">
               <div className="flex items-center gap-2">
@@ -944,7 +1054,7 @@ export default function BillOfMaterials() {
                 <Button
                   size="sm"
                   onClick={() => void handleSaveScopeInline()}
-                  disabled={!newScopeName.trim() || isLocked}
+                  disabled={!newScopeName.trim() || editDisabled}
                   className="bg-green-600 hover:bg-green-700 text-white">
                   
                   <Plus className="h-4 w-4 mr-2" />
@@ -977,7 +1087,7 @@ export default function BillOfMaterials() {
                     size="sm"
                     className="bg-green-600 hover:bg-green-700 text-white"
                     onClick={() => void handleSaveOrder()}
-                    disabled={isLocked}
+                    disabled={editDisabled}
                   >
                     Save Order
                   </Button>
@@ -986,7 +1096,7 @@ export default function BillOfMaterials() {
                     size="sm"
                     variant="outline"
                     onClick={handleToggleReorder}
-                    disabled={isLocked}
+                    disabled={editDisabled}
                   >
                     Reorder Scopes
                   </Button>
@@ -994,7 +1104,7 @@ export default function BillOfMaterials() {
                 <Button
               size="sm"
               onClick={handleAddScopeClick}
-              disabled={isLocked}
+              disabled={editDisabled}
               style={{ lineHeight: "1" }}
               className="bg-green-600 hover:bg-green-700 text-white">
               
@@ -1041,7 +1151,7 @@ export default function BillOfMaterials() {
                     <Button
                   size="sm"
                   onClick={() => void handleSaveScopeInline()}
-                  disabled={!newScopeName.trim() || isLocked}
+                  disabled={!newScopeName.trim() || editDisabled}
                   className="bg-green-600 hover:bg-green-700 text-white">
                   
                       <Plus className="h-4 w-4 mr-2" />
@@ -1083,7 +1193,7 @@ export default function BillOfMaterials() {
                               variant="outline"
                               className="h-7 w-7"
                               onClick={() => moveScope(index, "up")}
-                              disabled={index === 0 || isLocked}
+                              disabled={index === 0 || editDisabled}
                             >
                               <ArrowUp className="h-3.5 w-3.5" />
                             </Button>
@@ -1092,7 +1202,7 @@ export default function BillOfMaterials() {
                               variant="outline"
                               className="h-7 w-7"
                               onClick={() => moveScope(index, "down")}
-                              disabled={index === scopes.length - 1 || isLocked}
+                              disabled={index === scopes.length - 1 || editDisabled}
                             >
                               <ArrowDown className="h-3.5 w-3.5" />
                             </Button>
@@ -1162,7 +1272,7 @@ export default function BillOfMaterials() {
                               size="sm"
                               className="bg-green-600 hover:bg-green-700 text-white"
                               onClick={() => void handleSaveEditScope()}
-                              disabled={isLocked}
+                              disabled={editDisabled}
                             >
                               Save
                             </Button>
@@ -1198,7 +1308,7 @@ export default function BillOfMaterials() {
                                   variant="ghost"
                                   className="h-8 w-8 text-green-700 hover:text-green-800"
                                   onClick={() => handleStartEditScope(scope)}
-                                  disabled={isLocked}
+                                  disabled={editDisabled}
                                 >
                                   <Pencil className="h-4 w-4" />
                                 </Button>
@@ -1207,7 +1317,7 @@ export default function BillOfMaterials() {
                                   variant="ghost"
                                   className="h-8 w-8 text-red-600 hover:text-red-700"
                                   onClick={() => void handleDeleteScope(scope.id as string)}
-                                  disabled={isLocked}
+                                  disabled={editDisabled}
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -1324,7 +1434,7 @@ export default function BillOfMaterials() {
                                           size="sm"
                                           className="bg-green-600 hover:bg-green-700 text-white h-6 px-2 text-xs"
                                           onClick={() => void handleMaterialSubmitInline()}
-                                          disabled={isLocked}
+                                          disabled={editDisabled}
                                         >
                                           Update
                                         </Button>
@@ -1336,6 +1446,7 @@ export default function BillOfMaterials() {
                                             resetMaterialForm();
                                             setSelectedScopeId("");
                                           }}
+                                          disabled={editDisabled}
                                         >
                                           Cancel
                                         </Button>
@@ -1369,7 +1480,7 @@ export default function BillOfMaterials() {
                                           variant="ghost"
                                           className="h-6 w-6 text-green-700 hover:text-green-800"
                                           onClick={() => handleEditMaterial(material)}
-                                          disabled={isLocked}
+                                          disabled={editDisabled}
                                         >
                                           <Pencil className="h-3 w-3" />
                                         </Button>
@@ -1378,7 +1489,7 @@ export default function BillOfMaterials() {
                                           variant="ghost"
                                           className="h-6 w-6 text-red-600 hover:text-red-700"
                                           onClick={() => void handleDeleteMaterial(material.id as string)}
-                                          disabled={isLocked}
+                                          disabled={editDisabled}
                                         >
                                           <Trash2 className="h-3 w-3" />
                                         </Button>
@@ -1471,10 +1582,11 @@ export default function BillOfMaterials() {
                                     <div className="flex justify-end items-center gap-1">
                                       <Button
                                         size="sm"
-                                        className="bg-green-600 hover:bg-green-700 text-white h-6 px-2 text-xs"
+                                        className="bg-green-600 hover:bg-green-700 text-white h-6 text-xs"
                                         onClick={() => void handleMaterialSubmitInline()}
-                                        disabled={isLocked}
+                                        disabled={editDisabled}
                                       >
+                                        <Plus className="h-3 w-3 mr-1" />
                                         Add
                                       </Button>
                                       <Button
@@ -1485,7 +1597,7 @@ export default function BillOfMaterials() {
                                           resetMaterialForm();
                                           setSelectedScopeId("");
                                         }}
-                                        disabled={isLocked}
+                                        disabled={editDisabled}
                                       >
                                         Cancel
                                       </Button>
@@ -1497,11 +1609,11 @@ export default function BillOfMaterials() {
                           </Table>
 
                           {selectedScopeId !== scope.id && (
-                            <div className="flex justify-end mt-1 pr-2">
+                            <div className="flex justify-end mt-1">
                               <Button
                                 size="sm"
                                 className="bg-green-600 hover:bg-green-700 text-white h-6 text-xs"
-                                disabled={isLocked}
+                                disabled={editDisabled}
                                 onClick={() => {
                                   setSelectedScopeId(scope.id as string);
                                   resetMaterialForm();
@@ -1520,7 +1632,7 @@ export default function BillOfMaterials() {
                             <Button
                               size="sm"
                               className="bg-green-600 hover:bg-green-700 text-white h-6 text-xs"
-                              disabled={isLocked}
+                              disabled={editDisabled}
                               onClick={() => {
                                 setSelectedScopeId(scope.id as string);
                                 resetMaterialForm();
@@ -1541,7 +1653,7 @@ export default function BillOfMaterials() {
                               size="sm"
                               variant="outline"
                               className="border-green-600 dark:border-green-500 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/30 h-6 text-[10px] px-2"
-                              disabled={isLocked}
+                              disabled={editDisabled}
                               onClick={() => {
                                 if (activeLaborScopeId === scope.id) {
                                   setActiveLaborScopeId(null);
@@ -1688,7 +1800,7 @@ export default function BillOfMaterials() {
                                     size="sm"
                                     className="bg-green-600 hover:bg-green-700 text-white h-6 px-2 text-xs"
                                     onClick={() => void handleLaborSubmit(scope.id as string)}
-                                    disabled={isLocked}
+                                    disabled={editDisabled}
                                   >
                                     Save
                                   </Button>
@@ -1700,7 +1812,7 @@ export default function BillOfMaterials() {
                                       setActiveLaborScopeId(null);
                                       resetLaborForm();
                                     }}
-                                    disabled={isLocked}
+                                    disabled={editDisabled}
                                   >
                                     Cancel
                                   </Button>
@@ -1799,21 +1911,21 @@ export default function BillOfMaterials() {
                 <CardContent className="space-y-1.5">
                   <Table>
                     <TableHeader>
-                      <TableRow className="h-7 text-xs hover:bg-transparent border-b">
-                        <TableHead className="h-6 py-0.5 text-[10px]">Type</TableHead>
-                        <TableHead className="text-right h-6 py-0.5 text-[10px]">Value</TableHead>
-                        <TableHead className="text-right h-6 py-0.5 text-[10px]">Amount</TableHead>
-                        <TableHead className="text-right h-6 py-0.5 w-24"></TableHead>
+                      <TableRow className="h-7 text-xs text-xs hover:bg-transparent border-b">
+                        <TableHead className="h-6 py-0.5 text-[10px] text-xs">Type</TableHead>
+                        <TableHead className="text-right h-6 py-0.5 text-[10px] text-xs">Value</TableHead>
+                        <TableHead className="text-right h-6 py-0.5 text-[10px] text-xs">Amount</TableHead>
+                        <TableHead className="text-right h-6 py-0.5 w-24 text-xs"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {indirectCostsList.map((cost) => (
                         <TableRow key={cost.id} className="h-7">
-                          <TableCell className="py-0.5 font-medium text-sm">{cost.type}</TableCell>
-                          <TableCell className="text-right py-0.5 text-sm">
+                          <TableCell className="py-0.5 font-medium text-sm text-xs">{cost.type}</TableCell>
+                          <TableCell className="text-right py-0.5 text-sm text-xs">
                             {cost.type !== 'Others' ? `${cost.value}%` : formatCurrency(parseFloat(cost.value.replace(/,/g, "") || "0"))}
                           </TableCell>
-                          <TableCell className="text-right font-semibold py-0.5 text-sm text-muted-foreground">
+                          <TableCell className="text-right font-semibold py-0.5 text-sm text-muted-foreground text-xs">
                             {formatCurrency(
                               ['VAT', 'OCM', 'Profit', 'Tax'].includes(cost.type)
                               ? calculateTotalDirectCost() * (parseFloat(cost.value.replace(/,/g, "") || "0") / 100)
@@ -1822,10 +1934,10 @@ export default function BillOfMaterials() {
                           </TableCell>
                           <TableCell className="text-right py-0.5">
                             <div className="flex justify-end gap-1">
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-green-600 hover:text-green-700" onClick={() => handleEditIndirect(cost)} disabled={isLocked}>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-green-600 hover:text-green-700" onClick={() => handleEditIndirect(cost)} disabled={editDisabled}>
                                 <Pencil className="w-3 h-3" />
                               </Button>
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-red-600 hover:text-red-700" onClick={() => void handleDeleteIndirect(cost.id)} disabled={isLocked}>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-red-600 hover:text-red-700" onClick={() => void handleDeleteIndirect(cost.id)} disabled={editDisabled}>
                                 <Trash2 className="w-3 h-3" />
                               </Button>
                             </div>
@@ -1863,7 +1975,7 @@ export default function BillOfMaterials() {
                             }}
                           />
                         </TableCell>
-                        <TableCell className="text-right font-semibold py-0.5 text-sm text-muted-foreground">
+                        <TableCell className="text-right font-semibold py-0.5 text-sm text-muted-foreground text-xs">
                             {formatCurrency(
                               ['VAT', 'OCM', 'Profit', 'Tax'].includes(indirectRowForm.type)
                               ? calculateTotalDirectCost() * (parseFloat(indirectRowForm.value.replace(/,/g, "") || "0") / 100)
@@ -1872,11 +1984,11 @@ export default function BillOfMaterials() {
                         </TableCell>
                         <TableCell className="text-right py-0.5">
                           <div className="flex justify-end gap-1">
-                            <Button size="sm" className="h-6 px-2 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={() => void handleAddOrUpdateIndirect()} disabled={isLocked}>
+                            <Button size="sm" className="h-6 px-2 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={() => void handleAddOrUpdateIndirect()} disabled={editDisabled}>
                                 {indirectRowForm.id ? 'Update' : 'Add'}
                             </Button>
                             {indirectRowForm.id && (
-                                <Button size="sm" variant="outline" className="h-6 px-2 text-xs border-red-600 dark:border-red-500 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30" onClick={() => setIndirectRowForm({id: '', type: 'VAT', description: '', value: ''})} disabled={isLocked}>Cancel</Button>
+                                <Button size="sm" variant="outline" className="h-6 px-2 text-xs border-red-600 dark:border-red-500 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30" onClick={() => setIndirectRowForm({id: '', type: 'VAT', description: '', value: ''})} disabled={editDisabled}>Cancel</Button>
                             )}
                           </div>
                         </TableCell>

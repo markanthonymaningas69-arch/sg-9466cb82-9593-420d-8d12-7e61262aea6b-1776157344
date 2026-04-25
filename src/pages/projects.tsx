@@ -414,11 +414,15 @@ export default function Projects() {
                       <TableCell className="px-3 py-2 text-right">
                         <div className="flex flex-col items-stretch justify-end gap-1.5 sm:flex-row sm:items-center">
                           <Button 
-                            size="sm" 
-                            className="h-7 w-full whitespace-nowrap bg-green-600 px-2 text-[10px] text-white hover:bg-green-700 sm:w-auto" 
+                            size="sm"
+                            variant={project.bom_edit_locked ? "outline" : "default"}
+                            className={project.bom_edit_locked
+                              ? "h-7 w-full whitespace-nowrap border-amber-300 bg-amber-50 px-2 text-[10px] text-amber-700 hover:bg-amber-100 sm:w-auto"
+                              : "h-7 w-full whitespace-nowrap bg-green-600 px-2 text-[10px] text-white hover:bg-green-700 sm:w-auto"}
                             onClick={() => handleBOM(project.id)}
+                            title={project.bom_edit_locked ? "BOM editing is locked by GM control" : "Open BOM editor"}
                           >
-                            <FileText className="mr-1 h-3 w-3" /> <span>Add/Edit BOM</span>
+                            <FileText className="mr-1 h-3 w-3" /> <span>{project.bom_edit_locked ? "View BOM" : "Add/Edit BOM"}</span>
                           </Button>
                           <Button size="icon" variant="outline" className="h-7 w-7 text-amber-600 border-amber-200 hover:bg-amber-50" onClick={() => handleEdit(project)} disabled={isLocked}>
                             <Pencil className="h-3 w-3" />
