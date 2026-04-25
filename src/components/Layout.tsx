@@ -558,7 +558,7 @@ export function Layout({ children }: LayoutProps) {
 
         <div className="flex flex-col h-full overflow-hidden">
           {/* Logo */}
-          <div className="flex items-center justify-between h-14 px-5 border-b shrink-0">
+          <div className="flex items-center justify-between h-16 px-5 border-b shrink-0">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 shrink-0 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
                 TX
@@ -694,7 +694,7 @@ export function Layout({ children }: LayoutProps) {
       {/* Main content */}
       <div className={cn("transition-all duration-300 ease-in-out", sidebarCollapsed ? "lg:pl-[80px]" : "lg:pl-64")}>
         {/* Top bar */}
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-card px-6">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-card px-5">
           <Button
             variant="ghost"
             size="icon"
