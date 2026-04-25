@@ -1,6 +1,6 @@
 ---
 title: Site personnel warehouse label and request action
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -39,9 +39,9 @@ Keep the work scoped to the Site Personnel module and the specific request form 
 - [x] Auto-fill Requested By in material requests from the logged-in assigned site personnel user
 - [x] Fix Requested By so submit no longer gets blocked by browser required-field validation
 - [x] Remove the Requested By input from the material request form UI
-- [ ] Remove Estimated Amount from manual material request entry flow
-- [ ] Rename Date to Date Needed in the material request form
-- [ ] Validate lint, type, CSS, and runtime behavior
+- [x] Remove Estimated Amount from manual material request entry flow
+- [x] Rename Date to Date Needed in the material request form
+- [x] Validate lint, type, CSS, and runtime behavior
 
 ## Acceptance
 The Site Personnel module shows Site Warehouse instead of Warehouse in the updated section.

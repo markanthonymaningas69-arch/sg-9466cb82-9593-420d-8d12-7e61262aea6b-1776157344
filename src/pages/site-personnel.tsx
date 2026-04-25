@@ -3244,7 +3244,7 @@ export default function SitePersonnel() {
 
                       <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-2">
-                          <Label>{isToolRequest ? "Date Needed" : "Date"}</Label>
+                          <Label>{requestForm.request_type === "Materials" || isToolRequest ? "Date Needed" : "Date"}</Label>
                           <Input
                             type="date"
                             value={requestForm.request_date}
