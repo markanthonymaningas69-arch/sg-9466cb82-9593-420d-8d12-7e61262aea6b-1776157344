@@ -17,6 +17,8 @@ export interface ApprovalNotificationInput {
 export interface UnreadNotificationSummary {
   approvalCenter: number;
   sitePersonnel: number;
+  purchasing: number;
+  accounting: number;
 }
 
 function getUniqueModules(modules: string[]) {
@@ -62,13 +64,13 @@ export const notificationService = {
     const normalizedModules = getUniqueModules(modules);
 
     if (normalizedModules.length === 0) {
-      return { approvalCenter: 0, sitePersonnel: 0 };
+      return { approvalCenter: 0, sitePersonnel: 0, purchasing: 0, accounting: 0 };
     }
 
     const userId = await getCurrentUserId();
 
     if (!userId) {
-      return { approvalCenter: 0, sitePersonnel: 0 };
+      return { approvalCenter: 0, sitePersonnel: 0, purchasing: 0, accounting: 0 };
     }
 
     const { data: notifications, error } = await supabase
@@ -83,7 +85,7 @@ export const notificationService = {
     const notificationIds = (notifications || []).map((notification) => notification.id);
 
     if (notificationIds.length === 0) {
-      return { approvalCenter: 0, sitePersonnel: 0 };
+      return { approvalCenter: 0, sitePersonnel: 0, purchasing: 0, accounting: 0 };
     }
 
     const { data: reads, error: readsError } = await supabase
@@ -112,9 +114,17 @@ export const notificationService = {
           summary.sitePersonnel += 1;
         }
 
+        if (notification.target_surface === "Purchasing") {
+          summary.purchasing += 1;
+        }
+
+        if (notification.target_surface === "Accounting") {
+          summary.accounting += 1;
+        }
+
         return summary;
       },
-      { approvalCenter: 0, sitePersonnel: 0 }
+      { approvalCenter: 0, sitePersonnel: 0, purchasing: 0, accounting: 0 }
     );
   },
 
