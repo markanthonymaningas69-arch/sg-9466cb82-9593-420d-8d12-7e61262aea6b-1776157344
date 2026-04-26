@@ -113,7 +113,6 @@ export function ProgressTab({ projectId }: { projectId: string }) {
     bom_scope_id: "",
     update_date: new Date().toISOString().split("T")[0],
     percentage_completed: "",
-    updated_by: "",
     notes: "",
   });
 
@@ -201,7 +200,6 @@ export function ProgressTab({ projectId }: { projectId: string }) {
         bom_scope_id: formData.bom_scope_id,
         update_date: formData.update_date,
         percentage_completed: percentage,
-        updated_by: formData.updated_by,
         notes: formData.notes || null,
       });
 
@@ -217,7 +215,6 @@ export function ProgressTab({ projectId }: { projectId: string }) {
         bom_scope_id: "",
         update_date: new Date().toISOString().split("T")[0],
         percentage_completed: "",
-        updated_by: "",
         notes: "",
       });
       void loadData();
@@ -315,26 +312,18 @@ export function ProgressTab({ projectId }: { projectId: string }) {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="update_date">Update Date</Label>
-                    <Input
-                      id="update_date"
-                      type="date"
-                      value={formData.update_date}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, update_date: e.target.value }))}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="updated_by">Updated By</Label>
-                    <Input
-                      id="updated_by"
-                      value={formData.updated_by}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, updated_by: e.target.value }))}
-                      required
-                    />
-                  </div>
+                <div className="space-y-1">
+                  <Label htmlFor="update_date" className="text-[11px]">
+                    Update Date
+                  </Label>
+                  <Input
+                    id="update_date"
+                    type="date"
+                    className="h-8 text-xs"
+                    value={formData.update_date}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, update_date: e.target.value }))}
+                    required
+                  />
                 </div>
 
                 <div>
@@ -493,7 +482,7 @@ export function ProgressTab({ projectId }: { projectId: string }) {
                             <span className="text-sm font-medium">{update.percentage_completed}%</span>
                           </div>
                         </TableCell>
-                        <TableCell>{update.updated_by}</TableCell>
+                        <TableCell>{update.updated_by || "—"}</TableCell>
                         <TableCell className="max-w-[250px] truncate text-sm text-muted-foreground">{update.notes || "-"}</TableCell>
                         <TableCell>
                           <Button variant="ghost" size="icon" onClick={() => void handleDelete(update.id)}>
