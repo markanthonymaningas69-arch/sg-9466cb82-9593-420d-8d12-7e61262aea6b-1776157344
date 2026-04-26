@@ -1,26 +1,26 @@
 ---
 title: Purchasing voucher workflow
-status: todo
+status: in_progress
 priority: high
 type: feature
-tags: [purchasing, vouchers, incoming-requests]
+tags: [purchasing, vouchers, workflow]
 created_by: agent
-created_at: 2026-04-26T19:41:54 UTC
+created_at: 2026-04-26T19:45:30 UTC
 position: 102
 ---
 
 ## Notes
-Enhance Purchasing so approved material and tool requests can be processed into purchasing records and then converted into voucher requests. Purchasing must show voucher number, voucher status, a clear action to create a voucher request, and readiness for release or delivery after voucher approval.
+Extend Purchasing so approved material and tools requests can move into a voucher workflow. Purchasing should be able to create a voucher request from the linked purchase record, see voucher number/status after approval, and understand when an item is ready for delivery.
 
 ## Checklist
-- [ ] Inspect the current Incoming Requests and purchase record flows in Purchasing
-- [ ] Add Create Voucher Request action for eligible purchasing items
-- [ ] Generate linked voucher request data with project, supplier, amount, and description
-- [ ] Show voucher number and voucher status in Purchasing after approval
-- [ ] Add View Voucher access and ready-for-delivery state in Purchasing
-- [ ] Keep compact list behavior intact while adding the new workflow controls
+- [ ] Inspect the current Purchasing request and purchase record actions
+- [ ] Add Create Voucher Request action for eligible purchasing records
+- [ ] Create voucher request records linked to purchase, site request, project, and approval flow
+- [ ] Show voucher number and voucher approval state in Purchasing
+- [ ] Add a compact View Voucher action for linked voucher records
+- [ ] Validate the Purchasing voucher flow from request to ready-for-delivery state
 
 ## Acceptance
-Purchasing users can create a voucher request from an approved purchasing item.
-Approved voucher data appears back in Purchasing with voucher number and status.
+Purchasing can create a voucher request from an approved purchase flow.
+Purchasing records show the linked voucher number and status.
 Purchasing items move into a ready-for-delivery state after voucher approval.
