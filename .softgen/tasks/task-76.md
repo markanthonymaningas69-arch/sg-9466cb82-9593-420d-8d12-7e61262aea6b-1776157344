@@ -18,8 +18,8 @@ Update the Site Personnel surface by renaming the Deliveries module to Purchase 
 - [x] Update the record form to support Site Purchase vs Delivery mode with the requested fields and conditional costing behavior
 - [x] Update persistence and list rendering so the new fields save and display correctly
 - [x] Validate the Site Personnel flow builds cleanly after the changes
-- [ ] Remove the Delivery option from the Add Record form so users can only input Site Purchase entries
-- [ ] Keep the tab label as Site Purchase & Deliveries while preserving existing records display
+- [x] Remove the Delivery option from the Add Record form so users can only input Site Purchase entries
+- [x] Keep the tab label as Site Purchase & Deliveries while preserving existing records display
 
 ## Acceptance
 The Site Personnel module shows Purchase & Deliveries instead of Deliveries.
