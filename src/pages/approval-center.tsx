@@ -226,7 +226,7 @@ export default function ApprovalCenterPage() {
           </TabsList>
 
           <TabsContent value={activeTab} className="mt-0">
-            <div className="grid gap-3 xl:grid-cols-[minmax(0,1.65fr)_340px]">
+            <div className="grid gap-3">
               <Card>
                 <CardHeader className="space-y-1 p-4">
                   <CardTitle className="text-base">{approvalTabs.find((tab) => tab.key === activeTab)?.label}</CardTitle>
@@ -312,70 +312,6 @@ export default function ApprovalCenterPage() {
                         </TableBody>
                       </Table>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="space-y-1 p-4">
-                  <CardTitle className="text-base">Selected Request</CardTitle>
-                  <CardDescription className="text-xs">
-                    Preview request context here, then open Request Details to review notes, audit trail, and pending actions.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3 p-4 pt-0">
-                  {!selectedRequest ? (
-                    <div className="rounded-lg border border-dashed py-10 text-center text-sm text-muted-foreground">
-                      Select a request to review details.
-                    </div>
-                  ) : (
-                    <>
-                      <div className="space-y-2 rounded-lg border p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="space-y-1">
-                            <Badge variant="outline" className={`border text-[10px] ${getModuleTone(selectedRequest.sourceModule)}`}>
-                              {selectedRequest.sourceModule}
-                            </Badge>
-                            <h2 className="text-sm font-semibold text-foreground">{selectedRequest.requestType}</h2>
-                          </div>
-                          <Badge className={`text-[10px] ${statusBadgeClass(selectedRequest.status)}`}>
-                            {selectedRequest.status.replaceAll("_", " ")}
-                          </Badge>
-                        </div>
-                        <div className="grid gap-1.5 text-xs text-muted-foreground">
-                          <p><span className="font-medium text-foreground">Requested by:</span> {selectedRequest.requestedBy}</p>
-                          <p><span className="font-medium text-foreground">Date / time:</span> {formatDateTime(selectedRequest.requestedAt)}</p>
-                          <p><span className="font-medium text-foreground">Related project:</span> {selectedRequest.projectName || "No project"}</p>
-                          <p><span className="font-medium text-foreground">Target module:</span> {selectedRequest.targetModule || "Unassigned"}</p>
-                          <p><span className="font-medium text-foreground">Lifecycle status:</span> {formatWorkflowStatus(selectedRequest.workflowStatus)}</p>
-                          <p><span className="font-medium text-foreground">Summary:</span> {selectedRequest.summary || "No summary available"}</p>
-                        </div>
-                        {selectedRequestDetails.length > 0 ? (
-                          <div className="grid gap-1.5 border-t pt-2 text-xs text-muted-foreground">
-                            {selectedRequestDetails.map((detail) => (
-                              <p key={detail.label}>
-                                <span className="font-medium text-foreground">{detail.label}:</span> {detail.value}
-                              </p>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-
-                      <div className="grid gap-2">
-                        <RequestDetailsButton request={selectedRequest} allowActions onStatusUpdated={loadRequests} />
-                        {canArchiveRequest(selectedRequest) ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="border-amber-200 text-amber-800 hover:bg-amber-50"
-                            disabled={archivingId === selectedRequest.id}
-                            onClick={() => void handleArchive(selectedRequest)}
-                          >
-                            {archivingId === selectedRequest.id ? "Archiving..." : "Archive to GM Vault"}
-                          </Button>
-                        ) : null}
-                      </div>
-                    </>
                   )}
                 </CardContent>
               </Card>
