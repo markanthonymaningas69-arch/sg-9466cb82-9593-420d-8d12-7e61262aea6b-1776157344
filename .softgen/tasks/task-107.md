@@ -1,6 +1,6 @@
 ---
 title: Site accomplishments compact table
-status: todo
+status: done
 priority: high
 type: feature
 tags: [site-personnel, accomplishments, compact-ui]
@@ -13,12 +13,12 @@ position: 107
 Compact the Accomplishments tab so progress records remain readable while fitting more data into one screen. Use small text, tight spacing, single-line cells, and aligned columns. Match the visual density of Requests and Deliveries for a consistent ERP-style module.
 
 ## Checklist
-- [ ] Inspect the Accomplishments tab layout, table structure, and action controls
-- [ ] Reduce font sizes, padding, and vertical spacing
-- [ ] Prevent text wrapping with ellipsis in headers and cells
-- [ ] Add tooltips for truncated values
-- [ ] Keep statuses and numeric values aligned consistently
-- [ ] Maintain responsive table behavior with horizontal scroll instead of stacked layouts
+- [x] Inspect the current Accomplishments history table and update form layout
+- [x] Reduce font sizes, row height, card padding, and section spacing
+- [x] Prevent wrapping in headers and cells with ellipsis for long scope and notes values
+- [x] Add hover tooltips for truncated accomplishment fields
+- [x] Keep aligned columns, sticky headers, and compact action controls
+- [x] Validate the compact Accomplishments layout in the Site Personnel module
 
 ## Acceptance
 The Accomplishments tab uses a compact, consistent table layout.

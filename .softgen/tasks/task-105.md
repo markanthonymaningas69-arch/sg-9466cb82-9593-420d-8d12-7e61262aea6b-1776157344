@@ -1,6 +1,6 @@
 ---
 title: Site requests compact table
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [site-personnel, requests, compact-ui]
@@ -13,12 +13,12 @@ position: 105
 Tighten the Requests tab in Site Personnel so more request data fits on screen. Keep the current workflow behavior, but reduce spacing, prevent wrapping, align columns clearly, and add hover access for truncated values. The layout should feel like a compact ERP table rather than a spacious card list.
 
 ## Checklist
-- [ ] Inspect the current Requests tab structure, filters, and action cells
-- [ ] Reduce font sizes, padding, row height, and vertical spacing in the Requests surface
-- [ ] Prevent wrapping in headers and cells with ellipsis for long values
-- [ ] Add hover tooltips for truncated request fields
-- [ ] Keep numbers, status badges, and actions consistently aligned
-- [ ] Preserve usability on smaller screens with horizontal scrolling instead of wrapping
+- [x] Inspect the current Requests table and form layout
+- [x] Reduce font sizes, row height, and spacing in the Requests surface
+- [x] Prevent wrapping in headers and cells with ellipsis for long values
+- [x] Add hover tooltips for truncated request fields
+- [x] Keep aligned columns with compact status and action controls
+- [x] Validate the compact Requests layout in the Site Personnel module
 
 ## Acceptance
 The Requests tab shows more rows and columns on screen without multi-line text.
