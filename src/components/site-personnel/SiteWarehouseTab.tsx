@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Package, Plus, Trash2, Filter } from "lucide-react";
+import { Package, Plus, Trash2, Filter, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -63,6 +63,17 @@ interface PendingMaterialLine {
   unit_cost: string;
 }
 
+interface ReceiptGroup {
+  key: string;
+  receiptNumber: string | null;
+  transactionType: TransactionType | null;
+  deliveryDate: string | null;
+  supplier: string | null;
+  notes: string | null;
+  totalAmount: number;
+  items: DeliveryRecord[];
+}
+
 function getTodayDate() {
   return new Date().toISOString().split("T")[0];
 }
@@ -110,6 +121,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
   const [pendingLines, setPendingLines] = useState<PendingMaterialLine[]>([]);
   const [isOtherMaterial, setIsOtherMaterial] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [selectedReceiptGroup, setSelectedReceiptGroup] = useState<ReceiptGroup | null>(null);
   const [filters, setFilters] = useState({
     scopeId: "all",
     supplier: "all",
@@ -202,6 +214,40 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
     });
   }, [filters, records]);
 
+  const groupedReceipts = useMemo(() => {
+    const groups = new Map<string, ReceiptGroup>();
+
+    filteredRecords.forEach((record) => {
+      const normalizedReceipt = record.receipt_number?.trim();
+      const groupKey = normalizedReceipt ? `receipt-${normalizedReceipt.toLowerCase()}` : `record-${record.id}`;
+      const existingGroup = groups.get(groupKey);
+
+      if (existingGroup) {
+        existingGroup.items.push(record);
+        existingGroup.totalAmount += Number(record.amount || 0);
+
+        if (!existingGroup.notes && record.notes) {
+          existingGroup.notes = record.notes;
+        }
+
+        return;
+      }
+
+      groups.set(groupKey, {
+        key: groupKey,
+        receiptNumber: normalizedReceipt || null,
+        transactionType: record.transaction_type,
+        deliveryDate: record.delivery_date,
+        supplier: record.supplier,
+        notes: record.notes,
+        totalAmount: Number(record.amount || 0),
+        items: [record],
+      });
+    });
+
+    return Array.from(groups.values());
+  }, [filteredRecords]);
+
   const historySummary = useMemo(() => {
     const supplierCount = new Set(
       filteredRecords
@@ -213,10 +259,11 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
 
     return {
       recordCount: filteredRecords.length,
+      receiptCount: groupedReceipts.length,
       supplierCount,
       totalAmount,
     };
-  }, [filteredRecords]);
+  }, [filteredRecords, groupedReceipts]);
 
   useEffect(() => {
     void loadData();
@@ -456,6 +503,44 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
       await loadData();
     } catch (error) {
       console.error("Error deleting record:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete the record",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function handleDeleteGroup(group: ReceiptGroup) {
+    const targetLabel = group.receiptNumber
+      ? `receipt ${group.receiptNumber}`
+      : group.items.length === 1
+        ? "this purchase or delivery record"
+        : "these purchase or delivery records";
+
+    if (!confirm(`Delete ${targetLabel}?`)) {
+      return;
+    }
+
+    try {
+      const results = await Promise.all(group.items.map((item) => siteService.deleteDelivery(item.id)));
+      const failedResult = results.find((result) => result.error);
+
+      if (failedResult?.error) {
+        throw failedResult.error;
+      }
+
+      if (selectedReceiptGroup?.key === group.key) {
+        setSelectedReceiptGroup(null);
+      }
+
+      toast({
+        title: "Success",
+        description: group.items.length > 1 ? "Receipt records deleted" : "Record deleted",
+      });
+      await loadData();
+    } catch (error) {
+      console.error("Error deleting record group:", error);
       toast({
         title: "Error",
         description: "Failed to delete the record",
@@ -718,8 +803,8 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
       <CardContent>
         {loading ? (
           <div className="py-8 text-center text-muted-foreground">Loading purchase and delivery records...</div>
-        ) : records.length === 0 ? (
-          <div className="py-8 text-center text-muted-foreground">No purchase or delivery records yet</div>
+        ) : filteredRecords.length === 0 ? (
+          <div className="py-8 text-center text-muted-foreground">No purchase records match the current filters.</div>
         ) : (
           <div className="space-y-4">
             <div className="rounded-lg border bg-muted/30 p-3">
@@ -857,54 +942,142 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
 
               <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
                 <span>{historySummary.recordCount} records</span>
+                <span>{historySummary.receiptCount} receipts</span>
                 <span>{historySummary.supplierCount} suppliers</span>
                 <span>Total purchase value: {formatCurrency(historySummary.totalAmount)}</span>
               </div>
             </div>
 
-            {filteredRecords.length === 0 ? (
+            {groupedReceipts.length === 0 ? (
               <div className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
                 No purchase records match the current filters.
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Receipt No.</TableHead>
-                    <TableHead>Scope</TableHead>
-                    <TableHead>Material</TableHead>
-                    <TableHead>Quantity</TableHead>
-                    <TableHead>Supplier</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Notes</TableHead>
-                    <TableHead className="w-[80px] text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredRecords.map((record) => (
-                    <TableRow key={record.id}>
-                      <TableCell>{record.delivery_date ? new Date(record.delivery_date).toLocaleDateString() : "—"}</TableCell>
-                      <TableCell>{record.transaction_type === "site_purchase" ? "Site Purchase" : "Delivery"}</TableCell>
-                      <TableCell>{record.receipt_number || "—"}</TableCell>
-                      <TableCell>{getScopeName(record)}</TableCell>
-                      <TableCell className="font-medium">{record.item_name}</TableCell>
-                      <TableCell>
-                        {record.quantity || 0} {record.unit || ""}
-                      </TableCell>
-                      <TableCell>{record.supplier || "—"}</TableCell>
-                      <TableCell>{formatCurrency(record.transaction_type === "site_purchase" ? record.amount : null)}</TableCell>
-                      <TableCell className="max-w-[220px] truncate text-sm text-muted-foreground">{record.notes || "—"}</TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => void handleDelete(record.id)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </TableCell>
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Receipt No.</TableHead>
+                      <TableHead>Scope</TableHead>
+                      <TableHead>Materials</TableHead>
+                      <TableHead>Supplier</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Notes</TableHead>
+                      <TableHead className="w-[112px] text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {groupedReceipts.map((group) => (
+                      <TableRow key={group.key}>
+                        <TableCell>{group.deliveryDate ? new Date(group.deliveryDate).toLocaleDateString() : "—"}</TableCell>
+                        <TableCell>{group.transactionType === "site_purchase" ? "Site Purchase" : "Delivery"}</TableCell>
+                        <TableCell>{group.receiptNumber || "—"}</TableCell>
+                        <TableCell>
+                          {Array.from(
+                            new Set(group.items.map((item) => getScopeName(item)).filter((scopeName) => scopeName !== "—"))
+                          ).join(", ") || "—"}
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-0.5">
+                            <p className="font-medium">{group.items.length} material{group.items.length > 1 ? "s" : ""}</p>
+                            <p className="max-w-[240px] truncate text-xs text-muted-foreground">
+                              {group.items.map((item) => item.item_name).join(", ")}
+                            </p>
+                          </div>
+                        </TableCell>
+                        <TableCell>{group.supplier || "—"}</TableCell>
+                        <TableCell>{formatCurrency(group.transactionType === "site_purchase" ? group.totalAmount : null)}</TableCell>
+                        <TableCell className="max-w-[220px] truncate text-sm text-muted-foreground">{group.notes || "—"}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button type="button" variant="ghost" size="icon" onClick={() => setSelectedReceiptGroup(group)}>
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button type="button" variant="ghost" size="icon" onClick={() => void handleDeleteGroup(group)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+
+                <Dialog open={Boolean(selectedReceiptGroup)} onOpenChange={(open) => (!open ? setSelectedReceiptGroup(null) : null)}>
+                  <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader className="space-y-1">
+                      <DialogTitle className="text-base">
+                        {selectedReceiptGroup?.receiptNumber ? `Receipt ${selectedReceiptGroup.receiptNumber}` : "Purchase details"}
+                      </DialogTitle>
+                    </DialogHeader>
+
+                    {selectedReceiptGroup ? (
+                      <div className="space-y-4">
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="space-y-1 rounded-md border bg-muted/30 p-3 text-xs">
+                            <p className="text-muted-foreground">Date</p>
+                            <p className="font-medium text-foreground">
+                              {selectedReceiptGroup.deliveryDate ? new Date(selectedReceiptGroup.deliveryDate).toLocaleDateString() : "—"}
+                            </p>
+                          </div>
+                          <div className="space-y-1 rounded-md border bg-muted/30 p-3 text-xs">
+                            <p className="text-muted-foreground">Supplier</p>
+                            <p className="font-medium text-foreground">{selectedReceiptGroup.supplier || "—"}</p>
+                          </div>
+                          <div className="space-y-1 rounded-md border bg-muted/30 p-3 text-xs">
+                            <p className="text-muted-foreground">Type</p>
+                            <p className="font-medium text-foreground">
+                              {selectedReceiptGroup.transactionType === "site_purchase" ? "Site Purchase" : "Delivery"}
+                            </p>
+                          </div>
+                          <div className="space-y-1 rounded-md border bg-muted/30 p-3 text-xs">
+                            <p className="text-muted-foreground">Total Amount</p>
+                            <p className="font-medium text-foreground">
+                              {formatCurrency(
+                                selectedReceiptGroup.transactionType === "site_purchase" ? selectedReceiptGroup.totalAmount : null
+                              )}
+                            </p>
+                          </div>
+                        </div>
+
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Scope</TableHead>
+                              <TableHead>Material</TableHead>
+                              <TableHead>Quantity</TableHead>
+                              <TableHead>Unit Cost</TableHead>
+                              <TableHead>Amount</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {selectedReceiptGroup.items.map((item) => (
+                              <TableRow key={item.id}>
+                                <TableCell>{getScopeName(item)}</TableCell>
+                                <TableCell className="font-medium">{item.item_name}</TableCell>
+                                <TableCell>
+                                  {item.quantity || 0} {item.unit || ""}
+                                </TableCell>
+                                <TableCell>{formatCurrency(item.unit_cost)}</TableCell>
+                                <TableCell>{formatCurrency(item.amount)}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+
+                        <div className="space-y-1 text-xs">
+                          <p className="font-medium text-foreground">Notes</p>
+                          <p className="rounded-md border bg-muted/20 p-3 text-muted-foreground">
+                            {selectedReceiptGroup.notes || "—"}
+                          </p>
+                        </div>
+                      </div>
+                    ) : null}
+                  </DialogContent>
+                </Dialog>
+              </>
             )}
           </div>
         )}
