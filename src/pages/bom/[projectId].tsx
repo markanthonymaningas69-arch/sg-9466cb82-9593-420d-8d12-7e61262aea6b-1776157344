@@ -1290,9 +1290,9 @@ export default function BillOfMaterials() {
                           <>
                             {!reorderMode && (
                               <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-8 w-8 text-green-700 hover:text-green-800"
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-2 text-xs text-green-700 hover:text-green-800"
                                 onClick={() =>
                                   setCollapsedScopes((prev) => ({
                                     ...prev,
@@ -1306,8 +1306,8 @@ export default function BillOfMaterials() {
                             {!reorderMode && (
                               <>
                                 <Button
-                                  size="icon"
-                                  variant="ghost"
+                                  size="sm"
+                                  variant="outline"
                                   className="h-8 w-8 text-green-700 hover:text-green-800"
                                   onClick={() => handleStartEditScope(scope)}
                                   disabled={editDisabled}
@@ -1315,8 +1315,8 @@ export default function BillOfMaterials() {
                                   <Pencil className="h-4 w-4" />
                                 </Button>
                                 <Button
-                                  size="icon"
-                                  variant="ghost"
+                                  size="sm"
+                                  variant="outline"
                                   className="h-8 w-8 text-red-600 hover:text-red-700"
                                   onClick={() => void handleDeleteScope(scope.id as string)}
                                   disabled={editDisabled}
