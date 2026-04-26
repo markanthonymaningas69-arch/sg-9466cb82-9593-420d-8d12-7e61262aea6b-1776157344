@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
-import { Bot, List, Loader2, Minus, Send, Sparkles } from "lucide-react";
+import { Bot, List, Loader2, Minus, Send, Sparkles, Zap, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -48,6 +48,8 @@ export function AIChatAssistant({ contained = false }: AIChatAssistantProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [projectData, setProjectData] = useState<Record<string, unknown>>({});
+  const [currentModel, setCurrentModel] = useState<string | null>(null);
+  const [queryType, setQueryType] = useState<"simple" | "advanced" | null>(null);
 
   const activeThread = useMemo(
     () => threads.find((thread) => thread.id === activeThreadId) || threads[0] || null,
@@ -209,6 +211,8 @@ export function AIChatAssistant({ contained = false }: AIChatAssistantProps) {
 
     setInput("");
     setIsLoading(true);
+    setCurrentModel(null);
+    setQueryType(null);
 
     try {
       const response = await fetch("/api/ai/chat", {
@@ -229,10 +233,16 @@ export function AIChatAssistant({ contained = false }: AIChatAssistantProps) {
         }),
       });
 
-      const data = (await response.json()) as { error?: string; message?: string };
+      const data = (await response.json()) as { error?: string; message?: string; metadata?: { model: string; queryType: string; responseTime: number } };
 
       if (!response.ok) {
         throw new Error(data.error || "Failed to get AI response");
+      }
+
+      // Update model metadata from response
+      if (data.metadata) {
+        setCurrentModel(data.metadata.model);
+        setQueryType(data.metadata.queryType as "simple" | "advanced");
       }
 
       const assistantMessage: AssistantMessage = {
@@ -272,7 +282,24 @@ export function AIChatAssistant({ contained = false }: AIChatAssistantProps) {
           </div>
           <div>
             <p className="text-sm font-semibold leading-none">AI Company Consultant</p>
-            <p className="mt-1 text-[11px] text-primary-foreground/80">GM global analysis</p>
+            <div className="mt-1 flex items-center gap-2">
+              <p className="text-[11px] text-primary-foreground/80">GM global analysis</p>
+              {queryType && (
+                <span className="flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-medium">
+                  {queryType === "advanced" ? (
+                    <>
+                      <Brain className="h-3 w-3" />
+                      Expert Mode
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="h-3 w-3" />
+                      Quick Mode
+                    </>
+                  )}
+                </span>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -359,9 +386,16 @@ export function AIChatAssistant({ contained = false }: AIChatAssistantProps) {
                 <Send className="h-4 w-4" />
               </Button>
             </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              {isDataLoading ? "Loading GM data..." : "Ready with GM-wide project data"}
-            </p>
+            <div className="mt-2 flex items-center justify-between text-[11px]">
+              <p className="text-muted-foreground">
+                {isDataLoading ? "Loading GM data..." : "Ready with GM-wide project data"}
+              </p>
+              {currentModel && (
+                <p className="text-muted-foreground">
+                  {currentModel === "gpt-4o" ? "🧠 Expert" : "⚡ Quick"}
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>

@@ -424,6 +424,7 @@ export default function SitePersonnel() {
           hours_worked: att.hours_worked ?? 8,
           overtime_hours: att.overtime_hours ?? 0,
           bom_scope_id: att.bom_scope_id || null,
+          notes: att.notes || "",
         };
       });
       setAttendanceList(merged);

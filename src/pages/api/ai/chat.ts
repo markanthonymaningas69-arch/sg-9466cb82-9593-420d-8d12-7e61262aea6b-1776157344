@@ -5,6 +5,50 @@ interface ChatMessage {
   content: string;
 }
 
+// DUAL-MODEL CONFIGURATION
+const MODEL_SIMPLE = "gpt-4o-mini";
+const MODEL_ADVANCED = "gpt-4o";
+
+const ADVANCED_KEYWORDS = [
+  "why",
+  "how",
+  "analyze",
+  "analyse",
+  "improve",
+  "optimize",
+  "optimise",
+  "save project",
+  "reduce cost",
+  "forecast",
+  "compare",
+  "target",
+  "recommendation",
+  "strategy",
+  "recovery",
+  "risk",
+  "critical",
+  "budget overrun",
+  "delay",
+  "productivity",
+  "efficiency",
+];
+
+function classifyQuery(message: string): "simple" | "advanced" {
+  const lowerMessage = message.toLowerCase();
+  
+  // Check for advanced keywords
+  const hasAdvancedKeyword = ADVANCED_KEYWORDS.some(keyword => 
+    lowerMessage.includes(keyword)
+  );
+  
+  // Check for question complexity indicators
+  const isComplexQuestion = lowerMessage.includes("what should") || 
+                           lowerMessage.includes("how can") ||
+                           lowerMessage.includes("what if");
+  
+  return hasAdvancedKeyword || isComplexQuestion ? "advanced" : "simple";
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -28,8 +72,16 @@ export default async function handler(
       return res.status(400).json({ error: "Missing required fields" });
     }
 
+    // QUERY CLASSIFICATION
+    const queryType = classifyQuery(message);
+    const selectedModel = queryType === "advanced" ? MODEL_ADVANCED : MODEL_SIMPLE;
+    
+    // Log query classification
+    const startTime = Date.now();
+    console.log(`[AI Query] Type: ${queryType.toUpperCase()} | Model: ${selectedModel}`);
+
     // Build context-aware system prompt
-    const systemPrompt = buildSystemPrompt(projectData, uiContext);
+    const systemPrompt = buildSystemPrompt(projectData, uiContext, queryType);
 
     // Prepare messages for OpenAI
     const messages: ChatMessage[] = [
@@ -41,6 +93,19 @@ export default async function handler(
       { role: "user" as const, content: message }
     ];
 
+    // Build request body with model-specific parameters
+    const requestBody: any = {
+      model: selectedModel,
+      messages,
+      temperature: queryType === "advanced" ? 0.3 : 0.7,
+      max_tokens: queryType === "advanced" ? 2000 : 1000,
+    };
+
+    // Add reasoning effort for advanced model (GPT-4o supports this)
+    if (queryType === "advanced") {
+      requestBody.reasoning_effort = "high";
+    }
+
     // Call OpenAI API
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -48,12 +113,7 @@ export default async function handler(
         "Content-Type": "application/json",
         "Authorization": `Bearer ${apiKey}`
       },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages,
-        temperature: 0.7,
-        max_tokens: 1000
-      })
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
@@ -69,7 +129,18 @@ export default async function handler(
       throw new Error("No response from AI");
     }
 
-    return res.status(200).json({ message: aiMessage });
+    // Log response time
+    const responseTime = Date.now() - startTime;
+    console.log(`[AI Response] Model: ${selectedModel} | Time: ${responseTime}ms`);
+
+    return res.status(200).json({ 
+      message: aiMessage,
+      metadata: {
+        model: selectedModel,
+        queryType,
+        responseTime
+      }
+    });
   } catch (error) {
     console.error("AI Chat API Error:", error);
     return res.status(500).json({
@@ -78,7 +149,7 @@ export default async function handler(
   }
 }
 
-function buildSystemPrompt(projectData: any, uiContext?: { module?: string; tab?: string | null; pathname?: string; projectId?: string | null }): string {
+function buildSystemPrompt(projectData: any, uiContext?: { module?: string; tab?: string | null; pathname?: string; projectId?: string | null }, queryType: "simple" | "advanced" = "simple"): string {
   const projectName = projectData.projectName;
   const swaData = projectData.swaData;
   const materialUsageData = projectData.materialUsageData;
@@ -104,7 +175,22 @@ function buildSystemPrompt(projectData: any, uiContext?: { module?: string; tab?
   const bomIndirectCosts = projectData.bomIndirectCosts;
   const focusedProject = projectData.focusedProject;
 
-  let prompt = `You are an AI assistant analyzing construction management system data. You have access to data across all modules and all major tabs in the application.\n\n`;
+  let prompt = `You are an AI assistant analyzing construction management system data.\n\n`;
+  
+  // Add mode-specific instructions
+  if (queryType === "advanced") {
+    prompt += `=== EXPERT ANALYSIS MODE (GPT-4o) ===\n`;
+    prompt += `You are in ADVANCED ANALYSIS mode. Provide deep, computational, expert-level responses.\n\n`;
+    prompt += `RESPONSE STRUCTURE (MANDATORY):\n`;
+    prompt += `A. CURRENT STATUS: Brief overview of the situation\n`;
+    prompt += `B. COMPUTATION: Show calculations, formulas, and data analysis\n`;
+    prompt += `C. ANALYSIS: Deep insights, patterns, root causes\n`;
+    prompt += `D. RECOMMENDATIONS: Actionable steps with priorities\n`;
+    prompt += `E. TARGETS: Specific metrics and goals\n\n`;
+  } else {
+    prompt += `=== QUICK ANSWER MODE (GPT-4o-mini) ===\n`;
+    prompt += `Provide concise, direct answers. Use bullet points for clarity.\n\n`;
+  }
 
   // PROJECTS OVERVIEW
   if (uiContext?.module || uiContext?.tab || uiContext?.pathname) {
@@ -127,7 +213,7 @@ function buildSystemPrompt(projectData: any, uiContext?: { module?: string; tab?
     const completedProjects = allProjects.filter((p: any) => p.status === 'completed');
     prompt += `Active: ${activeProjects.length}, Completed: ${completedProjects.length}\n`;
     
-    if (activeProjects.length > 0) {
+    if (activeProjects.length > 0 && queryType === "advanced") {
       prompt += `Active Projects:\n`;
       activeProjects.slice(0, 5).forEach((p: any) => {
         prompt += `- ${p.name}: Budget ${formatCurrency(p.budget || 0)}\n`;
@@ -136,8 +222,8 @@ function buildSystemPrompt(projectData: any, uiContext?: { module?: string; tab?
     prompt += `\n`;
   }
 
-  // CURRENT PROJECT ANALYTICS
-  if (projectName && projectName !== "All Projects") {
+  // CURRENT PROJECT ANALYTICS - Only include detailed data for advanced mode
+  if (projectName && projectName !== "All Projects" && queryType === "advanced") {
     prompt += `=== CURRENT PROJECT: ${projectName} ===\n\n`;
     
     if (swaData?.totals) {
@@ -184,8 +270,24 @@ function buildSystemPrompt(projectData: any, uiContext?: { module?: string; tab?
     }
   }
 
-  // ACCOUNTING MODULE
-  if (accounting?.length > 0) {
+  // Include summary data for simple mode
+  if (queryType === "simple") {
+    if (accounting?.length > 0) {
+      const totalVouchers = accounting.length;
+      const pendingVouchers = accounting.filter((v: any) => v.status === 'pending').length;
+      prompt += `Accounting: ${totalVouchers} vouchers (${pendingVouchers} pending)\n`;
+    }
+    if (personnel?.length > 0) {
+      prompt += `Personnel: ${personnel.length} staff\n`;
+    }
+    if (warehouse?.length > 0) {
+      prompt += `Warehouse: ${warehouse.length} items\n`;
+    }
+    prompt += `\n`;
+  }
+
+  // ACCOUNTING MODULE - Full data for advanced mode
+  if (accounting?.length > 0 && queryType === "advanced") {
     prompt += `=== ACCOUNTING (VOUCHERS) ===\n`;
     const totalVouchers = accounting.length;
     const pendingVouchers = accounting.filter((v: any) => v.status === 'pending').length;
@@ -196,8 +298,8 @@ function buildSystemPrompt(projectData: any, uiContext?: { module?: string; tab?
     prompt += `Total Voucher Amount: ${formatCurrency(totalAmount)}\n\n`;
   }
 
-  // LEDGER / JOURNAL OPEX
-  if (ledger?.length > 0) {
+  // LEDGER / JOURNAL OPEX - Advanced mode only
+  if (ledger?.length > 0 && queryType === "advanced") {
     prompt += `=== LEDGER & OPEX ===\n`;
     const totalDebits = ledger.filter((t: any) => t.type === 'debit').reduce((sum: number, t: any) => sum + (Number(t.amount) || 0), 0);
     const totalCredits = ledger.filter((t: any) => t.type === 'credit').reduce((sum: number, t: any) => sum + (Number(t.amount) || 0), 0);
@@ -208,8 +310,8 @@ function buildSystemPrompt(projectData: any, uiContext?: { module?: string; tab?
     prompt += `Balance (Debits - Credits): ${formatCurrency(totalDebits - totalCredits)}\n\n`;
   }
 
-  // LIQUIDATIONS
-  if (liquidations?.length > 0) {
+  // LIQUIDATIONS - Advanced mode only
+  if (liquidations?.length > 0 && queryType === "advanced") {
     prompt += `=== LIQUIDATIONS ===\n`;
     const pendingLiq = liquidations.filter((l: any) => l.status === 'pending').length;
     const approvedLiq = liquidations.filter((l: any) => l.status === 'approved').length;
@@ -219,8 +321,8 @@ function buildSystemPrompt(projectData: any, uiContext?: { module?: string; tab?
     prompt += `Total Liquidation Amount: ${formatCurrency(totalAmount)}\n\n`;
   }
 
-  // PERSONNEL MODULE
-  if (personnel?.length > 0) {
+  // PERSONNEL MODULE - Advanced mode only
+  if (personnel?.length > 0 && queryType === "advanced") {
     prompt += `=== PERSONNEL ===\n`;
     prompt += `Total Personnel: ${personnel.length}\n`;
     const activePersonnel = personnel.filter((p: any) => p.status === 'active').length;
@@ -235,8 +337,8 @@ function buildSystemPrompt(projectData: any, uiContext?: { module?: string; tab?
     prompt += `Estimated Monthly Personnel Cost: ${formatCurrency(totalMonthlyCost)}\n\n`;
   }
 
-  // WAREHOUSE MODULE
-  if (warehouse?.length > 0) {
+  // WAREHOUSE MODULE - Advanced mode only
+  if (warehouse?.length > 0 && queryType === "advanced") {
     prompt += `=== WAREHOUSE ===\n`;
     prompt += `Total Items in Inventory: ${warehouse.length}\n`;
     
@@ -259,8 +361,8 @@ function buildSystemPrompt(projectData: any, uiContext?: { module?: string; tab?
     prompt += `Total Inventory Value: ${formatCurrency(totalInventoryValue)}\n\n`;
   }
 
-  // PURCHASING MODULE
-  if (purchases?.length > 0) {
+  // PURCHASING MODULE - Advanced mode only
+  if (purchases?.length > 0 && queryType === "advanced") {
     prompt += `=== PURCHASING ===\n`;
     const recentPurchases = purchases.slice(0, 10);
     const totalPurchaseValue = recentPurchases.reduce((sum: number, p: any) => {
@@ -271,7 +373,7 @@ function buildSystemPrompt(projectData: any, uiContext?: { module?: string; tab?
     prompt += `Total Purchase Records: ${purchases.length}\n\n`;
   }
 
-  if (scheduleTasks?.length > 0 || progressUpdates?.length > 0 || bomScopes?.length > 0) {
+  if ((scheduleTasks?.length > 0 || progressUpdates?.length > 0 || bomScopes?.length > 0) && queryType === "advanced") {
     prompt += `=== PROJECT MANAGER ===\n`;
     prompt += `Scheduled Tasks: ${scheduleTasks?.length || 0}\n`;
     const scheduledStatuses = Array.isArray(scheduleTasks)
@@ -293,7 +395,7 @@ function buildSystemPrompt(projectData: any, uiContext?: { module?: string; tab?
     prompt += `Progress Updates: ${progressUpdates?.length || 0}\n\n`;
   }
 
-  if (deliveries?.length > 0 || materialConsumption?.length > 0 || siteRequests?.length > 0 || siteAttendance?.length > 0) {
+  if ((deliveries?.length > 0 || materialConsumption?.length > 0 || siteRequests?.length > 0 || siteAttendance?.length > 0) && queryType === "advanced") {
     prompt += `=== SITE PERSONNEL ===\n`;
     prompt += `Deliveries: ${deliveries?.length || 0}\n`;
     prompt += `Material Usage Logs: ${materialConsumption?.length || 0}\n`;
@@ -309,7 +411,7 @@ function buildSystemPrompt(projectData: any, uiContext?: { module?: string; tab?
     prompt += `\n`;
   }
 
-  if (cashAdvances?.length > 0 || leaveRequests?.length > 0) {
+  if ((cashAdvances?.length > 0 || leaveRequests?.length > 0) && queryType === "advanced") {
     prompt += `=== HR & WORKFORCE REQUESTS ===\n`;
     prompt += `Cash Advance Requests: ${cashAdvances?.length || 0}\n`;
     prompt += `Leave Requests: ${leaveRequests?.length || 0}\n\n`;
@@ -317,7 +419,14 @@ function buildSystemPrompt(projectData: any, uiContext?: { module?: string; tab?
 
   prompt += `=== RESPONSE RULES ===\n`;
   prompt += `Ground every answer in the provided data only. If data for a requested module or tab is missing, say so clearly.\n`;
-  prompt += `Use bullet points for clarity. Highlight issues, trends, risks, and recommendations.\n`;
+  
+  if (queryType === "advanced") {
+    prompt += `Use the MANDATORY response structure (A-E). Show calculations, formulas, and specific numbers.\n`;
+    prompt += `Highlight root causes, risks, and recovery strategies. Provide specific, actionable recommendations with priorities.\n`;
+  } else {
+    prompt += `Use bullet points for clarity. Be concise and direct.\n`;
+  }
+  
   prompt += `When relevant, connect findings across modules such as Project Manager, Site Personnel, Warehouse, Purchasing, Accounting, HR, and Analytics.\n`;
 
   return prompt;
