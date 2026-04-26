@@ -83,6 +83,8 @@ export function Layout({ children }: LayoutProps) {
   const [unreadNotificationSummary, setUnreadNotificationSummary] = useState({
     approvalCenter: 0,
     sitePersonnel: 0,
+    purchasing: 0,
+    accounting: 0,
   });
   
   const [notificationOpen, setNotificationOpen] = useState(false);
@@ -171,6 +173,28 @@ export function Layout({ children }: LayoutProps) {
           await loadNotificationSummary(modules);
         } catch (error) {
           console.error("Error marking site personnel notifications read:", error);
+        }
+      })();
+    }
+
+    if (router.pathname === "/purchasing") {
+      void (async () => {
+        try {
+          await notificationService.markSurfaceAsRead("Purchasing", modules);
+          await loadNotificationSummary(modules);
+        } catch (error) {
+          console.error("Error marking purchasing notifications read:", error);
+        }
+      })();
+    }
+
+    if (router.pathname === "/accounting") {
+      void (async () => {
+        try {
+          await notificationService.markSurfaceAsRead("Accounting", modules);
+          await loadNotificationSummary(modules);
+        } catch (error) {
+          console.error("Error marking accounting notifications read:", error);
         }
       })();
     }
@@ -577,18 +601,22 @@ export function Layout({ children }: LayoutProps) {
     ...siteResolvedRequests.map((request) => `req-${request.id}-${request.status || "pending"}`),
   ]);
 
-  const acctCount = hasUnseenModuleNotifications("accounting", accountingSignature)
-    ? pendingCashAdvances.length + accountingPendingRequests.length + approvedVouchers.length
-    : 0;
+  const acctCount = unreadNotificationSummary.accounting || (
+    hasUnseenModuleNotifications("accounting", accountingSignature)
+      ? pendingCashAdvances.length + accountingPendingRequests.length + approvedVouchers.length
+      : 0
+  );
   const whseCount = hasUnseenModuleNotifications("warehouse", warehouseSignature)
     ? warehousePendingRequests.length
     : 0;
   const hrCount = hasUnseenModuleNotifications("personnel", hrSignature)
     ? pendingLeaves.length + expiringDocuments.length
     : 0;
-  const purchCount = hasUnseenModuleNotifications("purchasing", purchasingSignature)
-    ? pendingPurchases.length
-    : 0;
+  const purchCount = unreadNotificationSummary.purchasing || (
+    hasUnseenModuleNotifications("purchasing", purchasingSignature)
+      ? pendingPurchases.length
+      : 0
+  );
   const approvalCount = unreadNotificationSummary.approvalCenter || (
     hasUnseenModuleNotifications("approval-center", approvalCenterSignature)
       ? pendingApprovalRequests.length
