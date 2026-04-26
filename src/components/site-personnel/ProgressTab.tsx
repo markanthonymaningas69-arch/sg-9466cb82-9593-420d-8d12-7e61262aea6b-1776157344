@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { TrendingUp, Plus, Trash2 } from "lucide-react";
+import { TrendingUp, Plus, Trash2, Filter } from "lucide-react";
 
 interface ProgressUpdate {
   id: string;
@@ -69,6 +69,7 @@ export function ProgressTab({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [bomId, setBomId] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [filters, setFilters] = useState({
     scopeId: "all",
     completion: "all",
@@ -425,104 +426,120 @@ export function ProgressTab({ projectId }: { projectId: string }) {
                       Review updates by scope, completion range, updated by, and date range.
                     </p>
                   </div>
-                  <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={clearFilters}>
-                    Clear filters
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 px-3 text-xs"
+                      onClick={() => setFiltersOpen((current) => !current)}
+                    >
+                      <Filter className="mr-2 h-3.5 w-3.5" />
+                      {filtersOpen ? "Hide filters" : "Filter"}
+                    </Button>
+                    {filtersOpen ? (
+                      <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={clearFilters}>
+                        Clear filters
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
 
-                <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                  <div className="space-y-1">
-                    <Label htmlFor="progress-history-scope" className="text-[11px]">
-                      Scope
-                    </Label>
-                    <Select
-                      value={filters.scopeId}
-                      onValueChange={(value) => setFilters((current) => ({ ...current, scopeId: value }))}
-                    >
-                      <SelectTrigger id="progress-history-scope" className="h-8 text-xs">
-                        <SelectValue placeholder="All scopes" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All scopes</SelectItem>
-                        {bomScopes.map((scope) => (
-                          <SelectItem key={scope.id} value={scope.id}>
-                            {scope.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                {filtersOpen ? (
+                  <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                    <div className="space-y-1">
+                      <Label htmlFor="progress-history-scope" className="text-[11px]">
+                        Scope
+                      </Label>
+                      <Select
+                        value={filters.scopeId}
+                        onValueChange={(value) => setFilters((current) => ({ ...current, scopeId: value }))}
+                      >
+                        <SelectTrigger id="progress-history-scope" className="h-8 text-xs">
+                          <SelectValue placeholder="All scopes" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All scopes</SelectItem>
+                          {bomScopes.map((scope) => (
+                            <SelectItem key={scope.id} value={scope.id}>
+                              {scope.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                  <div className="space-y-1">
-                    <Label htmlFor="progress-history-completion" className="text-[11px]">
-                      Completion
-                    </Label>
-                    <Select
-                      value={filters.completion}
-                      onValueChange={(value) => setFilters((current) => ({ ...current, completion: value }))}
-                    >
-                      <SelectTrigger id="progress-history-completion" className="h-8 text-xs">
-                        <SelectValue placeholder="All completion bands" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All completion bands</SelectItem>
-                        <SelectItem value="0-24">0–24%</SelectItem>
-                        <SelectItem value="25-49">25–49%</SelectItem>
-                        <SelectItem value="50-74">50–74%</SelectItem>
-                        <SelectItem value="75-99">75–99%</SelectItem>
-                        <SelectItem value="100">100%</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="progress-history-completion" className="text-[11px]">
+                        Completion
+                      </Label>
+                      <Select
+                        value={filters.completion}
+                        onValueChange={(value) => setFilters((current) => ({ ...current, completion: value }))}
+                      >
+                        <SelectTrigger id="progress-history-completion" className="h-8 text-xs">
+                          <SelectValue placeholder="All completion bands" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All completion bands</SelectItem>
+                          <SelectItem value="0-24">0–24%</SelectItem>
+                          <SelectItem value="25-49">25–49%</SelectItem>
+                          <SelectItem value="50-74">50–74%</SelectItem>
+                          <SelectItem value="75-99">75–99%</SelectItem>
+                          <SelectItem value="100">100%</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                  <div className="space-y-1">
-                    <Label htmlFor="progress-history-updated-by" className="text-[11px]">
-                      Updated By
-                    </Label>
-                    <Select
-                      value={filters.updatedBy}
-                      onValueChange={(value) => setFilters((current) => ({ ...current, updatedBy: value }))}
-                    >
-                      <SelectTrigger id="progress-history-updated-by" className="h-8 text-xs">
-                        <SelectValue placeholder="All updaters" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All updaters</SelectItem>
-                        {updatedByOptions.map((updatedBy) => (
-                          <SelectItem key={updatedBy} value={updatedBy}>
-                            {updatedBy}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="progress-history-updated-by" className="text-[11px]">
+                        Updated By
+                      </Label>
+                      <Select
+                        value={filters.updatedBy}
+                        onValueChange={(value) => setFilters((current) => ({ ...current, updatedBy: value }))}
+                      >
+                        <SelectTrigger id="progress-history-updated-by" className="h-8 text-xs">
+                          <SelectValue placeholder="All updaters" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All updaters</SelectItem>
+                          {updatedByOptions.map((updatedBy) => (
+                            <SelectItem key={updatedBy} value={updatedBy}>
+                              {updatedBy}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                  <div className="space-y-1">
-                    <Label htmlFor="progress-history-date-from" className="text-[11px]">
-                      Date From
-                    </Label>
-                    <Input
-                      id="progress-history-date-from"
-                      type="date"
-                      className="h-8 text-xs"
-                      value={filters.dateFrom}
-                      onChange={(event) => setFilters((current) => ({ ...current, dateFrom: event.target.value }))}
-                    />
-                  </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="progress-history-date-from" className="text-[11px]">
+                        Date From
+                      </Label>
+                      <Input
+                        id="progress-history-date-from"
+                        type="date"
+                        className="h-8 text-xs"
+                        value={filters.dateFrom}
+                        onChange={(event) => setFilters((current) => ({ ...current, dateFrom: event.target.value }))}
+                      />
+                    </div>
 
-                  <div className="space-y-1">
-                    <Label htmlFor="progress-history-date-to" className="text-[11px]">
-                      Date To
-                    </Label>
-                    <Input
-                      id="progress-history-date-to"
-                      type="date"
-                      className="h-8 text-xs"
-                      value={filters.dateTo}
-                      onChange={(event) => setFilters((current) => ({ ...current, dateTo: event.target.value }))}
-                    />
+                    <div className="space-y-1">
+                      <Label htmlFor="progress-history-date-to" className="text-[11px]">
+                        Date To
+                      </Label>
+                      <Input
+                        id="progress-history-date-to"
+                        type="date"
+                        className="h-8 text-xs"
+                        value={filters.dateTo}
+                        onChange={(event) => setFilters((current) => ({ ...current, dateTo: event.target.value }))}
+                      />
+                    </div>
                   </div>
-                </div>
+                ) : null}
 
                 <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
                   <span>{historySummary.recordCount} updates</span>

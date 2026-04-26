@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Users, Plus, Trash2, CheckCircle, XCircle, Clock } from "lucide-react";
+import { Users, Plus, Trash2, CheckCircle, XCircle, Clock, Filter } from "lucide-react";
 
 interface AttendanceRecord {
   id: string;
@@ -47,6 +47,7 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
   const [personnelList, setPersonnelList] = useState<Personnel[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [filters, setFilters] = useState({
     personnelId: "all",
     role: "all",
@@ -404,101 +405,117 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
                       Review attendance by worker, position, attendance status, and date range.
                     </p>
                   </div>
-                  <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={clearFilters}>
-                    Clear filters
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 px-3 text-xs"
+                      onClick={() => setFiltersOpen((current) => !current)}
+                    >
+                      <Filter className="mr-2 h-3.5 w-3.5" />
+                      {filtersOpen ? "Hide filters" : "Filter"}
+                    </Button>
+                    {filtersOpen ? (
+                      <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={clearFilters}>
+                        Clear filters
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
 
-                <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                  <div className="space-y-1">
-                    <Label htmlFor="attendance-history-worker" className="text-[11px]">
-                      Worker
-                    </Label>
-                    <Select
-                      value={filters.personnelId}
-                      onValueChange={(value) => setFilters((current) => ({ ...current, personnelId: value }))}
-                    >
-                      <SelectTrigger id="attendance-history-worker" className="h-8 text-xs">
-                        <SelectValue placeholder="All workers" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All workers</SelectItem>
-                        {workerOptions.map((worker) => (
-                          <SelectItem key={worker.id} value={worker.id}>
-                            {worker.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                {filtersOpen ? (
+                  <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                    <div className="space-y-1">
+                      <Label htmlFor="attendance-history-worker" className="text-[11px]">
+                        Worker
+                      </Label>
+                      <Select
+                        value={filters.personnelId}
+                        onValueChange={(value) => setFilters((current) => ({ ...current, personnelId: value }))}
+                      >
+                        <SelectTrigger id="attendance-history-worker" className="h-8 text-xs">
+                          <SelectValue placeholder="All workers" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All workers</SelectItem>
+                          {workerOptions.map((worker) => (
+                            <SelectItem key={worker.id} value={worker.id}>
+                              {worker.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                  <div className="space-y-1">
-                    <Label htmlFor="attendance-history-role" className="text-[11px]">
-                      Position
-                    </Label>
-                    <Select value={filters.role} onValueChange={(value) => setFilters((current) => ({ ...current, role: value }))}>
-                      <SelectTrigger id="attendance-history-role" className="h-8 text-xs">
-                        <SelectValue placeholder="All positions" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All positions</SelectItem>
-                        {roleOptions.map((role) => (
-                          <SelectItem key={role} value={role}>
-                            {role}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="attendance-history-role" className="text-[11px]">
+                        Position
+                      </Label>
+                      <Select value={filters.role} onValueChange={(value) => setFilters((current) => ({ ...current, role: value }))}>
+                        <SelectTrigger id="attendance-history-role" className="h-8 text-xs">
+                          <SelectValue placeholder="All positions" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All positions</SelectItem>
+                          {roleOptions.map((role) => (
+                            <SelectItem key={role} value={role}>
+                              {role}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                  <div className="space-y-1">
-                    <Label htmlFor="attendance-history-status" className="text-[11px]">
-                      Status
-                    </Label>
-                    <Select
-                      value={filters.status}
-                      onValueChange={(value) => setFilters((current) => ({ ...current, status: value }))}
-                    >
-                      <SelectTrigger id="attendance-history-status" className="h-8 text-xs">
-                        <SelectValue placeholder="All statuses" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All statuses</SelectItem>
-                        {ATTENDANCE_STATUS.map((status) => (
-                          <SelectItem key={status.value} value={status.value}>
-                            {status.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="attendance-history-status" className="text-[11px]">
+                        Status
+                      </Label>
+                      <Select
+                        value={filters.status}
+                        onValueChange={(value) => setFilters((current) => ({ ...current, status: value }))}
+                      >
+                        <SelectTrigger id="attendance-history-status" className="h-8 text-xs">
+                          <SelectValue placeholder="All statuses" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All statuses</SelectItem>
+                          {ATTENDANCE_STATUS.map((status) => (
+                            <SelectItem key={status.value} value={status.value}>
+                              {status.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                  <div className="space-y-1">
-                    <Label htmlFor="attendance-history-date-from" className="text-[11px]">
-                      Date From
-                    </Label>
-                    <Input
-                      id="attendance-history-date-from"
-                      type="date"
-                      className="h-8 text-xs"
-                      value={filters.dateFrom}
-                      onChange={(event) => setFilters((current) => ({ ...current, dateFrom: event.target.value }))}
-                    />
-                  </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="attendance-history-date-from" className="text-[11px]">
+                        Date From
+                      </Label>
+                      <Input
+                        id="attendance-history-date-from"
+                        type="date"
+                        className="h-8 text-xs"
+                        value={filters.dateFrom}
+                        onChange={(event) => setFilters((current) => ({ ...current, dateFrom: event.target.value }))}
+                      />
+                    </div>
 
-                  <div className="space-y-1">
-                    <Label htmlFor="attendance-history-date-to" className="text-[11px]">
-                      Date To
-                    </Label>
-                    <Input
-                      id="attendance-history-date-to"
-                      type="date"
-                      className="h-8 text-xs"
-                      value={filters.dateTo}
-                      onChange={(event) => setFilters((current) => ({ ...current, dateTo: event.target.value }))}
-                    />
+                    <div className="space-y-1">
+                      <Label htmlFor="attendance-history-date-to" className="text-[11px]">
+                        Date To
+                      </Label>
+                      <Input
+                        id="attendance-history-date-to"
+                        type="date"
+                        className="h-8 text-xs"
+                        value={filters.dateTo}
+                        onChange={(event) => setFilters((current) => ({ ...current, dateTo: event.target.value }))}
+                      />
+                    </div>
                   </div>
-                </div>
+                ) : null}
 
                 <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
                   <span>{historySummary.recordCount} records</span>

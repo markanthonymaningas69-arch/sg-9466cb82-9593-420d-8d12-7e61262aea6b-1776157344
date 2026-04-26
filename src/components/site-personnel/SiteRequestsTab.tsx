@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, Plus, CheckCircle, XCircle, Clock } from "lucide-react";
+import { FileText, Plus, CheckCircle, XCircle, Clock, Filter } from "lucide-react";
 
 interface SiteRequest {
   id: string;
@@ -45,6 +45,7 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
   const [requests, setRequests] = useState<SiteRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [filters, setFilters] = useState({
     requestType: "all",
     status: "all",
@@ -357,112 +358,128 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
                     Review requests by type, status, requester, item, and request date.
                   </p>
                 </div>
-                <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={clearFilters}>
-                  Clear filters
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-3 text-xs"
+                    onClick={() => setFiltersOpen((current) => !current)}
+                  >
+                    <Filter className="mr-2 h-3.5 w-3.5" />
+                    {filtersOpen ? "Hide filters" : "Filter"}
+                  </Button>
+                  {filtersOpen ? (
+                    <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={clearFilters}>
+                      Clear filters
+                    </Button>
+                  ) : null}
+                </div>
               </div>
 
-              <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                <div className="space-y-1">
-                  <Label htmlFor="request-history-item" className="text-[11px]">
-                    Item
-                  </Label>
-                  <Input
-                    id="request-history-item"
-                    className="h-8 text-xs"
-                    value={filters.item}
-                    onChange={(event) => setFilters((current) => ({ ...current, item: event.target.value }))}
-                    placeholder="Search item or description"
-                  />
-                </div>
+              {filtersOpen ? (
+                <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="request-history-item" className="text-[11px]">
+                      Item
+                    </Label>
+                    <Input
+                      id="request-history-item"
+                      className="h-8 text-xs"
+                      value={filters.item}
+                      onChange={(event) => setFilters((current) => ({ ...current, item: event.target.value }))}
+                      placeholder="Search item or description"
+                    />
+                  </div>
 
-                <div className="space-y-1">
-                  <Label htmlFor="request-history-type" className="text-[11px]">
-                    Request Type
-                  </Label>
-                  <Select
-                    value={filters.requestType}
-                    onValueChange={(value) => setFilters((current) => ({ ...current, requestType: value }))}
-                  >
-                    <SelectTrigger id="request-history-type" className="h-8 text-xs">
-                      <SelectValue placeholder="All request types" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All request types</SelectItem>
-                      {requestTypeOptions.map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {type}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="request-history-type" className="text-[11px]">
+                      Request Type
+                    </Label>
+                    <Select
+                      value={filters.requestType}
+                      onValueChange={(value) => setFilters((current) => ({ ...current, requestType: value }))}
+                    >
+                      <SelectTrigger id="request-history-type" className="h-8 text-xs">
+                        <SelectValue placeholder="All request types" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All request types</SelectItem>
+                        {requestTypeOptions.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {type}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <div className="space-y-1">
-                  <Label htmlFor="request-history-status" className="text-[11px]">
-                    Status
-                  </Label>
-                  <Select value={filters.status} onValueChange={(value) => setFilters((current) => ({ ...current, status: value }))}>
-                    <SelectTrigger id="request-history-status" className="h-8 text-xs">
-                      <SelectValue placeholder="All statuses" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All statuses</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="approved">Approved</SelectItem>
-                      <SelectItem value="rejected">Rejected</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="request-history-status" className="text-[11px]">
+                      Status
+                    </Label>
+                    <Select value={filters.status} onValueChange={(value) => setFilters((current) => ({ ...current, status: value }))}>
+                      <SelectTrigger id="request-history-status" className="h-8 text-xs">
+                        <SelectValue placeholder="All statuses" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All statuses</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="approved">Approved</SelectItem>
+                        <SelectItem value="rejected">Rejected</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <div className="space-y-1">
-                  <Label htmlFor="request-history-requested-by" className="text-[11px]">
-                    Requested By
-                  </Label>
-                  <Select
-                    value={filters.requestedBy}
-                    onValueChange={(value) => setFilters((current) => ({ ...current, requestedBy: value }))}
-                  >
-                    <SelectTrigger id="request-history-requested-by" className="h-8 text-xs">
-                      <SelectValue placeholder="All requesters" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All requesters</SelectItem>
-                      {requesterOptions.map((requester) => (
-                        <SelectItem key={requester} value={requester}>
-                          {requester}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="request-history-requested-by" className="text-[11px]">
+                      Requested By
+                    </Label>
+                    <Select
+                      value={filters.requestedBy}
+                      onValueChange={(value) => setFilters((current) => ({ ...current, requestedBy: value }))}
+                    >
+                      <SelectTrigger id="request-history-requested-by" className="h-8 text-xs">
+                        <SelectValue placeholder="All requesters" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All requesters</SelectItem>
+                        {requesterOptions.map((requester) => (
+                          <SelectItem key={requester} value={requester}>
+                            {requester}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <div className="space-y-1">
-                  <Label htmlFor="request-history-date-from" className="text-[11px]">
-                    Date From
-                  </Label>
-                  <Input
-                    id="request-history-date-from"
-                    type="date"
-                    className="h-8 text-xs"
-                    value={filters.dateFrom}
-                    onChange={(event) => setFilters((current) => ({ ...current, dateFrom: event.target.value }))}
-                  />
-                </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="request-history-date-from" className="text-[11px]">
+                      Date From
+                    </Label>
+                    <Input
+                      id="request-history-date-from"
+                      type="date"
+                      className="h-8 text-xs"
+                      value={filters.dateFrom}
+                      onChange={(event) => setFilters((current) => ({ ...current, dateFrom: event.target.value }))}
+                    />
+                  </div>
 
-                <div className="space-y-1">
-                  <Label htmlFor="request-history-date-to" className="text-[11px]">
-                    Date To
-                  </Label>
-                  <Input
-                    id="request-history-date-to"
-                    type="date"
-                    className="h-8 text-xs"
-                    value={filters.dateTo}
-                    onChange={(event) => setFilters((current) => ({ ...current, dateTo: event.target.value }))}
-                  />
+                  <div className="space-y-1">
+                    <Label htmlFor="request-history-date-to" className="text-[11px]">
+                      Date To
+                    </Label>
+                    <Input
+                      id="request-history-date-to"
+                      type="date"
+                      className="h-8 text-xs"
+                      value={filters.dateTo}
+                      onChange={(event) => setFilters((current) => ({ ...current, dateTo: event.target.value }))}
+                    />
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
               <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
                 <span>{historySummary.recordCount} requests</span>

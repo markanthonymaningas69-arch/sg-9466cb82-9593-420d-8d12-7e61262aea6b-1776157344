@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, TrendingDown } from "lucide-react";
+import { Plus, Trash2, TrendingDown, Filter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -69,6 +69,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState<MaterialUsageFormData>(getDefaultFormData);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [filters, setFilters] = useState({
     scopeId: "all",
     material: "",
@@ -447,93 +448,109 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
                     Review saved usage records by scope, material, unit, and date range.
                   </p>
                 </div>
-                <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={clearFilters}>
-                  Clear filters
-                </Button>
-              </div>
-
-              <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                <div className="space-y-1">
-                  <Label htmlFor="usage-history-material" className="text-[11px]">
-                    Material
-                  </Label>
-                  <Input
-                    id="usage-history-material"
-                    className="h-8 text-xs"
-                    value={filters.material}
-                    onChange={(event) => setFilters((current) => ({ ...current, material: event.target.value }))}
-                    placeholder="Search material"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <Label htmlFor="usage-history-scope" className="text-[11px]">
-                    Scope
-                  </Label>
-                  <Select
-                    value={filters.scopeId}
-                    onValueChange={(value) => setFilters((current) => ({ ...current, scopeId: value }))}
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-3 text-xs"
+                    onClick={() => setFiltersOpen((current) => !current)}
                   >
-                    <SelectTrigger id="usage-history-scope" className="h-8 text-xs">
-                      <SelectValue placeholder="All scopes" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All scopes</SelectItem>
-                      {hasUnscopedRecords ? <SelectItem value="unscoped">Unscoped</SelectItem> : null}
-                      {bomScopes.map((scope) => (
-                        <SelectItem key={scope.id} value={scope.id}>
-                          {scope.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1">
-                  <Label htmlFor="usage-history-unit" className="text-[11px]">
-                    Unit
-                  </Label>
-                  <Select value={filters.unit} onValueChange={(value) => setFilters((current) => ({ ...current, unit: value }))}>
-                    <SelectTrigger id="usage-history-unit" className="h-8 text-xs">
-                      <SelectValue placeholder="All units" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All units</SelectItem>
-                      {unitOptions.map((unit) => (
-                        <SelectItem key={unit} value={unit}>
-                          {unit}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1">
-                  <Label htmlFor="usage-history-date-from" className="text-[11px]">
-                    Date From
-                  </Label>
-                  <Input
-                    id="usage-history-date-from"
-                    type="date"
-                    className="h-8 text-xs"
-                    value={filters.dateFrom}
-                    onChange={(event) => setFilters((current) => ({ ...current, dateFrom: event.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <Label htmlFor="usage-history-date-to" className="text-[11px]">
-                    Date To
-                  </Label>
-                  <Input
-                    id="usage-history-date-to"
-                    type="date"
-                    className="h-8 text-xs"
-                    value={filters.dateTo}
-                    onChange={(event) => setFilters((current) => ({ ...current, dateTo: event.target.value }))}
-                  />
+                    <Filter className="mr-2 h-3.5 w-3.5" />
+                    {filtersOpen ? "Hide filters" : "Filter"}
+                  </Button>
+                  {filtersOpen ? (
+                    <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={clearFilters}>
+                      Clear filters
+                    </Button>
+                  ) : null}
                 </div>
               </div>
+
+              {filtersOpen ? (
+                <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                  <div className="space-y-1">
+                    <Label htmlFor="usage-history-material" className="text-[11px]">
+                      Material
+                    </Label>
+                    <Input
+                      id="usage-history-material"
+                      className="h-8 text-xs"
+                      value={filters.material}
+                      onChange={(event) => setFilters((current) => ({ ...current, material: event.target.value }))}
+                      placeholder="Search material"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="usage-history-scope" className="text-[11px]">
+                      Scope
+                    </Label>
+                    <Select
+                      value={filters.scopeId}
+                      onValueChange={(value) => setFilters((current) => ({ ...current, scopeId: value }))}
+                    >
+                      <SelectTrigger id="usage-history-scope" className="h-8 text-xs">
+                        <SelectValue placeholder="All scopes" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All scopes</SelectItem>
+                        {hasUnscopedRecords ? <SelectItem value="unscoped">Unscoped</SelectItem> : null}
+                        {bomScopes.map((scope) => (
+                          <SelectItem key={scope.id} value={scope.id}>
+                            {scope.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="usage-history-unit" className="text-[11px]">
+                      Unit
+                    </Label>
+                    <Select value={filters.unit} onValueChange={(value) => setFilters((current) => ({ ...current, unit: value }))}>
+                      <SelectTrigger id="usage-history-unit" className="h-8 text-xs">
+                        <SelectValue placeholder="All units" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All units</SelectItem>
+                        {unitOptions.map((unit) => (
+                          <SelectItem key={unit} value={unit}>
+                            {unit}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="usage-history-date-from" className="text-[11px]">
+                      Date From
+                    </Label>
+                    <Input
+                      id="usage-history-date-from"
+                      type="date"
+                      className="h-8 text-xs"
+                      value={filters.dateFrom}
+                      onChange={(event) => setFilters((current) => ({ ...current, dateFrom: event.target.value }))}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="usage-history-date-to" className="text-[11px]">
+                      Date To
+                    </Label>
+                    <Input
+                      id="usage-history-date-to"
+                      type="date"
+                      className="h-8 text-xs"
+                      value={filters.dateTo}
+                      onChange={(event) => setFilters((current) => ({ ...current, dateTo: event.target.value }))}
+                    />
+                  </div>
+                </div>
+              ) : null}
 
               <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
                 <span>{historySummary.recordCount} records</span>

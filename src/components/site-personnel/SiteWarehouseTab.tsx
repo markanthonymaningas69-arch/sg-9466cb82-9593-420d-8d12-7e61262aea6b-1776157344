@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Package, Plus, Trash2 } from "lucide-react";
+import { Package, Plus, Trash2, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -100,6 +100,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState<FormState>(defaultFormState);
   const [isOtherMaterial, setIsOtherMaterial] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [filters, setFilters] = useState({
     scopeId: "all",
     supplier: "all",
@@ -617,114 +618,130 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                     Review saved site purchases by material, supplier, receipt number, scope, and date range.
                   </p>
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 px-2 text-xs"
-                  onClick={clearFilters}
-                >
-                  Clear filters
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-3 text-xs"
+                    onClick={() => setFiltersOpen((current) => !current)}
+                  >
+                    <Filter className="mr-2 h-3.5 w-3.5" />
+                    {filtersOpen ? "Hide filters" : "Filter"}
+                  </Button>
+                  {filtersOpen ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2 text-xs"
+                      onClick={clearFilters}
+                    >
+                      Clear filters
+                    </Button>
+                  ) : null}
+                </div>
               </div>
 
-              <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                <div className="space-y-1">
-                  <Label htmlFor="history-material" className="text-[11px]">
-                    Material
-                  </Label>
-                  <Input
-                    id="history-material"
-                    className="h-8 text-xs"
-                    value={filters.material}
-                    onChange={(event) => setFilters((current) => ({ ...current, material: event.target.value }))}
-                    placeholder="Search material"
-                  />
-                </div>
+              {filtersOpen ? (
+                <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="history-material" className="text-[11px]">
+                      Material
+                    </Label>
+                    <Input
+                      id="history-material"
+                      className="h-8 text-xs"
+                      value={filters.material}
+                      onChange={(event) => setFilters((current) => ({ ...current, material: event.target.value }))}
+                      placeholder="Search material"
+                    />
+                  </div>
 
-                <div className="space-y-1">
-                  <Label htmlFor="history-scope" className="text-[11px]">
-                    Scope
-                  </Label>
-                  <Select
-                    value={filters.scopeId}
-                    onValueChange={(value) => setFilters((current) => ({ ...current, scopeId: value }))}
-                  >
-                    <SelectTrigger id="history-scope" className="h-8 text-xs">
-                      <SelectValue placeholder="All scopes" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All scopes</SelectItem>
-                      {scopes.map((scope) => (
-                        <SelectItem key={scope.id} value={scope.id}>
-                          {scope.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="history-scope" className="text-[11px]">
+                      Scope
+                    </Label>
+                    <Select
+                      value={filters.scopeId}
+                      onValueChange={(value) => setFilters((current) => ({ ...current, scopeId: value }))}
+                    >
+                      <SelectTrigger id="history-scope" className="h-8 text-xs">
+                        <SelectValue placeholder="All scopes" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All scopes</SelectItem>
+                        {scopes.map((scope) => (
+                          <SelectItem key={scope.id} value={scope.id}>
+                            {scope.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <div className="space-y-1">
-                  <Label htmlFor="history-supplier" className="text-[11px]">
-                    Supplier
-                  </Label>
-                  <Select
-                    value={filters.supplier}
-                    onValueChange={(value) => setFilters((current) => ({ ...current, supplier: value }))}
-                  >
-                    <SelectTrigger id="history-supplier" className="h-8 text-xs">
-                      <SelectValue placeholder="All suppliers" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All suppliers</SelectItem>
-                      {supplierOptions.map((supplier) => (
-                        <SelectItem key={supplier} value={supplier}>
-                          {supplier}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="history-supplier" className="text-[11px]">
+                      Supplier
+                    </Label>
+                    <Select
+                      value={filters.supplier}
+                      onValueChange={(value) => setFilters((current) => ({ ...current, supplier: value }))}
+                    >
+                      <SelectTrigger id="history-supplier" className="h-8 text-xs">
+                        <SelectValue placeholder="All suppliers" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All suppliers</SelectItem>
+                        {supplierOptions.map((supplier) => (
+                          <SelectItem key={supplier} value={supplier}>
+                            {supplier}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <div className="space-y-1">
-                  <Label htmlFor="history-receipt" className="text-[11px]">
-                    Receipt Number
-                  </Label>
-                  <Input
-                    id="history-receipt"
-                    className="h-8 text-xs"
-                    value={filters.receipt}
-                    onChange={(event) => setFilters((current) => ({ ...current, receipt: event.target.value }))}
-                    placeholder="Search receipt"
-                  />
-                </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="history-receipt" className="text-[11px]">
+                      Receipt Number
+                    </Label>
+                    <Input
+                      id="history-receipt"
+                      className="h-8 text-xs"
+                      value={filters.receipt}
+                      onChange={(event) => setFilters((current) => ({ ...current, receipt: event.target.value }))}
+                      placeholder="Search receipt"
+                    />
+                  </div>
 
-                <div className="space-y-1">
-                  <Label htmlFor="history-date-from" className="text-[11px]">
-                    Date From
-                  </Label>
-                  <Input
-                    id="history-date-from"
-                    type="date"
-                    className="h-8 text-xs"
-                    value={filters.dateFrom}
-                    onChange={(event) => setFilters((current) => ({ ...current, dateFrom: event.target.value }))}
-                  />
-                </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="history-date-from" className="text-[11px]">
+                      Date From
+                    </Label>
+                    <Input
+                      id="history-date-from"
+                      type="date"
+                      className="h-8 text-xs"
+                      value={filters.dateFrom}
+                      onChange={(event) => setFilters((current) => ({ ...current, dateFrom: event.target.value }))}
+                    />
+                  </div>
 
-                <div className="space-y-1">
-                  <Label htmlFor="history-date-to" className="text-[11px]">
-                    Date To
-                  </Label>
-                  <Input
-                    id="history-date-to"
-                    type="date"
-                    className="h-8 text-xs"
-                    value={filters.dateTo}
-                    onChange={(event) => setFilters((current) => ({ ...current, dateTo: event.target.value }))}
-                  />
+                  <div className="space-y-1">
+                    <Label htmlFor="history-date-to" className="text-[11px]">
+                      Date To
+                    </Label>
+                    <Input
+                      id="history-date-to"
+                      type="date"
+                      className="h-8 text-xs"
+                      value={filters.dateTo}
+                      onChange={(event) => setFilters((current) => ({ ...current, dateTo: event.target.value }))}
+                    />
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
               <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
                 <span>{historySummary.recordCount} records</span>

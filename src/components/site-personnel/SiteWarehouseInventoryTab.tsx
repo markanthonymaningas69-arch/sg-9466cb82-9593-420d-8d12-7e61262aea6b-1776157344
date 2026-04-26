@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ClipboardCheck, PackageSearch, Save, Warehouse as WarehouseIcon } from "lucide-react";
+import { AlertTriangle, ClipboardCheck, PackageSearch, Save, Warehouse as WarehouseIcon, Filter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { siteService, type WarehouseMaterialLedgerItem } from "@/services/siteService";
 import { useToast } from "@/hooks/use-toast";
@@ -50,6 +50,7 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
   const [remainingInputs, setRemainingInputs] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [filters, setFilters] = useState({
     material: "",
     scope: "all",
@@ -235,93 +236,109 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                       Filter the material ledger by material, scope, balance status, or counted state.
                     </p>
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 px-2 text-xs"
-                    onClick={clearFilters}
-                  >
-                    Clear filters
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 px-3 text-xs"
+                      onClick={() => setFiltersOpen((current) => !current)}
+                    >
+                      <Filter className="mr-2 h-3.5 w-3.5" />
+                      {filtersOpen ? "Hide filters" : "Filter"}
+                    </Button>
+                    {filtersOpen ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs"
+                        onClick={clearFilters}
+                      >
+                        Clear filters
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
 
-                <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  <div className="space-y-1">
-                    <Label htmlFor="warehouse-history-material" className="text-[11px]">
-                      Material
-                    </Label>
-                    <Input
-                      id="warehouse-history-material"
-                      className="h-8 text-xs"
-                      value={filters.material}
-                      onChange={(event) => setFilters((current) => ({ ...current, material: event.target.value }))}
-                      placeholder="Search material"
-                    />
-                  </div>
+                {filtersOpen ? (
+                  <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="space-y-1">
+                      <Label htmlFor="warehouse-history-material" className="text-[11px]">
+                        Material
+                      </Label>
+                      <Input
+                        id="warehouse-history-material"
+                        className="h-8 text-xs"
+                        value={filters.material}
+                        onChange={(event) => setFilters((current) => ({ ...current, material: event.target.value }))}
+                        placeholder="Search material"
+                      />
+                    </div>
 
-                  <div className="space-y-1">
-                    <Label htmlFor="warehouse-history-scope" className="text-[11px]">
-                      Scope
-                    </Label>
-                    <Select
-                      value={filters.scope}
-                      onValueChange={(value) => setFilters((current) => ({ ...current, scope: value }))}
-                    >
-                      <SelectTrigger id="warehouse-history-scope" className="h-8 text-xs">
-                        <SelectValue placeholder="All scopes" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All scopes</SelectItem>
-                        {scopeOptions.map((scopeName) => (
-                          <SelectItem key={scopeName} value={scopeName}>
-                            {scopeName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="warehouse-history-scope" className="text-[11px]">
+                        Scope
+                      </Label>
+                      <Select
+                        value={filters.scope}
+                        onValueChange={(value) => setFilters((current) => ({ ...current, scope: value }))}
+                      >
+                        <SelectTrigger id="warehouse-history-scope" className="h-8 text-xs">
+                          <SelectValue placeholder="All scopes" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All scopes</SelectItem>
+                          {scopeOptions.map((scopeName) => (
+                            <SelectItem key={scopeName} value={scopeName}>
+                              {scopeName}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                  <div className="space-y-1">
-                    <Label htmlFor="warehouse-history-status" className="text-[11px]">
-                      Balance Status
-                    </Label>
-                    <Select
-                      value={filters.status}
-                      onValueChange={(value) => setFilters((current) => ({ ...current, status: value }))}
-                    >
-                      <SelectTrigger id="warehouse-history-status" className="h-8 text-xs">
-                        <SelectValue placeholder="All statuses" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All statuses</SelectItem>
-                        <SelectItem value="balanced">Balanced</SelectItem>
-                        <SelectItem value="missing">Missing</SelectItem>
-                        <SelectItem value="excess">Excess</SelectItem>
-                        <SelectItem value="uncounted">Needs Count</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="warehouse-history-status" className="text-[11px]">
+                        Balance Status
+                      </Label>
+                      <Select
+                        value={filters.status}
+                        onValueChange={(value) => setFilters((current) => ({ ...current, status: value }))}
+                      >
+                        <SelectTrigger id="warehouse-history-status" className="h-8 text-xs">
+                          <SelectValue placeholder="All statuses" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All statuses</SelectItem>
+                          <SelectItem value="balanced">Balanced</SelectItem>
+                          <SelectItem value="missing">Missing</SelectItem>
+                          <SelectItem value="excess">Excess</SelectItem>
+                          <SelectItem value="uncounted">Needs Count</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                  <div className="space-y-1">
-                    <Label htmlFor="warehouse-history-count-state" className="text-[11px]">
-                      Count State
-                    </Label>
-                    <Select
-                      value={filters.countState}
-                      onValueChange={(value) => setFilters((current) => ({ ...current, countState: value }))}
-                    >
-                      <SelectTrigger id="warehouse-history-count-state" className="h-8 text-xs">
-                        <SelectValue placeholder="All count states" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All count states</SelectItem>
-                        <SelectItem value="counted">Counted</SelectItem>
-                        <SelectItem value="uncounted">Uncounted</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="space-y-1">
+                      <Label htmlFor="warehouse-history-count-state" className="text-[11px]">
+                        Count State
+                      </Label>
+                      <Select
+                        value={filters.countState}
+                        onValueChange={(value) => setFilters((current) => ({ ...current, countState: value }))}
+                      >
+                        <SelectTrigger id="warehouse-history-count-state" className="h-8 text-xs">
+                          <SelectValue placeholder="All count states" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All count states</SelectItem>
+                          <SelectItem value="counted">Counted</SelectItem>
+                          <SelectItem value="uncounted">Uncounted</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                </div>
+                ) : null}
 
                 <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
                   <span>{filteredSummary.materialCount} visible materials</span>
