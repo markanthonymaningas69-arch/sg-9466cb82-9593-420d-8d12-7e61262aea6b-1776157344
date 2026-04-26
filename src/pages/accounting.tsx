@@ -16,6 +16,7 @@ import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { approvalCenterService, type ApprovalRequest } from "@/services/approvalCenterService";
+import { RequestDetailsButton } from "@/components/approval/RequestDetailsButton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export default function Accounting() {
@@ -201,13 +202,14 @@ export default function Accounting() {
                         <TableHead>Routed</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Summary</TableHead>
+                        <TableHead className="text-right">View Details</TableHead>
                         <TableHead className="text-right">Action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {incomingRequests.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                          <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
                             No incoming Accounting requests.
                           </TableCell>
                         </TableRow>
@@ -225,6 +227,9 @@ export default function Accounting() {
                             </TableCell>
                             <TableCell className="max-w-[260px] truncate text-sm text-muted-foreground">
                               {request.summary || "—"}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <RequestDetailsButton request={request} />
                             </TableCell>
                             <TableCell className="text-right">
                               {request.workflowStatus === "completed" ? (

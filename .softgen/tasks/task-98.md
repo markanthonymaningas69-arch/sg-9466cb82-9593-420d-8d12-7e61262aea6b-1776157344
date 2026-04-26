@@ -1,6 +1,6 @@
 ---
 title: Accounting request details access
-status: todo
+status: done
 priority: high
 type: feature
 tags: [accounting, incoming-requests, request-details]
@@ -13,11 +13,11 @@ position: 98
 Add View Details access to the Accounting Incoming Requests list. Reuse the shared Request Details panel so Accounting users can review routed cash requests, inspect lifecycle context, view comments and audit history, and inspect request content without leaving the module.
 
 ## Checklist
-- [ ] Inspect the current Accounting incoming requests list and available request data
-- [ ] Add a View Details button on the right side of each request row
-- [ ] Open the shared Request Details panel from Accounting
-- [ ] Show full request context in read-only mode unless approval actions are allowed for that role
-- [ ] Keep completion handling intact alongside the new details access
+- [x] Inspect the current Accounting incoming requests list and available request data
+- [x] Add a View Details button on the right side of each request row
+- [x] Open the shared Request Details panel from Accounting
+- [x] Show full request context in read-only mode unless approval actions are allowed for that role
+- [x] Keep completion handling intact alongside the new details access
 
 ## Acceptance
 Accounting incoming requests include a View Details action.

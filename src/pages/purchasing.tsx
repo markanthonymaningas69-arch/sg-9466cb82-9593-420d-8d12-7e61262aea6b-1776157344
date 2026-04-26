@@ -17,6 +17,7 @@ import { projectService } from "@/services/projectService";
 import { useSettings } from "@/contexts/SettingsProvider";
 import { cn } from "@/lib/utils";
 import { approvalCenterService, type ApprovalRequest } from "@/services/approvalCenterService";
+import { RequestDetailsButton } from "@/components/approval/RequestDetailsButton";
 
 const STANDARD_CATEGORIES = [
   "Construction Materials",
@@ -784,13 +785,14 @@ export default function Purchasing() {
                       <TableHead>Routed</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Summary</TableHead>
+                      <TableHead className="text-right">View Details</TableHead>
                       <TableHead className="text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {incomingRequests.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                        <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
                           No incoming Purchasing requests.
                         </TableCell>
                       </TableRow>
@@ -808,6 +810,9 @@ export default function Purchasing() {
                           </TableCell>
                           <TableCell className="max-w-[260px] truncate text-sm text-muted-foreground">
                             {request.summary || "—"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <RequestDetailsButton request={request} />
                           </TableCell>
                           <TableCell className="text-right">
                             {request.workflowStatus === "completed" ? (

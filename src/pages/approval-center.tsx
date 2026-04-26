@@ -3,15 +3,13 @@ import { Layout } from "@/components/Layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { RequestDetailsButton } from "@/components/approval/RequestDetailsButton";
 import {
   approvalCenterService,
-  type ApprovalAction,
   type ApprovalRequest,
   type ApprovalStatus,
   type WorkflowStatus,
@@ -50,7 +48,7 @@ function statusBadgeClass(status: ApprovalStatus) {
   if (status === "approved") return "bg-emerald-600 text-white";
   if (status === "rejected") return "bg-rose-600 text-white";
   if (status === "returned_for_revision") return "bg-amber-500 text-white";
-  return "bg-sky-600 text-white";
+  return "bg-amber-500 text-white";
 }
 
 function workflowBadgeClass(status: WorkflowStatus) {
@@ -60,7 +58,7 @@ function workflowBadgeClass(status: WorkflowStatus) {
   if (status === "rejected") return "bg-rose-600 text-white";
   if (status === "returned_for_revision") return "bg-amber-500 text-white";
   if (status === "approved") return "bg-emerald-600 text-white";
-  return "bg-sky-600 text-white";
+  return "bg-amber-500 text-white";
 }
 
 function formatWorkflowStatus(status: WorkflowStatus) {
@@ -72,10 +70,7 @@ function getModuleTone(sourceModule: string) {
 }
 
 function canArchiveRequest(request: ApprovalRequest) {
-  return (
-    request.status === "approved" &&
-    ["purchases", "site_requests", "cash_advance_requests", "leave_requests"].includes(request.sourceTable)
-  );
+  return request.status === "approved" && ["purchases", "site_requests", "cash_advance_requests", "leave_requests"].includes(request.sourceTable);
 }
 
 function getLinkedRequestDetails(request: ApprovalRequest) {
@@ -93,13 +88,11 @@ function getLinkedRequestDetails(request: ApprovalRequest) {
       : null;
 
   return [
-    { label: "Requested item", value: typeof payload.itemName === "string" ? payload.itemName : null },
+    { label: "Requested Item", value: typeof payload.itemName === "string" ? payload.itemName : null },
     { label: "Quantity / Amount", value: quantityLabel },
-    { label: "Request date", value: typeof payload.requestDate === "string" ? new Date(payload.requestDate).toLocaleDateString() : null },
-    { label: "Scope", value: typeof payload.scopeName === "string" && payload.scopeName ? payload.scopeName : null },
-    { label: "Requested by", value: typeof payload.requestedBy === "string" ? payload.requestedBy : null },
-    { label: "Recorded amount", value: typeof amount === "number" ? amount.toLocaleString("en-US") : null },
-    { label: "Notes", value: typeof payload.notes === "string" && payload.notes ? payload.notes : null },
+    { label: "Request Date", value: typeof payload.requestDate === "string" ? new Date(payload.requestDate).toLocaleDateString() : null },
+    { label: "Scope of Work", value: typeof payload.scopeName === "string" && payload.scopeName ? payload.scopeName : null },
+    { label: "Recorded Amount", value: typeof amount === "number" ? amount.toLocaleString("en-US") : null },
   ].filter((detail): detail is { label: string; value: string } => Boolean(detail.value));
 }
 
@@ -108,15 +101,9 @@ export default function ApprovalCenterPage() {
   const [activeTab, setActiveTab] = useState<ApprovalTabKey>("all");
   const [requests, setRequests] = useState<ApprovalRequest[]>([]);
   const [selectedRequestId, setSelectedRequestId] = useState("");
-  const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(true);
-  const [acting, setActing] = useState(false);
   const [archivingId, setArchivingId] = useState("");
   const [archiveOpen, setArchiveOpen] = useState(false);
-  const [viewOpen, setViewOpen] = useState(false);
-  const [viewRequest, setViewRequest] = useState<ApprovalRequest | null>(null);
-  const [viewActions, setViewActions] = useState<ApprovalAction[]>([]);
-  const [viewLoading, setViewLoading] = useState(false);
 
   const filteredRequests = useMemo(() => {
     if (activeTab === "all") return requests;
@@ -133,11 +120,6 @@ export default function ApprovalCenterPage() {
     [selectedRequest]
   );
 
-  const viewRequestDetails = useMemo(
-    () => (viewRequest ? getLinkedRequestDetails(viewRequest) : []),
-    [viewRequest]
-  );
-
   const pendingCounts = useMemo(() => {
     return approvalTabs.reduce<Record<ApprovalTabKey, number>>((accumulator, tab) => {
       const source = tab.key === "all" ? requests : requests.filter((request) => request.sourceModule === tab.key);
@@ -149,20 +131,6 @@ export default function ApprovalCenterPage() {
   async function loadRequests() {
     const data = await approvalCenterService.listRequests();
     setRequests(data);
-  }
-
-  async function loadViewActions(requestId: string) {
-    setViewLoading(true);
-    const data = await approvalCenterService.listActions(requestId);
-    setViewActions(data);
-    setViewLoading(false);
-  }
-
-  async function handleOpenView(request: ApprovalRequest) {
-    setSelectedRequestId(request.id);
-    setViewRequest(request);
-    setViewOpen(true);
-    await loadViewActions(request.id);
   }
 
   useEffect(() => {
@@ -183,15 +151,12 @@ export default function ApprovalCenterPage() {
       .on("postgres_changes", { event: "*", schema: "public", table: "approval_requests" }, () => {
         void loadRequests();
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "approval_actions" }, () => {
-        if (viewRequest?.id) void loadViewActions(viewRequest.id);
-      })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [toast, viewRequest?.id]);
+  }, [toast]);
 
   useEffect(() => {
     if (!selectedRequestId && filteredRequests[0]?.id) {
@@ -202,47 +167,15 @@ export default function ApprovalCenterPage() {
     }
   }, [filteredRequests, selectedRequestId]);
 
-  async function handleAction(status: ApprovalStatus) {
-    if (!selectedRequest?.id) return;
-
-    try {
-      setActing(true);
-      await approvalCenterService.updateStatus(selectedRequest.id, status, comment);
-      await loadRequests();
-      if (viewRequest?.id === selectedRequest.id) {
-        await loadViewActions(selectedRequest.id);
-      }
-      setComment("");
-      toast({
-        title: "Approval updated",
-        description: `Request marked as ${status.replaceAll("_", " ")}.`,
-      });
-    } catch (error) {
-      console.error(error);
-      toast({ title: "Error", description: "Failed to update approval request", variant: "destructive" });
-    } finally {
-      setActing(false);
-    }
-  }
-
   async function handleArchive(request: ApprovalRequest) {
     try {
       setArchivingId(request.id);
       await approvalCenterService.archiveRequest(request.id);
       await loadRequests();
-
       if (selectedRequestId === request.id) {
         setSelectedRequestId("");
       }
-
-      if (viewRequest?.id === request.id) {
-        setViewOpen(false);
-        setViewRequest(null);
-        setViewActions([]);
-      }
-
       setArchiveOpen(true);
-
       toast({
         title: "Moved to GM Vault",
         description: "The approved record was archived and is now available in the GM Vault.",
@@ -266,14 +199,10 @@ export default function ApprovalCenterPage() {
           <div className="space-y-1">
             <h1 className="font-heading text-xl font-bold sm:text-2xl">Approval Center</h1>
             <p className="text-sm text-muted-foreground">
-              Review Purchasing, Accounting, HR, Site Personnel, and Project Manager requests in one place, then move approved records into the GM Vault archive flow.
+              Review centralized requests, open the full request details panel, and route approved work into the correct execution module.
             </p>
           </div>
-          <Button
-            variant="outline"
-            className="border-amber-200 text-amber-800 hover:bg-amber-50"
-            onClick={() => setArchiveOpen(true)}
-          >
+          <Button variant="outline" className="border-amber-200 text-amber-800 hover:bg-amber-50" onClick={() => setArchiveOpen(true)}>
             Open GM Vault
           </Button>
         </div>
@@ -289,7 +218,7 @@ export default function ApprovalCenterPage() {
                 <span>{tab.label}</span>
                 {pendingCounts[tab.key] > 0 ? (
                   <Badge className="h-4 rounded-sm bg-black/15 px-1.5 text-[10px] text-current shadow-none">
-                    {pendingCounts[tab.key]}
+                    NEW {pendingCounts[tab.key]}
                   </Badge>
                 ) : null}
               </TabsTrigger>
@@ -300,11 +229,9 @@ export default function ApprovalCenterPage() {
             <div className="grid gap-3 xl:grid-cols-[minmax(0,1.65fr)_340px]">
               <Card>
                 <CardHeader className="space-y-1 p-4">
-                  <CardTitle className="text-base">
-                    {approvalTabs.find((tab) => tab.key === activeTab)?.label}
-                  </CardTitle>
+                  <CardTitle className="text-base">{approvalTabs.find((tab) => tab.key === activeTab)?.label}</CardTitle>
                   <CardDescription className="text-xs">
-                    Denser review list with quick access to request details and audit trail.
+                    Structured request review list with direct access to the full Request Details panel.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -326,8 +253,8 @@ export default function ApprovalCenterPage() {
                             <TableHead className="h-9 text-[11px] uppercase tracking-wide">Project</TableHead>
                             <TableHead className="h-9 text-[11px] uppercase tracking-wide">Status</TableHead>
                             <TableHead className="h-9 text-[11px] uppercase tracking-wide">Lifecycle</TableHead>
-                            <TableHead className="h-9 text-right text-[11px] uppercase tracking-wide">Action</TableHead>
-                            <TableHead className="h-9 text-right text-[11px] uppercase tracking-wide">View</TableHead>
+                            <TableHead className="h-9 text-right text-[11px] uppercase tracking-wide">Archive</TableHead>
+                            <TableHead className="h-9 text-right text-[11px] uppercase tracking-wide">View Details</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -378,17 +305,7 @@ export default function ApprovalCenterPage() {
                                 )}
                               </TableCell>
                               <TableCell className="py-2.5 text-right">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 px-2 text-xs"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    void handleOpenView(request);
-                                  }}
-                                >
-                                  View
-                                </Button>
+                                <RequestDetailsButton request={request} allowActions onStatusUpdated={loadRequests} />
                               </TableCell>
                             </TableRow>
                           ))}
@@ -401,9 +318,9 @@ export default function ApprovalCenterPage() {
 
               <Card>
                 <CardHeader className="space-y-1 p-4">
-                  <CardTitle className="text-base">Request Details</CardTitle>
+                  <CardTitle className="text-base">Selected Request</CardTitle>
                   <CardDescription className="text-xs">
-                    Review context, add notes, and update the request status.
+                    Preview request context here, then open Request Details to review notes, audit trail, and pending actions.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3 p-4 pt-0">
@@ -427,20 +344,11 @@ export default function ApprovalCenterPage() {
                         </div>
                         <div className="grid gap-1.5 text-xs text-muted-foreground">
                           <p><span className="font-medium text-foreground">Requested by:</span> {selectedRequest.requestedBy}</p>
-                          <p><span className="font-medium text-foreground">Date/time:</span> {formatDateTime(selectedRequest.requestedAt)}</p>
+                          <p><span className="font-medium text-foreground">Date / time:</span> {formatDateTime(selectedRequest.requestedAt)}</p>
                           <p><span className="font-medium text-foreground">Related project:</span> {selectedRequest.projectName || "No project"}</p>
-                          <p><span className="font-medium text-foreground">Summary:</span> {selectedRequest.summary || "No summary available"}</p>
                           <p><span className="font-medium text-foreground">Target module:</span> {selectedRequest.targetModule || "Unassigned"}</p>
-                          <p><span className="font-medium text-foreground">Lifecycle:</span> {formatWorkflowStatus(selectedRequest.workflowStatus)}</p>
-                          {selectedRequest.routedAt ? (
-                            <p><span className="font-medium text-foreground">Routed at:</span> {formatDateTime(selectedRequest.routedAt)}</p>
-                          ) : null}
-                          {selectedRequest.completedAt ? (
-                            <p><span className="font-medium text-foreground">Completed at:</span> {formatDateTime(selectedRequest.completedAt)}</p>
-                          ) : null}
-                          {selectedRequest.latestComment ? (
-                            <p><span className="font-medium text-foreground">Latest comment:</span> {selectedRequest.latestComment}</p>
-                          ) : null}
+                          <p><span className="font-medium text-foreground">Lifecycle status:</span> {formatWorkflowStatus(selectedRequest.workflowStatus)}</p>
+                          <p><span className="font-medium text-foreground">Summary:</span> {selectedRequest.summary || "No summary available"}</p>
                         </div>
                         {selectedRequestDetails.length > 0 ? (
                           <div className="grid gap-1.5 border-t pt-2 text-xs text-muted-foreground">
@@ -453,30 +361,8 @@ export default function ApprovalCenterPage() {
                         ) : null}
                       </div>
 
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-foreground">Comments</label>
-                        <Textarea
-                          value={comment}
-                          onChange={(event) => setComment(event.target.value)}
-                          placeholder="Add review notes, rejection reason, or revision instructions..."
-                          rows={3}
-                          className="text-sm"
-                        />
-                      </div>
-
                       <div className="grid gap-2">
-                        <Button size="sm" variant="outline" onClick={() => void handleOpenView(selectedRequest)}>
-                          Request Detail
-                        </Button>
-                        <Button size="sm" disabled={acting} onClick={() => void handleAction("approved")}>
-                          Approve
-                        </Button>
-                        <Button size="sm" disabled={acting} variant="destructive" onClick={() => void handleAction("rejected")}>
-                          Reject
-                        </Button>
-                        <Button size="sm" disabled={acting} variant="outline" onClick={() => void handleAction("returned_for_revision")}>
-                          Return with comment
-                        </Button>
+                        <RequestDetailsButton request={selectedRequest} allowActions onStatusUpdated={loadRequests} />
                         {canArchiveRequest(selectedRequest) ? (
                           <Button
                             size="sm"
@@ -488,9 +374,6 @@ export default function ApprovalCenterPage() {
                             {archivingId === selectedRequest.id ? "Archiving..." : "Archive to GM Vault"}
                           </Button>
                         ) : null}
-                        <Button size="sm" variant="secondary" onClick={() => void handleOpenView(selectedRequest)}>
-                          View audit trail
-                        </Button>
                       </div>
                     </>
                   )}
@@ -501,90 +384,6 @@ export default function ApprovalCenterPage() {
         </Tabs>
 
         <ArchiveViewer open={archiveOpen} onOpenChange={setArchiveOpen} />
-
-        <Dialog open={viewOpen} onOpenChange={setViewOpen}>
-          <DialogContent className="max-w-3xl">
-            <DialogHeader>
-              <DialogTitle className="text-base">Request View</DialogTitle>
-              <DialogDescription className="text-xs">
-                Full request summary with audit trail history.
-              </DialogDescription>
-            </DialogHeader>
-
-            {!viewRequest ? null : (
-              <div className="space-y-4">
-                <div className="grid gap-3 rounded-lg border p-3 text-xs text-muted-foreground sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <p><span className="font-medium text-foreground">Module:</span> {viewRequest.sourceModule}</p>
-                    <p><span className="font-medium text-foreground">Request type:</span> {viewRequest.requestType}</p>
-                    <p><span className="font-medium text-foreground">Requested by:</span> {viewRequest.requestedBy}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p><span className="font-medium text-foreground">Date/time:</span> {formatDateTime(viewRequest.requestedAt)}</p>
-                    <p><span className="font-medium text-foreground">Project:</span> {viewRequest.projectName || "No project"}</p>
-                    <p><span className="font-medium text-foreground">Status:</span> {viewRequest.status.replaceAll("_", " ")}</p>
-                    <p><span className="font-medium text-foreground">Lifecycle:</span> {formatWorkflowStatus(viewRequest.workflowStatus)}</p>
-                  </div>
-                  <div className="sm:col-span-2">
-                    <p><span className="font-medium text-foreground">Summary:</span> {viewRequest.summary || "No summary available"}</p>
-                    <p className="mt-1"><span className="font-medium text-foreground">Target module:</span> {viewRequest.targetModule || "Unassigned"}</p>
-                    {viewRequest.routedAt ? (
-                      <p className="mt-1"><span className="font-medium text-foreground">Routed at:</span> {formatDateTime(viewRequest.routedAt)}</p>
-                    ) : null}
-                    {viewRequest.completedAt ? (
-                      <p className="mt-1"><span className="font-medium text-foreground">Completed at:</span> {formatDateTime(viewRequest.completedAt)}</p>
-                    ) : null}
-                    {viewRequest.latestComment ? (
-                      <p className="mt-1"><span className="font-medium text-foreground">Latest comment:</span> {viewRequest.latestComment}</p>
-                    ) : null}
-                  </div>
-                  {viewRequestDetails.length > 0 ? (
-                    <div className="sm:col-span-2">
-                      <div className="grid gap-1.5 border-t pt-3 text-xs text-muted-foreground">
-                        {viewRequestDetails.map((detail) => (
-                          <p key={detail.label}>
-                            <span className="font-medium text-foreground">{detail.label}:</span> {detail.value}
-                          </p>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="space-y-2">
-                  <div>
-                    <h3 className="text-sm font-semibold text-foreground">Audit Trail</h3>
-                    <p className="text-xs text-muted-foreground">
-                      Logged status changes, comments, and reviewer activity.
-                    </p>
-                  </div>
-                  <div className="max-h-[340px] space-y-2 overflow-y-auto pr-1">
-                    {viewLoading ? (
-                      <p className="text-sm text-muted-foreground">Loading audit trail...</p>
-                    ) : viewActions.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No actions recorded yet.</p>
-                    ) : (
-                      viewActions.map((action) => (
-                        <div key={action.id} className="rounded-md border bg-muted/20 p-3">
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="text-sm font-medium text-foreground">{action.actorName}</span>
-                            <Badge className={`text-[10px] ${statusBadgeClass(action.actionStatus)}`}>
-                              {action.actionStatus.replaceAll("_", " ")}
-                            </Badge>
-                          </div>
-                          <p className="mt-1 text-[11px] text-muted-foreground">{formatDateTime(action.createdAt)}</p>
-                          {action.comments ? (
-                            <p className="mt-2 text-sm text-foreground">{action.comments}</p>
-                          ) : null}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
       </div>
     </Layout>
   );
