@@ -1,6 +1,6 @@
 ---
 title: Site purchase multi-material receipt flow
-status: done
+status: in_progress
 priority: high
 type: feature
 tags: [site-purchase, warehouse, receipts, mobile]
@@ -18,6 +18,7 @@ Update the Record Site Purchase flow so one receipt number can contain one or mo
 - [x] Add logic so one receipt number can include multiple material lines
 - [x] Keep save behavior aligned with the current purchase records structure
 - [x] Validate the updated purchase flow does not break existing usage
+- [ ] Keep the Record Site Purchase modal fully visible and scrollable when multiple materials are added
 
 ## Acceptance
 A user can record multiple materials under one receipt number without losing the existing fields.
