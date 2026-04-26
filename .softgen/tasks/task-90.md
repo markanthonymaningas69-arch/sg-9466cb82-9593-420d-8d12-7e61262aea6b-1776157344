@@ -17,7 +17,7 @@ Tighten the Usage list table so large datasets stay usable. Add a scrollable tab
 - [x] Add a constrained scrollable container around the list table
 - [x] Reduce font sizing and row density for the Usage table
 - [x] Keep the current columns and actions intact
-- [ ] Keep scrolling inside the Usage table area only, not on the main screen
+- [x] Keep scrolling inside the Usage table area only, not on the main screen
 
 ## Acceptance
 The Usage list can scroll inside its table area.
