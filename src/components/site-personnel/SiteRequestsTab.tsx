@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, Clock, FileText, Filter, Plus, XCircle } from "lucide-react";
+import { FileText, Plus, CheckCircle, XCircle, Clock, Filter } from "lucide-react";
+import { siteService } from "@/services/siteService";
 
 interface SiteRequest {
   id: string;
@@ -24,6 +25,20 @@ interface SiteRequest {
   status: string;
   notes?: string;
   created_at: string;
+  bom_scope_id?: string | null;
+  amount?: number | null;
+}
+
+interface ScopeOption {
+  id: string;
+  name: string;
+}
+
+interface MaterialOption {
+  id: string;
+  name: string;
+  unit: string;
+  scope_id: string | null;
 }
 
 const REQUEST_TYPE_OPTIONS = [
@@ -32,6 +47,8 @@ const REQUEST_TYPE_OPTIONS = [
   { label: "Cash Advance", value: "Cash Advance" },
   { label: "Petty Cash", value: "Petty Cash" },
 ] as const;
+
+const OTHER_MATERIAL_OPTION = "__others__";
 
 const STATUS_CONFIG = {
   pending: { label: "Pending", icon: Clock, variant: "secondary" as const },
@@ -42,9 +59,12 @@ const STATUS_CONFIG = {
 function getDefaultFormData() {
   return {
     request_type: "Materials",
+    bom_scope_id: "",
     item_name: "",
+    custom_item_name: "",
     quantity: "",
     unit: "",
+    supplier: "",
     requested_by: "",
     request_date: new Date().toISOString().split("T")[0],
     notes: "",
@@ -58,9 +78,12 @@ function isCashRequestType(requestType: string) {
 export function SiteRequestsTab({ projectId }: { projectId: string }) {
   const { toast } = useToast();
   const [requests, setRequests] = useState<SiteRequest[]>([]);
+  const [scopes, setScopes] = useState<ScopeOption[]>([]);
+  const [materials, setMaterials] = useState<MaterialOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [isOtherMaterial, setIsOtherMaterial] = useState(false);
   const [filters, setFilters] = useState({
     requestType: "all",
     status: "all",
@@ -107,12 +130,47 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
     };
   }, [filteredRequests]);
 
+  const filteredMaterials = useMemo(() => {
+    if (!formData.bom_scope_id) {
+      return [];
+    }
+
+    return materials.filter((material) => material.scope_id === formData.bom_scope_id);
+  }, [formData.bom_scope_id, materials]);
+
+  const selectedMaterialValue = useMemo(() => {
+    if (isOtherMaterial) {
+      return OTHER_MATERIAL_OPTION;
+    }
+
+    return formData.item_name;
+  }, [formData.item_name, isOtherMaterial]);
+
+  const availableUnits = useMemo(() => {
+    if (!formData.bom_scope_id || formData.request_type !== "Materials") {
+      return [];
+    }
+
+    if (isOtherMaterial) {
+      return Array.from(new Set(filteredMaterials.map((material) => material.unit).filter(Boolean)));
+    }
+
+    const selectedMaterial = filteredMaterials.find((material) => material.name === formData.item_name);
+
+    if (selectedMaterial?.unit) {
+      return [selectedMaterial.unit];
+    }
+
+    return Array.from(new Set(filteredMaterials.map((material) => material.unit).filter(Boolean)));
+  }, [filteredMaterials, formData.bom_scope_id, formData.item_name, formData.request_type, isOtherMaterial]);
+
   const quantityLabel = isCashRequestType(formData.request_type) ? "Amount" : "Quantity";
   const unitLabel = isCashRequestType(formData.request_type) ? "Currency / Ref." : "Unit";
   const itemLabel = isCashRequestType(formData.request_type) ? "Purpose / Description" : "Item / Description";
 
   useEffect(() => {
     void loadRequests();
+    void loadScopesAndMaterials();
   }, [projectId]);
 
   async function loadRequests() {
@@ -139,6 +197,45 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
     }
   }
 
+  async function loadScopesAndMaterials() {
+    try {
+      const [scopesResult, materialsResult] = await Promise.all([
+        siteService.getScopeOfWorks(projectId),
+        siteService.getBomMaterials(projectId),
+      ]);
+
+      if (scopesResult.error) {
+        throw scopesResult.error;
+      }
+
+      if (materialsResult.error) {
+        throw materialsResult.error;
+      }
+
+      setScopes(
+        (scopesResult.data || []).map((scope) => ({
+          id: scope.id,
+          name: scope.name || "Untitled scope",
+        }))
+      );
+      setMaterials(
+        (materialsResult.data || []).map((material) => ({
+          id: material.id,
+          name: material.name,
+          unit: material.unit || "",
+          scope_id: material.scope_id || null,
+        }))
+      );
+    } catch (error) {
+      console.error("Error loading scopes and materials:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load scopes and materials",
+        variant: "destructive",
+      });
+    }
+  }
+
   function clearFilters() {
     setFilters({
       requestType: "all",
@@ -149,11 +246,45 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
     });
   }
 
+  function handleScopeChange(scopeId: string) {
+    setFormData((prev) => ({
+      ...prev,
+      bom_scope_id: scopeId,
+      item_name: "",
+      custom_item_name: "",
+      unit: "",
+    }));
+    setIsOtherMaterial(false);
+  }
+
+  function handleMaterialChange(materialName: string) {
+    if (materialName === OTHER_MATERIAL_OPTION) {
+      setIsOtherMaterial(true);
+      setFormData((prev) => ({
+        ...prev,
+        item_name: "",
+        custom_item_name: "",
+        unit: "",
+      }));
+      return;
+    }
+
+    const selectedMaterial = filteredMaterials.find((material) => material.name === materialName);
+    setIsOtherMaterial(false);
+
+    setFormData((prev) => ({
+      ...prev,
+      item_name: materialName,
+      custom_item_name: "",
+      unit: selectedMaterial?.unit || "",
+    }));
+  }
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
 
     try {
-      const { error } = await supabase.from("site_requests").insert({
+      const insertData: Record<string, unknown> = {
         project_id: projectId,
         request_type: formData.request_type,
         item_name: formData.item_name,
@@ -163,7 +294,13 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
         request_date: formData.request_date,
         status: "pending",
         notes: formData.notes || null,
-      });
+      };
+
+      if (formData.request_type === "Materials" && formData.bom_scope_id) {
+        insertData.bom_scope_id = formData.bom_scope_id;
+      }
+
+      const { error } = await supabase.from("site_requests").insert(insertData);
 
       if (error) throw error;
 
@@ -174,6 +311,7 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
 
       setDialogOpen(false);
       setFormData(getDefaultFormData());
+      setIsOtherMaterial(false);
       void loadRequests();
     } catch (error) {
       console.error("Error creating request:", error);
@@ -242,7 +380,10 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
                       type="button"
                       variant={formData.request_type === option.value ? "default" : "outline"}
                       className="h-8 text-xs"
-                      onClick={() => setFormData((current) => ({ ...current, request_type: option.value }))}
+                      onClick={() => {
+                        setFormData((current) => ({ ...current, request_type: option.value }));
+                        setIsOtherMaterial(false);
+                      }}
                     >
                       {option.label}
                     </Button>
@@ -250,50 +391,191 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <Label htmlFor="item_name" className="text-[11px]">
-                  {itemLabel}
-                </Label>
-                <Input
-                  id="item_name"
-                  className="h-8 text-xs"
-                  value={formData.item_name}
-                  onChange={(event) => setFormData((current) => ({ ...current, item_name: event.target.value }))}
-                  placeholder={isCashRequestType(formData.request_type) ? "e.g., Fuel allowance for crew" : "e.g., Cement, Grinder, Safety Helmet"}
-                  required
-                />
-              </div>
+              {formData.request_type === "Materials" ? (
+                <>
+                  <div className="space-y-1">
+                    <Label htmlFor="scope" className="text-[11px]">
+                      Select Scope
+                    </Label>
+                    <Select value={formData.bom_scope_id} onValueChange={handleScopeChange}>
+                      <SelectTrigger id="scope" className="h-8 text-xs">
+                        <SelectValue placeholder="Select scope" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {scopes.map((scope) => (
+                          <SelectItem key={scope.id} value={scope.id}>
+                            {scope.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="material" className="text-[11px]">
+                      Select Material
+                    </Label>
+                    <Select value={selectedMaterialValue} onValueChange={handleMaterialChange} disabled={!formData.bom_scope_id}>
+                      <SelectTrigger id="material" className="h-8 text-xs">
+                        <SelectValue placeholder={formData.bom_scope_id ? "Select material" : "Select scope first"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {filteredMaterials.map((material) => (
+                          <SelectItem key={material.id} value={material.name}>
+                            {material.name}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value={OTHER_MATERIAL_OPTION}>Others</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {selectedMaterialValue === OTHER_MATERIAL_OPTION ? (
+                    <div className="space-y-1">
+                      <Label htmlFor="custom_material" className="text-[11px]">
+                        Other Material
+                      </Label>
+                      <Input
+                        id="custom_material"
+                        className="h-8 text-xs"
+                        value={formData.custom_item_name}
+                        onChange={(event) =>
+                          setFormData((current) => ({
+                            ...current,
+                            custom_item_name: event.target.value,
+                            item_name: event.target.value,
+                          }))
+                        }
+                        placeholder="Enter material name"
+                        required
+                      />
+                    </div>
+                  ) : null}
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="quantity" className="text-[11px]">
+                        Quantity
+                      </Label>
+                      <Input
+                        id="quantity"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="h-8 text-xs"
+                        value={formData.quantity}
+                        onChange={(event) => setFormData((current) => ({ ...current, quantity: event.target.value }))}
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label htmlFor="unit" className="text-[11px]">
+                        Unit
+                      </Label>
+                      {isOtherMaterial ? (
+                        <Input
+                          id="unit"
+                          className="h-8 text-xs"
+                          value={formData.unit}
+                          onChange={(event) => setFormData((current) => ({ ...current, unit: event.target.value }))}
+                          placeholder="Enter unit"
+                          required
+                        />
+                      ) : (
+                        <Select
+                          value={formData.unit}
+                          onValueChange={(value) => setFormData((current) => ({ ...current, unit: value }))}
+                          disabled={!formData.bom_scope_id || availableUnits.length === 0}
+                        >
+                          <SelectTrigger id="unit" className="h-8 text-xs">
+                            <SelectValue
+                              placeholder={
+                                !formData.bom_scope_id
+                                  ? "Select scope first"
+                                  : availableUnits.length === 0
+                                    ? "No BOM units available"
+                                    : "Select unit"
+                              }
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableUnits.map((unitOption) => (
+                              <SelectItem key={unitOption} value={unitOption}>
+                                {unitOption}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="supplier" className="text-[11px]">
+                      Supplier
+                    </Label>
+                    <Input
+                      id="supplier"
+                      className="h-8 text-xs"
+                      value={formData.supplier}
+                      onChange={(event) => setFormData((current) => ({ ...current, supplier: event.target.value }))}
+                      placeholder="Enter supplier name"
+                    />
+                  </div>
+                </>
+              ) : (
                 <div className="space-y-1">
-                  <Label htmlFor="quantity" className="text-[11px]">
-                    {quantityLabel}
+                  <Label htmlFor="item_name" className="text-[11px]">
+                    {isCashRequestType(formData.request_type) ? "Purpose / Description" : "Item / Description"}
                   </Label>
                   <Input
-                    id="quantity"
-                    type="number"
-                    step="0.01"
+                    id="item_name"
                     className="h-8 text-xs"
-                    value={formData.quantity}
-                    onChange={(event) => setFormData((current) => ({ ...current, quantity: event.target.value }))}
+                    value={formData.item_name}
+                    onChange={(event) => setFormData((current) => ({ ...current, item_name: event.target.value }))}
+                    placeholder={
+                      isCashRequestType(formData.request_type)
+                        ? "e.g., Fuel allowance for crew"
+                        : "e.g., Cement, Grinder, Safety Helmet"
+                    }
                     required
                   />
                 </div>
+              )}
 
-                <div className="space-y-1">
-                  <Label htmlFor="unit" className="text-[11px]">
-                    {unitLabel}
-                  </Label>
-                  <Input
-                    id="unit"
-                    className="h-8 text-xs"
-                    value={formData.unit}
-                    onChange={(event) => setFormData((current) => ({ ...current, unit: event.target.value }))}
-                    placeholder={isCashRequestType(formData.request_type) ? "e.g., PHP / SOA" : "e.g., bags, pcs, set"}
-                    required
-                  />
+              {formData.request_type !== "Materials" ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="quantity" className="text-[11px]">
+                      {isCashRequestType(formData.request_type) ? "Amount" : "Quantity"}
+                    </Label>
+                    <Input
+                      id="quantity"
+                      type="number"
+                      step="0.01"
+                      className="h-8 text-xs"
+                      value={formData.quantity}
+                      onChange={(event) => setFormData((current) => ({ ...current, quantity: event.target.value }))}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="unit" className="text-[11px]">
+                      {isCashRequestType(formData.request_type) ? "Currency / Ref." : "Unit"}
+                    </Label>
+                    <Input
+                      id="unit"
+                      className="h-8 text-xs"
+                      value={formData.unit}
+                      onChange={(event) => setFormData((current) => ({ ...current, unit: event.target.value }))}
+                      placeholder={isCashRequestType(formData.request_type) ? "e.g., PHP / SOA" : "e.g., bags, pcs, set"}
+                      required
+                    />
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
