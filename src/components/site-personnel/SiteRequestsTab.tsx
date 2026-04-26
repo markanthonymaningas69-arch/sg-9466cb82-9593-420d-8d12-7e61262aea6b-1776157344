@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useSettings } from "@/contexts/SettingsProvider";
 import { FileText, Plus, CheckCircle, XCircle, Clock, Filter } from "lucide-react";
 import { siteService } from "@/services/siteService";
 
@@ -76,6 +77,7 @@ function isCashRequestType(requestType: string) {
 
 export function SiteRequestsTab({ projectId }: { projectId: string }) {
   const { toast } = useToast();
+  const { currency } = useSettings();
   const [requests, setRequests] = useState<SiteRequest[]>([]);
   const [scopes, setScopes] = useState<ScopeOption[]>([]);
   const [materials, setMaterials] = useState<MaterialOption[]>([]);
@@ -171,6 +173,23 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
     void loadRequests();
     void loadScopesAndMaterials();
   }, [projectId]);
+
+  useEffect(() => {
+    if (!isCashRequestType(formData.request_type)) {
+      return;
+    }
+
+    setFormData((current) => {
+      if (current.unit === currency) {
+        return current;
+      }
+
+      return {
+        ...current,
+        unit: currency,
+      };
+    });
+  }, [currency, formData.request_type]);
 
   async function loadRequests() {
     try {
@@ -382,7 +401,11 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
                       variant={formData.request_type === option.value ? "default" : "outline"}
                       className="h-8 text-xs"
                       onClick={() => {
-                        setFormData((current) => ({ ...current, request_type: option.value }));
+                        setFormData((current) => ({
+                          ...current,
+                          request_type: option.value,
+                          unit: option.value === "Cash Advance" || option.value === "Petty Cash" ? currency : current.unit,
+                        }));
                         setIsOtherMaterial(false);
                       }}
                     >
@@ -472,42 +495,18 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
 
                     <div className="space-y-1">
                       <Label htmlFor="unit" className="text-[11px]">
-                        Unit
+                        {isCashRequestType(formData.request_type) ? "Currency" : "Unit"}
                       </Label>
-                      {isOtherMaterial ? (
+                      {isCashRequestType(formData.request_type) ? (
+                        <Input id="unit" className="h-8 bg-muted text-xs" value={currency} readOnly aria-readonly="true" />
+                      ) : (
                         <Input
                           id="unit"
                           className="h-8 text-xs"
                           value={formData.unit}
                           onChange={(event) => setFormData((current) => ({ ...current, unit: event.target.value }))}
-                          placeholder="Enter unit"
                           required
                         />
-                      ) : (
-                        <Select
-                          value={formData.unit}
-                          onValueChange={(value) => setFormData((current) => ({ ...current, unit: value }))}
-                          disabled={!formData.bom_scope_id || availableUnits.length === 0}
-                        >
-                          <SelectTrigger id="unit" className="h-8 text-xs">
-                            <SelectValue
-                              placeholder={
-                                !formData.bom_scope_id
-                                  ? "Select scope first"
-                                  : availableUnits.length === 0
-                                    ? "No BOM units available"
-                                    : "Select unit"
-                              }
-                            />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableUnits.map((unitOption) => (
-                              <SelectItem key={unitOption} value={unitOption}>
-                                {unitOption}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
                       )}
                     </div>
                   </div>

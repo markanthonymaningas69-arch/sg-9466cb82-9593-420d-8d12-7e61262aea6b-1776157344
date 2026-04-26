@@ -22,7 +22,7 @@ Add a history list and clean filters to the Requests tab. The list should help u
 - [x] Replace the request type selector with quick action buttons for Materials, Tools&Equipments, Cash Advance, and Petty Cash
 - [x] Align the request history table structure and spacing with the other site-personnel tabs
 - [x] Adjust the request filters so they match the cleaner review pattern used across the other tabs
-- [ ] Link Cash Advance and Petty Cash request currency to the shared currency engine and show it as read-only
+- [x] Link Cash Advance and Petty Cash request currency to the shared currency engine and show it as read-only
 
 ## Acceptance
 Users can review request history from the Requests tab.
