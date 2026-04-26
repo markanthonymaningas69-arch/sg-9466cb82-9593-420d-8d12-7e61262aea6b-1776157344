@@ -383,16 +383,16 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="p-0 sm:p-6">
             <div className="overflow-x-auto">
-              <Table>
+              <Table className="text-xs sm:text-sm">
                 <TableHeader className="bg-muted/50">
                   <TableRow>
-                    <TableHead className="min-w-[150px]">Project</TableHead>
-                    <TableHead className="min-w-[120px]">Date Started</TableHead>
-                    <TableHead className="text-right min-w-[120px]">Contract Amount</TableHead>
-                    <TableHead className="text-right min-w-[120px]">Cost to Date</TableHead>
-                    <TableHead className="text-right min-w-[100px]">Profit Margin</TableHead>
-                    <TableHead className="w-48 text-right min-w-[150px]">Accomplishment</TableHead>
-                    <TableHead className="w-40 text-right min-w-[180px]">Action</TableHead>
+                    <TableHead className="min-w-[150px] text-[11px] sm:text-xs">Project</TableHead>
+                    <TableHead className="min-w-[120px] text-[11px] sm:text-xs">Date Started</TableHead>
+                    <TableHead className="text-right min-w-[120px] text-[11px] sm:text-xs">Contract Amount</TableHead>
+                    <TableHead className="text-right min-w-[120px] text-[11px] sm:text-xs">Cost to Date</TableHead>
+                    <TableHead className="text-right min-w-[100px] text-[11px] sm:text-xs">Profit Margin</TableHead>
+                    <TableHead className="w-48 text-right min-w-[150px] text-[11px] sm:text-xs">Accomplishment</TableHead>
+                    <TableHead className="w-40 text-right min-w-[180px] text-[11px] sm:text-xs">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -405,33 +405,33 @@ export default function Dashboard() {
                   ) : (
                     portfolio.map((project) => (
                       <TableRow key={project.id}>
-                        <TableCell>
-                          <div className="font-semibold">{project.name}</div>
-                          <div className="text-xs text-muted-foreground">{project.location}</div>
+                        <TableCell className="py-3">
+                          <div className="font-semibold text-xs sm:text-sm">{project.name}</div>
+                          <div className="text-[11px] text-muted-foreground sm:text-xs">{project.location}</div>
                         </TableCell>
-                        <TableCell>
-                          <span className="text-sm text-muted-foreground">
+                        <TableCell className="py-3">
+                          <span className="text-[11px] text-muted-foreground sm:text-xs">
                             {formatDateStarted(project.dateStarted)}
                           </span>
                         </TableCell>
-                        <TableCell className="text-right font-medium">
+                        <TableCell className="py-3 text-right text-xs font-medium sm:text-sm">
                           {formatCurrency(project.contractAmount)}
                         </TableCell>
-                        <TableCell className="text-right text-muted-foreground">
+                        <TableCell className="py-3 text-right text-[11px] text-muted-foreground sm:text-xs">
                           {formatCurrency(project.costToDate)}
                         </TableCell>
-                        <TableCell className="text-right">
-                          <span className={`font-semibold ${project.margin >= 0 ? 'text-success' : 'text-destructive'}`}>
+                        <TableCell className="py-3 text-right">
+                          <span className={`text-xs font-semibold sm:text-sm ${project.margin >= 0 ? 'text-success' : 'text-destructive'}`}>
                             {project.margin.toFixed(2)}%
                           </span>
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="py-3 text-right">
                           <div className="flex flex-col gap-1.5 items-end">
-                            <span className="text-sm font-semibold">{project.completion.toFixed(2)}%</span>
+                            <span className="text-xs font-semibold sm:text-sm">{project.completion.toFixed(2)}%</span>
                             <Progress value={project.completion} className="h-1.5 w-full bg-muted" />
                           </div>
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="py-3 text-right">
                           <div className="flex flex-col items-stretch justify-end gap-2 sm:flex-row sm:items-center">
                             <Button size="sm" variant="outline" className="h-8 w-full sm:w-auto" onClick={() => openProjectDetails(project)}>
                               <Eye className="h-3 w-3 sm:mr-1" /> <span className="hidden sm:inline">View</span>
