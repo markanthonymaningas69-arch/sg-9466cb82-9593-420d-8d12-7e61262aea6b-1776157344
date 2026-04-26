@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { siteService } from "@/services/siteService";
 import { requestWorkflowService } from "@/services/requestWorkflowService";
 import { notificationService } from "@/services/notificationService";
+import { CompactText } from "@/components/site-personnel/CompactText";
 
 type TransactionType = "site_purchase" | "delivery";
 const OTHER_MATERIAL_OPTION = "__others__";
@@ -681,15 +682,15 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-4">
-        <CardTitle className="flex items-center gap-2">
-          <Package className="h-5 w-5" />
+      <CardHeader className="flex flex-row items-center justify-between gap-3 px-4 py-3">
+        <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+          <Package className="h-4 w-4" />
           Site Purchase & Deliveries
         </CardTitle>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button size="sm">
-              <Plus className="mr-2 h-4 w-4" />
+            <Button size="sm" className="h-8 px-2 text-xs">
+              <Plus className="mr-1.5 h-3.5 w-3.5" />
               Add Record
             </Button>
           </DialogTrigger>
@@ -930,14 +931,14 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
         </Dialog>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="space-y-3 px-4 pb-4 pt-0">
         {loading ? (
           <div className="py-8 text-center text-muted-foreground">Loading purchase and delivery records...</div>
         ) : filteredRecords.length === 0 ? (
           <div className="py-8 text-center text-muted-foreground">No purchase records match the current filters.</div>
         ) : (
           <div className="space-y-4">
-            <div className="rounded-lg border bg-emerald-50/40 p-3">
+            <div className="rounded-lg border bg-emerald-50/30 p-2.5">
               <div className="space-y-1">
                 <p className="text-sm font-medium text-foreground">Ready for Receiving</p>
                 <p className="text-xs text-muted-foreground">
@@ -946,21 +947,21 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
               </div>
 
               {readyForReceiving.length === 0 ? (
-                <div className="mt-3 rounded-md border border-dashed bg-background/70 py-6 text-center text-sm text-muted-foreground">
+                <div className="mt-2.5 rounded-md border border-dashed bg-background/70 py-6 text-center text-sm text-muted-foreground">
                   No voucher-approved records are ready for receiving.
                 </div>
               ) : (
-                <div className="mt-3 overflow-auto rounded-md border bg-background">
-                  <Table>
-                    <TableHeader>
+                <div className="mt-2.5 overflow-auto rounded-md border bg-background">
+                  <Table className="min-w-[940px] table-fixed text-xs">
+                    <TableHeader className="sticky top-0 z-10 bg-background">
                       <TableRow>
-                        <TableHead>Item</TableHead>
-                        <TableHead>Supplier</TableHead>
-                        <TableHead>Voucher No.</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Qty</TableHead>
-                        <TableHead>Last Update</TableHead>
-                        <TableHead className="text-right">Action</TableHead>
+                        <TableHead className="h-8 w-[220px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Item</TableHead>
+                        <TableHead className="h-8 w-[140px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Supplier</TableHead>
+                        <TableHead className="h-8 w-[130px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Voucher No.</TableHead>
+                        <TableHead className="h-8 w-[130px] whitespace-nowrap px-2 text-center text-[11px] uppercase tracking-wide">Status</TableHead>
+                        <TableHead className="h-8 w-[110px] whitespace-nowrap px-2 text-right text-[11px] uppercase tracking-wide">Qty</TableHead>
+                        <TableHead className="h-8 w-[170px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Last Update</TableHead>
+                        <TableHead className="h-8 w-[96px] whitespace-nowrap px-2 text-right text-[11px] uppercase tracking-wide">Action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -969,25 +970,35 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                         const isEligible = Boolean(record.voucher_number) && record.lifecycle_status === "ready_for_delivery" && !record.received_at;
 
                         return (
-                          <TableRow key={record.id}>
-                            <TableCell className="font-medium">{linkedSiteRequest?.item_name || "—"}</TableCell>
-                            <TableCell>{record.supplier || "—"}</TableCell>
-                            <TableCell>{record.voucher_number || "—"}</TableCell>
-                            <TableCell>
-                              <Badge variant={record.received_at ? "default" : "secondary"}>
-                                {record.received_at ? "received" : record.lifecycle_status.replaceAll("_", " ")}
-                              </Badge>
+                          <TableRow key={record.id} className="border-b last:border-b-0">
+                            <TableCell className="px-2 py-1.5 align-middle">
+                              <CompactText value={linkedSiteRequest?.item_name || "—"} className="max-w-[202px] font-medium text-foreground" />
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="px-2 py-1.5 align-middle">
+                              <CompactText value={record.supplier || "—"} className="max-w-[122px]" />
+                            </TableCell>
+                            <TableCell className="px-2 py-1.5 align-middle">
+                              <CompactText value={record.voucher_number || "—"} className="max-w-[112px]" />
+                            </TableCell>
+                            <TableCell className="px-2 py-1.5 text-center align-middle">
+                              <div className="flex justify-center">
+                                <Badge variant={record.received_at ? "default" : "secondary"} className="h-5 whitespace-nowrap px-1.5 text-[10px]">
+                                  {record.received_at ? "Received" : record.lifecycle_status.replaceAll("_", " ")}
+                                </Badge>
+                              </div>
+                            </TableCell>
+                            <TableCell className="px-2 py-1.5 text-right align-middle whitespace-nowrap">
                               {linkedSiteRequest?.quantity || 0} {linkedSiteRequest?.unit || ""}
                             </TableCell>
-                            <TableCell>{record.updated_at ? new Date(record.updated_at).toLocaleString() : "—"}</TableCell>
-                            <TableCell className="text-right">
+                            <TableCell className="px-2 py-1.5 align-middle text-muted-foreground">
+                              <CompactText value={record.updated_at ? new Date(record.updated_at).toLocaleString() : "—"} className="max-w-[152px]" />
+                            </TableCell>
+                            <TableCell className="px-2 py-1.5 text-right align-middle">
                               {record.received_at ? (
-                                <span className="text-xs text-muted-foreground">Received</span>
+                                <span className="text-[11px] text-muted-foreground">Received</span>
                               ) : (
-                                <Button size="sm" disabled={!isEligible} onClick={() => openReceiveDialog(record)}>
-                                  Mark as Received
+                                <Button size="sm" className="h-7 px-2 text-[11px]" disabled={!isEligible} onClick={() => openReceiveDialog(record)}>
+                                  Receive
                                 </Button>
                               )}
                             </TableCell>
@@ -1000,9 +1011,9 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
               )}
             </div>
 
-            <div className="rounded-lg border bg-muted/30 p-3">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div className="space-y-1">
+            <div className="rounded-lg border bg-muted/20 p-2.5">
+              <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                <div className="space-y-0.5">
                   <p className="text-sm font-medium text-foreground">Purchase History</p>
                   <p className="text-xs text-muted-foreground">
                     Review saved site purchases by material, supplier, receipt number, scope, and date range.
@@ -1013,10 +1024,10 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="h-8 px-3 text-xs"
+                    className="h-7 px-2 text-[11px]"
                     onClick={() => setFiltersOpen((current) => !current)}
                   >
-                    <Filter className="mr-2 h-3.5 w-3.5" />
+                    <Filter className="mr-1.5 h-3.5 w-3.5" />
                     {filtersOpen ? "Hide filters" : "Filter"}
                   </Button>
                   {filtersOpen ? (
@@ -1024,10 +1035,10 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-8 px-2 text-xs"
+                      className="h-7 px-2 text-[11px]"
                       onClick={clearFilters}
                     >
-                      Clear filters
+                      Clear
                     </Button>
                   ) : null}
                 </div>
@@ -1133,7 +1144,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                 </div>
               ) : null}
 
-              <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
+              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
                 <span>{historySummary.recordCount} records</span>
                 <span>{historySummary.receiptCount} receipts</span>
                 <span>{historySummary.supplierCount} suppliers</span>
@@ -1147,50 +1158,65 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
               </div>
             ) : (
               <>
-                <div className="h-[420px] overflow-auto overscroll-contain rounded-md border text-xs [&_td]:py-2 [&_th]:py-2 [&_th]:text-[11px]">
-                  <Table>
-                    <TableHeader>
+                <div className="h-[420px] overflow-auto overscroll-contain rounded-md border text-xs">
+                  <Table className="min-w-[1100px] table-fixed text-xs">
+                    <TableHeader className="sticky top-0 z-10 bg-background">
                       <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Receipt No.</TableHead>
-                        <TableHead>Scope</TableHead>
-                        <TableHead>Materials</TableHead>
-                        <TableHead>Supplier</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Notes</TableHead>
-                        <TableHead className="w-[112px] text-right">Actions</TableHead>
+                        <TableHead className="h-8 w-[110px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Date</TableHead>
+                        <TableHead className="h-8 w-[110px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Type</TableHead>
+                        <TableHead className="h-8 w-[130px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Receipt No.</TableHead>
+                        <TableHead className="h-8 w-[170px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Scope</TableHead>
+                        <TableHead className="h-8 w-[260px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Materials</TableHead>
+                        <TableHead className="h-8 w-[150px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Supplier</TableHead>
+                        <TableHead className="h-8 w-[120px] whitespace-nowrap px-2 text-right text-[11px] uppercase tracking-wide">Amount</TableHead>
+                        <TableHead className="h-8 w-[200px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Notes</TableHead>
+                        <TableHead className="h-8 w-[96px] whitespace-nowrap px-2 text-right text-[11px] uppercase tracking-wide">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {groupedReceipts.map((group) => (
-                        <TableRow key={group.key}>
-                          <TableCell>{group.deliveryDate ? new Date(group.deliveryDate).toLocaleDateString() : "—"}</TableCell>
-                          <TableCell>{group.transactionType === "site_purchase" ? "Site Purchase" : "Delivery"}</TableCell>
-                          <TableCell>{group.receiptNumber || "—"}</TableCell>
-                          <TableCell>
-                            {Array.from(
-                              new Set(group.items.map((item) => getScopeName(item)).filter((scopeName) => scopeName !== "—"))
-                            ).join(", ") || "—"}
+                        <TableRow key={group.key} className="border-b last:border-b-0">
+                          <TableCell className="px-2 py-1.5 align-middle whitespace-nowrap">
+                            {group.deliveryDate ? new Date(group.deliveryDate).toLocaleDateString() : "—"}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="px-2 py-1.5 align-middle whitespace-nowrap">
+                            {group.transactionType === "site_purchase" ? "Site Purchase" : "Delivery"}
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5 align-middle">
+                            <CompactText value={group.receiptNumber || "—"} className="max-w-[112px]" />
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5 align-middle">
+                            <CompactText
+                              value={
+                                Array.from(
+                                  new Set(group.items.map((item) => getScopeName(item)).filter((scopeName) => scopeName !== "—"))
+                                ).join(", ") || "—"
+                              }
+                              className="max-w-[152px]"
+                            />
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5 align-middle">
                             <div className="space-y-0.5">
-                              <p className="font-medium">{group.items.length} material{group.items.length > 1 ? "s" : ""}</p>
-                              <p className="max-w-[240px] truncate text-xs text-muted-foreground">
-                                {group.items.map((item) => item.item_name).join(", ")}
-                              </p>
+                              <CompactText value={`${group.items.length} material${group.items.length > 1 ? "s" : ""}`} className="max-w-[242px] font-medium text-foreground" />
+                              <CompactText value={group.items.map((item) => item.item_name).join(", ")} className="max-w-[242px] text-[11px] text-muted-foreground" />
                             </div>
                           </TableCell>
-                          <TableCell>{group.supplier || "—"}</TableCell>
-                          <TableCell>{formatCurrency(group.transactionType === "site_purchase" ? group.totalAmount : null)}</TableCell>
-                          <TableCell className="max-w-[220px] truncate text-xs text-muted-foreground">{group.notes || "—"}</TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="px-2 py-1.5 align-middle">
+                            <CompactText value={group.supplier || "—"} className="max-w-[132px]" />
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5 text-right align-middle whitespace-nowrap">
+                            {formatCurrency(group.transactionType === "site_purchase" ? group.totalAmount : null)}
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5 align-middle text-muted-foreground">
+                            <CompactText value={group.notes || "—"} className="max-w-[182px]" />
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5 text-right align-middle">
                             <div className="flex justify-end gap-1">
-                              <Button type="button" variant="ghost" size="icon" onClick={() => setSelectedReceiptGroup(group)}>
-                                <Eye className="h-4 w-4" />
+                              <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSelectedReceiptGroup(group)}>
+                                <Eye className="h-3.5 w-3.5" />
                               </Button>
-                              <Button type="button" variant="ghost" size="icon" onClick={() => void handleDeleteGroup(group)}>
-                                <Trash2 className="h-4 w-4 text-destructive" />
+                              <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => void handleDeleteGroup(group)}>
+                                <Trash2 className="h-3.5 w-3.5 text-destructive" />
                               </Button>
                             </div>
                           </TableCell>

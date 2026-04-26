@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { TrendingUp, Plus, Trash2, Filter } from "lucide-react";
+import { CompactText } from "@/components/site-personnel/CompactText";
 
 interface ProgressUpdate {
   id: string;
@@ -265,15 +266,15 @@ export function ProgressTab({ projectId }: { projectId: string }) {
     <div className="space-y-6">
       {/* Progress Updates Table */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
-            Progress Updates History
+        <CardHeader className="flex flex-row items-center justify-between gap-3 px-4 py-3">
+          <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+            <TrendingUp className="h-4 w-4" />
+            Accomplishments
           </CardTitle>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button size="sm">
-                <Plus className="mr-2 h-4 w-4" />
+              <Button size="sm" className="h-8 px-2 text-xs">
+                <Plus className="mr-1.5 h-3.5 w-3.5" />
                 Update Progress
               </Button>
             </DialogTrigger>
@@ -344,16 +345,16 @@ export function ProgressTab({ projectId }: { projectId: string }) {
             </DialogContent>
           </Dialog>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3 px-4 pb-4 pt-0">
           {loading ? (
             <div className="py-8 text-center text-muted-foreground">Loading progress updates...</div>
           ) : progressUpdates.length === 0 ? (
             <div className="py-8 text-center text-muted-foreground">No progress updates recorded yet</div>
           ) : (
-            <div className="space-y-4">
-              <div className="rounded-lg border bg-muted/30 p-3">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="space-y-1">
+            <div className="space-y-3">
+              <div className="rounded-lg border bg-muted/20 p-2.5">
+                <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="space-y-0.5">
                     <p className="text-sm font-medium text-foreground">Progress History</p>
                     <p className="text-xs text-muted-foreground">
                       Review updates by scope, completion range, and date range.
@@ -364,22 +365,22 @@ export function ProgressTab({ projectId }: { projectId: string }) {
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="h-8 px-3 text-xs"
+                      className="h-7 px-2 text-[11px]"
                       onClick={() => setFiltersOpen((current) => !current)}
                     >
-                      <Filter className="mr-2 h-3.5 w-3.5" />
+                      <Filter className="mr-1.5 h-3.5 w-3.5" />
                       {filtersOpen ? "Hide filters" : "Filter"}
                     </Button>
                     {filtersOpen ? (
-                      <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={clearFilters}>
-                        Clear filters
+                      <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={clearFilters}>
+                        Clear
                       </Button>
                     ) : null}
                   </div>
                 </div>
 
                 {filtersOpen ? (
-                  <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="mt-2.5 grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
                     <div className="space-y-1">
                       <Label htmlFor="progress-history-scope" className="text-[11px]">
                         Scope
@@ -458,41 +459,51 @@ export function ProgressTab({ projectId }: { projectId: string }) {
                   No progress updates match the current filters.
                 </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Scope</TableHead>
-                      <TableHead>Progress</TableHead>
-                      <TableHead>Updated By</TableHead>
-                      <TableHead>Notes</TableHead>
-                      <TableHead className="w-[80px]">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredProgressUpdates.map((update) => (
-                      <TableRow key={update.id}>
-                        <TableCell>{new Date(update.update_date).toLocaleDateString()}</TableCell>
-                        <TableCell className="font-medium">{getScopeName(update)}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div className="w-24">
-                              <Progress value={update.percentage_completed} className="h-2" />
-                            </div>
-                            <span className="text-sm font-medium">{update.percentage_completed}%</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>{update.updated_by || "—"}</TableCell>
-                        <TableCell className="max-w-[250px] truncate text-sm text-muted-foreground">{update.notes || "-"}</TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="icon" onClick={() => void handleDelete(update.id)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </TableCell>
+                <div className="overflow-auto rounded-md border">
+                  <Table className="min-w-[930px] table-fixed text-xs">
+                    <TableHeader className="sticky top-0 z-10 bg-background">
+                      <TableRow>
+                        <TableHead className="h-8 w-[110px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Date</TableHead>
+                        <TableHead className="h-8 w-[260px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Scope</TableHead>
+                        <TableHead className="h-8 w-[180px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Progress</TableHead>
+                        <TableHead className="h-8 w-[140px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Updated By</TableHead>
+                        <TableHead className="h-8 w-[220px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Notes</TableHead>
+                        <TableHead className="h-8 w-[80px] whitespace-nowrap px-2 text-right text-[11px] uppercase tracking-wide">Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredProgressUpdates.map((update) => (
+                        <TableRow key={update.id} className="border-b last:border-b-0">
+                          <TableCell className="px-2 py-1.5 align-middle whitespace-nowrap">
+                            {new Date(update.update_date).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5 align-middle">
+                            <CompactText value={getScopeName(update)} className="max-w-[242px] font-medium text-foreground" />
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5 align-middle">
+                            <div className="flex items-center gap-2 whitespace-nowrap">
+                              <div className="w-24">
+                                <Progress value={update.percentage_completed} className="h-2" />
+                              </div>
+                              <span className="text-[11px] font-semibold tabular-nums">{update.percentage_completed}%</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5 align-middle">
+                            <CompactText value={update.updated_by || "—"} className="max-w-[122px]" />
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5 align-middle text-muted-foreground">
+                            <CompactText value={update.notes || "—"} className="max-w-[202px]" />
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5 text-right align-middle">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => void handleDelete(update.id)}>
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </div>
           )}

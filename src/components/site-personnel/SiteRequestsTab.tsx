@@ -15,6 +15,7 @@ import { useSettings } from "@/contexts/SettingsProvider";
 import { FileText, Plus, CheckCircle, XCircle, Clock, Filter } from "lucide-react";
 import { siteService } from "@/services/siteService";
 import { approvalCenterService } from "@/services/approvalCenterService";
+import { CompactText } from "@/components/site-personnel/CompactText";
 import { useRouter } from "next/router";
 
 interface SiteRequest {
@@ -470,16 +471,16 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2">
-          <FileText className="h-5 w-5" />
+      <CardHeader className="flex flex-row items-center justify-between gap-3 px-4 py-3">
+        <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+          <FileText className="h-4 w-4" />
           Requests
         </CardTitle>
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button size="sm">
-              <Plus className="mr-2 h-4 w-4" />
+            <Button size="sm" className="h-8 px-2 text-xs">
+              <Plus className="mr-1.5 h-3.5 w-3.5" />
               New Request
             </Button>
           </DialogTrigger>
@@ -750,41 +751,41 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
         </Dialog>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="space-y-3 px-4 pb-4 pt-0">
         {loading ? (
-          <div className="py-8 text-center text-muted-foreground">Loading requests...</div>
+          <div className="py-8 text-center text-sm text-muted-foreground">Loading requests...</div>
         ) : requests.length === 0 ? (
-          <div className="py-8 text-center text-muted-foreground">No requests submitted yet.</div>
+          <div className="py-8 text-center text-sm text-muted-foreground">No requests submitted yet.</div>
         ) : (
-          <div className="space-y-4">
-            <div className="rounded-lg border bg-muted/30 p-3">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div className="space-y-1">
+          <div className="space-y-3">
+            <div className="rounded-lg border bg-muted/20 p-2.5">
+              <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                <div className="space-y-0.5">
                   <p className="text-sm font-medium text-foreground">Request History</p>
                   <p className="text-xs text-muted-foreground">
-                    Review requests with the same clean history pattern used across the other site tabs.
+                    Review requests in a compact single-line table with aligned statuses and actions.
                   </p>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Button type="button" variant="outline" size="sm" className="h-8 px-3 text-xs" onClick={() => setFiltersOpen((open) => !open)}>
-                    <Filter className="mr-2 h-3.5 w-3.5" />
+                  <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-[11px]" onClick={() => setFiltersOpen((open) => !open)}>
+                    <Filter className="mr-1.5 h-3.5 w-3.5" />
                     {filtersOpen ? "Hide filters" : "Filter"}
                   </Button>
                   {filtersOpen ? (
-                    <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={clearFilters}>
-                      Clear filters
+                    <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={clearFilters}>
+                      Clear
                     </Button>
                   ) : null}
                 </div>
               </div>
 
               {filtersOpen ? (
-                <div className="mt-3 space-y-3">
+                <div className="mt-2.5 space-y-2.5">
                   <div className="space-y-1">
                     <Label className="text-[11px]">Request Type</Label>
-                    <div className="flex flex-wrap gap-2">
-                      <Button type="button" variant={filters.requestType === "all" ? "default" : "outline"} className="h-8 text-xs" onClick={() => setFilters((current) => ({ ...current, requestType: "all" }))}>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Button type="button" variant={filters.requestType === "all" ? "default" : "outline"} className="h-7 px-2 text-[11px]" onClick={() => setFilters((current) => ({ ...current, requestType: "all" }))}>
                         All Types
                       </Button>
                       {REQUEST_TYPE_OPTIONS.map((option) => (
@@ -792,7 +793,7 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
                           key={option.value}
                           type="button"
                           variant={filters.requestType === option.value ? "default" : "outline"}
-                          className="h-8 text-xs"
+                          className="h-7 px-2 text-[11px]"
                           onClick={() => setFilters((current) => ({ ...current, requestType: option.value }))}
                         >
                           {option.label}
@@ -801,7 +802,7 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
                     </div>
                   </div>
 
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
                     <div className="space-y-1">
                       <Label htmlFor="request-history-item" className="text-[11px]">
                         Item / Purpose
@@ -861,7 +862,7 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
                 </div>
               ) : null}
 
-              <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
                 <span>{historySummary.recordCount} requests</span>
                 <span>{historySummary.pendingCount} pending</span>
                 <span>{historySummary.approvedCount} approved</span>
@@ -874,55 +875,69 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
                 No requests match the current filters.
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Item / Purpose</TableHead>
-                    <TableHead>Qty / Amount</TableHead>
-                    <TableHead>Requested By</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Notes</TableHead>
-                    <TableHead className="w-[110px]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredRequests.map((request) => {
-                    const statusKey = request.status as "pending" | "approved" | "rejected";
-                    const statusConfig = STATUS_CONFIG[statusKey] || STATUS_CONFIG.pending;
-                    const StatusIcon = statusConfig.icon;
+              <div className="overflow-auto rounded-md border">
+                <Table className="min-w-[980px] table-fixed text-xs">
+                  <TableHeader className="sticky top-0 z-10 bg-background">
+                    <TableRow>
+                      <TableHead className="h-8 w-[110px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Date</TableHead>
+                      <TableHead className="h-8 w-[130px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Type</TableHead>
+                      <TableHead className="h-8 w-[260px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Item / Purpose</TableHead>
+                      <TableHead className="h-8 w-[120px] whitespace-nowrap px-2 text-right text-[11px] uppercase tracking-wide">Qty / Amount</TableHead>
+                      <TableHead className="h-8 w-[140px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Requested By</TableHead>
+                      <TableHead className="h-8 w-[120px] whitespace-nowrap px-2 text-center text-[11px] uppercase tracking-wide">Status</TableHead>
+                      <TableHead className="h-8 w-[210px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Notes</TableHead>
+                      <TableHead className="h-8 w-[110px] whitespace-nowrap px-2 text-right text-[11px] uppercase tracking-wide">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredRequests.map((request) => {
+                      const statusKey = request.status as "pending" | "approved" | "rejected";
+                      const statusConfig = STATUS_CONFIG[statusKey] || STATUS_CONFIG.pending;
+                      const StatusIcon = statusConfig.icon;
 
-                    return (
-                      <TableRow key={request.id}>
-                        <TableCell>{new Date(request.request_date).toLocaleDateString()}</TableCell>
-                        <TableCell className="text-sm">{request.request_type}</TableCell>
-                        <TableCell className="font-medium">{request.item_name}</TableCell>
-                        <TableCell>
-                          {request.quantity} {request.unit}
-                        </TableCell>
-                        <TableCell>{request.requested_by}</TableCell>
-                        <TableCell>
-                          <Badge variant={statusConfig.variant} className="gap-1">
-                            <StatusIcon className="h-3 w-3" />
-                            {statusConfig.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="max-w-[220px] truncate text-sm text-muted-foreground">{request.notes || "—"}</TableCell>
-                        <TableCell>
-                          {request.status === "pending" ? (
-                            <Button variant="outline" size="sm" className="h-8 px-2 text-xs" onClick={() => void router.push("/approval-center")}>
-                              Review
-                            </Button>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+                      return (
+                        <TableRow key={request.id} className="border-b last:border-b-0">
+                          <TableCell className="px-2 py-1.5 align-middle whitespace-nowrap">
+                            {new Date(request.request_date).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5 align-middle">
+                            <CompactText value={request.request_type} className="max-w-[112px]" />
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5 align-middle">
+                            <CompactText value={request.item_name} className="max-w-[242px] font-medium text-foreground" />
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5 text-right align-middle whitespace-nowrap">
+                            {request.quantity} {request.unit}
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5 align-middle">
+                            <CompactText value={request.requested_by} className="max-w-[122px]" />
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5 text-center align-middle">
+                            <div className="flex justify-center">
+                              <Badge variant={statusConfig.variant} className="h-5 gap-1 whitespace-nowrap px-1.5 text-[10px]">
+                                <StatusIcon className="h-3 w-3" />
+                                {statusConfig.label}
+                              </Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5 align-middle text-muted-foreground">
+                            <CompactText value={request.notes || "—"} className="max-w-[194px]" />
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5 text-right align-middle">
+                            {request.status === "pending" ? (
+                              <Button variant="outline" size="sm" className="h-7 px-2 text-[11px]" onClick={() => void router.push("/approval-center")}>
+                                Review
+                              </Button>
+                            ) : (
+                              <span className="text-[11px] text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </div>
         )}

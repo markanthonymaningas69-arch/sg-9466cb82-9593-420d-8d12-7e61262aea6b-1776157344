@@ -138,19 +138,19 @@ export default function SitePersonnelPage() {
     <Layout>
       <SEO title="Site Personnel Management" description="Manage site purchase and deliveries, warehouse, material usage, requests, progress, and attendance" />
       
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Site Personnel</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl font-bold tracking-tight">Site Personnel</h1>
+            <p className="text-sm text-muted-foreground">
               Manage site operations, purchase deliveries, warehouse, and workforce
             </p>
           </div>
 
-          <div className="w-full sm:w-[300px]">
+          <div className="w-full sm:w-[280px]">
             <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-              <SelectTrigger>
+              <SelectTrigger className="h-8 text-xs">
                 <SelectValue placeholder="Select project" />
               </SelectTrigger>
               <SelectContent>
@@ -165,73 +165,73 @@ export default function SitePersonnelPage() {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="deliveries" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6 gap-1 bg-slate-100 p-1">
+        <Tabs defaultValue="deliveries" className="space-y-3">
+          <TabsList className="flex h-auto w-full justify-start gap-1 overflow-x-auto rounded-md bg-slate-100 p-1">
             <TabsTrigger
               value="deliveries"
-              className="gap-1.5 px-2 text-[10px] font-semibold leading-tight text-amber-700 data-[state=active]:bg-amber-100 data-[state=active]:text-amber-950 sm:text-[11px]"
+              className="h-8 shrink-0 gap-1.5 whitespace-nowrap rounded-md px-2 text-[10px] font-semibold leading-none text-amber-700 data-[state=active]:bg-amber-100 data-[state=active]:text-amber-950 sm:text-[11px]"
             >
-              <Package className="h-4 w-4" />
-              <span className="hidden sm:inline">Site Purchase & Deliveries</span>
+              <Package className="h-3.5 w-3.5" />
+              <span>Site Purchase & Deliveries</span>
             </TabsTrigger>
             <TabsTrigger
               value="site-warehouse"
-              className="gap-1.5 px-2 text-[10px] font-semibold leading-tight text-sky-700 data-[state=active]:bg-sky-100 data-[state=active]:text-sky-950 sm:text-[11px]"
+              className="h-8 shrink-0 gap-1.5 whitespace-nowrap rounded-md px-2 text-[10px] font-semibold leading-none text-sky-700 data-[state=active]:bg-sky-100 data-[state=active]:text-sky-950 sm:text-[11px]"
             >
-              <WarehouseIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">Site Warehouse</span>
+              <WarehouseIcon className="h-3.5 w-3.5" />
+              <span>Site Warehouse</span>
             </TabsTrigger>
             <TabsTrigger
               value="usage"
-              className="gap-1.5 px-2 text-[10px] font-semibold leading-tight text-rose-700 data-[state=active]:bg-rose-100 data-[state=active]:text-rose-950 sm:text-[11px]"
+              className="h-8 shrink-0 gap-1.5 whitespace-nowrap rounded-md px-2 text-[10px] font-semibold leading-none text-rose-700 data-[state=active]:bg-rose-100 data-[state=active]:text-rose-950 sm:text-[11px]"
             >
-              <TrendingDown className="h-4 w-4" />
-              <span className="hidden sm:inline">Usage</span>
+              <TrendingDown className="h-3.5 w-3.5" />
+              <span>Usage</span>
             </TabsTrigger>
             <TabsTrigger
               value="requests"
-              className="gap-1.5 px-2 text-[10px] font-semibold leading-tight text-violet-700 data-[state=active]:bg-violet-100 data-[state=active]:text-violet-950 sm:text-[11px]"
+              className="h-8 shrink-0 gap-1.5 whitespace-nowrap rounded-md px-2 text-[10px] font-semibold leading-none text-violet-700 data-[state=active]:bg-violet-100 data-[state=active]:text-violet-950 sm:text-[11px]"
             >
-              <FileText className="h-4 w-4" />
-              <span className="hidden sm:inline">Requests</span>
+              <FileText className="h-3.5 w-3.5" />
+              <span>Requests</span>
             </TabsTrigger>
             <TabsTrigger
               value="progress"
-              className="gap-1.5 px-2 text-[10px] font-semibold leading-tight text-emerald-700 data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-950 sm:text-[11px]"
+              className="h-8 shrink-0 gap-1.5 whitespace-nowrap rounded-md px-2 text-[10px] font-semibold leading-none text-emerald-700 data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-950 sm:text-[11px]"
             >
-              <TrendingUp className="h-4 w-4" />
-              <span className="hidden sm:inline">Progress</span>
+              <TrendingUp className="h-3.5 w-3.5" />
+              <span>Accomplishments</span>
             </TabsTrigger>
             <TabsTrigger
               value="attendance"
-              className="gap-1.5 px-2 text-[10px] font-semibold leading-tight text-indigo-700 data-[state=active]:bg-indigo-100 data-[state=active]:text-indigo-950 sm:text-[11px]"
+              className="h-8 shrink-0 gap-1.5 whitespace-nowrap rounded-md px-2 text-[10px] font-semibold leading-none text-indigo-700 data-[state=active]:bg-indigo-100 data-[state=active]:text-indigo-950 sm:text-[11px]"
             >
-              <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Attendance</span>
+              <Users className="h-3.5 w-3.5" />
+              <span>Attendance</span>
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="deliveries">
+          <TabsContent value="deliveries" className="mt-0">
             <SiteWarehouseTab projectId={selectedProjectId} />
           </TabsContent>
 
-          <TabsContent value="site-warehouse">
+          <TabsContent value="site-warehouse" className="mt-0">
             <SiteWarehouseInventoryTab projectId={selectedProjectId} />
           </TabsContent>
 
-          <TabsContent value="usage">
+          <TabsContent value="usage" className="mt-0">
             <MaterialUsageTab projectId={selectedProjectId} />
           </TabsContent>
 
-          <TabsContent value="requests">
+          <TabsContent value="requests" className="mt-0">
             <SiteRequestsTab projectId={selectedProjectId} />
           </TabsContent>
 
-          <TabsContent value="progress">
+          <TabsContent value="progress" className="mt-0">
             <ProgressTab projectId={selectedProjectId} />
           </TabsContent>
 
-          <TabsContent value="attendance">
+          <TabsContent value="attendance" className="mt-0">
             <AttendanceTab projectId={selectedProjectId} />
           </TabsContent>
         </Tabs>
