@@ -99,6 +99,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState<FormState>(defaultFormState);
+  const [isOtherMaterial, setIsOtherMaterial] = useState(false);
 
   const amount = useMemo(() => {
     const quantity = Number(formData.quantity || 0);
@@ -115,12 +116,30 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
   }, [formData.bom_scope_id, materials]);
 
   const selectedMaterialValue = useMemo(() => {
-    if (formData.custom_item_name) {
+    if (isOtherMaterial) {
       return OTHER_MATERIAL_OPTION;
     }
 
     return formData.item_name;
-  }, [formData.custom_item_name, formData.item_name]);
+  }, [formData.item_name, isOtherMaterial]);
+
+  const availableUnits = useMemo(() => {
+    if (!formData.bom_scope_id) {
+      return [];
+    }
+
+    if (isOtherMaterial) {
+      return Array.from(new Set(filteredMaterials.map((material) => material.unit).filter(Boolean)));
+    }
+
+    const selectedMaterial = filteredMaterials.find((material) => material.name === formData.item_name);
+
+    if (selectedMaterial?.unit) {
+      return [selectedMaterial.unit];
+    }
+
+    return Array.from(new Set(filteredMaterials.map((material) => material.unit).filter(Boolean)));
+  }, [filteredMaterials, formData.bom_scope_id, formData.item_name, isOtherMaterial]);
 
   useEffect(() => {
     void loadData();
@@ -180,6 +199,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
       ...defaultFormState,
       delivery_date: getTodayDate(),
     });
+    setIsOtherMaterial(false);
   }
 
   function handleScopeChange(scopeId: string) {
@@ -190,10 +210,12 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
       custom_item_name: "",
       unit: "",
     }));
+    setIsOtherMaterial(false);
   }
 
   function handleMaterialChange(materialName: string) {
     if (materialName === OTHER_MATERIAL_OPTION) {
+      setIsOtherMaterial(true);
       setFormData((prev) => ({
         ...prev,
         item_name: "",
@@ -204,12 +226,13 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
     }
 
     const selectedMaterial = filteredMaterials.find((material) => material.name === materialName);
+    setIsOtherMaterial(false);
 
     setFormData((prev) => ({
       ...prev,
       item_name: materialName,
       custom_item_name: "",
-      unit: selectedMaterial?.unit || prev.unit,
+      unit: selectedMaterial?.unit || "",
     }));
   }
 
@@ -367,13 +390,30 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="unit">Unit</Label>
-                  <Input
-                    id="unit"
-                    className="h-9"
+                  <Select
                     value={formData.unit}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, unit: event.target.value }))}
-                    required
-                  />
+                    onValueChange={(value) => setFormData((prev) => ({ ...prev, unit: value }))}
+                    disabled={!formData.bom_scope_id || availableUnits.length === 0}
+                  >
+                    <SelectTrigger id="unit" className="h-9">
+                      <SelectValue
+                        placeholder={
+                          !formData.bom_scope_id
+                            ? "Select scope first"
+                            : availableUnits.length === 0
+                              ? "No BOM units available"
+                              : "Select unit"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableUnits.map((unitOption) => (
+                        <SelectItem key={unitOption} value={unitOption}>
+                          {unitOption}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
