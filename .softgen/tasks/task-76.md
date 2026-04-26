@@ -1,6 +1,6 @@
 ---
 title: Site Personnel purchase and deliveries form
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [site-personnel, deliveries, purchasing, form]
@@ -13,11 +13,11 @@ position: 76
 Update the Site Personnel surface by renaming the Deliveries module to Purchase & Deliveries. Replace the current record form fields with: Site Purchase/Delivery toggle, Select Scope, Select Material, Quantity, Unit, Unit Cost, Amount auto-calculated, Supplier, Delivery/Purchase Date, and Notes optional. If the record comes from Delivery, remove the costing fields because the amount is already recorded from accounting.
 
 ## Checklist
-- [ ] Review the Site Personnel page, delivery tab component, related service layer, and database schema for the current deliveries record flow
-- [ ] Rename the visible Deliveries label to Purchase & Deliveries on the affected Site Personnel surface
-- [ ] Update the record form to support Site Purchase vs Delivery mode with the requested fields and conditional costing behavior
-- [ ] Update persistence and list rendering so the new fields save and display correctly
-- [ ] Validate the Site Personnel flow builds cleanly after the changes
+- [x] Review the Site Personnel page, delivery tab component, related service layer, and database schema for the current deliveries record flow
+- [x] Rename the visible Deliveries label to Purchase & Deliveries on the affected Site Personnel surface
+- [x] Update the record form to support Site Purchase vs Delivery mode with the requested fields and conditional costing behavior
+- [x] Update persistence and list rendering so the new fields save and display correctly
+- [x] Validate the Site Personnel flow builds cleanly after the changes
 
 ## Acceptance
 The Site Personnel module shows Purchase & Deliveries instead of Deliveries.
