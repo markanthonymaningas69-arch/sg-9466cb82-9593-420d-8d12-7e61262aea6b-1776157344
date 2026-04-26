@@ -549,10 +549,10 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
 
                     <div className="space-y-1">
                       <Label htmlFor="unit" className="text-[11px]">
-                        {isCashRequestType(formData.request_type) ? "Currency" : "Unit"}
+                        {isCashRequestType(formData.request_type) ? "Curency" : "Unit"}
                       </Label>
                       {isCashRequestType(formData.request_type) ? (
-                        <Input id="unit" className="h-8 bg-muted text-xs" value={currency} readOnly aria-readonly="true" />
+                        <Input id="unit" className="h-8 bg-muted text-xs" value={formData.unit} readOnly aria-readonly="true" />
                       ) : (
                         <Input
                           id="unit"
