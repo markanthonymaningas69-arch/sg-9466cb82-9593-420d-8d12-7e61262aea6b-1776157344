@@ -1,6 +1,6 @@
 ---
 title: Site purchase multi-material receipt flow
-status: done
+status: in_progress
 priority: high
 type: feature
 tags: [site-purchase, warehouse, receipts, mobile]
@@ -20,7 +20,10 @@ Update the Record Site Purchase flow so one receipt number can contain one or mo
 - [x] Validate the updated purchase flow does not break existing usage
 - [x] Keep the Record Site Purchase modal fully visible and scrollable when multiple materials are added
 - [x] Allow Save Record to submit when receipt items are already added to the list without re-filling the cleared line inputs
+- [ ] Group the purchase history table by receipt number so one receipt can show one or more materials
+- [ ] Add a View action that opens the receipt and lists all included materials
 
 ## Acceptance
 A user can record multiple materials under one receipt number without losing the existing fields.
 The Record Site Purchase form still looks familiar and uses the same field set.
+The purchase history shows grouped receipts and lets users inspect the materials inside each receipt.
