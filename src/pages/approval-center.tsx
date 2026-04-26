@@ -465,6 +465,9 @@ export default function ApprovalCenterPage() {
                       </div>
 
                       <div className="grid gap-2">
+                        <Button size="sm" variant="outline" onClick={() => void handleOpenView(selectedRequest)}>
+                          Request Detail
+                        </Button>
                         <Button size="sm" disabled={acting} onClick={() => void handleAction("approved")}>
                           Approve
                         </Button>
