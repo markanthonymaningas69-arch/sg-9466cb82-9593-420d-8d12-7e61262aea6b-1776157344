@@ -557,7 +557,7 @@ export function Layout({ children }: LayoutProps) {
 
         <div className="flex flex-col h-full overflow-hidden">
           {/* Logo */}
-          <div className="flex items-center justify-between h-16 px-5 border-b shrink-0">
+          <div className="flex items-center justify-between h-14 px-4 border-b shrink-0">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 shrink-0 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
                 TX
@@ -582,8 +582,8 @@ export function Layout({ children }: LayoutProps) {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 overflow-y-auto py-2">
-            <ul className="space-y-0 px-2.5">
+          <nav className="flex-1 overflow-y-auto py-1">
+            <ul className="space-y-0 px-2">
               {navigation.filter((item) => {
                 if (assignedModules.includes("GM")) {
                   const isRestrictedPlan = currentPlan === "starter" || currentPlan === "trial" || isTrial;
@@ -601,7 +601,7 @@ export function Layout({ children }: LayoutProps) {
                       href={item.href}
                       title={sidebarCollapsed ? item.name : undefined}
                       className={cn(
-                        "flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors relative",
+                        "flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors relative",
                         isActive ?
                         "bg-primary text-primary-foreground" :
                         "text-muted-foreground hover:bg-secondary hover:text-foreground",
@@ -647,7 +647,7 @@ export function Layout({ children }: LayoutProps) {
           </nav>
 
           {/* System Navigation (Separated visually) */}
-          <div className="mt-auto px-2.5 py-2 border-t space-y-0.5 shrink-0">
+          <div className="mt-auto px-2 py-1.5 border-t space-y-0.5 shrink-0">
             {!sidebarCollapsed && (
               <p className="px-2.5 text-[9px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 truncate">
                 {assignedModules.includes("GM") ? "System Settings" : "Preferences"}
@@ -656,7 +656,7 @@ export function Layout({ children }: LayoutProps) {
             <Link 
               href="/settings" 
               title={sidebarCollapsed ? (assignedModules.includes("GM") ? "Company Settings" : "Settings") : undefined}
-              className={cn("flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors relative", router.pathname === "/settings" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground", sidebarCollapsed && "justify-center")} 
+              className={cn("flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors relative", router.pathname === "/settings" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground", sidebarCollapsed && "justify-center")} 
               onClick={() => setSidebarOpen(false)}>
               <Settings className="h-4.5 w-4.5 shrink-0" />
               {!sidebarCollapsed && <span className="truncate">{assignedModules.includes("GM") ? "Company Settings" : "Settings"}</span>}
@@ -674,8 +674,8 @@ export function Layout({ children }: LayoutProps) {
           </div>
 
           {/* Footer */}
-          <div className="border-t p-3 shrink-0">
-            <div className={cn("flex items-center gap-3", sidebarCollapsed ? "justify-center px-0" : "px-3 py-2")}>
+          <div className="border-t p-2.5 shrink-0">
+            <div className={cn("flex items-center gap-2.5", sidebarCollapsed ? "justify-center px-0" : "px-2.5 py-1.5")}>
               <div className="h-7 w-7 shrink-0 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold text-sm">
                 {userName.charAt(0).toUpperCase()}
               </div>
