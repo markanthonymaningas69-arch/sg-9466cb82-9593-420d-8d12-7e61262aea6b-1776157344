@@ -15,6 +15,7 @@ import {
   type ApprovalRequest,
   type ApprovalStatus,
 } from "@/services/approvalCenterService";
+import { ArchiveViewer } from "@/components/ArchiveViewer";
 
 type ApprovalTabKey = "all" | "Purchasing" | "Accounting" | "HR" | "Site Personnel" | "Project Manager";
 
@@ -71,6 +72,7 @@ export default function ApprovalCenterPage() {
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
   const [archivingId, setArchivingId] = useState("");
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [viewRequest, setViewRequest] = useState<ApprovalRequest | null>(null);
   const [viewActions, setViewActions] = useState<ApprovalAction[]>([]);
@@ -189,6 +191,8 @@ export default function ApprovalCenterPage() {
         setViewActions([]);
       }
 
+      setArchiveOpen(true);
+
       toast({
         title: "Moved to GM Vault",
         description: "The approved record was archived and is now available in the GM Vault.",
@@ -208,11 +212,20 @@ export default function ApprovalCenterPage() {
   return (
     <Layout>
       <div className="space-y-4">
-        <div className="space-y-1">
-          <h1 className="font-heading text-xl font-bold sm:text-2xl">Approval Center</h1>
-          <p className="text-sm text-muted-foreground">
-            Review Purchasing, Accounting, HR, Site Personnel, and Project Manager requests in one place, then move approved records into the GM Vault archive flow.
-          </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-1">
+            <h1 className="font-heading text-xl font-bold sm:text-2xl">Approval Center</h1>
+            <p className="text-sm text-muted-foreground">
+              Review Purchasing, Accounting, HR, Site Personnel, and Project Manager requests in one place, then move approved records into the GM Vault archive flow.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            className="border-amber-200 text-amber-800 hover:bg-amber-50"
+            onClick={() => setArchiveOpen(true)}
+          >
+            Open GM Vault
+          </Button>
         </div>
 
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as ApprovalTabKey)} className="space-y-3">
@@ -407,6 +420,8 @@ export default function ApprovalCenterPage() {
             </div>
           </TabsContent>
         </Tabs>
+
+        <ArchiveViewer open={archiveOpen} onOpenChange={setArchiveOpen} />
 
         <Dialog open={viewOpen} onOpenChange={setViewOpen}>
           <DialogContent className="max-w-3xl">
