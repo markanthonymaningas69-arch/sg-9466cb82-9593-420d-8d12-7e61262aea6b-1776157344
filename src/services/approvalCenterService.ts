@@ -42,6 +42,35 @@ export interface CreateApprovalRequestInput {
   payload?: JsonValue | null;
 }
 
+const archivableSourceTables = [
+  "purchases",
+  "site_requests",
+  "cash_advance_requests",
+  "leave_requests",
+] as const;
+
+type ArchivableSourceTable = (typeof archivableSourceTables)[number];
+
+function isArchivableSourceTable(sourceTable: string): sourceTable is ArchivableSourceTable {
+  return archivableSourceTables.includes(sourceTable as ArchivableSourceTable);
+}
+
+async function listArchivedSourceIds() {
+  const archivedQueries = await Promise.all(
+    archivableSourceTables.map(async (table) => {
+      const { data, error } = await supabase.from(table).select("id").eq("is_archived", true);
+
+      if (error) {
+        throw error;
+      }
+
+      return (data || []).map((item) => item.id);
+    })
+  );
+
+  return new Set(archivedQueries.flat());
+}
+
 function mapApprovalStatus(sourceTable: string, status: ApprovalStatus) {
   if (sourceTable === "purchases") {
     if (status === "approved") {
@@ -289,20 +318,24 @@ export const approvalCenterService = {
       throw error;
     }
 
-    return (data || []).map((item) => ({
-      id: item.id,
-      sourceModule: item.source_module,
-      sourceTable: item.source_table,
-      sourceRecordId: item.source_record_id,
-      requestType: item.request_type,
-      requestedBy: item.requested_by,
-      requestedAt: item.requested_at,
-      projectId: item.project_id,
-      projectName: Array.isArray(item.projects) ? item.projects[0]?.name || null : item.projects?.name || null,
-      status: item.status as ApprovalStatus,
-      summary: item.summary,
-      latestComment: item.latest_comment,
-    })) as ApprovalRequest[];
+    const archivedSourceIds = await listArchivedSourceIds();
+
+    return (data || [])
+      .filter((item) => !archivedSourceIds.has(item.source_record_id))
+      .map((item) => ({
+        id: item.id,
+        sourceModule: item.source_module,
+        sourceTable: item.source_table,
+        sourceRecordId: item.source_record_id,
+        requestType: item.request_type,
+        requestedBy: item.requested_by,
+        requestedAt: item.requested_at,
+        projectId: item.project_id,
+        projectName: Array.isArray(item.projects) ? item.projects[0]?.name || null : item.projects?.name || null,
+        status: item.status as ApprovalStatus,
+        summary: item.summary,
+        latestComment: item.latest_comment,
+      })) as ApprovalRequest[];
   },
 
   async listActions(approvalRequestId: string) {
@@ -391,6 +424,35 @@ export const approvalCenterService = {
         requestedBy: request.requested_by,
         projectId: request.project_id,
       });
+    }
+  },
+
+  async archiveRequest(approvalRequestId: string) {
+    const { data: request, error: requestError } = await supabase
+      .from("approval_requests")
+      .select("id, source_table, source_record_id, status")
+      .eq("id", approvalRequestId)
+      .single();
+
+    if (requestError || !request) {
+      throw requestError || new Error("Approval request not found");
+    }
+
+    if (request.status !== "approved") {
+      throw new Error("Only approved requests can be archived to the GM Vault");
+    }
+
+    if (!isArchivableSourceTable(request.source_table)) {
+      throw new Error("This approval type is not linked to the GM Vault archive");
+    }
+
+    const { error: archiveError } = await supabase
+      .from(request.source_table)
+      .update({ is_archived: true })
+      .eq("id", request.source_record_id);
+
+    if (archiveError) {
+      throw archiveError;
     }
   },
 };

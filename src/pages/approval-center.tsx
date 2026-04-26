@@ -55,6 +55,13 @@ function getModuleTone(sourceModule: string) {
   return approvalTabs.find((tab) => tab.key === sourceModule)?.tone || approvalTabs[0].tone;
 }
 
+function canArchiveRequest(request: ApprovalRequest) {
+  return (
+    request.status === "approved" &&
+    ["purchases", "site_requests", "cash_advance_requests", "leave_requests"].includes(request.sourceTable)
+  );
+}
+
 export default function ApprovalCenterPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<ApprovalTabKey>("all");
@@ -63,6 +70,7 @@ export default function ApprovalCenterPage() {
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
+  const [archivingId, setArchivingId] = useState("");
   const [viewOpen, setViewOpen] = useState(false);
   const [viewRequest, setViewRequest] = useState<ApprovalRequest | null>(null);
   const [viewActions, setViewActions] = useState<ApprovalAction[]>([]);
@@ -165,13 +173,45 @@ export default function ApprovalCenterPage() {
     }
   }
 
+  async function handleArchive(request: ApprovalRequest) {
+    try {
+      setArchivingId(request.id);
+      await approvalCenterService.archiveRequest(request.id);
+      await loadRequests();
+
+      if (selectedRequestId === request.id) {
+        setSelectedRequestId("");
+      }
+
+      if (viewRequest?.id === request.id) {
+        setViewOpen(false);
+        setViewRequest(null);
+        setViewActions([]);
+      }
+
+      toast({
+        title: "Moved to GM Vault",
+        description: "The approved record was archived and is now available in the GM Vault.",
+      });
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to archive record to GM Vault",
+        variant: "destructive",
+      });
+    } finally {
+      setArchivingId("");
+    }
+  }
+
   return (
     <Layout>
       <div className="space-y-4">
         <div className="space-y-1">
           <h1 className="font-heading text-xl font-bold sm:text-2xl">Approval Center</h1>
           <p className="text-sm text-muted-foreground">
-            Review Purchasing, Accounting, HR, Site Personnel, and Project Manager requests in one place.
+            Review Purchasing, Accounting, HR, Site Personnel, and Project Manager requests in one place, then move approved records into the GM Vault archive flow.
           </p>
         </div>
 
@@ -222,6 +262,7 @@ export default function ApprovalCenterPage() {
                             <TableHead className="h-9 text-[11px] uppercase tracking-wide">Date & Time</TableHead>
                             <TableHead className="h-9 text-[11px] uppercase tracking-wide">Project</TableHead>
                             <TableHead className="h-9 text-[11px] uppercase tracking-wide">Status</TableHead>
+                            <TableHead className="h-9 text-right text-[11px] uppercase tracking-wide">Action</TableHead>
                             <TableHead className="h-9 text-right text-[11px] uppercase tracking-wide">View</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -245,6 +286,24 @@ export default function ApprovalCenterPage() {
                                 <Badge className={`text-[10px] ${statusBadgeClass(request.status)}`}>
                                   {request.status.replaceAll("_", " ")}
                                 </Badge>
+                              </TableCell>
+                              <TableCell className="py-2.5 text-right">
+                                {canArchiveRequest(request) ? (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 border-amber-200 px-2 text-xs text-amber-800 hover:bg-amber-50"
+                                    disabled={archivingId === request.id}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      void handleArchive(request);
+                                    }}
+                                  >
+                                    {archivingId === request.id ? "Archiving..." : "Archive"}
+                                  </Button>
+                                ) : (
+                                  <span className="text-[11px] text-muted-foreground">—</span>
+                                )}
                               </TableCell>
                               <TableCell className="py-2.5 text-right">
                                 <Button
@@ -326,6 +385,17 @@ export default function ApprovalCenterPage() {
                         <Button size="sm" disabled={acting} variant="outline" onClick={() => void handleAction("returned_for_revision")}>
                           Return with comment
                         </Button>
+                        {canArchiveRequest(selectedRequest) ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-amber-200 text-amber-800 hover:bg-amber-50"
+                            disabled={archivingId === selectedRequest.id}
+                            onClick={() => void handleArchive(selectedRequest)}
+                          >
+                            {archivingId === selectedRequest.id ? "Archiving..." : "Archive to GM Vault"}
+                          </Button>
+                        ) : null}
                         <Button size="sm" variant="secondary" onClick={() => void handleOpenView(selectedRequest)}>
                           View audit trail
                         </Button>
