@@ -154,6 +154,92 @@ export type Database = {
           },
         ]
       }
+      approval_notification_reads: {
+        Row: {
+          company_id: string
+          id: string
+          notification_id: string
+          read_at: string
+          user_id: string
+        }
+        Insert: {
+          company_id?: string
+          id?: string
+          notification_id: string
+          read_at?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          id?: string
+          notification_id?: string
+          read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_notification_reads_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "approval_notifications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_notification_reads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      approval_notifications: {
+        Row: {
+          approval_request_id: string | null
+          audience_module: string
+          company_id: string
+          created_at: string
+          event_type: string
+          id: string
+          message: string
+          payload: Json
+          target_surface: string
+          title: string
+        }
+        Insert: {
+          approval_request_id?: string | null
+          audience_module: string
+          company_id?: string
+          created_at?: string
+          event_type: string
+          id?: string
+          message: string
+          payload?: Json
+          target_surface: string
+          title: string
+        }
+        Update: {
+          approval_request_id?: string | null
+          audience_module?: string
+          company_id?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          message?: string
+          payload?: Json
+          target_surface?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_notifications_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       approval_requests: {
         Row: {
           company_id: string

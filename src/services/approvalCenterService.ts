@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { notificationService } from "@/services/notificationService";
 
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | { [key: string]: JsonValue } | JsonValue[];
@@ -306,6 +307,24 @@ export const approvalCenterService = {
       throw error;
     }
 
+    if (data?.id) {
+      await notificationService.createNotification({
+        approvalRequestId: data.id,
+        audienceModule: "GM",
+        targetSurface: "Approval Center",
+        eventType: "request_submitted",
+        title: `${input.sourceModule} request submitted`,
+        message: input.summary ? `${input.requestType} • ${input.summary}` : `${input.requestType} from ${input.requestedBy}`,
+        payload: {
+          sourceTable: input.sourceTable,
+          sourceRecordId: input.sourceRecordId,
+          requestType: input.requestType,
+          requestedBy: input.requestedBy,
+          projectId: input.projectId || null,
+        },
+      });
+    }
+
     return data;
   },
 
@@ -379,7 +398,7 @@ export const approvalCenterService = {
 
     const { data: request, error: requestError } = await supabase
       .from("approval_requests")
-      .select("id, source_table, source_record_id, request_type, requested_by, project_id")
+      .select("id, source_module, source_table, source_record_id, request_type, requested_by, project_id, summary")
       .eq("id", approvalRequestId)
       .single();
 
@@ -427,6 +446,24 @@ export const approvalCenterService = {
         projectId: request.project_id,
       });
     }
+
+    await notificationService.createNotification({
+      approvalRequestId,
+      audienceModule: request.source_module,
+      targetSurface: request.source_module,
+      eventType: "status_updated",
+      title: `${request.request_type} ${status.replaceAll("_", " ")}`,
+      message: request.summary
+        ? `${actorName} marked this request as ${status.replaceAll("_", " ")} • ${request.summary}`
+        : `${actorName} marked this request as ${status.replaceAll("_", " ")}`,
+      payload: {
+        status,
+        comments: comments || null,
+        sourceTable: request.source_table,
+        sourceRecordId: request.source_record_id,
+        requestType: request.request_type,
+      },
+    });
   },
 
   async archiveRequest(approvalRequestId: string) {

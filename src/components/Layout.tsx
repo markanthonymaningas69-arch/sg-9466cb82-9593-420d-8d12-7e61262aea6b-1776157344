@@ -42,6 +42,7 @@ import { useSettings } from "@/contexts/SettingsProvider";
 import { AlertCircle, Lock, ShieldCheck } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AIChatAssistant } from "@/components/AIChatAssistant";
+import { notificationService } from "@/services/notificationService";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -79,6 +80,10 @@ export function Layout({ children }: LayoutProps) {
   const [resolvedRequests, setResolvedRequests] = useState<any[]>([]);
   const [resolvedLeaves, setResolvedLeaves] = useState<any[]>([]);
   const [resolvedCashAdvances, setResolvedCashAdvances] = useState<any[]>([]);
+  const [unreadNotificationSummary, setUnreadNotificationSummary] = useState({
+    approvalCenter: 0,
+    sitePersonnel: 0,
+  });
   
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [lastSeenNotificationIds, setLastSeenNotificationIds] = useState<string>(() => typeof window !== 'undefined' ? localStorage.getItem('lastSeenNotificationIds') || "" : "");
@@ -118,24 +123,83 @@ export function Layout({ children }: LayoutProps) {
   }, []);
 
   useEffect(() => {
-    void loadUserProfile();
-    void loadPendingRequests();
-    const interval = setInterval(() => {
-      void loadPendingRequests();
-    }, 30000);
+    const modules = getNotificationModules();
 
-    const approvalChannel = supabase
-      .channel("layout_approval_notifications")
-      .on("postgres_changes", { event: "*", schema: "public", table: "approval_requests" }, () => {
-        void loadPendingRequests();
+    if (modules.length === 0) {
+      return;
+    }
+
+    void loadNotificationSummary(modules);
+
+    const notificationChannel = supabase
+      .channel("layout_notification_updates")
+      .on("postgres_changes", { event: "*", schema: "public", table: "approval_notifications" }, () => {
+        void loadNotificationSummary(modules);
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "approval_notification_reads" }, () => {
+        void loadNotificationSummary(modules);
       })
       .subscribe();
 
     return () => {
-      clearInterval(interval);
-      supabase.removeChannel(approvalChannel);
+      supabase.removeChannel(notificationChannel);
     };
-  }, []);
+  }, [assignedModule, assignedModules]);
+
+  useEffect(() => {
+    const modules = getNotificationModules();
+
+    if (modules.length === 0) {
+      return;
+    }
+
+    if (router.pathname === "/approval-center") {
+      void (async () => {
+        try {
+          await notificationService.markSurfaceAsRead("Approval Center", modules);
+          await loadNotificationSummary(modules);
+        } catch (error) {
+          console.error("Error marking approval center notifications read:", error);
+        }
+      })();
+    }
+
+    if (router.pathname === "/site-personnel") {
+      void (async () => {
+        try {
+          await notificationService.markSurfaceAsRead("Site Personnel", modules);
+          await loadNotificationSummary(modules);
+        } catch (error) {
+          console.error("Error marking site personnel notifications read:", error);
+        }
+      })();
+    }
+  }, [assignedModule, assignedModules, router.pathname]);
+
+  const getNotificationModules = (modulesOverride?: string[]) => {
+    if (modulesOverride && modulesOverride.length > 0) {
+      return modulesOverride.filter(Boolean);
+    }
+
+    if (assignedModules.length > 0) {
+      return assignedModules.filter(Boolean);
+    }
+
+    if (assignedModule) {
+      return [assignedModule];
+    }
+
+    return [];
+  };
+
+  const loadNotificationSummary = async (modulesOverride?: string[]) => {
+    try {
+      const summary = await notificationService.listUnreadCounts(getNotificationModules(modulesOverride));
+      setUnreadNotificationSummary(summary);
+    } catch (error) {
+      console.error("Error loading approval notifications:", error);
+    }
+  };
 
   const loadUserProfile = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -156,11 +220,11 @@ export function Layout({ children }: LayoutProps) {
         setAssignedModule(mods[0]);
         setUserName(profile.full_name || profile.email?.split('@')[0] || "User");
 
-        // Cache to prevent flash on navigation
         localStorage.setItem('app_assigned_modules', JSON.stringify(mods));
         localStorage.setItem('app_assigned_module', mods[0]);
         localStorage.setItem('app_user_name', profile.full_name || profile.email?.split('@')[0] || "User");
         localStorage.setItem('app_user_email', session.user.email || "");
+        void loadNotificationSummary(mods);
       }
     } else {
       router.push('/auth/login');
@@ -525,9 +589,12 @@ export function Layout({ children }: LayoutProps) {
   const purchCount = hasUnseenModuleNotifications("purchasing", purchasingSignature)
     ? pendingPurchases.length
     : 0;
-  const approvalCount = hasUnseenModuleNotifications("approval-center", approvalCenterSignature)
-    ? pendingApprovalRequests.length
-    : 0;
+  const approvalCount = unreadNotificationSummary.approvalCenter || (
+    hasUnseenModuleNotifications("approval-center", approvalCenterSignature)
+      ? pendingApprovalRequests.length
+      : 0
+  );
+  const sitePersonnelNotificationCount = unreadNotificationSummary.sitePersonnel;
 
   return (
     <div className="min-h-screen bg-background">
@@ -636,7 +703,12 @@ export function Layout({ children }: LayoutProps) {
                           {approvalCount}
                         </Badge>
                       }
-                      {sidebarCollapsed && (acctCount > 0 || whseCount > 0 || hrCount > 0 || purchCount > 0 || approvalCount > 0) && ['Accounting', 'Warehouse', 'Human Resources', 'Purchasing', 'Approval Center'].includes(item.name) && (
+                      {!sidebarCollapsed && item.name === "Site Personnel" && sitePersonnelNotificationCount > 0 &&
+                      <Badge variant="destructive" className="ml-auto h-4.5 min-w-[18px] px-1 flex items-center justify-center text-[9px] shrink-0">
+                          {sitePersonnelNotificationCount}
+                        </Badge>
+                      }
+                      {sidebarCollapsed && (sitePersonnelNotificationCount > 0 || acctCount > 0 || whseCount > 0 || hrCount > 0 || purchCount > 0 || approvalCount > 0) && ['Site Personnel', 'Accounting', 'Warehouse', 'Human Resources', 'Purchasing', 'Approval Center'].includes(item.name) && (
                         <div className="absolute right-2 top-2 h-2 w-2 rounded-full bg-destructive border-2 border-card"></div>
                       )}
                     </Link>

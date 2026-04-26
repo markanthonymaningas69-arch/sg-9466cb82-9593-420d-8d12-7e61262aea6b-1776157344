@@ -13,10 +13,10 @@ position: 92
 Create or update the notifications engine so approval-related events surface clearly to users. Start with the approval workflow created for Site Personnel requests and reuse existing app patterns if a notification system already exists.
 
 ## Checklist
-- [ ] Inspect existing notification-related UI, state, and services
-- [ ] Define the approval events that create notifications
-- [ ] Store and fetch notifications through the connected backend
-- [ ] Show unread notification state in an existing user-facing surface
+- [x] Inspect existing notification-related UI, state, and services
+- [x] Define the approval events that create notifications
+- [x] Store and fetch notifications through the connected backend
+- [x] Show unread notification state in an existing user-facing surface
 - [ ] Validate the notification flow for new approval requests and status changes
 
 ## Acceptance
