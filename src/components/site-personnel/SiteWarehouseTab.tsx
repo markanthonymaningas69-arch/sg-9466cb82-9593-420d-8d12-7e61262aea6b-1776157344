@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { siteService } from "@/services/siteService";
 
 type TransactionType = "site_purchase" | "delivery";
+const OTHER_MATERIAL_OPTION = "__others__";
 
 interface DeliveryRecord {
   id: string;
@@ -51,6 +52,7 @@ interface FormState {
   delivery_date: string;
   receipt_number: string;
   notes: string;
+  custom_item_name: string;
 }
 
 function getTodayDate() {
@@ -67,6 +69,7 @@ const defaultFormState: FormState = {
   delivery_date: getTodayDate(),
   receipt_number: "",
   notes: "",
+  custom_item_name: "",
 };
 
 function getScopeName(record: DeliveryRecord) {
@@ -110,6 +113,14 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
 
     return materials.filter((material) => material.scope_id === formData.bom_scope_id);
   }, [formData.bom_scope_id, materials]);
+
+  const selectedMaterialValue = useMemo(() => {
+    if (formData.custom_item_name) {
+      return OTHER_MATERIAL_OPTION;
+    }
+
+    return formData.item_name;
+  }, [formData.custom_item_name, formData.item_name]);
 
   useEffect(() => {
     void loadData();
@@ -176,16 +187,28 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
       ...prev,
       bom_scope_id: scopeId,
       item_name: "",
+      custom_item_name: "",
       unit: "",
     }));
   }
 
   function handleMaterialChange(materialName: string) {
+    if (materialName === OTHER_MATERIAL_OPTION) {
+      setFormData((prev) => ({
+        ...prev,
+        item_name: "",
+        custom_item_name: "",
+        unit: "",
+      }));
+      return;
+    }
+
     const selectedMaterial = filteredMaterials.find((material) => material.name === materialName);
 
     setFormData((prev) => ({
       ...prev,
       item_name: materialName,
+      custom_item_name: "",
       unit: selectedMaterial?.unit || prev.unit,
     }));
   }
@@ -293,7 +316,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
 
               <div className="space-y-1.5">
                 <Label htmlFor="material">Select Material</Label>
-                <Select value={formData.item_name} onValueChange={handleMaterialChange} disabled={!formData.bom_scope_id}>
+                <Select value={selectedMaterialValue} onValueChange={handleMaterialChange} disabled={!formData.bom_scope_id}>
                   <SelectTrigger id="material" className="h-9">
                     <SelectValue placeholder={formData.bom_scope_id ? "Select material" : "Select scope first"} />
                   </SelectTrigger>
@@ -303,9 +326,30 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                         {material.name}
                       </SelectItem>
                     ))}
+                    <SelectItem value={OTHER_MATERIAL_OPTION}>Others</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+
+              {selectedMaterialValue === OTHER_MATERIAL_OPTION ? (
+                <div className="space-y-1.5">
+                  <Label htmlFor="custom_material">Other Material</Label>
+                  <Input
+                    id="custom_material"
+                    className="h-9"
+                    value={formData.custom_item_name}
+                    onChange={(event) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        custom_item_name: event.target.value,
+                        item_name: event.target.value,
+                      }))
+                    }
+                    placeholder="Enter material name"
+                    required
+                  />
+                </div>
+              ) : null}
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">

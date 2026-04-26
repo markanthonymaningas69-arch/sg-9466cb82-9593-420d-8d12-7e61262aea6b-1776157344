@@ -22,7 +22,7 @@ Update the Site Personnel surface by renaming the Deliveries module to Purchase 
 - [x] Keep the tab label as Site Purchase & Deliveries while preserving existing records display
 - [x] Compress the vertical spacing in the Site Purchase modal so the form is denser
 - [x] Add a receipt number input and persist it with Site Purchase records
-- [ ] Add an Others option to Select Material and show a manual input when selected
+- [x] Add an Others option to Select Material and show a manual input when selected
 
 ## Acceptance
 The Site Personnel module shows Purchase & Deliveries instead of Deliveries.
