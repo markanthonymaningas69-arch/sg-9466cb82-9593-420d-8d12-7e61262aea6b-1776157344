@@ -57,6 +57,8 @@ const REQUEST_TYPE_OPTIONS = [
 ] as const;
 
 const OTHER_MATERIAL_OPTION = "__others__";
+const OTHER_TOOL_UNIT_OPTION = "__tool_unit_others__";
+const TOOL_UNIT_OPTIONS = ["Unit", "Pc", "Set"] as const;
 
 const STATUS_CONFIG = {
   pending: { label: "Pending", icon: Clock, variant: "secondary" as const },
@@ -154,6 +156,14 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
 
     return formData.item_name;
   }, [formData.item_name, isOtherMaterial]);
+
+  const selectedToolUnitValue = useMemo(() => {
+    if (formData.request_type !== "Tools&Equipments") {
+      return "";
+    }
+
+    return TOOL_UNIT_OPTIONS.includes(formData.unit as (typeof TOOL_UNIT_OPTIONS)[number]) ? formData.unit : OTHER_TOOL_UNIT_OPTION;
+  }, [formData.request_type, formData.unit]);
 
   const availableUnits = useMemo(() => {
     if (!formData.bom_scope_id || formData.request_type !== "Materials") {
@@ -322,6 +332,21 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
     }));
   }
 
+  function handleToolUnitChange(unitValue: string) {
+    if (unitValue === OTHER_TOOL_UNIT_OPTION) {
+      setFormData((current) => ({
+        ...current,
+        unit: "",
+      }));
+      return;
+    }
+
+    setFormData((current) => ({
+      ...current,
+      unit: unitValue,
+    }));
+  }
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
 
@@ -437,7 +462,14 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
                         setFormData((current) => ({
                           ...current,
                           request_type: option.value,
-                          unit: option.value === "Cash Advance" || option.value === "Petty Cash" ? currency : current.unit,
+                          unit:
+                            option.value === "Cash Advance" || option.value === "Petty Cash"
+                              ? currency
+                              : option.value === "Tools&Equipments"
+                                ? TOOL_UNIT_OPTIONS[0]
+                                : option.value === "Materials"
+                                  ? ""
+                                  : current.unit,
                           worker_id: option.value === "Cash Advance" ? current.worker_id : "",
                         }));
                         setIsOtherMaterial(false);
@@ -551,16 +583,17 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
                       <Label htmlFor="unit" className="text-[11px]">
                         {isCashRequestType(formData.request_type) ? "Curency" : "Unit"}
                       </Label>
-                      {isCashRequestType(formData.request_type) ? (
-                        <Input id="unit" className="h-8 bg-muted text-xs" value={formData.unit} readOnly aria-readonly="true" />
-                      ) : (
+                      {isOtherMaterial ? (
                         <Input
                           id="unit"
                           className="h-8 text-xs"
                           value={formData.unit}
                           onChange={(event) => setFormData((current) => ({ ...current, unit: event.target.value }))}
+                          placeholder="Enter unit"
                           required
                         />
+                      ) : (
+                        <Input id="unit" className="h-8 bg-muted text-xs" value={formData.unit} readOnly aria-readonly="true" required />
                       )}
                     </div>
                   </div>
@@ -601,13 +634,42 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
                     <Label htmlFor="unit" className="text-[11px]">
                       {isCashRequestType(formData.request_type) ? "Currency / Ref." : "Unit"}
                     </Label>
-                    <Input
-                      id="unit"
-                      className="h-8 text-xs"
-                      value={formData.unit}
-                      onChange={(event) => setFormData((current) => ({ ...current, unit: event.target.value }))}
-                      required
-                    />
+                    {isCashRequestType(formData.request_type) ? (
+                      <Input id="unit" className="h-8 bg-muted text-xs" value={formData.unit} readOnly aria-readonly="true" />
+                    ) : formData.request_type === "Tools&Equipments" ? (
+                      <div className="space-y-2">
+                        <Select value={selectedToolUnitValue} onValueChange={handleToolUnitChange}>
+                          <SelectTrigger id="unit" className="h-8 text-xs">
+                            <SelectValue placeholder="Select unit" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TOOL_UNIT_OPTIONS.map((unitOption) => (
+                              <SelectItem key={unitOption} value={unitOption}>
+                                {unitOption}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value={OTHER_TOOL_UNIT_OPTION}>Others</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {selectedToolUnitValue === OTHER_TOOL_UNIT_OPTION ? (
+                          <Input
+                            className="h-8 text-xs"
+                            value={formData.unit}
+                            onChange={(event) => setFormData((current) => ({ ...current, unit: event.target.value }))}
+                            placeholder="Enter unit"
+                            required
+                          />
+                        ) : null}
+                      </div>
+                    ) : (
+                      <Input
+                        id="unit"
+                        className="h-8 text-xs"
+                        value={formData.unit}
+                        onChange={(event) => setFormData((current) => ({ ...current, unit: event.target.value }))}
+                        required
+                      />
+                    )}
                   </div>
                 </div>
               ) : null}
