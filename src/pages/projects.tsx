@@ -42,7 +42,7 @@ export default function Projects() {
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   const [isScopeModalOpen, setIsScopeModalOpen] = useState(false);
   const [masterItems, setMasterItems] = useState<any[]>([]);
-  const [masterForm, setMasterForm] = useState({ name: "", category: "", unit: "", associated_scopes: [] as string[] });
+  const [masterForm, setMasterForm] = useState({ name: "", category: "Materials", unit: "", associated_scopes: [] as string[] });
   const [isManualMasterCategory, setIsManualMasterCategory] = useState(false);
   const [isManualMasterUnit, setIsManualMasterUnit] = useState(false);
   const [currentScopeSelection, setCurrentScopeSelection] = useState("");
@@ -139,10 +139,10 @@ export default function Projects() {
   const handleMasterItemSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!masterForm.name.trim() || !masterForm.category.trim() || !masterForm.unit.trim()) {
+    if (!masterForm.name.trim() || !masterForm.unit.trim()) {
       toast({ 
         title: "Missing Fields", 
-        description: "Please fill in all required fields: Name, Category, and Unit.", 
+        description: "Please fill in all required fields: Name and Unit.", 
         variant: "destructive" 
       });
       return;
@@ -150,7 +150,7 @@ export default function Projects() {
 
     const payload = {
       name: masterForm.name.trim(),
-      category: masterForm.category.trim(),
+      category: masterForm.category.trim() || "Materials",
       unit: masterForm.unit.trim(),
       associated_scopes: masterForm.associated_scopes || []
     };
@@ -164,9 +164,7 @@ export default function Projects() {
         toast({ title: "Saved", description: "New item added to catalog." });
       }
       
-      // Clean Reset
-      setMasterForm({ name: "", category: "", unit: "", associated_scopes: [] });
-      setIsManualMasterCategory(false);
+      setMasterForm({ name: "", category: "Materials", unit: "", associated_scopes: [] });
       setIsManualMasterUnit(false);
       setCurrentScopeSelection("");
       setEditingMasterItemId(null);
@@ -181,11 +179,10 @@ export default function Projects() {
     setEditingMasterItemId(item.id);
     setMasterForm({
       name: item.name,
-      category: item.category,
+      category: item.category || "Materials",
       unit: item.unit,
       associated_scopes: item.associated_scopes || []
     });
-    setIsManualMasterCategory(!STANDARD_CATEGORIES.includes(item.category));
     setIsManualMasterUnit(!STANDARD_UNITS.includes(item.unit));
     setIsItemModalOpen(true);
   };
@@ -454,7 +451,7 @@ export default function Projects() {
           <Tabs defaultValue="items" className="w-full mt-4">
             <TabsList className="shrink-0 flex flex-wrap w-full gap-1 h-auto bg-transparent p-0 pb-4">
               <TabsTrigger value="items" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border border-transparent bg-muted/50 text-muted-foreground hover:bg-muted">
-                <Database className="h-3 w-3 mr-1.5 hidden sm:inline" /> Materials & Tools
+                <Database className="h-3 w-3 mr-1.5 hidden sm:inline" /> Materials
               </TabsTrigger>
               <TabsTrigger value="scopes" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground border border-transparent bg-muted/50 text-muted-foreground hover:bg-muted">
                 <FileText className="h-3 w-3 mr-1.5 hidden sm:inline" /> Scopes of Work
@@ -464,7 +461,7 @@ export default function Projects() {
             <TabsContent value="items" className="space-y-4">
               <div className="flex justify-between items-center">
                 <div>
-                  <h3 className="text-lg font-medium">Materials, Tools & Equipments</h3>
+                  <h3 className="text-lg font-medium">Materials</h3>
                   <p className="text-sm text-muted-foreground">Master catalog for project procurement and warehouse</p>
                 </div>
                 <Dialog open={newItemDialogOpen} onOpenChange={setNewItemDialogOpen}>
@@ -479,7 +476,7 @@ export default function Projects() {
 
               <Card>
                 <CardHeader className="py-4">
-                  <CardTitle className="text-lg">Encoded Materials & Tools</CardTitle>
+                  <CardTitle className="text-lg">Encoded Materials</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <Table>
@@ -588,8 +585,7 @@ export default function Projects() {
         setIsItemModalOpen(open);
         if (!open) {
           setEditingMasterItemId(null);
-          setMasterForm({ name: "", category: "", unit: "", associated_scopes: [] });
-          setIsManualMasterCategory(false);
+          setMasterForm({ name: "", category: "Materials", unit: "", associated_scopes: [] });
           setIsManualMasterUnit(false);
         }
       }}>
@@ -605,40 +601,6 @@ export default function Projects() {
                 value={masterForm.name} 
                 onChange={(e) => setMasterForm({...masterForm, name: e.target.value})} 
               />
-            </div>
-            
-            <div className="space-y-1.5">
-              <Label className="font-semibold">Category <span className="text-red-500">*</span></Label>
-              {!isManualMasterCategory ? (
-                <select
-                  className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background text-foreground px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                  value={masterForm.category || ""}
-                  onChange={(e) => {
-                    if (e.target.value === "others") {
-                      setIsManualMasterCategory(true);
-                      setMasterForm({...masterForm, category: ""});
-                    } else {
-                      setMasterForm({...masterForm, category: e.target.value});
-                    }
-                  }}
-                >
-                  <option value="" disabled hidden className="text-muted-foreground">Select Category...</option>
-                  {STANDARD_CATEGORIES.map(c => <option key={c} value={c} className="text-foreground bg-background">{c}</option>)}
-                  <option value="others" className="text-primary font-semibold bg-primary/10">Others (Type custom...)</option>
-                </select>
-              ) : (
-                <div className="flex gap-2">
-                  <Input 
-                    placeholder="Type custom category..."
-                    value={masterForm.category} 
-                    onChange={(e) => setMasterForm({...masterForm, category: e.target.value})} 
-                  />
-                  <Button type="button" variant="outline" className="px-3" onClick={() => {
-                    setIsManualMasterCategory(false);
-                    setMasterForm({...masterForm, category: ""});
-                  }}>Back</Button>
-                </div>
-              )}
             </div>
             
             <div className="space-y-1.5">
