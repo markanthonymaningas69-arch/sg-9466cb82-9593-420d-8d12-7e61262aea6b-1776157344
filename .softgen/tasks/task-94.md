@@ -1,6 +1,6 @@
 ---
 title: Purchasing incoming requests inbox
-status: todo
+status: in_progress
 priority: high
 type: feature
 tags: [purchasing, inbox, requests]
@@ -13,11 +13,11 @@ position: 94
 Add an Incoming Requests surface in Purchasing for approved Site Personnel requests that should be executed by Purchasing. This inbox should focus on Materials and Tools & Equipment requests and expose clear request details and action state.
 
 ## Checklist
-- [ ] Inspect the current Purchasing page structure and request-related data sources
-- [ ] Add an Incoming Requests tab or section in Purchasing
-- [ ] Show approved Materials and Tools & Equipment requests with project, requester, summary, and lifecycle status
-- [ ] Add clear request actions or state markers for execution handling
-- [ ] Show unread/new state for newly routed requests
+- [x] Inspect the current Purchasing page structure and request-related data sources
+- [x] Add an Incoming Requests tab or section in Purchasing
+- [x] Show approved Materials and Tools & Equipment requests with project, requester, summary, and lifecycle status
+- [x] Add clear request actions or state markers for execution handling
+- [x] Show unread/new state for newly routed requests
 
 ## Acceptance
 Purchasing has an Incoming Requests area for approved Materials and Tools & Equipment requests.

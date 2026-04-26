@@ -15,6 +15,8 @@ import { useSettings } from "@/contexts/SettingsProvider";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { approvalCenterService, type ApprovalRequest } from "@/services/approvalCenterService";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export default function Accounting() {
   const { currentPlan } = useSettings();
@@ -26,14 +28,21 @@ export default function Accounting() {
   const [seenVoucherIds, setSeenVoucherIds] = useState<string>(() => typeof window !== 'undefined' ? localStorage.getItem('seenVoucherIds') || "" : "");
   const [seenReqIds, setSeenReqIds] = useState<string>(() => typeof window !== 'undefined' ? localStorage.getItem('seenReqIds') || "" : "");
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [incomingRequests, setIncomingRequests] = useState<ApprovalRequest[]>([]);
+  const [processingRequestId, setProcessingRequestId] = useState("");
 
   useEffect(() => {
     loadCounts();
+    void loadIncomingRequests();
+
     const channel = supabase
       .channel('accounting_badges')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vouchers' }, () => loadCounts())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'site_requests' }, () => loadCounts())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_advance_requests' }, () => loadCounts())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'approval_requests' }, () => {
+        void loadIncomingRequests();
+      })
       .subscribe();
 
     return () => {
@@ -78,6 +87,21 @@ export default function Accounting() {
     const rIds = [...(r1 || []), ...(r2 || [])].map(r => r.id).sort().join(',');
     setPendingReqIds(rIds);
     setPendingRequestsCount((r1?.length || 0) + (r2?.length || 0));
+  };
+
+  const loadIncomingRequests = async () => {
+    const incoming = await approvalCenterService.listModuleInbox("Accounting");
+    setIncomingRequests(incoming);
+  };
+
+  const handleCompleteIncomingRequest = async (approvalRequestId: string) => {
+    try {
+      setProcessingRequestId(approvalRequestId);
+      await approvalCenterService.updateWorkflowStatus(approvalRequestId, "completed");
+      await loadIncomingRequests();
+    } finally {
+      setProcessingRequestId("");
+    }
   };
 
   return (
@@ -126,6 +150,14 @@ export default function Accounting() {
                   </Badge>
                 )}
               </TabsTrigger>
+              <TabsTrigger value="incoming" className="flex-1 min-w-[90px] h-9 text-xs data-[state=active]:bg-cyan-700 data-[state=active]:text-white border border-transparent data-[state=active]:border-cyan-800 bg-cyan-50 text-cyan-700 hover:bg-cyan-100 relative">
+                Incoming Requests
+                {incomingRequests.filter((request) => request.workflowStatus === "in_accounting").length > 0 && (
+                  <Badge variant="destructive" className="ml-1 h-4 min-w-4 flex items-center justify-center p-0 px-1 text-[9px] absolute -top-1 -right-1">
+                    {incomingRequests.filter((request) => request.workflowStatus === "in_accounting").length}
+                  </Badge>
+                )}
+              </TabsTrigger>
               <TabsTrigger value="tax" className="flex-1 min-w-[70px] h-9 text-xs data-[state=active]:bg-purple-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-purple-700 bg-purple-50 text-purple-700 hover:bg-purple-100">
                 <FileText className="h-3 w-3 mr-1.5 hidden sm:inline" /> Tax
               </TabsTrigger>
@@ -154,6 +186,67 @@ export default function Accounting() {
 
           <TabsContent value="requests" className="flex-1 mt-0">
             <RequestsViewTab />
+          </TabsContent>
+
+          <TabsContent value="incoming" className="flex-1 mt-0">
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Request</TableHead>
+                        <TableHead>Project</TableHead>
+                        <TableHead>Requested By</TableHead>
+                        <TableHead>Routed</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Summary</TableHead>
+                        <TableHead className="text-right">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {incomingRequests.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                            No incoming Accounting requests.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        incomingRequests.map((request) => (
+                          <TableRow key={request.id}>
+                            <TableCell className="font-medium">{request.requestType}</TableCell>
+                            <TableCell>{request.projectName || "No project"}</TableCell>
+                            <TableCell>{request.requestedBy}</TableCell>
+                            <TableCell>{request.routedAt ? new Date(request.routedAt).toLocaleString() : "—"}</TableCell>
+                            <TableCell>
+                              <Badge variant={request.workflowStatus === "completed" ? "default" : "secondary"}>
+                                {request.workflowStatus.replaceAll("_", " ")}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="max-w-[260px] truncate text-sm text-muted-foreground">
+                              {request.summary || "—"}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {request.workflowStatus === "completed" ? (
+                                <span className="text-xs text-muted-foreground">Completed</span>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  onClick={() => void handleCompleteIncomingRequest(request.id)}
+                                  disabled={processingRequestId === request.id}
+                                >
+                                  {processingRequestId === request.id ? "Saving..." : "Mark Completed"}
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="tax" className="flex-1 mt-0">

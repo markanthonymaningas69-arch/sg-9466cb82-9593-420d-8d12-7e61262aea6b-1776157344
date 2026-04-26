@@ -13,11 +13,11 @@ position: 93
 Extend the current request approval implementation into a complete lifecycle workflow. Site Personnel requests must move through Approval Center, retain project/requester/history links, and continue into the correct execution module after approval. Keep the existing request forms intact while adding the missing workflow states and routing logic.
 
 ## Checklist
-- [ ] Inspect current request, approval, and routing data structures across Site Personnel, Approval Center, Purchasing, and Accounting
-- [ ] Add lifecycle statuses and target-module routing data needed for end-to-end tracking
-- [ ] Update Approval Center actions to move requests through approval and execution states with audit history
-- [ ] Ensure approved requests are routed to Purchasing or Accounting based on request type
-- [ ] Keep project, requester, approval history, and target module links attached to each request
+- [x] Inspect current request, approval, and routing data structures across Site Personnel, Approval Center, Purchasing, and Accounting
+- [x] Add lifecycle statuses and target-module routing data needed for end-to-end tracking
+- [x] Update Approval Center actions to move requests through approval and execution states with audit history
+- [x] Ensure approved requests are routed to Purchasing or Accounting based on request type
+- [x] Keep project, requester, approval history, and target module links attached to each request
 - [ ] Validate the request lifecycle from creation to routed execution
 
 ## Acceptance

@@ -1,6 +1,6 @@
 ---
 title: Accounting incoming requests inbox
-status: todo
+status: in_progress
 priority: high
 type: feature
 tags: [accounting, inbox, requests]
@@ -13,11 +13,11 @@ position: 95
 Add an Incoming Requests surface in Accounting for approved Site Personnel requests that should be executed by Accounting. This inbox should focus on Cash Advance and Petty Cash requests and expose clear request details and action state.
 
 ## Checklist
-- [ ] Inspect the current Accounting page structure and request-related data sources
-- [ ] Add an Incoming Requests tab or section in Accounting
-- [ ] Show approved Cash Advance and Petty Cash requests with project, requester, summary, and lifecycle status
-- [ ] Add clear request actions or state markers for execution handling
-- [ ] Show unread/new state for newly routed requests
+- [x] Inspect the current Accounting page structure and request-related data sources
+- [x] Add an Incoming Requests tab or section in Accounting
+- [x] Show approved Cash Advance and Petty Cash requests with project, requester, summary, and lifecycle status
+- [x] Add clear request actions or state markers for execution handling
+- [x] Show unread/new state for newly routed requests
 
 ## Acceptance
 Accounting has an Incoming Requests area for approved Cash Advance and Petty Cash requests.

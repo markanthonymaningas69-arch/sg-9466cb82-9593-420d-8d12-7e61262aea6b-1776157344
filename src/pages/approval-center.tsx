@@ -14,6 +14,7 @@ import {
   type ApprovalAction,
   type ApprovalRequest,
   type ApprovalStatus,
+  type WorkflowStatus,
 } from "@/services/approvalCenterService";
 import { ArchiveViewer } from "@/components/ArchiveViewer";
 
@@ -50,6 +51,20 @@ function statusBadgeClass(status: ApprovalStatus) {
   if (status === "rejected") return "bg-rose-600 text-white";
   if (status === "returned_for_revision") return "bg-amber-500 text-white";
   return "bg-sky-600 text-white";
+}
+
+function workflowBadgeClass(status: WorkflowStatus) {
+  if (status === "completed") return "bg-emerald-700 text-white";
+  if (status === "in_purchasing") return "bg-amber-600 text-white";
+  if (status === "in_accounting") return "bg-violet-600 text-white";
+  if (status === "rejected") return "bg-rose-600 text-white";
+  if (status === "returned_for_revision") return "bg-amber-500 text-white";
+  if (status === "approved") return "bg-emerald-600 text-white";
+  return "bg-sky-600 text-white";
+}
+
+function formatWorkflowStatus(status: WorkflowStatus) {
+  return status.replaceAll("_", " ");
 }
 
 function getModuleTone(sourceModule: string) {
@@ -310,6 +325,7 @@ export default function ApprovalCenterPage() {
                             <TableHead className="h-9 text-[11px] uppercase tracking-wide">Date & Time</TableHead>
                             <TableHead className="h-9 text-[11px] uppercase tracking-wide">Project</TableHead>
                             <TableHead className="h-9 text-[11px] uppercase tracking-wide">Status</TableHead>
+                            <TableHead className="h-9 text-[11px] uppercase tracking-wide">Lifecycle</TableHead>
                             <TableHead className="h-9 text-right text-[11px] uppercase tracking-wide">Action</TableHead>
                             <TableHead className="h-9 text-right text-[11px] uppercase tracking-wide">View</TableHead>
                           </TableRow>
@@ -334,6 +350,14 @@ export default function ApprovalCenterPage() {
                                 <Badge className={`text-[10px] ${statusBadgeClass(request.status)}`}>
                                   {request.status.replaceAll("_", " ")}
                                 </Badge>
+                              </TableCell>
+                              <TableCell className="py-2.5">
+                                <div className="space-y-1">
+                                  <Badge className={`text-[10px] ${workflowBadgeClass(request.workflowStatus)}`}>
+                                    {formatWorkflowStatus(request.workflowStatus)}
+                                  </Badge>
+                                  <p className="text-[11px] text-muted-foreground">{request.targetModule || "Unassigned"}</p>
+                                </div>
                               </TableCell>
                               <TableCell className="py-2.5 text-right">
                                 {canArchiveRequest(request) ? (
@@ -406,6 +430,14 @@ export default function ApprovalCenterPage() {
                           <p><span className="font-medium text-foreground">Date/time:</span> {formatDateTime(selectedRequest.requestedAt)}</p>
                           <p><span className="font-medium text-foreground">Related project:</span> {selectedRequest.projectName || "No project"}</p>
                           <p><span className="font-medium text-foreground">Summary:</span> {selectedRequest.summary || "No summary available"}</p>
+                          <p><span className="font-medium text-foreground">Target module:</span> {selectedRequest.targetModule || "Unassigned"}</p>
+                          <p><span className="font-medium text-foreground">Lifecycle:</span> {formatWorkflowStatus(selectedRequest.workflowStatus)}</p>
+                          {selectedRequest.routedAt ? (
+                            <p><span className="font-medium text-foreground">Routed at:</span> {formatDateTime(selectedRequest.routedAt)}</p>
+                          ) : null}
+                          {selectedRequest.completedAt ? (
+                            <p><span className="font-medium text-foreground">Completed at:</span> {formatDateTime(selectedRequest.completedAt)}</p>
+                          ) : null}
                           {selectedRequest.latestComment ? (
                             <p><span className="font-medium text-foreground">Latest comment:</span> {selectedRequest.latestComment}</p>
                           ) : null}
@@ -488,9 +520,17 @@ export default function ApprovalCenterPage() {
                     <p><span className="font-medium text-foreground">Date/time:</span> {formatDateTime(viewRequest.requestedAt)}</p>
                     <p><span className="font-medium text-foreground">Project:</span> {viewRequest.projectName || "No project"}</p>
                     <p><span className="font-medium text-foreground">Status:</span> {viewRequest.status.replaceAll("_", " ")}</p>
+                    <p><span className="font-medium text-foreground">Lifecycle:</span> {formatWorkflowStatus(viewRequest.workflowStatus)}</p>
                   </div>
                   <div className="sm:col-span-2">
                     <p><span className="font-medium text-foreground">Summary:</span> {viewRequest.summary || "No summary available"}</p>
+                    <p className="mt-1"><span className="font-medium text-foreground">Target module:</span> {viewRequest.targetModule || "Unassigned"}</p>
+                    {viewRequest.routedAt ? (
+                      <p className="mt-1"><span className="font-medium text-foreground">Routed at:</span> {formatDateTime(viewRequest.routedAt)}</p>
+                    ) : null}
+                    {viewRequest.completedAt ? (
+                      <p className="mt-1"><span className="font-medium text-foreground">Completed at:</span> {formatDateTime(viewRequest.completedAt)}</p>
+                    ) : null}
                     {viewRequest.latestComment ? (
                       <p className="mt-1"><span className="font-medium text-foreground">Latest comment:</span> {viewRequest.latestComment}</p>
                     ) : null}

@@ -16,7 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { projectService } from "@/services/projectService";
 import { useSettings } from "@/contexts/SettingsProvider";
 import { cn } from "@/lib/utils";
-import { approvalCenterService } from "@/services/approvalCenterService";
+import { approvalCenterService, type ApprovalRequest } from "@/services/approvalCenterService";
 
 const STANDARD_CATEGORIES = [
   "Construction Materials",
@@ -59,7 +59,10 @@ export default function Purchasing() {
   const [supplierDialogOpen, setSupplierDialogOpen] = useState(false);
   const [viewSuppliersDialogOpen, setViewSuppliersDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  
+  const [activeView, setActiveView] = useState<"incoming" | "purchase-orders">("incoming");
+  const [incomingRequests, setIncomingRequests] = useState<ApprovalRequest[]>([]);
+  const [processingRequestId, setProcessingRequestId] = useState("");
+
   const [gmSubmitDialogOpen, setGmSubmitDialogOpen] = useState(false);
   const [gmSubmitForm, setGmSubmitForm] = useState<any>(null);
   const [itemPopoverOpen, setItemPopoverOpen] = useState(false);
@@ -122,16 +125,31 @@ export default function Purchasing() {
 
   useEffect(() => {
     loadData();
+
+    const channel = supabase
+      .channel("purchasing_workflow_updates")
+      .on("postgres_changes", { event: "*", schema: "public", table: "approval_requests" }, () => {
+        void loadData();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "purchases" }, () => {
+        void loadData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const loadData = async () => {
     setLoading(true);
-    const [{ data: pData }, { data: projData }, { data: supData }, { data: vouchData }, { data: masterData }] = await Promise.all([
+    const [{ data: pData }, { data: projData }, { data: supData }, { data: vouchData }, { data: masterData }, incomingData] = await Promise.all([
       supabase.from("purchases").select(`*, projects(name)`).eq('is_archived', false).order('created_at', { ascending: false }),
       projectService.getAll(),
       supabase.from("suppliers").select("*").order("name"),
       supabase.from("vouchers").select("*").order("created_at", { ascending: false }),
-      projectService.getMasterItems()
+      projectService.getMasterItems(),
+      approvalCenterService.listModuleInbox("Purchasing")
     ]);
     
     const loadedPurchases = pData || [];
@@ -150,6 +168,7 @@ export default function Purchasing() {
       });
     }
     setCatalogItems(Array.from(uniqueItemsMap.values()));
+    setIncomingRequests(incomingData || []);
     
     if (!editingId && !poHeader.order_number) {
       setPoHeader(prev => ({ ...prev, order_number: generateNextPONumber(loadedPurchases) }));
@@ -442,6 +461,16 @@ export default function Purchasing() {
     printWindow.document.close();
   };
 
+  const handleCompleteIncomingRequest = async (approvalRequestId: string) => {
+    try {
+      setProcessingRequestId(approvalRequestId);
+      await approvalCenterService.updateWorkflowStatus(approvalRequestId, "completed");
+      await loadData();
+    } finally {
+      setProcessingRequestId("");
+    }
+  };
+
   return (
     <Layout>
       <div className="space-y-4 sm:space-y-6 flex flex-col h-full px-3 sm:px-0">
@@ -722,6 +751,97 @@ export default function Purchasing() {
           </div>
         </div>
 
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant={activeView === "incoming" ? "default" : "outline"}
+            className="h-9"
+            onClick={() => setActiveView("incoming")}
+          >
+            Incoming Requests
+            {incomingRequests.length > 0 ? (
+              <Badge variant="secondary" className="ml-2 h-5 min-w-[20px] px-1.5">
+                {incomingRequests.filter((request) => request.workflowStatus === "in_purchasing").length}
+              </Badge>
+            ) : null}
+          </Button>
+          <Button
+            type="button"
+            variant={activeView === "purchase-orders" ? "default" : "outline"}
+            className="h-9"
+            onClick={() => setActiveView("purchase-orders")}
+          >
+            Purchase Orders
+          </Button>
+        </div>
+
+        {activeView === "incoming" ? (
+          <Card className="border-0 shadow-none">
+            <CardHeader>
+              <CardTitle>Incoming Requests</CardTitle>
+              <CardDescription>Approved Materials and Tools & Equipment requests routed from Approval Center.</CardDescription>
+            </CardHeader>
+            <CardContent className="px-0 sm:px-6">
+              <div className="overflow-x-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Request</TableHead>
+                      <TableHead>Project</TableHead>
+                      <TableHead>Requested By</TableHead>
+                      <TableHead>Routed</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Summary</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {incomingRequests.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                          No incoming Purchasing requests.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      incomingRequests.map((request) => (
+                        <TableRow key={request.id}>
+                          <TableCell className="font-medium">{request.requestType}</TableCell>
+                          <TableCell>{request.projectName || "No project"}</TableCell>
+                          <TableCell>{request.requestedBy}</TableCell>
+                          <TableCell>{request.routedAt ? new Date(request.routedAt).toLocaleString() : "—"}</TableCell>
+                          <TableCell>
+                            <Badge variant={request.workflowStatus === "completed" ? "default" : "secondary"}>
+                              {request.workflowStatus.replaceAll("_", " ")}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="max-w-[260px] truncate text-sm text-muted-foreground">
+                            {request.summary || "—"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {request.workflowStatus === "completed" ? (
+                              <span className="text-xs text-muted-foreground">Completed</span>
+                            ) : (
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => void handleCompleteIncomingRequest(request.id)}
+                                disabled={processingRequestId === request.id}
+                              >
+                                {processingRequestId === request.id ? "Saving..." : "Mark Completed"}
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {activeView === "purchase-orders" ? (
         <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none">
           <div className="flex justify-end mb-4 shrink-0">
             <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="h-9">
@@ -890,6 +1010,7 @@ export default function Purchasing() {
             </Table>
           </div>
         </Card>
+        ) : null}
 
         {/* GM Submit Dialog */}
         <Dialog open={gmSubmitDialogOpen} onOpenChange={setGmSubmitDialogOpen}>

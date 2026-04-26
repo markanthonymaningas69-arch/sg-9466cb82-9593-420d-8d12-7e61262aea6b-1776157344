@@ -243,60 +243,75 @@ export type Database = {
       approval_requests: {
         Row: {
           company_id: string
+          completed_at: string | null
           created_at: string
           id: string
           latest_comment: string | null
           payload: Json
+          processed_at: string | null
           project_id: string | null
           request_type: string
           requested_at: string
           requested_by: string
           reviewed_at: string | null
           reviewed_by: string | null
+          routed_at: string | null
           source_module: string
           source_record_id: string
           source_table: string
           status: string
           summary: string | null
+          target_module: string | null
           updated_at: string
+          workflow_status: string
         }
         Insert: {
           company_id?: string
+          completed_at?: string | null
           created_at?: string
           id?: string
           latest_comment?: string | null
           payload?: Json
+          processed_at?: string | null
           project_id?: string | null
           request_type: string
           requested_at?: string
           requested_by: string
           reviewed_at?: string | null
           reviewed_by?: string | null
+          routed_at?: string | null
           source_module: string
           source_record_id: string
           source_table: string
           status?: string
           summary?: string | null
+          target_module?: string | null
           updated_at?: string
+          workflow_status?: string
         }
         Update: {
           company_id?: string
+          completed_at?: string | null
           created_at?: string
           id?: string
           latest_comment?: string | null
           payload?: Json
+          processed_at?: string | null
           project_id?: string | null
           request_type?: string
           requested_at?: string
           requested_by?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
+          routed_at?: string | null
           source_module?: string
           source_record_id?: string
           source_table?: string
           status?: string
           summary?: string | null
+          target_module?: string | null
           updated_at?: string
+          workflow_status?: string
         }
         Relationships: [
           {
