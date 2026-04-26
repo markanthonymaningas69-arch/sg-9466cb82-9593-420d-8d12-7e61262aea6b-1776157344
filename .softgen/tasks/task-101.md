@@ -13,9 +13,9 @@ position: 101
 Extend the current request workflow into a complete end-to-end chain from Site Personnel request submission through Approval Center, Purchasing, voucher approval, Accounting, and final receiving. The workflow must preserve traceability between the originating site request, purchasing record, voucher request, voucher number, and receiving confirmation. Approval history and comments must remain attached at each step.
 
 ## Checklist
-- [ ] Inspect the current request, approval, purchasing, accounting, and site receiving data flow
-- [ ] Add workflow fields and linking fields needed for request → purchase → voucher → receiving traceability
-- [ ] Support voucher request records that can be routed back into Approval Center as a second approval step
+- [x] Inspect the current request, approval, purchasing, accounting, and site receiving data flow
+- [x] Add workflow fields and linking fields needed for request → purchase → voucher → receiving traceability
+- [x] Support voucher request records that can be routed back into Approval Center as a second approval step
 - [ ] Track lifecycle states: pending approval, in purchasing, voucher pending approval, voucher approved, ready for delivery, received
 - [ ] Preserve audit trail entries, comments, users, timestamps, and linked module references
 - [ ] Validate the linked workflow end to end

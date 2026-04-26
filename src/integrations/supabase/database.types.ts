@@ -2018,6 +2018,132 @@ export type Database = {
           },
         ]
       }
+      request_execution_tracking: {
+        Row: {
+          actual_quantity: number | null
+          company_id: string
+          created_at: string
+          delivery_id: string | null
+          id: string
+          initial_approval_request_id: string | null
+          lifecycle_status: string
+          project_id: string | null
+          purchase_id: string | null
+          received_at: string | null
+          received_by: string | null
+          remarks: string | null
+          site_request_id: string
+          supplier: string | null
+          target_module: string | null
+          total_amount: number
+          updated_at: string
+          voucher_id: string | null
+          voucher_number: string | null
+          voucher_request_id: string | null
+        }
+        Insert: {
+          actual_quantity?: number | null
+          company_id?: string
+          created_at?: string
+          delivery_id?: string | null
+          id?: string
+          initial_approval_request_id?: string | null
+          lifecycle_status?: string
+          project_id?: string | null
+          purchase_id?: string | null
+          received_at?: string | null
+          received_by?: string | null
+          remarks?: string | null
+          site_request_id: string
+          supplier?: string | null
+          target_module?: string | null
+          total_amount?: number
+          updated_at?: string
+          voucher_id?: string | null
+          voucher_number?: string | null
+          voucher_request_id?: string | null
+        }
+        Update: {
+          actual_quantity?: number | null
+          company_id?: string
+          created_at?: string
+          delivery_id?: string | null
+          id?: string
+          initial_approval_request_id?: string | null
+          lifecycle_status?: string
+          project_id?: string | null
+          purchase_id?: string | null
+          received_at?: string | null
+          received_by?: string | null
+          remarks?: string | null
+          site_request_id?: string
+          supplier?: string | null
+          target_module?: string | null
+          total_amount?: number
+          updated_at?: string
+          voucher_id?: string | null
+          voucher_number?: string | null
+          voucher_request_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "request_execution_tracking_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "request_execution_tracking_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "deliveries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "request_execution_tracking_initial_approval_request_id_fkey"
+            columns: ["initial_approval_request_id"]
+            isOneToOne: true
+            referencedRelation: "approval_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "request_execution_tracking_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "request_execution_tracking_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: true
+            referencedRelation: "purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "request_execution_tracking_site_request_id_fkey"
+            columns: ["site_request_id"]
+            isOneToOne: true
+            referencedRelation: "site_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "request_execution_tracking_voucher_id_fkey"
+            columns: ["voucher_id"]
+            isOneToOne: false
+            referencedRelation: "vouchers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "request_execution_tracking_voucher_request_id_fkey"
+            columns: ["voucher_request_id"]
+            isOneToOne: true
+            referencedRelation: "voucher_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       site_attendance: {
         Row: {
           bom_scope_id: string | null
@@ -2513,6 +2639,109 @@ export type Database = {
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "project_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      voucher_requests: {
+        Row: {
+          accounting_status: string
+          approved_at: string | null
+          company_id: string
+          created_at: string
+          description: string | null
+          id: string
+          project_id: string | null
+          purchase_id: string
+          requested_by: string
+          reviewed_by: string | null
+          site_request_id: string | null
+          source_approval_request_id: string | null
+          status: string
+          supplier: string | null
+          total_amount: number
+          updated_at: string
+          voucher_number: string | null
+        }
+        Insert: {
+          accounting_status?: string
+          approved_at?: string | null
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          project_id?: string | null
+          purchase_id: string
+          requested_by: string
+          reviewed_by?: string | null
+          site_request_id?: string | null
+          source_approval_request_id?: string | null
+          status?: string
+          supplier?: string | null
+          total_amount?: number
+          updated_at?: string
+          voucher_number?: string | null
+        }
+        Update: {
+          accounting_status?: string
+          approved_at?: string | null
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          project_id?: string | null
+          purchase_id?: string
+          requested_by?: string
+          reviewed_by?: string | null
+          site_request_id?: string | null
+          source_approval_request_id?: string | null
+          status?: string
+          supplier?: string | null
+          total_amount?: number
+          updated_at?: string
+          voucher_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voucher_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voucher_requests_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voucher_requests_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voucher_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voucher_requests_site_request_id_fkey"
+            columns: ["site_request_id"]
+            isOneToOne: false
+            referencedRelation: "site_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voucher_requests_source_approval_request_id_fkey"
+            columns: ["source_approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests"
             referencedColumns: ["id"]
           },
         ]
