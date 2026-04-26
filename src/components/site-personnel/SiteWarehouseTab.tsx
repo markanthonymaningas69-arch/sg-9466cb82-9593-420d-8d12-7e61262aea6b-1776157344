@@ -318,13 +318,15 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
           </DialogTrigger>
           <DialogContent className="sm:max-w-lg">
             <DialogHeader className="space-y-1">
-              <DialogTitle>Record Site Purchase</DialogTitle>
+              <DialogTitle className="text-base">Record Site Purchase</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="scope">Select Scope</Label>
+            <form onSubmit={handleSubmit} className="space-y-2.5">
+              <div className="space-y-1">
+                <Label htmlFor="scope" className="text-[11px]">
+                  Select Scope
+                </Label>
                 <Select value={formData.bom_scope_id} onValueChange={handleScopeChange}>
-                  <SelectTrigger id="scope" className="h-9">
+                  <SelectTrigger id="scope" className="h-8 text-xs">
                     <SelectValue placeholder="Select scope" />
                   </SelectTrigger>
                   <SelectContent>
@@ -337,10 +339,12 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                 </Select>
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="material">Select Material</Label>
+              <div className="space-y-1">
+                <Label htmlFor="material" className="text-[11px]">
+                  Select Material
+                </Label>
                 <Select value={selectedMaterialValue} onValueChange={handleMaterialChange} disabled={!formData.bom_scope_id}>
-                  <SelectTrigger id="material" className="h-9">
+                  <SelectTrigger id="material" className="h-8 text-xs">
                     <SelectValue placeholder={formData.bom_scope_id ? "Select material" : "Select scope first"} />
                   </SelectTrigger>
                   <SelectContent>
@@ -355,11 +359,13 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
               </div>
 
               {selectedMaterialValue === OTHER_MATERIAL_OPTION ? (
-                <div className="space-y-1.5">
-                  <Label htmlFor="custom_material">Other Material</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="custom_material" className="text-[11px]">
+                    Other Material
+                  </Label>
                   <Input
                     id="custom_material"
-                    className="h-9"
+                    className="h-8 text-xs"
                     value={formData.custom_item_name}
                     onChange={(event) =>
                       setFormData((prev) => ({
@@ -375,25 +381,29 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
               ) : null}
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="quantity">Quantity</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="quantity" className="text-[11px]">
+                    Quantity
+                  </Label>
                   <Input
                     id="quantity"
                     type="number"
                     step="0.01"
                     min="0"
-                    className="h-9"
+                    className="h-8 text-xs"
                     value={formData.quantity}
                     onChange={(event) => setFormData((prev) => ({ ...prev, quantity: event.target.value }))}
                     required
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="unit">Unit</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="unit" className="text-[11px]">
+                    Unit
+                  </Label>
                   {isOtherMaterial ? (
                     <Input
                       id="unit"
-                      className="h-9"
+                      className="h-8 text-xs"
                       value={formData.unit}
                       onChange={(event) => setFormData((prev) => ({ ...prev, unit: event.target.value }))}
                       placeholder="Enter unit"
@@ -405,7 +415,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                       onValueChange={(value) => setFormData((prev) => ({ ...prev, unit: value }))}
                       disabled={!formData.bom_scope_id || availableUnits.length === 0}
                     >
-                      <SelectTrigger id="unit" className="h-9">
+                      <SelectTrigger id="unit" className="h-8 text-xs">
                         <SelectValue
                           placeholder={
                             !formData.bom_scope_id
@@ -429,41 +439,49 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="unit_cost">Unit Cost</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="unit_cost" className="text-[11px]">
+                    Unit Cost
+                  </Label>
                   <Input
                     id="unit_cost"
                     type="number"
                     step="0.01"
                     min="0"
-                    className="h-9"
+                    className="h-8 text-xs"
                     value={formData.unit_cost}
                     onChange={(event) => setFormData((prev) => ({ ...prev, unit_cost: event.target.value }))}
                     required
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="amount">Amount</Label>
-                  <Input id="amount" className="h-9" value={amount ? formatCurrency(amount) : "0.00"} readOnly />
+                <div className="space-y-1">
+                  <Label htmlFor="amount" className="text-[11px]">
+                    Amount
+                  </Label>
+                  <Input id="amount" className="h-8 text-xs" value={amount ? formatCurrency(amount) : "0.00"} readOnly />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="supplier">Supplier</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="supplier" className="text-[11px]">
+                    Supplier
+                  </Label>
                   <Input
                     id="supplier"
-                    className="h-9"
+                    className="h-8 text-xs"
                     value={formData.supplier}
                     onChange={(event) => setFormData((prev) => ({ ...prev, supplier: event.target.value }))}
                     required
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="receipt_number">Receipt Number</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="receipt_number" className="text-[11px]">
+                    Receipt Number
+                  </Label>
                   <Input
                     id="receipt_number"
-                    className="h-9"
+                    className="h-8 text-xs"
                     value={formData.receipt_number}
                     onChange={(event) => setFormData((prev) => ({ ...prev, receipt_number: event.target.value }))}
                     placeholder="Enter receipt number"
@@ -471,29 +489,34 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="delivery_date">Purchase Date</Label>
+              <div className="space-y-1">
+                <Label htmlFor="delivery_date" className="text-[11px]">
+                  Purchase Date
+                </Label>
                 <Input
                   id="delivery_date"
                   type="date"
-                  className="h-9"
+                  className="h-8 text-xs"
                   value={formData.delivery_date}
                   onChange={(event) => setFormData((prev) => ({ ...prev, delivery_date: event.target.value }))}
                   required
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="notes">Notes (Optional)</Label>
+              <div className="space-y-1">
+                <Label htmlFor="notes" className="text-[11px]">
+                  Notes (Optional)
+                </Label>
                 <Textarea
                   id="notes"
                   rows={2}
+                  className="min-h-[56px] text-xs"
                   value={formData.notes}
                   onChange={(event) => setFormData((prev) => ({ ...prev, notes: event.target.value }))}
                 />
               </div>
 
-              <Button type="submit" className="h-9 w-full">
+              <Button type="submit" className="h-8 w-full text-xs">
                 Save Record
               </Button>
             </form>
