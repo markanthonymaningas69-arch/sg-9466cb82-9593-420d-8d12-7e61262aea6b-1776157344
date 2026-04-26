@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,10 +30,11 @@ interface BOMScope {
   name: string;
 }
 
-interface WarehouseItem {
+interface BOMMaterial {
   id: string;
-  name: string;
+  material_name: string;
   unit: string;
+  scope_id: string;
 }
 
 interface MaterialUsageFormData {
@@ -60,10 +61,18 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
   const { toast } = useToast();
   const [usageRecords, setUsageRecords] = useState<MaterialUsage[]>([]);
   const [bomScopes, setBomScopes] = useState<BOMScope[]>([]);
-  const [warehouseItems, setWarehouseItems] = useState<WarehouseItem[]>([]);
+  const [bomMaterials, setBomMaterials] = useState<BOMMaterial[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState<MaterialUsageFormData>(getDefaultFormData);
+
+  const filteredMaterials = useMemo(() => {
+    if (formData.bom_scope_id === "none") {
+      return bomMaterials;
+    }
+
+    return bomMaterials.filter((material) => material.scope_id === formData.bom_scope_id);
+  }, [bomMaterials, formData.bom_scope_id]);
 
   useEffect(() => {
     void loadData();
@@ -102,33 +111,43 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
         .eq("project_id", projectId)
         .maybeSingle();
 
-      if (bomData?.id) {
-        const { data: scopesData, error: scopesError } = await supabase
-          .from("bom_scope_of_work")
-          .select("id, name")
-          .eq("bom_id", bomData.id)
-          .order("order_number");
-
-        if (scopesError) {
-          throw scopesError;
-        }
-
-        setBomScopes(scopesData || []);
-      } else {
+      if (!bomData?.id) {
         setBomScopes([]);
+        setBomMaterials([]);
+        return;
       }
 
-      const { data: warehouseData, error: warehouseError } = await supabase
-        .from("inventory")
-        .select("id, name, unit")
-        .eq("project_id", projectId)
-        .order("name");
+      const { data: scopesData, error: scopesError } = await supabase
+        .from("bom_scope_of_work")
+        .select("id, name")
+        .eq("bom_id", bomData.id)
+        .order("order_number");
 
-      if (warehouseError) {
-        throw warehouseError;
+      if (scopesError) {
+        throw scopesError;
       }
 
-      setWarehouseItems(warehouseData || []);
+      const scopes = scopesData || [];
+      setBomScopes(scopes);
+
+      if (scopes.length === 0) {
+        setBomMaterials([]);
+        return;
+      }
+
+      const scopeIds = scopes.map((scope) => scope.id);
+
+      const { data: materialsData, error: materialsError } = await supabase
+        .from("bom_materials")
+        .select("id, material_name, unit, scope_id")
+        .in("scope_id", scopeIds)
+        .order("material_name");
+
+      if (materialsError) {
+        throw materialsError;
+      }
+
+      setBomMaterials(materialsData || []);
     } catch (error) {
       console.error("Error loading usage data:", error);
       toast({
@@ -206,6 +225,28 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
     }
   }
 
+  function handleScopeChange(value: string) {
+    const nextMaterials = value === "none" ? bomMaterials : bomMaterials.filter((material) => material.scope_id === value);
+    const selectedMaterial = nextMaterials.find((material) => material.material_name === formData.item_name);
+
+    setFormData((prev) => ({
+      ...prev,
+      bom_scope_id: value,
+      item_name: selectedMaterial ? prev.item_name : "",
+      unit: selectedMaterial ? selectedMaterial.unit || prev.unit : "",
+    }));
+  }
+
+  function handleMaterialChange(value: string) {
+    const selectedMaterial = filteredMaterials.find((material) => material.material_name === value);
+
+    setFormData((prev) => ({
+      ...prev,
+      item_name: value,
+      unit: selectedMaterial?.unit || "",
+    }));
+  }
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -227,10 +268,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <Label htmlFor="bom_scope_id">Scope of Works</Label>
-                <Select
-                  value={formData.bom_scope_id}
-                  onValueChange={(value) => setFormData((prev) => ({ ...prev, bom_scope_id: value }))}
-                >
+                <Select value={formData.bom_scope_id} onValueChange={handleScopeChange}>
                   <SelectTrigger id="bom_scope_id">
                     <SelectValue placeholder="Select scope of works" />
                   </SelectTrigger>
@@ -247,24 +285,22 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
 
               <div>
                 <Label htmlFor="item_name">Material Name</Label>
-                <Select
-                  value={formData.item_name}
-                  onValueChange={(value) => {
-                    const item = warehouseItems.find((warehouseItem) => warehouseItem.name === value);
-                    setFormData((prev) => ({
-                      ...prev,
-                      item_name: value,
-                      unit: item?.unit || prev.unit,
-                    }));
-                  }}
-                >
+                <Select value={formData.item_name} onValueChange={handleMaterialChange} disabled={filteredMaterials.length === 0}>
                   <SelectTrigger id="item_name">
-                    <SelectValue placeholder="Select material" />
+                    <SelectValue
+                      placeholder={
+                        formData.bom_scope_id === "none"
+                          ? "Select scope to narrow materials"
+                          : filteredMaterials.length === 0
+                            ? "No materials for this scope"
+                            : "Select material"
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
-                    {warehouseItems.map((item) => (
-                      <SelectItem key={item.id} value={item.name}>
-                        {item.name}
+                    {filteredMaterials.map((item) => (
+                      <SelectItem key={item.id} value={item.material_name}>
+                        {item.material_name}
                       </SelectItem>
                     ))}
                   </SelectContent>
