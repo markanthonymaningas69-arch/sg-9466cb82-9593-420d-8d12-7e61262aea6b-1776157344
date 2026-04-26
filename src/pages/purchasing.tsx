@@ -20,6 +20,7 @@ import { approvalCenterService, type ApprovalRequest } from "@/services/approval
 import { requestWorkflowService } from "@/services/requestWorkflowService";
 import { RequestDetailsButton } from "@/components/approval/RequestDetailsButton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const STANDARD_CATEGORIES = [
   "Construction Materials",
@@ -911,28 +912,28 @@ export default function Purchasing() {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant={activeView === "incoming" ? "default" : "outline"}
-            className="h-9"
-            onClick={() => setActiveView("incoming")}
-          >
-            Incoming Requests
-            {incomingRequests.length > 0 ? (
-              <Badge variant="secondary" className="ml-2 h-5 min-w-[20px] px-1.5">
-                {incomingRequests.filter((request) => request.workflowStatus === "in_purchasing").length}
-              </Badge>
-            ) : null}
-          </Button>
-          <Button
-            type="button"
-            variant={activeView === "purchase-orders" ? "default" : "outline"}
-            className="h-9"
-            onClick={() => setActiveView("purchase-orders")}
-          >
-            Purchase Orders
-          </Button>
+        <div className="overflow-x-auto overflow-y-hidden rounded-lg border bg-card p-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <Tabs value={activeView} onValueChange={(value) => setActiveView(value as "incoming" | "purchase-orders")} className="w-full">
+            <TabsList className="inline-flex h-9 min-w-max flex-nowrap items-center justify-start gap-1 bg-transparent p-0">
+              <TabsTrigger
+                value="incoming"
+                className="h-7 shrink-0 whitespace-nowrap rounded-md border border-amber-200 bg-amber-50 px-2.5 text-[11px] font-medium text-amber-800 data-[state=active]:border-amber-700 data-[state=active]:bg-amber-600 data-[state=active]:text-white"
+              >
+                Incoming Requests
+                {incomingRequests.filter((request) => request.workflowStatus === "in_purchasing").length > 0 ? (
+                  <Badge variant="secondary" className="ml-2 h-4 min-w-[18px] px-1 text-[10px]">
+                    {incomingRequests.filter((request) => request.workflowStatus === "in_purchasing").length}
+                  </Badge>
+                ) : null}
+              </TabsTrigger>
+              <TabsTrigger
+                value="purchase-orders"
+                className="h-7 shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-slate-50 px-2.5 text-[11px] font-medium text-slate-700 data-[state=active]:border-slate-700 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+              >
+                Purchase Orders
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
 
         {activeView === "incoming" ? (

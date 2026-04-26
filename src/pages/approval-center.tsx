@@ -208,22 +208,24 @@ export default function ApprovalCenterPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as ApprovalTabKey)} className="space-y-3">
-          <TabsList className="h-auto w-full flex-wrap justify-start gap-1.5 bg-transparent p-0">
-            {approvalTabs.map((tab) => (
-              <TabsTrigger
-                key={tab.key}
-                value={tab.key}
-                className={`h-8 gap-2 border px-2.5 text-xs font-medium ${tab.tone} ${tab.activeTone}`}
-              >
-                <span>{tab.label}</span>
-                {pendingCounts[tab.key] > 0 ? (
-                  <Badge className="h-4 rounded-sm bg-black/15 px-1.5 text-[10px] text-current shadow-none">
-                    NEW {pendingCounts[tab.key]}
-                  </Badge>
-                ) : null}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+          <div className="overflow-x-auto overflow-y-hidden rounded-lg border bg-card p-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <TabsList className="inline-flex h-9 min-w-max flex-nowrap items-center justify-start gap-1 bg-transparent p-0">
+              {approvalTabs.map((tab) => (
+                <TabsTrigger
+                  key={tab.key}
+                  value={tab.key}
+                  className={`h-7 shrink-0 whitespace-nowrap border px-2.5 text-[11px] font-medium ${tab.tone} ${tab.activeTone}`}
+                >
+                  <span>{tab.label}</span>
+                  {pendingCounts[tab.key] > 0 ? (
+                    <Badge className="ml-1 h-4 rounded-sm bg-black/15 px-1 text-[10px] text-current shadow-none">
+                      {pendingCounts[tab.key]}
+                    </Badge>
+                  ) : null}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
 
           <TabsContent value={activeTab} className="mt-0">
             <div className="grid gap-3">
