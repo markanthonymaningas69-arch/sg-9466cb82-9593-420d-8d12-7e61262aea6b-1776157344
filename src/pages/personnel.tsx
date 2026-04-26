@@ -637,13 +637,13 @@ export default function Personnel() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList className="shrink-0 flex flex-wrap w-full gap-1 h-auto bg-transparent p-0">
-            <TabsTrigger value="personnel" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-blue-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-blue-700 bg-blue-50 text-blue-700 hover:bg-blue-100">
-              <UserCheck className="h-3 w-3 mr-1.5 hidden sm:inline" />
-              Staff
-            </TabsTrigger>
             <TabsTrigger value="rates" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-violet-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-violet-700 bg-violet-50 text-violet-700 hover:bg-violet-100">
               <DollarSign className="h-3 w-3 mr-1.5 hidden sm:inline" />
               Personnel Catalog
+            </TabsTrigger>
+            <TabsTrigger value="personnel" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-blue-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-blue-700 bg-blue-50 text-blue-700 hover:bg-blue-100">
+              <UserCheck className="h-3 w-3 mr-1.5 hidden sm:inline" />
+              Staff
             </TabsTrigger>
             <TabsTrigger value="attendance" className="flex-1 min-w-[80px] h-9 text-xs data-[state=active]:bg-indigo-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-indigo-700 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
               <Clock className="h-3 w-3 mr-1.5 hidden sm:inline" />

@@ -509,7 +509,18 @@ export default function SitePersonnel() {
         .from('bom_progress_updates')
         .select('*, bom_scope_of_work(name)')
         .in('bom_scope_id', scopeIds)
-        .order('update_date', { ascending: false });
+        .order('update_date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      const latestPercentage = progressData && progressData.length > 0 ? progressData[0].percentage_completed : 0;
+      
+      // Update the master scope record which drives the SWA
+      await supabase
+        .from('bom_scope_of_work')
+        .update({ completion_percentage: latestPercentage })
+        .eq('id', scopeIds[0]);
+      
       setProgressUpdates(progressData || []);
     } else {
       setProgressUpdates([]);
@@ -1763,3 +1774,10649 @@ export default function SitePersonnel() {
                             )}
                           </div>
                         );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {attendanceList.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {attendanceList.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="deliveries" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="warehouse" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="consumption" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="request" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="request" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={async () => {
+                                        if(confirm("Archive this personnel?")) {
+                                          await siteService.deletePersonnel(row.personnel_id);
+                                          loadProjectPersonnelList();
+                                        }
+                                      }} title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scope" className="flex-1 overflow-hidden data-[state=active]:flex flex-col mt-0">
+              <Card className="flex-1 flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>Project Deliveries</CardTitle>
+                      <CardDescription>Manage deliveries and receipts</CardDescription>
+                      <div className="flex items-center gap-3 mt-4">
+                        <Label>Date Filter:</Label>
+                        <Input
+                          type="date"
+                          value={deliveriesDate}
+                          onChange={(e) => {
+                            setDeliveriesDate(e.target.value);
+                            setIsEditMode(false);
+                          }}
+                          className="w-auto h-9"
+                        />
+                        {deliveriesDate && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setDeliveriesDate("");
+                            setIsEditMode(false);
+                          }} className="text-muted-foreground h-9">
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Dialog open={addManpowerDialogOpen} onOpenChange={setAddManpowerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={!deliveriesDate || isLocked}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Manpower from List
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Add Manpower to {deliveriesDate || 'Selected'} Roll Call</DialogTitle>
+                          </DialogHeader>
+                          {(() => {
+                            const availableToAdd = projectPersonnelList
+                              .filter(p => !attendanceList.find(a => a.personnel_id === p.id))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+                            return (
+                              <div className="space-y-4 mt-4">
+                                <div className="flex justify-between items-center border-b pb-4">
+                                  <p className="text-sm text-muted-foreground">Select workers from your master list to add to today's roll call.</p>
+                                  <Button onClick={handleAddAllToRollCall} disabled={availableToAdd.length === 0 || isLocked}>
+                                    Add All Missing
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Position</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {availableToAdd.map(p => (
+                                      <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.role}</TableCell>
+                                        <TableCell className="text-right">
+                                          <Button size="sm" variant="outline" onClick={() => handleAddWorkerToRollCall(p.id)} disabled={isLocked}>
+                                            Add
+                                          </Button>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {availableToAdd.length === 0 && (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                                          All enrolled workers are already on the roll call for this date!
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden pb-4 flex flex-col">
+                  {deliveriesDate ? (
+                    <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+                      {deliveries.length > 0 && (() => {
+                        const presentWorkers = deliveries.filter(r => r.status !== "absent");
+                        const totalCost = presentWorkers.reduce((sum, r) => {
+                          const daily = r.daily_rate || 0;
+                          const ot = r.overtime_rate || 0;
+                          const hrs = r.hours_worked ?? 8;
+                          const oth = r.overtime_hours ?? 0;
+                          return sum + ((daily / 8) * hrs) + (ot * oth);
+                        }, 0);
+                        const roleCounts = presentWorkers.reduce((acc, r) => {
+                          acc[r.role] = (acc[r.role] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>);
+
+                        return (
+                          <div className="bg-muted/30 p-4 rounded-lg border flex flex-wrap gap-4 items-center justify-between shrink-0">
+                            <div className="flex flex-wrap gap-4 items-center">
+                              <div className="font-semibold text-lg border-r pr-4 text-primary">
+                                Daily Labor Cost: AED {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                              <div className="flex items-center flex-wrap gap-2 text-sm">
+                                <Badge variant="secondary">Total Workers: {presentWorkers.length}</Badge>
+                                {Object.entries(roleCounts).map(([role, count]) => (
+                                  <Badge key={role} variant="outline">{role}: {count}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                            {!isEditMode ? (
+                              <Button type="button" variant="outline" onClick={(e) => { e.preventDefault(); setIsEditMode(true); }} disabled={isLocked}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Roll Call
+                              </Button>
+                            ) : (
+                              <Button type="button" variant="default" onClick={(e) => { e.preventDefault(); setIsEditMode(false); }}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Done Editing
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">Name</TableHead>
+                              <TableHead className="w-32">Position</TableHead>
+                              <TableHead className="w-32">Daily Rate</TableHead>
+                              <TableHead className="w-32">OT Rate</TableHead>
+                              <TableHead className="w-32">Status</TableHead>
+                              <TableHead className="w-32">Hours Worked</TableHead>
+                              <TableHead className="w-32">Overtime Hours</TableHead>
+                              <TableHead className="w-32">BOM Scope ID</TableHead>
+                              <TableHead className="w-32">Notes</TableHead>
+                              <TableHead className="w-32">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveries.map((row) => (
+                              <TableRow key={row.personnel_id}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell>{row.role}</TableCell>
+                                <TableCell>{row.daily_rate}</TableCell>
+                                <TableCell>{row.overtime_rate}</TableCell>
+                                <TableCell>
+                                  {getStatusBadge(row.status)}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.hours_worked}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "hours_worked", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={row.overtime_hours}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "overtime_hours", parseFloat(e.target.value) || 0)}
+                                    disabled={isEditMode}
+                                    min="0"
+                                    step="0.5"
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    value={row.bom_scope_id}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "bom_scope_id", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Textarea
+                                    value={row.notes}
+                                    onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
+                                    disabled={isEditMode}
+                                    className="h
