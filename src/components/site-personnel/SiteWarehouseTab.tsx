@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
+import { Package, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { siteService } from "@/services/siteService";
-import { Package, Plus, Trash2 } from "lucide-react";
 
 type TransactionType = "site_purchase" | "delivery";
 
@@ -25,6 +25,7 @@ interface DeliveryRecord {
   bom_scope_id: string | null;
   unit_cost: number | null;
   amount: number | null;
+  receipt_number: string | null;
   bom_scope_of_work?: { name?: string | null } | Array<{ name?: string | null }> | null;
 }
 
@@ -41,7 +42,6 @@ interface MaterialOption {
 }
 
 interface FormState {
-  transaction_type: TransactionType;
   bom_scope_id: string;
   item_name: string;
   quantity: string;
@@ -49,18 +49,23 @@ interface FormState {
   unit_cost: string;
   supplier: string;
   delivery_date: string;
+  receipt_number: string;
   notes: string;
 }
 
+function getTodayDate() {
+  return new Date().toISOString().split("T")[0];
+}
+
 const defaultFormState: FormState = {
-  transaction_type: "site_purchase",
   bom_scope_id: "",
   item_name: "",
   quantity: "",
   unit: "",
   unit_cost: "",
   supplier: "",
-  delivery_date: new Date().toISOString().split("T")[0],
+  delivery_date: getTodayDate(),
+  receipt_number: "",
   notes: "",
 };
 
@@ -72,7 +77,7 @@ function getScopeName(record: DeliveryRecord) {
   return record.bom_scope_of_work?.name || "—";
 }
 
-function formatAmount(value: number | null) {
+function formatCurrency(value: number | null) {
   if (value === null || value === undefined) {
     return "Recorded in accounting";
   }
@@ -100,7 +105,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
 
   const filteredMaterials = useMemo(() => {
     if (!formData.bom_scope_id) {
-      return materials;
+      return [];
     }
 
     return materials.filter((material) => material.scope_id === formData.bom_scope_id);
@@ -120,9 +125,17 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
         siteService.getBomMaterials(projectId),
       ]);
 
-      if (deliveriesResult.error) throw deliveriesResult.error;
-      if (scopesResult.error) throw scopesResult.error;
-      if (materialsResult.error) throw materialsResult.error;
+      if (deliveriesResult.error) {
+        throw deliveriesResult.error;
+      }
+
+      if (scopesResult.error) {
+        throw scopesResult.error;
+      }
+
+      if (materialsResult.error) {
+        throw materialsResult.error;
+      }
 
       setRecords((deliveriesResult.data || []) as DeliveryRecord[]);
       setScopes(
@@ -154,7 +167,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
   function resetForm() {
     setFormData({
       ...defaultFormState,
-      delivery_date: new Date().toISOString().split("T")[0],
+      delivery_date: getTodayDate(),
     });
   }
 
@@ -168,13 +181,12 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
   }
 
   function handleMaterialChange(materialName: string) {
-    const selectedMaterial = materials.find((material) => material.name === materialName);
+    const selectedMaterial = filteredMaterials.find((material) => material.name === materialName);
 
     setFormData((prev) => ({
       ...prev,
       item_name: materialName,
       unit: selectedMaterial?.unit || prev.unit,
-      bom_scope_id: prev.bom_scope_id || selectedMaterial?.scope_id || "",
     }));
   }
 
@@ -196,6 +208,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
         status: "pending",
         unit_cost: Number(formData.unit_cost || 0),
         amount,
+        receipt_number: formData.receipt_number || null,
       });
 
       toast({
@@ -207,7 +220,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
       resetForm();
       await loadData();
     } catch (error) {
-      console.error("Error creating purchase or delivery record:", error);
+      console.error("Error creating site purchase record:", error);
       toast({
         title: "Error",
         description: "Failed to save the record",
@@ -224,7 +237,9 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
     try {
       const { error } = await siteService.deleteDelivery(id);
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
       toast({
         title: "Success",
@@ -255,15 +270,15 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
               Add Record
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-xl">
-            <DialogHeader>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader className="space-y-1">
               <DialogTitle>Record Site Purchase</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <div className="space-y-1.5">
                 <Label htmlFor="scope">Select Scope</Label>
                 <Select value={formData.bom_scope_id} onValueChange={handleScopeChange}>
-                  <SelectTrigger id="scope">
+                  <SelectTrigger id="scope" className="h-9">
                     <SelectValue placeholder="Select scope" />
                   </SelectTrigger>
                   <SelectContent>
@@ -276,11 +291,11 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                 </Select>
               </div>
 
-              <div>
+              <div className="space-y-1.5">
                 <Label htmlFor="material">Select Material</Label>
-                <Select value={formData.item_name} onValueChange={handleMaterialChange}>
-                  <SelectTrigger id="material">
-                    <SelectValue placeholder="Select material" />
+                <Select value={formData.item_name} onValueChange={handleMaterialChange} disabled={!formData.bom_scope_id}>
+                  <SelectTrigger id="material" className="h-9">
+                    <SelectValue placeholder={formData.bom_scope_id ? "Select material" : "Select scope first"} />
                   </SelectTrigger>
                   <SelectContent>
                     {filteredMaterials.map((material) => (
@@ -292,23 +307,25 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                 </Select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
                   <Label htmlFor="quantity">Quantity</Label>
                   <Input
                     id="quantity"
                     type="number"
                     step="0.01"
                     min="0"
+                    className="h-9"
                     value={formData.quantity}
                     onChange={(event) => setFormData((prev) => ({ ...prev, quantity: event.target.value }))}
                     required
                   />
                 </div>
-                <div>
+                <div className="space-y-1.5">
                   <Label htmlFor="unit">Unit</Label>
                   <Input
                     id="unit"
+                    className="h-9"
                     value={formData.unit}
                     onChange={(event) => setFormData((prev) => ({ ...prev, unit: event.target.value }))}
                     required
@@ -316,63 +333,79 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
                   <Label htmlFor="unit_cost">Unit Cost</Label>
                   <Input
                     id="unit_cost"
                     type="number"
                     step="0.01"
                     min="0"
+                    className="h-9"
                     value={formData.unit_cost}
                     onChange={(event) => setFormData((prev) => ({ ...prev, unit_cost: event.target.value }))}
                     required
                   />
                 </div>
-                <div>
+                <div className="space-y-1.5">
                   <Label htmlFor="amount">Amount</Label>
-                  <Input id="amount" value={amount ? formatAmount(amount) : "0.00"} readOnly />
+                  <Input id="amount" className="h-9" value={amount ? formatCurrency(amount) : "0.00"} readOnly />
                 </div>
               </div>
 
-              <div>
-                <Label htmlFor="supplier">Supplier</Label>
-                <Input
-                  id="supplier"
-                  value={formData.supplier}
-                  onChange={(event) => setFormData((prev) => ({ ...prev, supplier: event.target.value }))}
-                  required
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="supplier">Supplier</Label>
+                  <Input
+                    id="supplier"
+                    className="h-9"
+                    value={formData.supplier}
+                    onChange={(event) => setFormData((prev) => ({ ...prev, supplier: event.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="receipt_number">Receipt Number</Label>
+                  <Input
+                    id="receipt_number"
+                    className="h-9"
+                    value={formData.receipt_number}
+                    onChange={(event) => setFormData((prev) => ({ ...prev, receipt_number: event.target.value }))}
+                    placeholder="Enter receipt number"
+                  />
+                </div>
               </div>
 
-              <div>
+              <div className="space-y-1.5">
                 <Label htmlFor="delivery_date">Purchase Date</Label>
                 <Input
                   id="delivery_date"
                   type="date"
+                  className="h-9"
                   value={formData.delivery_date}
                   onChange={(event) => setFormData((prev) => ({ ...prev, delivery_date: event.target.value }))}
                   required
                 />
               </div>
 
-              <div>
+              <div className="space-y-1.5">
                 <Label htmlFor="notes">Notes (Optional)</Label>
                 <Textarea
                   id="notes"
+                  rows={2}
                   value={formData.notes}
                   onChange={(event) => setFormData((prev) => ({ ...prev, notes: event.target.value }))}
-                  rows={3}
                 />
               </div>
 
-              <Button type="submit" className="w-full">
+              <Button type="submit" className="h-9 w-full">
                 Save Record
               </Button>
             </form>
           </DialogContent>
         </Dialog>
       </CardHeader>
+
       <CardContent>
         {loading ? (
           <div className="py-8 text-center text-muted-foreground">Loading purchase and delivery records...</div>
@@ -384,6 +417,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
               <TableRow>
                 <TableHead>Date</TableHead>
                 <TableHead>Type</TableHead>
+                <TableHead>Receipt No.</TableHead>
                 <TableHead>Scope</TableHead>
                 <TableHead>Material</TableHead>
                 <TableHead>Quantity</TableHead>
@@ -398,13 +432,14 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                 <TableRow key={record.id}>
                   <TableCell>{record.delivery_date ? new Date(record.delivery_date).toLocaleDateString() : "—"}</TableCell>
                   <TableCell>{record.transaction_type === "site_purchase" ? "Site Purchase" : "Delivery"}</TableCell>
+                  <TableCell>{record.receipt_number || "—"}</TableCell>
                   <TableCell>{getScopeName(record)}</TableCell>
                   <TableCell className="font-medium">{record.item_name}</TableCell>
                   <TableCell>
                     {record.quantity || 0} {record.unit || ""}
                   </TableCell>
                   <TableCell>{record.supplier || "—"}</TableCell>
-                  <TableCell>{formatAmount(record.transaction_type === "site_purchase" ? record.amount : null)}</TableCell>
+                  <TableCell>{formatCurrency(record.transaction_type === "site_purchase" ? record.amount : null)}</TableCell>
                   <TableCell className="max-w-[220px] truncate text-sm text-muted-foreground">{record.notes || "—"}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon" onClick={() => void handleDelete(record.id)}>
