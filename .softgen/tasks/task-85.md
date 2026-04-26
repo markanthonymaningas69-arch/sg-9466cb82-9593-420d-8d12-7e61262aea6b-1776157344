@@ -13,12 +13,13 @@ position: 85
 Add a history list and clean filters to the Progress tab so users can review prior updates quickly. Filters should line up with progress review needs such as scope, date, updated-by context, and completion range.
 
 ## Checklist
-- [x] Review the current Progress tab summary, entry flow, and updates list
-- [x] Add a history list section for saved progress updates
-- [x] Add clean filters for scope, completion range, updated by, and date range
-- [x] Add a clear or reset filters action
+- [x] Review the current Progress tab layout, data source, and existing filter controls
+- [x] Add a history list or review section for progress updates
+- [x] Add clean filters for scope, date range, and the most relevant project fields
+- [x] Make clear-filter behavior easy to access
 - [x] Preserve current progress entry and summary workflows
-- [ ] Put the progress filters behind a Filter button so the Progress tab stays visually clean by default
+- [ ] Remove the top progress summary blocks to maximize vertical space
+- [ ] Remove the Updated By filter from the Progress history filter set
 
 ## Acceptance
 Users can browse progress history from the Progress tab.
