@@ -18,6 +18,7 @@ Add a history list and clean filters to the Progress tab so users can review pri
 - [x] Add clean filters for scope, completion range, updated by, and date range
 - [x] Add a clear or reset filters action
 - [x] Preserve current progress entry and summary workflows
+- [ ] Put the progress filters behind a Filter button so the Progress tab stays visually clean by default
 
 ## Acceptance
 Users can browse progress history from the Progress tab.

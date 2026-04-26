@@ -18,6 +18,7 @@ Add a history list and clean filters to the Requests tab. The list should help u
 - [x] Add clean filters for status, date, requester, request type, and item details
 - [x] Add an easy clear-filters action
 - [x] Preserve current request submission and review flows
+- [ ] Put the request filters behind a Filter button so the Requests tab stays visually clean by default
 
 ## Acceptance
 Users can review request history from the Requests tab.

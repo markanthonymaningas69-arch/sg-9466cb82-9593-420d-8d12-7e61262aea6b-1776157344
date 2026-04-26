@@ -18,6 +18,7 @@ Add a history-oriented review layer and clean filters to the Site Warehouse tab.
 - [x] Add clean filters for material, scope, status, and counted or uncounted balance states
 - [x] Make clear-filter behavior easy to access
 - [x] Preserve existing remaining-material input and missing or excess visibility
+- [ ] Put the warehouse filters behind a Filter button so the Site Warehouse tab stays visually clean by default
 
 ## Acceptance
 Users can review warehouse material records in a history-style list.

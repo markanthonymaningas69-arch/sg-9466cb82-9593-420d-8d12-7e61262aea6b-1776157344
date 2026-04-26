@@ -18,6 +18,7 @@ Add a history list and clean filtering controls to the Site Purchase & Deliverie
 - [x] Add clean filters for common review actions such as date, scope, supplier, material, and status
 - [x] Make reset or clear-filter behavior obvious and easy to use
 - [x] Keep the Add Record flow intact while improving browsing of past records
+- [ ] Put the history filters behind a Filter button so the Site Purchase & Deliveries tab stays visually clean by default
 
 ## Acceptance
 Users can review past Site Purchase records in a dedicated history list.

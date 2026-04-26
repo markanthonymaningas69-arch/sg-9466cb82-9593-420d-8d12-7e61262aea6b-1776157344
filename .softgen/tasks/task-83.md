@@ -18,6 +18,7 @@ Add a history list and clean filters to the Usage tab so users can review saved 
 - [x] Add clean filters for date, scope, material, and unit where useful
 - [x] Add a clear or reset filters action
 - [x] Preserve current add, edit, and delete usage workflows
+- [ ] Put the usage filters behind a Filter button so the Usage tab stays visually clean by default
 
 ## Acceptance
 Users can browse usage history in a dedicated, easy-to-scan section.

@@ -18,6 +18,7 @@ Add a history list and clean filters to the Attendance tab so users can review p
 - [x] Add clean filters for worker, position, status, and date range
 - [x] Add a clear or reset filters action
 - [x] Preserve current attendance marking and delete workflows
+- [ ] Put the attendance filters behind a Filter button so the Attendance tab stays visually clean by default
 
 ## Acceptance
 Users can browse attendance history from the Attendance tab.
