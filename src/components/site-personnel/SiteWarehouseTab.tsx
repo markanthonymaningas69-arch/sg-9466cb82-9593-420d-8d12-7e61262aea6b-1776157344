@@ -537,7 +537,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                       }))
                     }
                     placeholder="Enter material name"
-                    required
+                    required={pendingLines.length === 0}
                   />
                 </div>
               ) : null}
@@ -555,7 +555,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                     className="h-8 text-xs"
                     value={formData.quantity}
                     onChange={(event) => setFormData((prev) => ({ ...prev, quantity: event.target.value }))}
-                    required
+                    required={pendingLines.length === 0}
                   />
                 </div>
                 <div className="space-y-1">
@@ -569,7 +569,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                       value={formData.unit}
                       onChange={(event) => setFormData((prev) => ({ ...prev, unit: event.target.value }))}
                       placeholder="Enter unit"
-                      required
+                      required={pendingLines.length === 0}
                     />
                   ) : (
                     <Select
