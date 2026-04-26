@@ -1,6 +1,6 @@
 ---
 title: Site receiving confirmation flow
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [site-personnel, receiving, deliveries]
@@ -19,7 +19,7 @@ Add the final receiving step in Site Personnel so ready-for-delivery requests ca
 - [x] Add Mark as Received action with received by, timestamp, actual quantity, and remarks
 - [x] Restrict receiving to items with voucher number and ready-for-delivery status
 - [x] Trigger notifications back to Purchasing and Accounting after receiving
-- [ ] Validate the final receiving flow end to end
+- [x] Validate the final receiving flow end to end
 
 ## Acceptance
 Site Personnel can see ready-for-delivery records with linked voucher information.

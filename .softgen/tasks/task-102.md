@@ -1,6 +1,6 @@
 ---
 title: Purchasing voucher workflow
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [purchasing, vouchers, workflow]
@@ -18,7 +18,7 @@ Extend Purchasing so approved material and tools requests can move into a vouche
 - [x] Create voucher request records linked to purchase, site request, project, and approval flow
 - [x] Show voucher number and voucher approval state in Purchasing
 - [x] Add a compact View Voucher action for linked voucher records
-- [ ] Validate the Purchasing voucher flow from request to ready-for-delivery state
+- [x] Validate the Purchasing voucher flow from request to ready-for-delivery state
 
 ## Acceptance
 Purchasing can create a voucher request from an approved purchase flow.
