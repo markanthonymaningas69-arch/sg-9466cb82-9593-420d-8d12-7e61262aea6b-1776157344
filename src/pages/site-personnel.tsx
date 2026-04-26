@@ -166,28 +166,46 @@ export default function SitePersonnelPage() {
 
         {/* Tabs */}
         <Tabs defaultValue="deliveries" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="deliveries" className="gap-2">
+          <TabsList className="grid w-full grid-cols-6 gap-1 bg-slate-100 p-1">
+            <TabsTrigger
+              value="deliveries"
+              className="gap-1.5 px-2 text-[10px] font-semibold leading-tight text-amber-700 data-[state=active]:bg-amber-100 data-[state=active]:text-amber-950 sm:text-[11px]"
+            >
               <Package className="h-4 w-4" />
               <span className="hidden sm:inline">Site Purchase & Deliveries</span>
             </TabsTrigger>
-            <TabsTrigger value="site-warehouse" className="gap-2">
+            <TabsTrigger
+              value="site-warehouse"
+              className="gap-1.5 px-2 text-[10px] font-semibold leading-tight text-sky-700 data-[state=active]:bg-sky-100 data-[state=active]:text-sky-950 sm:text-[11px]"
+            >
               <WarehouseIcon className="h-4 w-4" />
               <span className="hidden sm:inline">Site Warehouse</span>
             </TabsTrigger>
-            <TabsTrigger value="usage" className="gap-2">
+            <TabsTrigger
+              value="usage"
+              className="gap-1.5 px-2 text-[10px] font-semibold leading-tight text-rose-700 data-[state=active]:bg-rose-100 data-[state=active]:text-rose-950 sm:text-[11px]"
+            >
               <TrendingDown className="h-4 w-4" />
               <span className="hidden sm:inline">Usage</span>
             </TabsTrigger>
-            <TabsTrigger value="requests" className="gap-2">
+            <TabsTrigger
+              value="requests"
+              className="gap-1.5 px-2 text-[10px] font-semibold leading-tight text-violet-700 data-[state=active]:bg-violet-100 data-[state=active]:text-violet-950 sm:text-[11px]"
+            >
               <FileText className="h-4 w-4" />
               <span className="hidden sm:inline">Requests</span>
             </TabsTrigger>
-            <TabsTrigger value="progress" className="gap-2">
+            <TabsTrigger
+              value="progress"
+              className="gap-1.5 px-2 text-[10px] font-semibold leading-tight text-emerald-700 data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-950 sm:text-[11px]"
+            >
               <TrendingUp className="h-4 w-4" />
               <span className="hidden sm:inline">Progress</span>
             </TabsTrigger>
-            <TabsTrigger value="attendance" className="gap-2">
+            <TabsTrigger
+              value="attendance"
+              className="gap-1.5 px-2 text-[10px] font-semibold leading-tight text-indigo-700 data-[state=active]:bg-indigo-100 data-[state=active]:text-indigo-950 sm:text-[11px]"
+            >
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Attendance</span>
             </TabsTrigger>
