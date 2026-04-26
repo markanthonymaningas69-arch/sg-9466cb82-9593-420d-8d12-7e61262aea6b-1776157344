@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Package, Plus, Trash2, Filter, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -152,8 +153,17 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
   const [pendingLines, setPendingLines] = useState<PendingMaterialLine[]>([]);
   const [isOtherMaterial, setIsOtherMaterial] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filters, setFilters] = useState({
+    scopeId: "all",
+    supplier: "all",
+    material: "",
+    receipt: "",
+    dateFrom: "",
+    dateTo: "",
+  });
   const [selectedReceiptGroup, setSelectedReceiptGroup] = useState<ReceiptGroup | null>(null);
   const [selectedReadyRecord, setSelectedReadyRecord] = useState<ReadyForReceivingRecord | null>(null);
+  const [receivingDialogOpen, setReceivingDialogOpen] = useState(false);
   const [receivingForm, setReceivingForm] = useState({
     receivedBy: "Site Personnel",
     actualQuantity: "",
