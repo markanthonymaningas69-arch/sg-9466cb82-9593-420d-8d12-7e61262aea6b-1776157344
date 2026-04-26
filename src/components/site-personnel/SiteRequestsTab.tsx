@@ -21,10 +21,8 @@ interface SiteRequest {
   unit: string;
   requested_by: string;
   request_date: string;
-  status: "pending" | "approved" | "rejected";
+  status: string;
   notes?: string;
-  reviewed_by?: string;
-  reviewed_at?: string;
   created_at: string;
 }
 
@@ -289,7 +287,8 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
             </TableHeader>
             <TableBody>
               {requests.map((request) => {
-                const statusConfig = STATUS_CONFIG[request.status];
+                const statusKey = request.status as "pending" | "approved" | "rejected";
+                const statusConfig = STATUS_CONFIG[statusKey] || STATUS_CONFIG.pending;
                 const StatusIcon = statusConfig.icon;
 
                 return (

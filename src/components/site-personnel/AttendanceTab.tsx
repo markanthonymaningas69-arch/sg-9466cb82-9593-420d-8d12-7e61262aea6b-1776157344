@@ -14,14 +14,24 @@ import { Users, Plus, Trash2, CheckCircle, XCircle, Clock } from "lucide-react";
 interface AttendanceRecord {
   id: string;
   project_id: string;
-  worker_name: string;
-  position: string;
+  personnel_id: string;
   date: string;
   time_in?: string;
-  time_out?: string;
+  hours_worked?: number;
+  overtime_hours?: number;
   status: "present" | "absent" | "late" | "half_day";
   notes?: string;
   created_at: string;
+  personnel?: {
+    name: string;
+    role: string;
+  };
+}
+
+interface Personnel {
+  id: string;
+  name: string;
+  role: string;
 }
 
 const ATTENDANCE_STATUS = [
@@ -34,36 +44,51 @@ const ATTENDANCE_STATUS = [
 export function AttendanceTab({ projectId }: { projectId: string }) {
   const { toast } = useToast();
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
+  const [personnelList, setPersonnelList] = useState<Personnel[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
-    worker_name: "",
-    position: "",
+    personnel_id: "",
     date: new Date().toISOString().split("T")[0],
     time_in: "",
-    time_out: "",
+    hours_worked: "8",
+    overtime_hours: "0",
     status: "present" as AttendanceRecord["status"],
     notes: "",
   });
 
   useEffect(() => {
-    void loadAttendance();
+    void loadData();
   }, [projectId]);
 
-  async function loadAttendance() {
+  async function loadData() {
     try {
       setLoading(true);
 
+      // Load personnel for this project
+      const { data: personnelData, error: personnelError } = await supabase
+        .from("personnel")
+        .select("id, name, role")
+        .eq("status", "active")
+        .eq("project_id", projectId);
+
+      if (personnelError) throw personnelError;
+      setPersonnelList(personnelData || []);
+
+      // Load attendance
       const { data, error } = await supabase
         .from("site_attendance")
-        .select("*")
+        .select(`
+          *,
+          personnel (name, role)
+        `)
         .eq("project_id", projectId)
         .order("date", { ascending: false });
 
       if (error) throw error;
-      setAttendance(data || []);
+      setAttendance((data as any) || []);
     } catch (error) {
       console.error("Error loading attendance:", error);
       toast({
@@ -79,14 +104,19 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
+    if (!formData.personnel_id) {
+      toast({ title: "Required", description: "Please select a worker", variant: "destructive" });
+      return;
+    }
+
     try {
       const { error } = await supabase.from("site_attendance").insert({
         project_id: projectId,
-        worker_name: formData.worker_name,
-        position: formData.position,
+        personnel_id: formData.personnel_id,
         date: formData.date,
-        time_in: formData.time_in || null,
-        time_out: formData.time_out || null,
+        time_in: formData.time_in ? `${formData.time_in}:00` : null,
+        hours_worked: Number(formData.hours_worked),
+        overtime_hours: Number(formData.overtime_hours),
         status: formData.status,
         notes: formData.notes || null,
       });
@@ -100,20 +130,20 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
 
       setDialogOpen(false);
       setFormData({
-        worker_name: "",
-        position: "",
+        personnel_id: "",
         date: new Date().toISOString().split("T")[0],
         time_in: "",
-        time_out: "",
+        hours_worked: "8",
+        overtime_hours: "0",
         status: "present",
         notes: "",
       });
-      void loadAttendance();
-    } catch (error) {
+      void loadData();
+    } catch (error: any) {
       console.error("Error recording attendance:", error);
       toast({
         title: "Error",
-        description: "Failed to record attendance",
+        description: error.message?.includes("duplicate") ? "Attendance already recorded for this worker on this date" : "Failed to record attendance",
         variant: "destructive",
       });
     }
@@ -131,7 +161,7 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
         title: "Success",
         description: "Attendance record deleted",
       });
-      void loadAttendance();
+      void loadData();
     } catch (error) {
       console.error("Error deleting attendance:", error);
       toast({
@@ -197,25 +227,20 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
                 <DialogTitle>Mark Attendance</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="worker_name">Worker Name</Label>
-                    <Input
-                      id="worker_name"
-                      value={formData.worker_name}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, worker_name: e.target.value }))}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="position">Position</Label>
-                    <Input
-                      id="position"
-                      value={formData.position}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, position: e.target.value }))}
-                      required
-                    />
-                  </div>
+                <div>
+                  <Label htmlFor="personnel_id">Worker</Label>
+                  <Select value={formData.personnel_id} onValueChange={(value) => setFormData((prev) => ({ ...prev, personnel_id: value }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select worker" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {personnelList.map((person) => (
+                        <SelectItem key={person.id} value={person.id}>
+                          {person.name} ({person.role})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
@@ -231,21 +256,25 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="time_in">Time In (Optional)</Label>
+                    <Label htmlFor="hours_worked">Hours Worked</Label>
                     <Input
-                      id="time_in"
-                      type="time"
-                      value={formData.time_in}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, time_in: e.target.value }))}
+                      id="hours_worked"
+                      type="number"
+                      step="0.5"
+                      value={formData.hours_worked}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, hours_worked: e.target.value }))}
+                      required
                     />
                   </div>
                   <div>
-                    <Label htmlFor="time_out">Time Out (Optional)</Label>
+                    <Label htmlFor="overtime_hours">Overtime Hours</Label>
                     <Input
-                      id="time_out"
-                      type="time"
-                      value={formData.time_out}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, time_out: e.target.value }))}
+                      id="overtime_hours"
+                      type="number"
+                      step="0.5"
+                      value={formData.overtime_hours}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, overtime_hours: e.target.value }))}
+                      required
                     />
                   </div>
                 </div>
@@ -294,8 +323,8 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
                   <TableHead>Date</TableHead>
                   <TableHead>Worker Name</TableHead>
                   <TableHead>Position</TableHead>
-                  <TableHead>Time In</TableHead>
-                  <TableHead>Time Out</TableHead>
+                  <TableHead>Hours</TableHead>
+                  <TableHead>Overtime</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Notes</TableHead>
                   <TableHead className="w-[80px]">Actions</TableHead>
@@ -309,10 +338,10 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
                   return (
                     <TableRow key={record.id}>
                       <TableCell>{new Date(record.date).toLocaleDateString()}</TableCell>
-                      <TableCell className="font-medium">{record.worker_name}</TableCell>
-                      <TableCell>{record.position}</TableCell>
-                      <TableCell>{record.time_in || "-"}</TableCell>
-                      <TableCell>{record.time_out || "-"}</TableCell>
+                      <TableCell className="font-medium">{record.personnel?.name || "Unknown"}</TableCell>
+                      <TableCell>{record.personnel?.role || "-"}</TableCell>
+                      <TableCell>{record.hours_worked || 0}</TableCell>
+                      <TableCell>{record.overtime_hours || 0}</TableCell>
                       <TableCell>
                         <Badge variant={statusConfig?.variant} className="gap-1">
                           <StatusIcon className="h-3 w-3" />

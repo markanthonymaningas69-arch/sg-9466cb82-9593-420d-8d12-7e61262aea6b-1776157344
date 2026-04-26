@@ -14,18 +14,20 @@ import { TrendingUp, Plus, Trash2 } from "lucide-react";
 
 interface ProgressUpdate {
   id: string;
-  project_id: string;
-  scope_name: string;
+  bom_scope_id: string;
   update_date: string;
-  progress_percentage: number;
+  percentage_completed: number;
   updated_by: string;
   notes?: string;
   created_at: string;
+  bom_scope_of_work?: {
+    name: string;
+  };
 }
 
 interface BOMScope {
   id: string;
-  scope_name: string;
+  name: string;
 }
 
 export function ProgressTab({ projectId }: { projectId: string }) {
@@ -34,12 +36,13 @@ export function ProgressTab({ projectId }: { projectId: string }) {
   const [bomScopes, setBomScopes] = useState<BOMScope[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [bomId, setBomId] = useState<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
-    scope_name: "",
+    bom_scope_id: "",
     update_date: new Date().toISOString().split("T")[0],
-    progress_percentage: "",
+    percentage_completed: "",
     updated_by: "",
     notes: "",
   });
@@ -52,25 +55,47 @@ export function ProgressTab({ projectId }: { projectId: string }) {
     try {
       setLoading(true);
 
-      // Load progress updates
-      const { data: progressData, error: progressError } = await supabase
-        .from("progress_updates")
-        .select("*")
+      // Get BOM for project
+      const { data: bomData } = await supabase
+        .from("bill_of_materials")
+        .select("id")
         .eq("project_id", projectId)
-        .order("update_date", { ascending: false });
+        .single();
 
-      if (progressError) throw progressError;
-      setProgressUpdates(progressData || []);
+      if (!bomData) {
+        setLoading(false);
+        return;
+      }
+      
+      setBomId(bomData.id);
 
       // Load BOM scopes
       const { data: scopesData, error: scopesError } = await supabase
-        .from("bom_scopes")
-        .select("id, scope_name")
-        .eq("project_id", projectId)
-        .order("scope_name");
+        .from("bom_scope_of_work")
+        .select("id, name")
+        .eq("bom_id", bomData.id)
+        .order("order_number");
 
       if (scopesError) throw scopesError;
       setBomScopes(scopesData || []);
+
+      if (scopesData && scopesData.length > 0) {
+        const scopeIds = scopesData.map(s => s.id);
+        
+        // Load progress updates
+        const { data: progressData, error: progressError } = await supabase
+          .from("bom_progress_updates")
+          .select(`
+            *,
+            bom_scope_of_work (name)
+          `)
+          .in("bom_scope_id", scopeIds)
+          .order("update_date", { ascending: false });
+
+        if (progressError) throw progressError;
+        setProgressUpdates((progressData as any) || []);
+      }
+
     } catch (error) {
       console.error("Error loading progress data:", error);
       toast({
@@ -86,7 +111,12 @@ export function ProgressTab({ projectId }: { projectId: string }) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    const percentage = Number(formData.progress_percentage);
+    if (!formData.bom_scope_id) {
+      toast({ title: "Required", description: "Please select a scope", variant: "destructive" });
+      return;
+    }
+
+    const percentage = Number(formData.percentage_completed);
     if (percentage < 0 || percentage > 100) {
       toast({
         title: "Invalid Input",
@@ -97,11 +127,10 @@ export function ProgressTab({ projectId }: { projectId: string }) {
     }
 
     try {
-      const { error } = await supabase.from("progress_updates").insert({
-        project_id: projectId,
-        scope_name: formData.scope_name,
+      const { error } = await supabase.from("bom_progress_updates").insert({
+        bom_scope_id: formData.bom_scope_id,
         update_date: formData.update_date,
-        progress_percentage: percentage,
+        percentage_completed: percentage,
         updated_by: formData.updated_by,
         notes: formData.notes || null,
       });
@@ -115,9 +144,9 @@ export function ProgressTab({ projectId }: { projectId: string }) {
 
       setDialogOpen(false);
       setFormData({
-        scope_name: "",
+        bom_scope_id: "",
         update_date: new Date().toISOString().split("T")[0],
-        progress_percentage: "",
+        percentage_completed: "",
         updated_by: "",
         notes: "",
       });
@@ -136,7 +165,7 @@ export function ProgressTab({ projectId }: { projectId: string }) {
     if (!confirm("Delete this progress update?")) return;
 
     try {
-      const { error } = await supabase.from("progress_updates").delete().eq("id", id);
+      const { error } = await supabase.from("bom_progress_updates").delete().eq("id", id);
 
       if (error) throw error;
 
@@ -157,9 +186,10 @@ export function ProgressTab({ projectId }: { projectId: string }) {
 
   // Calculate latest progress per scope
   const latestProgressByScope = progressUpdates.reduce((acc, update) => {
-    const existing = acc[update.scope_name];
+    const scopeName = update.bom_scope_of_work?.name || update.bom_scope_id;
+    const existing = acc[scopeName];
     if (!existing || new Date(update.update_date) > new Date(existing.update_date)) {
-      acc[update.scope_name] = update;
+      acc[scopeName] = update;
     }
     return acc;
   }, {} as Record<string, ProgressUpdate>);
@@ -169,18 +199,18 @@ export function ProgressTab({ projectId }: { projectId: string }) {
       {/* Summary Cards */}
       {Object.keys(latestProgressByScope).length > 0 && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {Object.values(latestProgressByScope).map((update) => (
-            <Card key={update.scope_name}>
+          {Object.entries(latestProgressByScope).map(([scopeName, update]) => (
+            <Card key={update.id}>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">{update.scope_name}</CardTitle>
+                <CardTitle className="text-sm font-medium">{scopeName}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Progress</span>
-                    <span className="font-semibold">{update.progress_percentage}%</span>
+                    <span className="font-semibold">{update.percentage_completed}%</span>
                   </div>
-                  <Progress value={update.progress_percentage} className="h-2" />
+                  <Progress value={update.percentage_completed} className="h-2" />
                   <p className="text-xs text-muted-foreground">
                     Updated {new Date(update.update_date).toLocaleDateString()}
                   </p>
@@ -211,15 +241,15 @@ export function ProgressTab({ projectId }: { projectId: string }) {
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <Label htmlFor="scope_name">Scope</Label>
-                  <Select value={formData.scope_name} onValueChange={(value) => setFormData((prev) => ({ ...prev, scope_name: value }))}>
+                  <Label htmlFor="bom_scope_id">Scope</Label>
+                  <Select value={formData.bom_scope_id} onValueChange={(value) => setFormData((prev) => ({ ...prev, bom_scope_id: value }))}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select scope" />
                     </SelectTrigger>
                     <SelectContent>
                       {bomScopes.map((scope) => (
-                        <SelectItem key={scope.id} value={scope.scope_name}>
-                          {scope.scope_name}
+                        <SelectItem key={scope.id} value={scope.id}>
+                          {scope.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -227,15 +257,15 @@ export function ProgressTab({ projectId }: { projectId: string }) {
                 </div>
 
                 <div>
-                  <Label htmlFor="progress_percentage">Progress (%)</Label>
+                  <Label htmlFor="percentage_completed">Progress (%)</Label>
                   <Input
-                    id="progress_percentage"
+                    id="percentage_completed"
                     type="number"
                     min="0"
                     max="100"
                     step="0.1"
-                    value={formData.progress_percentage}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, progress_percentage: e.target.value }))}
+                    value={formData.percentage_completed}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, percentage_completed: e.target.value }))}
                     required
                   />
                 </div>
@@ -301,13 +331,13 @@ export function ProgressTab({ projectId }: { projectId: string }) {
                 {progressUpdates.map((update) => (
                   <TableRow key={update.id}>
                     <TableCell>{new Date(update.update_date).toLocaleDateString()}</TableCell>
-                    <TableCell className="font-medium">{update.scope_name}</TableCell>
+                    <TableCell className="font-medium">{update.bom_scope_of_work?.name || "Unknown Scope"}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div className="w-24">
-                          <Progress value={update.progress_percentage} className="h-2" />
+                          <Progress value={update.percentage_completed} className="h-2" />
                         </div>
-                        <span className="text-sm font-medium">{update.progress_percentage}%</span>
+                        <span className="text-sm font-medium">{update.percentage_completed}%</span>
                       </div>
                     </TableCell>
                     <TableCell>{update.updated_by}</TableCell>

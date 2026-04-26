@@ -13,24 +13,27 @@ import { TrendingDown, Plus, Trash2 } from "lucide-react";
 interface MaterialUsage {
   id: string;
   project_id: string;
+  bom_scope_id?: string;
   material_name: string;
   quantity: number;
   unit: string;
-  used_by: string;
-  usage_date: string;
-  scope_name?: string;
+  recorded_by: string;
+  date_used: string;
   notes?: string;
   created_at: string;
+  bom_scope_of_work?: {
+    name: string;
+  };
 }
 
 interface BOMScope {
   id: string;
-  scope_name: string;
+  name: string;
 }
 
 interface WarehouseItem {
   id: string;
-  item_name: string;
+  name: string;
   unit: string;
 }
 
@@ -47,9 +50,9 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
     material_name: "",
     quantity: "",
     unit: "",
-    used_by: "",
-    usage_date: new Date().toISOString().split("T")[0],
-    scope_name: "",
+    recorded_by: "",
+    date_used: new Date().toISOString().split("T")[0],
+    bom_scope_id: "none",
     notes: "",
   });
 
@@ -64,28 +67,40 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
       // Load usage records
       const { data: usageData, error: usageError } = await supabase
         .from("material_consumption")
-        .select("*")
+        .select(`
+          *,
+          bom_scope_of_work (name)
+        `)
         .eq("project_id", projectId)
-        .order("usage_date", { ascending: false });
+        .order("date_used", { ascending: false });
 
       if (usageError) throw usageError;
-      setUsageRecords(usageData || []);
+      setUsageRecords((usageData as any) || []);
 
-      // Load BOM scopes
-      const { data: scopesData, error: scopesError } = await supabase
-        .from("bom_scopes")
-        .select("id, scope_name")
+      // Load BOM scopes - first get the BOM for this project
+      const { data: bomData } = await supabase
+        .from("bill_of_materials")
+        .select("id")
         .eq("project_id", projectId)
-        .order("scope_name");
+        .single();
 
-      if (scopesError) throw scopesError;
-      setBomScopes(scopesData || []);
+      if (bomData) {
+        const { data: scopesData, error: scopesError } = await supabase
+          .from("bom_scope_of_work")
+          .select("id, name")
+          .eq("bom_id", bomData.id)
+          .order("order_number");
 
-      // Load warehouse items
+        if (scopesError) throw scopesError;
+        setBomScopes(scopesData || []);
+      }
+
+      // Load warehouse items (inventory)
       const { data: warehouseData, error: warehouseError } = await supabase
-        .from("warehouse")
-        .select("id, item_name, unit")
-        .order("item_name");
+        .from("inventory")
+        .select("id, name, unit")
+        .eq("project_id", projectId)
+        .order("name");
 
       if (warehouseError) throw warehouseError;
       setWarehouseItems(warehouseData || []);
@@ -110,9 +125,9 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
         material_name: formData.material_name,
         quantity: Number(formData.quantity),
         unit: formData.unit,
-        used_by: formData.used_by,
-        usage_date: formData.usage_date,
-        scope_name: formData.scope_name || null,
+        recorded_by: formData.recorded_by,
+        date_used: formData.date_used,
+        bom_scope_id: formData.bom_scope_id === "none" ? null : formData.bom_scope_id,
         notes: formData.notes || null,
       });
 
@@ -128,9 +143,9 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
         material_name: "",
         quantity: "",
         unit: "",
-        used_by: "",
-        usage_date: new Date().toISOString().split("T")[0],
-        scope_name: "",
+        recorded_by: "",
+        date_used: new Date().toISOString().split("T")[0],
+        bom_scope_id: "none",
         notes: "",
       });
       void loadData();
@@ -191,7 +206,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
                 <Select
                   value={formData.material_name}
                   onValueChange={(value) => {
-                    const item = warehouseItems.find((i) => i.item_name === value);
+                    const item = warehouseItems.find((i) => i.name === value);
                     setFormData((prev) => ({
                       ...prev,
                       material_name: value,
@@ -204,8 +219,8 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
                   </SelectTrigger>
                   <SelectContent>
                     {warehouseItems.map((item) => (
-                      <SelectItem key={item.id} value={item.item_name}>
-                        {item.item_name}
+                      <SelectItem key={item.id} value={item.name}>
+                        {item.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -236,15 +251,16 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
               </div>
 
               <div>
-                <Label htmlFor="scope_name">Scope (Optional)</Label>
-                <Select value={formData.scope_name} onValueChange={(value) => setFormData((prev) => ({ ...prev, scope_name: value }))}>
+                <Label htmlFor="bom_scope_id">Scope (Optional)</Label>
+                <Select value={formData.bom_scope_id} onValueChange={(value) => setFormData((prev) => ({ ...prev, bom_scope_id: value }))}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select scope" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="none">-- No Scope --</SelectItem>
                     {bomScopes.map((scope) => (
-                      <SelectItem key={scope.id} value={scope.scope_name}>
-                        {scope.scope_name}
+                      <SelectItem key={scope.id} value={scope.id}>
+                        {scope.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -253,21 +269,21 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="usage_date">Usage Date</Label>
+                  <Label htmlFor="date_used">Usage Date</Label>
                   <Input
-                    id="usage_date"
+                    id="date_used"
                     type="date"
-                    value={formData.usage_date}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, usage_date: e.target.value }))}
+                    value={formData.date_used}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, date_used: e.target.value }))}
                     required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="used_by">Used By</Label>
+                  <Label htmlFor="recorded_by">Recorded By</Label>
                   <Input
-                    id="used_by"
-                    value={formData.used_by}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, used_by: e.target.value }))}
+                    id="recorded_by"
+                    value={formData.recorded_by}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, recorded_by: e.target.value }))}
                     required
                   />
                 </div>
@@ -310,13 +326,13 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
             <TableBody>
               {usageRecords.map((record) => (
                 <TableRow key={record.id}>
-                  <TableCell>{new Date(record.usage_date).toLocaleDateString()}</TableCell>
+                  <TableCell>{new Date(record.date_used).toLocaleDateString()}</TableCell>
                   <TableCell className="font-medium">{record.material_name}</TableCell>
                   <TableCell>
                     {record.quantity} {record.unit}
                   </TableCell>
-                  <TableCell>{record.scope_name || "-"}</TableCell>
-                  <TableCell>{record.used_by}</TableCell>
+                  <TableCell>{record.bom_scope_of_work?.name || "-"}</TableCell>
+                  <TableCell>{record.recorded_by}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{record.notes || "-"}</TableCell>
                   <TableCell>
                     <Button variant="ghost" size="icon" onClick={() => void handleDelete(record.id)}>

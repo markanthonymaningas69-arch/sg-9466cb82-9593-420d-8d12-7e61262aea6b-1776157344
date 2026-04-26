@@ -9,7 +9,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Package, Plus, Trash2 } from "lucide-react";
-import { formatCurrency } from "@/lib/currency";
 
 interface Delivery {
   id: string;
@@ -26,7 +25,7 @@ interface Delivery {
 
 interface WarehouseItem {
   id: string;
-  item_name: string;
+  name: string;
   quantity: number;
   unit: string;
 }
@@ -59,7 +58,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
 
       // Load deliveries
       const { data: deliveriesData, error: deliveriesError } = await supabase
-        .from("material_deliveries")
+        .from("deliveries")
         .select("*")
         .eq("project_id", projectId)
         .order("delivery_date", { ascending: false });
@@ -67,11 +66,12 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
       if (deliveriesError) throw deliveriesError;
       setDeliveries(deliveriesData || []);
 
-      // Load warehouse items for autocomplete
+      // Load warehouse items for autocomplete (inventory table)
       const { data: warehouseData, error: warehouseError } = await supabase
-        .from("warehouse")
-        .select("id, item_name, quantity, unit")
-        .order("item_name");
+        .from("inventory")
+        .select("id, name, quantity, unit")
+        .eq("project_id", projectId)
+        .order("name");
 
       if (warehouseError) throw warehouseError;
       setWarehouseItems(warehouseData || []);
@@ -91,15 +91,16 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
     e.preventDefault();
 
     try {
-      const { error } = await supabase.from("material_deliveries").insert({
+      const { error } = await supabase.from("deliveries").insert({
         project_id: projectId,
-        material_name: formData.material_name,
+        item_name: formData.material_name,
         quantity: Number(formData.quantity),
         unit: formData.unit,
         supplier: formData.supplier,
         delivery_date: formData.delivery_date,
         received_by: formData.received_by,
         notes: formData.notes || null,
+        status: "pending"
       });
 
       if (error) throw error;
@@ -134,7 +135,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
     if (!confirm("Delete this delivery record?")) return;
 
     try {
-      const { error } = await supabase.from("material_deliveries").delete().eq("id", id);
+      const { error } = await supabase.from("deliveries").delete().eq("id", id);
 
       if (error) throw error;
 
@@ -177,7 +178,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                 <Select
                   value={formData.material_name}
                   onValueChange={(value) => {
-                    const item = warehouseItems.find((i) => i.item_name === value);
+                    const item = warehouseItems.find((i) => i.name === value);
                     setFormData((prev) => ({
                       ...prev,
                       material_name: value,
@@ -190,8 +191,8 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                   </SelectTrigger>
                   <SelectContent>
                     {warehouseItems.map((item) => (
-                      <SelectItem key={item.id} value={item.item_name}>
-                        {item.item_name}
+                      <SelectItem key={item.id} value={item.name}>
+                        {item.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -291,7 +292,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
               {deliveries.map((delivery) => (
                 <TableRow key={delivery.id}>
                   <TableCell>{new Date(delivery.delivery_date).toLocaleDateString()}</TableCell>
-                  <TableCell className="font-medium">{delivery.material_name}</TableCell>
+                  <TableCell className="font-medium">{delivery.item_name}</TableCell>
                   <TableCell>
                     {delivery.quantity} {delivery.unit}
                   </TableCell>
