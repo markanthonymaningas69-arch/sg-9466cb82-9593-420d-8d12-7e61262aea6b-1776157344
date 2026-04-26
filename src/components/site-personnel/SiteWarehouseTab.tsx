@@ -478,11 +478,11 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
               Add Record
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-lg">
+          <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader className="space-y-1">
               <DialogTitle className="text-base">Record Site Purchase</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-2.5">
+            <form onSubmit={handleSubmit} className="space-y-2.5 pb-1">
               <div className="space-y-1">
                 <Label htmlFor="scope" className="text-[11px]">
                   Select Scope
