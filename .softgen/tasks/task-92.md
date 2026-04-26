@@ -17,8 +17,11 @@ Create or update the notifications engine so approval-related events surface cle
 - [x] Define the approval events that create notifications
 - [x] Store and fetch notifications through the connected backend
 - [x] Show unread notification state in an existing user-facing surface
+- [ ] Trigger notifications for Approval Center, GM, Site Personnel, Purchasing, and Accounting at the correct workflow events
+- [ ] Show unread/new badges for module inboxes and Approval Center tabs
 - [ ] Validate the notification flow for new approval requests and status changes
 
 ## Acceptance
 Submitting a request creates a visible approval notification.
 Approval status updates can be surfaced back through the notification flow.
+Approved requests generate visible inbox notifications for Purchasing or Accounting.
