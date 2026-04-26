@@ -13,7 +13,7 @@ import { Package, Plus, Trash2 } from "lucide-react";
 interface Delivery {
   id: string;
   project_id: string;
-  material_name: string;
+  item_name: string;
   quantity: number;
   unit: string;
   supplier: string;
