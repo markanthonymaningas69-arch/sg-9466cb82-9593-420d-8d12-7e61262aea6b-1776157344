@@ -12419,4 +12419,59 @@ export default function SitePersonnel() {
                                     onChange={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
                                     onBlur={(e) => handleAttendanceChange(row.personnel_id, "notes", e.target.value)}
                                     disabled={isEditMode}
-                                    className="h
+                                    className="h-9"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {isEditMode ? (
+                                    <Button variant="ghost" size="sm" onClick={() => setIsEditMode(false)}>
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                  ) : (
+                                    <div className="flex gap-2 justify-end">
+                                      <Button variant="ghost" size="sm" onClick={() => setIsEditMode(true)}>
+                                        <Pencil className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={async () => {
+                                          if(confirm("Archive this personnel?")) {
+                                            await siteService.deletePersonnel(row.personnel_id);
+                                            loadProjectPersonnelList();
+                                          }
+                                        }}
+                                        title="Archive">
+                                        <Archive className="h-4 w-4 text-orange-600" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            {deliveries.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground border-2 border-dashed">
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-muted-foreground">Select a date to view attendance</div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        )}
+      </div>
+    </Layout>
+  );
+}
