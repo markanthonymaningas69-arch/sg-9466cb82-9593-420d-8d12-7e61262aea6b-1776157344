@@ -522,11 +522,6 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
                     className="h-8 text-xs"
                     value={formData.item_name}
                     onChange={(event) => setFormData((current) => ({ ...current, item_name: event.target.value }))}
-                    placeholder={
-                      isCashRequestType(formData.request_type)
-                        ? "e.g., Fuel allowance for crew"
-                        : "e.g., Cement, Grinder, Safety Helmet"
-                    }
                     required
                   />
                 </div>
@@ -558,7 +553,6 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
                       className="h-8 text-xs"
                       value={formData.unit}
                       onChange={(event) => setFormData((current) => ({ ...current, unit: event.target.value }))}
-                      placeholder={isCashRequestType(formData.request_type) ? "e.g., PHP / SOA" : "e.g., bags, pcs, set"}
                       required
                     />
                   </div>
