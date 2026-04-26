@@ -18,6 +18,7 @@ import { useSettings } from "@/contexts/SettingsProvider";
 import { cn } from "@/lib/utils";
 import { approvalCenterService, type ApprovalRequest } from "@/services/approvalCenterService";
 import { RequestDetailsButton } from "@/components/approval/RequestDetailsButton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const STANDARD_CATEGORIES = [
   "Construction Materials",
@@ -47,6 +48,41 @@ const STANDARD_UNITS = [
   "Sq.m",
   "Unit"
 ];
+
+function TruncatedText({ value, className = "" }: { value: string | null | undefined; className?: string }) {
+  const text = value && value.trim() ? value : "—";
+
+  if (text === "—") {
+    return <span className={cn("block truncate whitespace-nowrap", className)}>{text}</span>;
+  }
+
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className={cn("block truncate whitespace-nowrap", className)}>{text}</span>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs text-xs">
+          <p>{text}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+function formatCompactDateTime(value: string | null) {
+  if (!value) {
+    return "—";
+  }
+
+  return new Date(value).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
 
 export default function Purchasing() {
   const { formatCurrency, company, currency, isLocked } = useSettings();
@@ -770,61 +806,70 @@ export default function Purchasing() {
 
         {activeView === "incoming" ? (
           <Card className="border-0 shadow-none">
-            <CardHeader>
-              <CardTitle>Incoming Requests</CardTitle>
-              <CardDescription>Approved Materials and Tools & Equipment requests routed from Approval Center.</CardDescription>
+            <CardHeader className="px-0 pb-2 pt-0 sm:px-6">
+              <CardTitle className="text-sm sm:text-base">Incoming Requests</CardTitle>
+              <CardDescription className="text-xs">Approved Materials and Tools & Equipment requests routed from Approval Center.</CardDescription>
             </CardHeader>
             <CardContent className="px-0 sm:px-6">
-              <div className="overflow-x-auto rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Request</TableHead>
-                      <TableHead>Project</TableHead>
-                      <TableHead>Requested By</TableHead>
-                      <TableHead>Routed</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Summary</TableHead>
-                      <TableHead className="text-right">View Details</TableHead>
-                      <TableHead className="text-right">Action</TableHead>
+              <div className="overflow-auto rounded-md border">
+                <Table className="min-w-[1100px] table-fixed text-xs">
+                  <TableHeader className="sticky top-0 z-10 bg-background">
+                    <TableRow className="border-b">
+                      <TableHead className="h-8 w-[160px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Request</TableHead>
+                      <TableHead className="h-8 w-[150px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Project</TableHead>
+                      <TableHead className="h-8 w-[130px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Requested By</TableHead>
+                      <TableHead className="h-8 w-[150px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Routed</TableHead>
+                      <TableHead className="h-8 w-[120px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Status</TableHead>
+                      <TableHead className="h-8 w-[260px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Summary</TableHead>
+                      <TableHead className="h-8 w-[120px] whitespace-nowrap px-2 text-right text-[11px] uppercase tracking-wide">View Details</TableHead>
+                      <TableHead className="h-8 w-[120px] whitespace-nowrap px-2 text-right text-[11px] uppercase tracking-wide">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {incomingRequests.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+                        <TableCell colSpan={8} className="py-8 text-center text-xs text-muted-foreground">
                           No incoming Purchasing requests.
                         </TableCell>
                       </TableRow>
                     ) : (
                       incomingRequests.map((request) => (
-                        <TableRow key={request.id}>
-                          <TableCell className="font-medium">{request.requestType}</TableCell>
-                          <TableCell>{request.projectName || "No project"}</TableCell>
-                          <TableCell>{request.requestedBy}</TableCell>
-                          <TableCell>{request.routedAt ? new Date(request.routedAt).toLocaleString() : "—"}</TableCell>
-                          <TableCell>
-                            <Badge variant={request.workflowStatus === "completed" ? "default" : "secondary"}>
+                        <TableRow key={request.id} className="border-b last:border-b-0">
+                          <TableCell className="px-2 py-1.5 align-middle">
+                            <TruncatedText value={request.requestType} className="max-w-[140px] font-medium text-foreground" />
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5 align-middle">
+                            <TruncatedText value={request.projectName || "No project"} className="max-w-[130px]" />
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5 align-middle">
+                            <TruncatedText value={request.requestedBy} className="max-w-[110px]" />
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5 align-middle text-muted-foreground">
+                            <TruncatedText value={formatCompactDateTime(request.routedAt)} className="max-w-[140px]" />
+                          </TableCell>
+                          <TableCell className="px-2 py-1.5 align-middle">
+                            <Badge variant={request.workflowStatus === "completed" ? "default" : "secondary"} className="h-5 whitespace-nowrap px-1.5 text-[10px]">
                               {request.workflowStatus.replaceAll("_", " ")}
                             </Badge>
                           </TableCell>
-                          <TableCell className="max-w-[260px] truncate text-sm text-muted-foreground">
-                            {request.summary || "—"}
+                          <TableCell className="px-2 py-1.5 align-middle text-muted-foreground">
+                            <TruncatedText value={request.summary || "—"} className="max-w-[240px]" />
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="px-2 py-1.5 text-right align-middle">
                             <RequestDetailsButton request={request} />
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="px-2 py-1.5 text-right align-middle">
                             {request.workflowStatus === "completed" ? (
-                              <span className="text-xs text-muted-foreground">Completed</span>
+                              <span className="text-[11px] text-muted-foreground">Completed</span>
                             ) : (
                               <Button
                                 type="button"
                                 size="sm"
+                                className="h-7 px-2 text-[11px]"
                                 onClick={() => void handleCompleteIncomingRequest(request.id)}
                                 disabled={processingRequestId === request.id}
                               >
-                                {processingRequestId === request.id ? "Saving..." : "Mark Completed"}
+                                {processingRequestId === request.id ? "Saving..." : "Complete"}
                               </Button>
                             )}
                           </TableCell>
@@ -840,9 +885,9 @@ export default function Purchasing() {
 
         {activeView === "purchase-orders" ? (
         <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none">
-          <div className="flex justify-end mb-4 shrink-0">
-            <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="h-9">
-              <Filter className="h-4 w-4 mr-2" />
+          <div className="flex justify-end mb-3 shrink-0">
+            <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="h-8 px-2 text-xs">
+              <Filter className="h-3.5 w-3.5 mr-1.5" />
               {showFilters ? "Hide Filters" : "Filters"}
               {(filterSupplier !== "all" || filterStatus !== "all" || filterItem || filterDate) && (
                 <span className="ml-2 flex h-2 w-2 rounded-full bg-primary shadow-[0_0_4px_rgba(var(--primary),0.5)]"></span>
@@ -851,12 +896,12 @@ export default function Purchasing() {
           </div>
 
           {showFilters && (
-            <div className="bg-muted/30 p-3 mb-4 border rounded-lg shrink-0">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+            <div className="bg-muted/30 p-2.5 mb-3 border rounded-lg shrink-0">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2.5">
                 <div className="space-y-1">
-                  <Label className="text-xs">Filter by Supplier:</Label>
+                  <Label className="text-[11px]">Filter by Supplier:</Label>
                   <Select value={filterSupplier} onValueChange={setFilterSupplier}>
-                    <SelectTrigger className="w-full h-9 bg-white dark:bg-background">
+                    <SelectTrigger className="w-full h-8 bg-white text-xs dark:bg-background">
                       <SelectValue placeholder="All Suppliers" />
                     </SelectTrigger>
                     <SelectContent>
@@ -867,24 +912,24 @@ export default function Purchasing() {
                 </div>
                 
                 <div className="space-y-1">
-                  <Label className="text-xs">Filter by Status:</Label>
-                  <div className="flex bg-background border p-0.5 rounded-md w-full h-9 items-center overflow-x-auto">
-                    <Button variant={filterStatus === "all" ? "secondary" : "ghost"} size="sm" className="h-full text-xs flex-1" onClick={() => setFilterStatus("all")}>All</Button>
-                    <Button variant={filterStatus === "pending" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-orange-600 dark:text-orange-400 flex-1" onClick={() => setFilterStatus("pending")}>Pending</Button>
-                    <Button variant={filterStatus === "pending_approval" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-purple-600 dark:text-purple-400 whitespace-nowrap flex-1" onClick={() => setFilterStatus("pending_approval")}>P. Approval</Button>
-                    <Button variant={filterStatus === "approved" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-blue-600 dark:text-blue-400 flex-1" onClick={() => setFilterStatus("approved")}>Approved</Button>
-                    <Button variant={filterStatus === "received" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-green-600 dark:text-green-400 flex-1" onClick={() => setFilterStatus("received")}>Received</Button>
+                  <Label className="text-[11px]">Filter by Status:</Label>
+                  <div className="flex bg-background border p-0.5 rounded-md w-full h-8 items-center overflow-x-auto">
+                    <Button variant={filterStatus === "all" ? "secondary" : "ghost"} size="sm" className="h-full px-2 text-[11px] flex-1" onClick={() => setFilterStatus("all")}>All</Button>
+                    <Button variant={filterStatus === "pending" ? "secondary" : "ghost"} size="sm" className="h-full px-2 text-[11px] text-orange-600 dark:text-orange-400 flex-1" onClick={() => setFilterStatus("pending")}>Pending</Button>
+                    <Button variant={filterStatus === "pending_approval" ? "secondary" : "ghost"} size="sm" className="h-full px-2 text-[11px] text-purple-600 dark:text-purple-400 whitespace-nowrap flex-1" onClick={() => setFilterStatus("pending_approval")}>P. Approval</Button>
+                    <Button variant={filterStatus === "approved" ? "secondary" : "ghost"} size="sm" className="h-full px-2 text-[11px] text-blue-600 dark:text-blue-400 flex-1" onClick={() => setFilterStatus("approved")}>Approved</Button>
+                    <Button variant={filterStatus === "received" ? "secondary" : "ghost"} size="sm" className="h-full px-2 text-[11px] text-green-600 dark:text-green-400 flex-1" onClick={() => setFilterStatus("received")}>Received</Button>
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-xs">Search Item:</Label>
+                  <Label className="text-[11px]">Search Item:</Label>
                   <div className="relative">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
                     <Input 
                       type="text" 
                       placeholder="Item name..." 
-                      className="w-full h-9 pl-8 bg-white dark:bg-background"
+                      className="w-full h-8 pl-7 text-xs bg-white dark:bg-background"
                       value={filterItem}
                       onChange={(e) => setFilterItem(e.target.value)}
                     />
@@ -892,20 +937,20 @@ export default function Purchasing() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-xs">Filter by Date:</Label>
+                  <Label className="text-[11px]">Filter by Date:</Label>
                   <Input 
                     type="date" 
-                    className="w-full h-9 bg-white dark:bg-background" 
+                    className="w-full h-8 text-xs bg-white dark:bg-background" 
                     value={filterDate} 
                     onChange={(e) => setFilterDate(e.target.value)} 
                   />
                 </div>
 
-                <div className="space-y-1 flex items-end pb-0.5">
+                <div className="space-y-1 flex items-end">
                   <Button 
                     variant="ghost" 
                     size="sm" 
-                    className="h-8 text-muted-foreground w-full"
+                    className="h-8 text-[11px] text-muted-foreground w-full"
                     onClick={() => {
                       setFilterSupplier("all");
                       setFilterStatus("all");
@@ -913,7 +958,7 @@ export default function Purchasing() {
                       setFilterDate("");
                     }}
                   >
-                    <FilterX className="h-4 w-4 mr-2" />
+                    <FilterX className="h-3.5 w-3.5 mr-1.5" />
                     Clear
                   </Button>
                 </div>
@@ -921,82 +966,108 @@ export default function Purchasing() {
             </div>
           )}
 
-          <div className="overflow-x-auto rounded-md border h-full relative -mx-3 sm:mx-0">
-            <Table>
+          <div className="overflow-auto rounded-md border h-full relative -mx-3 sm:mx-0">
+            <Table className="min-w-[1340px] table-fixed text-xs">
               <TableHeader className="sticky top-0 bg-background z-10">
-                <TableRow>
-                  <TableHead className="min-w-[100px]">PO Number</TableHead>
-                  <TableHead className="hidden lg:table-cell min-w-[100px]">Voucher No.</TableHead>
-                  <TableHead className="hidden md:table-cell min-w-[90px]">Date</TableHead>
-                  <TableHead className="hidden sm:table-cell min-w-[120px]">Supplier</TableHead>
-                  <TableHead className="min-w-[150px]">Item</TableHead>
-                  <TableHead className="text-right hidden xl:table-cell min-w-[80px]">Qty</TableHead>
-                  <TableHead className="text-right hidden xl:table-cell min-w-[100px]">Unit Cost</TableHead>
-                  <TableHead className="text-right min-w-[100px]">Total Cost</TableHead>
-                  <TableHead className="hidden lg:table-cell min-w-[120px]">Destination</TableHead>
-                  <TableHead className="min-w-[100px]">Status</TableHead>
-                  <TableHead className="text-right min-w-[100px]">Actions</TableHead>
+                <TableRow className="border-b">
+                  <TableHead className="h-8 min-w-[100px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">PO Number</TableHead>
+                  <TableHead className="hidden lg:table-cell h-8 min-w-[100px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Voucher No.</TableHead>
+                  <TableHead className="hidden md:table-cell h-8 min-w-[96px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Date</TableHead>
+                  <TableHead className="hidden sm:table-cell h-8 min-w-[140px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Supplier</TableHead>
+                  <TableHead className="h-8 min-w-[250px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Item</TableHead>
+                  <TableHead className="text-right hidden xl:table-cell h-8 min-w-[90px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Qty</TableHead>
+                  <TableHead className="text-right hidden xl:table-cell h-8 min-w-[110px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Unit Cost</TableHead>
+                  <TableHead className="text-right h-8 min-w-[110px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Total Cost</TableHead>
+                  <TableHead className="hidden lg:table-cell h-8 min-w-[140px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Destination</TableHead>
+                  <TableHead className="h-8 min-w-[100px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Status</TableHead>
+                  <TableHead className="text-right h-8 min-w-[108px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Loading purchases...</TableCell>
+                    <TableCell colSpan={11} className="text-center py-8 text-xs text-muted-foreground">Loading purchases...</TableCell>
                   </TableRow>
                 ) : filteredPurchases.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">No purchase orders found.</TableCell>
+                    <TableCell colSpan={11} className="text-center py-8 text-xs text-muted-foreground">No purchase orders found.</TableCell>
                   </TableRow>
                 ) : (
                   filteredPurchases.map((p) => (
-                    <TableRow key={p.id}>
-                      <TableCell className="font-medium text-primary">{p.order_number}</TableCell>
-                      <TableCell className="text-muted-foreground hidden lg:table-cell">{p.voucher_number || "-"}</TableCell>
-                      <TableCell className="text-muted-foreground hidden md:table-cell">{p.order_date}</TableCell>
-                      <TableCell className="hidden sm:table-cell">{p.supplier}</TableCell>
-                      <TableCell className="font-medium">
-                        {p.item_name}
-                        <div className="text-xs text-muted-foreground">{p.category}</div>
-                        <div className="text-xs text-muted-foreground xl:hidden">{p.quantity} {p.unit}</div>
+                    <TableRow key={p.id} className="border-b last:border-b-0">
+                      <TableCell className="px-2 py-1.5 align-middle font-medium text-primary whitespace-nowrap">{p.order_number}</TableCell>
+                      <TableCell className="hidden lg:table-cell px-2 py-1.5 align-middle text-muted-foreground whitespace-nowrap">
+                        <TruncatedText value={p.voucher_number || "-"} className="max-w-[90px]" />
                       </TableCell>
-                      <TableCell className="text-right hidden xl:table-cell">{p.quantity} {p.unit}</TableCell>
-                      <TableCell className="text-right hidden xl:table-cell">{formatCurrency(p.unit_cost)}</TableCell>
-                      <TableCell className="text-right font-bold">{formatCurrency(p.total_cost)}</TableCell>
-                      <TableCell className="hidden lg:table-cell">
-                        {p.destination_type === 'main_warehouse' ? (
-                          <Badge variant="outline" className="flex w-fit items-center gap-1"><WarehouseIcon className="h-3 w-3" /> Main</Badge>
-                        ) : (
-                          <Badge variant="secondary" className="flex w-fit items-center gap-1 bg-blue-50 text-blue-700 border-blue-200"><Building2 className="h-3 w-3" /> {p.projects?.name || 'Project'}</Badge>
-                        )}
+                      <TableCell className="hidden md:table-cell px-2 py-1.5 align-middle text-muted-foreground whitespace-nowrap">{p.order_date}</TableCell>
+                      <TableCell className="hidden sm:table-cell px-2 py-1.5 align-middle whitespace-nowrap">
+                        <TruncatedText value={p.supplier || "—"} className="max-w-[124px]" />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="px-2 py-1.5 align-middle">
+                        <div className="min-w-0 space-y-0.5">
+                          <TruncatedText value={p.item_name} className="max-w-[220px] font-medium text-foreground" />
+                          <TruncatedText value={p.category || "—"} className="max-w-[220px] text-[11px] text-muted-foreground" />
+                          <TruncatedText value={`${p.quantity} ${p.unit}`} className="max-w-[220px] text-[11px] text-muted-foreground xl:hidden" />
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right hidden xl:table-cell px-2 py-1.5 align-middle whitespace-nowrap">{p.quantity} {p.unit}</TableCell>
+                      <TableCell className="text-right hidden xl:table-cell px-2 py-1.5 align-middle whitespace-nowrap">{formatCurrency(p.unit_cost)}</TableCell>
+                      <TableCell className="text-right px-2 py-1.5 align-middle font-semibold whitespace-nowrap">{formatCurrency(p.total_cost)}</TableCell>
+                      <TableCell className="hidden lg:table-cell px-2 py-1.5 align-middle">
+                        <TooltipProvider delayDuration={150}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center gap-1 overflow-hidden whitespace-nowrap text-[11px]">
+                                {p.destination_type === "main_warehouse" ? (
+                                  <WarehouseIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                ) : (
+                                  <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                )}
+                                <span className="truncate">
+                                  {p.destination_type === "main_warehouse" ? "Main Warehouse" : p.projects?.name || "Project"}
+                                </span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent className="text-xs">
+                              {p.destination_type === "main_warehouse" ? "Main Warehouse" : p.projects?.name || "Project"}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableCell>
+                      <TableCell className="px-2 py-1.5 align-middle whitespace-nowrap">
                         <Badge 
                           variant="outline" 
                           className={
-                            p.status === 'received' ? 'bg-green-500 hover:bg-green-600 border-transparent text-white' : 
-                            p.status === 'approved' ? 'bg-blue-500 hover:bg-blue-600 border-transparent text-white' : 
-                            p.status === 'pending_approval' ? 'bg-purple-500 hover:bg-purple-600 border-transparent text-white' : 
-                            'bg-orange-500 hover:bg-orange-600 border-transparent text-white'
+                            p.status === "received" ? "h-5 whitespace-nowrap bg-green-500 hover:bg-green-600 border-transparent px-1.5 text-[10px] text-white" : 
+                            p.status === "approved" ? "h-5 whitespace-nowrap bg-blue-500 hover:bg-blue-600 border-transparent px-1.5 text-[10px] text-white" : 
+                            p.status === "pending_approval" ? "h-5 whitespace-nowrap bg-purple-500 hover:bg-purple-600 border-transparent px-1.5 text-[10px] text-white" : 
+                            "h-5 whitespace-nowrap bg-orange-500 hover:bg-orange-600 border-transparent px-1.5 text-[10px] text-white"
                           }
                         >
-                          {p.status === 'pending_approval' ? 'P. APPROVAL' : p.status.toUpperCase()}
+                          {p.status === "pending_approval" ? "P. APPROVAL" : p.status.toUpperCase()}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          {p.status === 'pending' && p.order_number?.startsWith('PR-') && (
-                            <Button variant="outline" size="sm" className="h-8 text-xs bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 hidden sm:inline-flex" onClick={() => {
-                              setGmSubmitForm({ ...p, unit_cost: p.unit_cost || '' });
-                              setGmSubmitDialogOpen(true);
-                            }} disabled={isLocked}>
-                              Price & Submit
+                      <TableCell className="text-right px-2 py-1.5 align-middle">
+                        <div className="flex justify-end gap-1 whitespace-nowrap">
+                          {p.status === "pending" && p.order_number?.startsWith("PR-") && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 px-2 text-[11px] bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 hidden sm:inline-flex"
+                              onClick={() => {
+                                setGmSubmitForm({ ...p, unit_cost: p.unit_cost || "" });
+                                setGmSubmitDialogOpen(true);
+                              }}
+                              disabled={isLocked}
+                            >
+                              Submit
                             </Button>
                           )}
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" onClick={() => handlePrint(p)} title="Print PO" disabled={isLocked}>
-                            <Printer className="h-4 w-4" />
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-50" onClick={() => handlePrint(p)} title="Print PO" disabled={isLocked}>
+                            <Printer className="h-3.5 w-3.5" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50" onClick={() => handleArchive(p.id)} title="Archive" disabled={isLocked}>
-                            <Archive className="h-4 w-4" />
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-orange-600 hover:text-orange-700 hover:bg-orange-50" onClick={() => handleArchive(p.id)} title="Archive" disabled={isLocked}>
+                            <Archive className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       </TableCell>
