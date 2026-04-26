@@ -390,30 +390,41 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="unit">Unit</Label>
-                  <Select
-                    value={formData.unit}
-                    onValueChange={(value) => setFormData((prev) => ({ ...prev, unit: value }))}
-                    disabled={!formData.bom_scope_id || availableUnits.length === 0}
-                  >
-                    <SelectTrigger id="unit" className="h-9">
-                      <SelectValue
-                        placeholder={
-                          !formData.bom_scope_id
-                            ? "Select scope first"
-                            : availableUnits.length === 0
-                              ? "No BOM units available"
-                              : "Select unit"
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableUnits.map((unitOption) => (
-                        <SelectItem key={unitOption} value={unitOption}>
-                          {unitOption}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {isOtherMaterial ? (
+                    <Input
+                      id="unit"
+                      className="h-9"
+                      value={formData.unit}
+                      onChange={(event) => setFormData((prev) => ({ ...prev, unit: event.target.value }))}
+                      placeholder="Enter unit"
+                      required
+                    />
+                  ) : (
+                    <Select
+                      value={formData.unit}
+                      onValueChange={(value) => setFormData((prev) => ({ ...prev, unit: value }))}
+                      disabled={!formData.bom_scope_id || availableUnits.length === 0}
+                    >
+                      <SelectTrigger id="unit" className="h-9">
+                        <SelectValue
+                          placeholder={
+                            !formData.bom_scope_id
+                              ? "Select scope first"
+                              : availableUnits.length === 0
+                                ? "No BOM units available"
+                                : "Select unit"
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableUnits.map((unitOption) => (
+                          <SelectItem key={unitOption} value={unitOption}>
+                            {unitOption}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
               </div>
 
