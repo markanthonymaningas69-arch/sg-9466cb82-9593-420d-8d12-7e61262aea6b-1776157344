@@ -164,11 +164,11 @@ export default function SitePersonnelPage() {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="warehouse" className="space-y-6">
+        <Tabs defaultValue="deliveries" className="space-y-6">
           <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="warehouse" className="gap-2">
+            <TabsTrigger value="deliveries" className="gap-2">
               <Package className="h-4 w-4" />
-              <span className="hidden sm:inline">Warehouse</span>
+              <span className="hidden sm:inline">Deliveries</span>
             </TabsTrigger>
             <TabsTrigger value="usage" className="gap-2">
               <TrendingDown className="h-4 w-4" />
@@ -188,7 +188,7 @@ export default function SitePersonnelPage() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="warehouse">
+          <TabsContent value="deliveries">
             <SiteWarehouseTab projectId={selectedProjectId} />
           </TabsContent>
 

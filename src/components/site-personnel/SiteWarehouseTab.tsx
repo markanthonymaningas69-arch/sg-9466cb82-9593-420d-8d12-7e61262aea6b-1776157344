@@ -159,7 +159,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2">
           <Package className="h-5 w-5" />
-          Site Warehouse - Material Deliveries
+          Site Deliveries
         </CardTitle>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
