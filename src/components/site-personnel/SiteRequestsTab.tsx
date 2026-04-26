@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -65,6 +66,7 @@ function getDefaultFormData() {
     quantity: "",
     unit: "",
     supplier: "",
+    receipt_number: "",
     requested_by: "",
     request_date: new Date().toISOString().split("T")[0],
     notes: "",
@@ -284,7 +286,7 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
     event.preventDefault();
 
     try {
-      const insertData: Record<string, unknown> = {
+      const insertData: Database["public"]["Tables"]["site_requests"]["Insert"] = {
         project_id: projectId,
         request_type: formData.request_type,
         item_name: formData.item_name,
@@ -294,6 +296,8 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
         request_date: formData.request_date,
         status: "pending",
         notes: formData.notes || null,
+        supplier: formData.request_type === "Materials" ? formData.supplier || null : null,
+        receipt_number: formData.request_type === "Materials" ? formData.receipt_number || null : null,
       };
 
       if (formData.request_type === "Materials" && formData.bom_scope_id) {
@@ -511,17 +515,32 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
                     </div>
                   </div>
 
-                  <div className="space-y-1">
-                    <Label htmlFor="supplier" className="text-[11px]">
-                      Supplier
-                    </Label>
-                    <Input
-                      id="supplier"
-                      className="h-8 text-xs"
-                      value={formData.supplier}
-                      onChange={(event) => setFormData((current) => ({ ...current, supplier: event.target.value }))}
-                      placeholder="Enter supplier name"
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="supplier" className="text-[11px]">
+                        Supplier
+                      </Label>
+                      <Input
+                        id="supplier"
+                        className="h-8 text-xs"
+                        value={formData.supplier}
+                        onChange={(event) => setFormData((current) => ({ ...current, supplier: event.target.value }))}
+                        placeholder="Enter supplier name"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label htmlFor="receipt_number" className="text-[11px]">
+                        Receipt Number
+                      </Label>
+                      <Input
+                        id="receipt_number"
+                        className="h-8 text-xs"
+                        value={formData.receipt_number}
+                        onChange={(event) => setFormData((current) => ({ ...current, receipt_number: event.target.value }))}
+                        placeholder="Enter receipt no."
+                      />
+                    </div>
                   </div>
                 </>
               ) : (

@@ -2004,10 +2004,12 @@ export type Database = {
           notes: string | null
           project_id: string
           quantity: number
+          receipt_number: string | null
           request_date: string
           request_type: string | null
           requested_by: string
           status: string | null
+          supplier: string | null
           unit: string
         }
         Insert: {
@@ -2022,10 +2024,12 @@ export type Database = {
           notes?: string | null
           project_id: string
           quantity: number
+          receipt_number?: string | null
           request_date?: string
           request_type?: string | null
           requested_by: string
           status?: string | null
+          supplier?: string | null
           unit: string
         }
         Update: {
@@ -2040,10 +2044,12 @@ export type Database = {
           notes?: string | null
           project_id?: string
           quantity?: number
+          receipt_number?: string | null
           request_date?: string
           request_type?: string | null
           requested_by?: string
           status?: string | null
+          supplier?: string | null
           unit?: string
         }
         Relationships: [
