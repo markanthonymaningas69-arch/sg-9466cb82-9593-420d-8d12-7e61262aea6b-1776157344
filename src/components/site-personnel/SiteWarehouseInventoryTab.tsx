@@ -352,7 +352,7 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                   No warehouse materials match the current filters.
                 </div>
               ) : (
-                <div className="max-h-[420px] overflow-auto rounded-md border text-xs [&_td]:py-2 [&_th]:py-2 [&_th]:text-[11px]">
+                <div className="h-[420px] overflow-auto overscroll-contain rounded-md border text-xs [&_td]:py-2 [&_th]:py-2 [&_th]:text-[11px]">
                   <Table>
                     <TableHeader>
                       <TableRow>
