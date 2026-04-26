@@ -444,16 +444,16 @@ export default function Purchasing() {
 
   return (
     <Layout>
-      <div className="space-y-6 flex flex-col h-full">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="space-y-4 sm:space-y-6 flex flex-col h-full px-3 sm:px-0">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-heading font-bold">Purchasing</h1>
-            <p className="text-muted-foreground mt-1">Procurement and purchase orders</p>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-heading font-bold">Purchasing</h1>
+            <p className="text-sm text-muted-foreground mt-1">Procurement and purchase orders</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" disabled={isLocked}>
+                <Button variant="outline" disabled={isLocked} className="w-full sm:w-auto">
                   <Building2 className="h-4 w-4 mr-2" />
                   Suppliers
                 </Button>
@@ -471,7 +471,7 @@ export default function Purchasing() {
             </DropdownMenu>
 
             <Dialog open={supplierDialogOpen} onOpenChange={setSupplierDialogOpen}>
-              <DialogContent>
+              <DialogContent className="max-w-[95vw] sm:max-w-md">
                 <DialogHeader>
                   <DialogTitle>Register New Supplier</DialogTitle>
                 </DialogHeader>
@@ -501,7 +501,7 @@ export default function Purchasing() {
             </Dialog>
 
             <Dialog open={viewSuppliersDialogOpen} onOpenChange={setViewSuppliersDialogOpen}>
-              <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+              <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[80vh] flex flex-col">
                 <DialogHeader className="shrink-0">
                   <DialogTitle className="flex items-center gap-2">
                     <Building2 className="h-5 w-5 text-primary" />
@@ -513,9 +513,9 @@ export default function Purchasing() {
                     <TableHeader className="sticky top-0 bg-background z-10">
                       <TableRow>
                         <TableHead>Name</TableHead>
-                        <TableHead>Contact Person</TableHead>
-                        <TableHead>Phone</TableHead>
-                        <TableHead>Address</TableHead>
+                        <TableHead className="hidden sm:table-cell">Contact Person</TableHead>
+                        <TableHead className="hidden md:table-cell">Phone</TableHead>
+                        <TableHead className="hidden lg:table-cell">Address</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -529,9 +529,9 @@ export default function Purchasing() {
                         suppliers.map((s) => (
                           <TableRow key={s.id}>
                             <TableCell className="font-medium">{s.name}</TableCell>
-                            <TableCell>{s.contact_person || <span className="text-muted-foreground">-</span>}</TableCell>
-                            <TableCell>{s.phone || <span className="text-muted-foreground">-</span>}</TableCell>
-                            <TableCell>{s.address || <span className="text-muted-foreground">-</span>}</TableCell>
+                            <TableCell className="hidden sm:table-cell">{s.contact_person || <span className="text-muted-foreground">-</span>}</TableCell>
+                            <TableCell className="hidden md:table-cell">{s.phone || <span className="text-muted-foreground">-</span>}</TableCell>
+                            <TableCell className="hidden lg:table-cell">{s.address || <span className="text-muted-foreground">-</span>}</TableCell>
                           </TableRow>
                         ))
                       )}
@@ -548,7 +548,7 @@ export default function Purchasing() {
                   New Purchase
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Create Purchase Order</DialogTitle>
                   <p className="text-sm text-muted-foreground">
@@ -557,7 +557,7 @@ export default function Purchasing() {
                 </DialogHeader>
                 <div className="space-y-6">
                   {/* Header Section */}
-                  <div className="grid grid-cols-2 gap-4 bg-muted/30 p-4 rounded-lg border">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-muted/30 p-4 rounded-lg border">
                     <div className="space-y-2">
                       <Label>PO Number *</Label>
                       <Input value={poHeader.order_number} onChange={(e) => setPoHeader({ ...poHeader, order_number: e.target.value })} required />
@@ -586,7 +586,7 @@ export default function Purchasing() {
                       </Select>
                     </div>
                     {poHeader.destination_type === "project_warehouse" && (
-                      <div className="space-y-2 col-span-2">
+                      <div className="space-y-2 sm:col-span-2">
                         <Label>Select Project *</Label>
                         <Select value={poHeader.project_id} onValueChange={(val) => setPoHeader({ ...poHeader, project_id: val })}>
                           <SelectTrigger><SelectValue placeholder="Select active project" /></SelectTrigger>
@@ -602,66 +602,70 @@ export default function Purchasing() {
                   {/* Add Item Section */}
                   <div className="space-y-4">
                     <h3 className="text-sm font-semibold">Add Line Item</h3>
-                    <div className="grid grid-cols-6 gap-3 items-end">
-                      <div className="space-y-2 col-span-2 flex flex-col justify-end">
-                        <Label className="text-xs">Item Name *</Label>
-                        <Input 
-                          list="catalog-items"
-                          value={currentItem.item_name}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            const found = catalogItems.find(item => item.name === val);
-                            if (found) {
-                              setCurrentItem({
-                                ...currentItem,
-                                item_name: val,
-                                category: found.category || currentItem.category,
-                                unit: found.unit || currentItem.unit
-                              });
-                            } else {
-                              setCurrentItem({ ...currentItem, item_name: val });
-                            }
-                          }}
-                          className="h-9"
-                          placeholder="Type or select item..."
-                        />
-                        <datalist id="catalog-items">
-                          {catalogItems.map((item, i) => (
-                            <option key={i} value={item.name} />
-                          ))}
-                        </datalist>
+                    <div className="grid grid-cols-1 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-2 flex flex-col justify-end">
+                          <Label className="text-xs">Item Name *</Label>
+                          <Input 
+                            list="catalog-items"
+                            value={currentItem.item_name}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const found = catalogItems.find(item => item.name === val);
+                              if (found) {
+                                setCurrentItem({
+                                  ...currentItem,
+                                  item_name: val,
+                                  category: found.category || currentItem.category,
+                                  unit: found.unit || currentItem.unit
+                                });
+                              } else {
+                                setCurrentItem({ ...currentItem, item_name: val });
+                              }
+                            }}
+                            className="h-9"
+                            placeholder="Type or select item..."
+                          />
+                          <datalist id="catalog-items">
+                            {catalogItems.map((item, i) => (
+                              <option key={i} value={item.name} />
+                            ))}
+                          </datalist>
+                        </div>
+                        <div className="space-y-2 flex flex-col justify-end">
+                          <Label className="text-xs">Category</Label>
+                          <Select value={currentItem.category} onValueChange={(val) => setCurrentItem({ ...currentItem, category: val })}>
+                            <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {STANDARD_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                              {!STANDARD_CATEGORIES.includes(currentItem.category) && currentItem.category && (
+                                <SelectItem value={currentItem.category}>{currentItem.category}</SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
-                      <div className="space-y-2 col-span-1 flex flex-col justify-end">
-                        <Label className="text-xs">Category</Label>
-                        <Select value={currentItem.category} onValueChange={(val) => setCurrentItem({ ...currentItem, category: val })}>
-                          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {STANDARD_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                            {!STANDARD_CATEGORIES.includes(currentItem.category) && currentItem.category && (
-                              <SelectItem value={currentItem.category}>{currentItem.category}</SelectItem>
-                            )}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2 col-span-1">
-                        <Label className="text-xs">Qty *</Label>
-                        <Input type="number" value={currentItem.quantity} onChange={(e) => setCurrentItem({ ...currentItem, quantity: e.target.value })} className="h-9" />
-                      </div>
-                      <div className="space-y-2 col-span-1">
-                        <Label className="text-xs">Unit</Label>
-                        <Select value={currentItem.unit} onValueChange={(val) => setCurrentItem({ ...currentItem, unit: val })}>
-                          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {STANDARD_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                            {!STANDARD_UNITS.includes(currentItem.unit) && currentItem.unit && (
-                              <SelectItem value={currentItem.unit}>{currentItem.unit}</SelectItem>
-                            )}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2 col-span-1">
-                        <Label className="text-xs">Unit Cost *</Label>
-                        <Input type="number" step="0.01" value={currentItem.unit_cost} onChange={(e) => setCurrentItem({ ...currentItem, unit_cost: e.target.value })} className="h-9" />
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <div className="space-y-2">
+                          <Label className="text-xs">Qty *</Label>
+                          <Input type="number" value={currentItem.quantity} onChange={(e) => setCurrentItem({ ...currentItem, quantity: e.target.value })} className="h-9" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">Unit</Label>
+                          <Select value={currentItem.unit} onValueChange={(val) => setCurrentItem({ ...currentItem, unit: val })}>
+                            <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {STANDARD_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                              {!STANDARD_UNITS.includes(currentItem.unit) && currentItem.unit && (
+                                <SelectItem value={currentItem.unit}>{currentItem.unit}</SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">Unit Cost *</Label>
+                          <Input type="number" step="0.01" value={currentItem.unit_cost} onChange={(e) => setCurrentItem({ ...currentItem, unit_cost: e.target.value })} className="h-9" />
+                        </div>
                       </div>
                     </div>
                     <div className="flex justify-end">
@@ -673,23 +677,23 @@ export default function Purchasing() {
 
                   {/* Items Table */}
                   {poItems.length > 0 && (
-                    <div className="border rounded-md">
+                    <div className="border rounded-md overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow>
                             <TableHead className="h-8 text-xs">Item</TableHead>
-                            <TableHead className="h-8 text-xs text-right">Qty</TableHead>
-                            <TableHead className="h-8 text-xs text-right">Unit Cost</TableHead>
+                            <TableHead className="h-8 text-xs text-right hidden sm:table-cell">Qty</TableHead>
+                            <TableHead className="h-8 text-xs text-right hidden md:table-cell">Unit Cost</TableHead>
                             <TableHead className="h-8 text-xs text-right">Total</TableHead>
-                            <TableHead className="h-8 text-xs text-right"></TableHead>
+                            <TableHead className="h-8 text-xs text-right w-12"></TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {poItems.map((item, index) => (
                             <TableRow key={index}>
-                              <TableCell className="py-2 text-sm">{item.item_name} <span className="text-xs text-muted-foreground block">{item.category}</span></TableCell>
-                              <TableCell className="py-2 text-sm text-right">{item.quantity} {item.unit}</TableCell>
-                              <TableCell className="py-2 text-sm text-right">{formatCurrency(parseFloat(item.unit_cost) || 0)}</TableCell>
+                              <TableCell className="py-2 text-sm">{item.item_name} <span className="text-xs text-muted-foreground block sm:hidden">{item.quantity} {item.unit}</span></TableCell>
+                              <TableCell className="py-2 text-sm text-right hidden sm:table-cell">{item.quantity} {item.unit}</TableCell>
+                              <TableCell className="py-2 text-sm text-right hidden md:table-cell">{formatCurrency(parseFloat(item.unit_cost) || 0)}</TableCell>
                               <TableCell className="py-2 text-sm text-right font-medium">{formatCurrency((parseFloat(item.quantity) || 0) * (parseFloat(item.unit_cost) || 0))}</TableCell>
                               <TableCell className="py-2 text-right">
                                 <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleRemoveItem(index)}>
@@ -703,13 +707,13 @@ export default function Purchasing() {
                     </div>
                   )}
 
-                  <div className="flex justify-between items-center pt-4 border-t mt-6">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-4 border-t mt-6">
                     <p className="text-xs font-semibold">
                       Total PO Value: {formatCurrency(poItems.reduce((sum, item) => sum + ((parseFloat(item.quantity) || 0) * (parseFloat(item.unit_cost) || 0)), 0))}
                     </p>
-                    <div className="flex gap-2">
-                      <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                      <Button type="button" onClick={handleSubmitPO}>Submit PO for Approval</Button>
+                    <div className="flex gap-2 w-full sm:w-auto">
+                      <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="flex-1 sm:flex-initial">Cancel</Button>
+                      <Button type="button" onClick={handleSubmitPO} className="flex-1 sm:flex-initial">Submit PO for Approval</Button>
                     </div>
                   </div>
                 </div>
@@ -730,89 +734,91 @@ export default function Purchasing() {
           </div>
 
           {showFilters && (
-            <div className="bg-muted/30 p-3 mb-4 border rounded-lg flex flex-wrap gap-4 shrink-0">
-              <div className="space-y-1">
-                <Label className="text-xs">Filter by Supplier:</Label>
-                <Select value={filterSupplier} onValueChange={setFilterSupplier}>
-                  <SelectTrigger className="w-[180px] h-9 bg-white dark:bg-background">
-                    <SelectValue placeholder="All Suppliers" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Suppliers</SelectItem>
-                    {uniqueSuppliers.map((s: any) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-1">
-                <Label className="text-xs">Filter by Status:</Label>
-                <div className="flex bg-background border p-0.5 rounded-md w-fit h-9 items-center overflow-x-auto">
-                  <Button variant={filterStatus === "all" ? "secondary" : "ghost"} size="sm" className="h-full text-xs" onClick={() => setFilterStatus("all")}>All</Button>
-                  <Button variant={filterStatus === "pending" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-orange-600 dark:text-orange-400" onClick={() => setFilterStatus("pending")}>Pending</Button>
-                  <Button variant={filterStatus === "pending_approval" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-purple-600 dark:text-purple-400 whitespace-nowrap" onClick={() => setFilterStatus("pending_approval")}>Pending Approval</Button>
-                  <Button variant={filterStatus === "approved" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-blue-600 dark:text-blue-400" onClick={() => setFilterStatus("approved")}>Approved</Button>
-                  <Button variant={filterStatus === "received" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-green-600 dark:text-green-400" onClick={() => setFilterStatus("received")}>Received</Button>
+            <div className="bg-muted/30 p-3 mb-4 border rounded-lg shrink-0">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Filter by Supplier:</Label>
+                  <Select value={filterSupplier} onValueChange={setFilterSupplier}>
+                    <SelectTrigger className="w-full h-9 bg-white dark:bg-background">
+                      <SelectValue placeholder="All Suppliers" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Suppliers</SelectItem>
+                      {uniqueSuppliers.map((s: any) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
-              </div>
+                
+                <div className="space-y-1">
+                  <Label className="text-xs">Filter by Status:</Label>
+                  <div className="flex bg-background border p-0.5 rounded-md w-full h-9 items-center overflow-x-auto">
+                    <Button variant={filterStatus === "all" ? "secondary" : "ghost"} size="sm" className="h-full text-xs flex-1" onClick={() => setFilterStatus("all")}>All</Button>
+                    <Button variant={filterStatus === "pending" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-orange-600 dark:text-orange-400 flex-1" onClick={() => setFilterStatus("pending")}>Pending</Button>
+                    <Button variant={filterStatus === "pending_approval" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-purple-600 dark:text-purple-400 whitespace-nowrap flex-1" onClick={() => setFilterStatus("pending_approval")}>P. Approval</Button>
+                    <Button variant={filterStatus === "approved" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-blue-600 dark:text-blue-400 flex-1" onClick={() => setFilterStatus("approved")}>Approved</Button>
+                    <Button variant={filterStatus === "received" ? "secondary" : "ghost"} size="sm" className="h-full text-xs text-green-600 dark:text-green-400 flex-1" onClick={() => setFilterStatus("received")}>Received</Button>
+                  </div>
+                </div>
 
-              <div className="space-y-1">
-                <Label className="text-xs">Search Item:</Label>
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <div className="space-y-1">
+                  <Label className="text-xs">Search Item:</Label>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                      type="text" 
+                      placeholder="Item name..." 
+                      className="w-full h-9 pl-8 bg-white dark:bg-background"
+                      value={filterItem}
+                      onChange={(e) => setFilterItem(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">Filter by Date:</Label>
                   <Input 
-                    type="text" 
-                    placeholder="Item name..." 
-                    className="w-[180px] h-9 pl-8 bg-white dark:bg-background"
-                    value={filterItem}
-                    onChange={(e) => setFilterItem(e.target.value)}
+                    type="date" 
+                    className="w-full h-9 bg-white dark:bg-background" 
+                    value={filterDate} 
+                    onChange={(e) => setFilterDate(e.target.value)} 
                   />
                 </div>
-              </div>
 
-              <div className="space-y-1">
-                <Label className="text-xs">Filter by Date:</Label>
-                <Input 
-                  type="date" 
-                  className="w-[160px] h-9 bg-white dark:bg-background" 
-                  value={filterDate} 
-                  onChange={(e) => setFilterDate(e.target.value)} 
-                />
-              </div>
-
-              <div className="space-y-1 flex items-end pb-0.5">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-8 text-muted-foreground"
-                  onClick={() => {
-                    setFilterSupplier("all");
-                    setFilterStatus("all");
-                    setFilterItem("");
-                    setFilterDate("");
-                  }}
-                >
-                  <FilterX className="h-4 w-4 mr-2" />
-                  Clear
-                </Button>
+                <div className="space-y-1 flex items-end pb-0.5">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-8 text-muted-foreground w-full"
+                    onClick={() => {
+                      setFilterSupplier("all");
+                      setFilterStatus("all");
+                      setFilterItem("");
+                      setFilterDate("");
+                    }}
+                  >
+                    <FilterX className="h-4 w-4 mr-2" />
+                    Clear
+                  </Button>
+                </div>
               </div>
             </div>
           )}
 
-          <div className="overflow-y-auto rounded-md border h-full relative">
+          <div className="overflow-x-auto rounded-md border h-full relative -mx-3 sm:mx-0">
             <Table>
               <TableHeader className="sticky top-0 bg-background z-10">
                 <TableRow>
-                  <TableHead>PO Number</TableHead>
-                  <TableHead>Voucher No.</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead>Item</TableHead>
-                  <TableHead className="text-right">Qty</TableHead>
-                  <TableHead className="text-right">Unit Cost</TableHead>
-                  <TableHead className="text-right">Total Cost</TableHead>
-                  <TableHead>Destination</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="min-w-[100px]">PO Number</TableHead>
+                  <TableHead className="hidden lg:table-cell min-w-[100px]">Voucher No.</TableHead>
+                  <TableHead className="hidden md:table-cell min-w-[90px]">Date</TableHead>
+                  <TableHead className="hidden sm:table-cell min-w-[120px]">Supplier</TableHead>
+                  <TableHead className="min-w-[150px]">Item</TableHead>
+                  <TableHead className="text-right hidden xl:table-cell min-w-[80px]">Qty</TableHead>
+                  <TableHead className="text-right hidden xl:table-cell min-w-[100px]">Unit Cost</TableHead>
+                  <TableHead className="text-right min-w-[100px]">Total Cost</TableHead>
+                  <TableHead className="hidden lg:table-cell min-w-[120px]">Destination</TableHead>
+                  <TableHead className="min-w-[100px]">Status</TableHead>
+                  <TableHead className="text-right min-w-[100px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -828,17 +834,18 @@ export default function Purchasing() {
                   filteredPurchases.map((p) => (
                     <TableRow key={p.id}>
                       <TableCell className="font-medium text-primary">{p.order_number}</TableCell>
-                      <TableCell className="text-muted-foreground">{p.voucher_number || "-"}</TableCell>
-                      <TableCell className="text-muted-foreground">{p.order_date}</TableCell>
-                      <TableCell>{p.supplier}</TableCell>
+                      <TableCell className="text-muted-foreground hidden lg:table-cell">{p.voucher_number || "-"}</TableCell>
+                      <TableCell className="text-muted-foreground hidden md:table-cell">{p.order_date}</TableCell>
+                      <TableCell className="hidden sm:table-cell">{p.supplier}</TableCell>
                       <TableCell className="font-medium">
                         {p.item_name}
                         <div className="text-xs text-muted-foreground">{p.category}</div>
+                        <div className="text-xs text-muted-foreground xl:hidden">{p.quantity} {p.unit}</div>
                       </TableCell>
-                      <TableCell className="text-right">{p.quantity} {p.unit}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(p.unit_cost)}</TableCell>
+                      <TableCell className="text-right hidden xl:table-cell">{p.quantity} {p.unit}</TableCell>
+                      <TableCell className="text-right hidden xl:table-cell">{formatCurrency(p.unit_cost)}</TableCell>
                       <TableCell className="text-right font-bold">{formatCurrency(p.total_cost)}</TableCell>
-                      <TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         {p.destination_type === 'main_warehouse' ? (
                           <Badge variant="outline" className="flex w-fit items-center gap-1"><WarehouseIcon className="h-3 w-3" /> Main</Badge>
                         ) : (
@@ -855,13 +862,13 @@ export default function Purchasing() {
                             'bg-orange-500 hover:bg-orange-600 border-transparent text-white'
                           }
                         >
-                          {p.status === 'pending_approval' ? 'PENDING APPROVAL' : p.status.toUpperCase()}
+                          {p.status === 'pending_approval' ? 'P. APPROVAL' : p.status.toUpperCase()}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
                           {p.status === 'pending' && p.order_number?.startsWith('PR-') && (
-                            <Button variant="outline" size="sm" className="h-8 text-xs bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100" onClick={() => {
+                            <Button variant="outline" size="sm" className="h-8 text-xs bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 hidden sm:inline-flex" onClick={() => {
                               setGmSubmitForm({ ...p, unit_cost: p.unit_cost || '' });
                               setGmSubmitDialogOpen(true);
                             }} disabled={isLocked}>
@@ -886,7 +893,7 @@ export default function Purchasing() {
 
         {/* GM Submit Dialog */}
         <Dialog open={gmSubmitDialogOpen} onOpenChange={setGmSubmitDialogOpen}>
-          <DialogContent>
+          <DialogContent className="max-w-[95vw] sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Submit for Approval</DialogTitle>
               <CardDescription>Enter the unit cost and supplier before routing this purchase to Approval Center.</CardDescription>
@@ -913,9 +920,9 @@ export default function Purchasing() {
                     Total Estimated Cost: AED {(parseFloat(gmSubmitForm.unit_cost) || 0) * gmSubmitForm.quantity}
                   </p>
                 </div>
-                <div className="flex justify-end gap-2 pt-4">
-                  <Button variant="outline" onClick={() => setGmSubmitDialogOpen(false)}>Cancel</Button>
-                  <Button onClick={handleGmSubmit}>Send to Approval Center</Button>
+                <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4">
+                  <Button variant="outline" onClick={() => setGmSubmitDialogOpen(false)} className="w-full sm:w-auto">Cancel</Button>
+                  <Button onClick={handleGmSubmit} className="w-full sm:w-auto">Send to Approval Center</Button>
                 </div>
               </div>
             )}
