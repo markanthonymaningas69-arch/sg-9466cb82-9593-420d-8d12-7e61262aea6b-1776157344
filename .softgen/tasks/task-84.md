@@ -24,6 +24,8 @@ Add a history list and clean filters to the Requests tab. The list should help u
 - [x] Adjust the request filters so they match the cleaner review pattern used across the other tabs
 - [x] Link Cash Advance and Petty Cash request currency to the shared currency engine and show it as read-only
 - [x] Add a Worker Name dropdown as the first field in the Cash Advance request form using the existing project worker data source
+- [ ] Link the Materials request unit to the selected BOM material so it is filled from BOM data
+- [ ] Change the Tools&Equipments unit field to a dropdown with Unit, Pc, Set, and Others with manual input
 
 ## Acceptance
 Users can review request history from the Requests tab.
