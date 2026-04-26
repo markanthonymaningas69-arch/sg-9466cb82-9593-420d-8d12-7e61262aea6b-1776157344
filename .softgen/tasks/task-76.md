@@ -27,6 +27,7 @@ Update the Site Personnel surface by renaming the Deliveries module to Purchase 
 - [x] Restore the material field to a dropdown and keep an Others option with manual input
 - [x] Ensure selecting Others always allows manual material name input
 - [x] Change Unit to a dropdown that syncs to BOM units for the selected material
+- [ ] Allow manual unit input when the material is entered through Others
 
 ## Acceptance
 The Site Personnel module shows Purchase & Deliveries instead of Deliveries.
