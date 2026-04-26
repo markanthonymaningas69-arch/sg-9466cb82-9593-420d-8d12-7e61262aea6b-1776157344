@@ -100,6 +100,14 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState<FormState>(defaultFormState);
   const [isOtherMaterial, setIsOtherMaterial] = useState(false);
+  const [filters, setFilters] = useState({
+    scopeId: "all",
+    supplier: "all",
+    material: "",
+    receipt: "",
+    dateFrom: "",
+    dateTo: "",
+  });
 
   const amount = useMemo(() => {
     const quantity = Number(formData.quantity || 0);
@@ -140,6 +148,65 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
 
     return Array.from(new Set(filteredMaterials.map((material) => material.unit).filter(Boolean)));
   }, [filteredMaterials, formData.bom_scope_id, formData.item_name, isOtherMaterial]);
+
+  const supplierOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        records
+          .map((record) => record.supplier?.trim())
+          .filter((supplier): supplier is string => Boolean(supplier))
+      )
+    ).sort((left, right) => left.localeCompare(right));
+  }, [records]);
+
+  const filteredRecords = useMemo(() => {
+    const materialQuery = filters.material.trim().toLowerCase();
+    const receiptQuery = filters.receipt.trim().toLowerCase();
+
+    return records.filter((record) => {
+      if (filters.scopeId !== "all" && record.bom_scope_id !== filters.scopeId) {
+        return false;
+      }
+
+      if (filters.supplier !== "all" && (record.supplier || "").trim() !== filters.supplier) {
+        return false;
+      }
+
+      if (materialQuery && !record.item_name.toLowerCase().includes(materialQuery)) {
+        return false;
+      }
+
+      if (receiptQuery && !(record.receipt_number || "").toLowerCase().includes(receiptQuery)) {
+        return false;
+      }
+
+      if (filters.dateFrom && (record.delivery_date || "") < filters.dateFrom) {
+        return false;
+      }
+
+      if (filters.dateTo && (record.delivery_date || "") > filters.dateTo) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [filters, records]);
+
+  const historySummary = useMemo(() => {
+    const supplierCount = new Set(
+      filteredRecords
+        .map((record) => record.supplier?.trim())
+        .filter((supplier): supplier is string => Boolean(supplier))
+    ).size;
+
+    const totalAmount = filteredRecords.reduce((sum, record) => sum + Number(record.amount || 0), 0);
+
+    return {
+      recordCount: filteredRecords.length,
+      supplierCount,
+      totalAmount,
+    };
+  }, [filteredRecords]);
 
   useEffect(() => {
     void loadData();
@@ -234,6 +301,17 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
       custom_item_name: "",
       unit: selectedMaterial?.unit || "",
     }));
+  }
+
+  function clearFilters() {
+    setFilters({
+      scopeId: "all",
+      supplier: "all",
+      material: "",
+      receipt: "",
+      dateFrom: "",
+      dateTo: "",
+    });
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -530,44 +608,176 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
         ) : records.length === 0 ? (
           <div className="py-8 text-center text-muted-foreground">No purchase or delivery records yet</div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Receipt No.</TableHead>
-                <TableHead>Scope</TableHead>
-                <TableHead>Material</TableHead>
-                <TableHead>Quantity</TableHead>
-                <TableHead>Supplier</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Notes</TableHead>
-                <TableHead className="w-[80px] text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {records.map((record) => (
-                <TableRow key={record.id}>
-                  <TableCell>{record.delivery_date ? new Date(record.delivery_date).toLocaleDateString() : "—"}</TableCell>
-                  <TableCell>{record.transaction_type === "site_purchase" ? "Site Purchase" : "Delivery"}</TableCell>
-                  <TableCell>{record.receipt_number || "—"}</TableCell>
-                  <TableCell>{getScopeName(record)}</TableCell>
-                  <TableCell className="font-medium">{record.item_name}</TableCell>
-                  <TableCell>
-                    {record.quantity || 0} {record.unit || ""}
-                  </TableCell>
-                  <TableCell>{record.supplier || "—"}</TableCell>
-                  <TableCell>{formatCurrency(record.transaction_type === "site_purchase" ? record.amount : null)}</TableCell>
-                  <TableCell className="max-w-[220px] truncate text-sm text-muted-foreground">{record.notes || "—"}</TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" onClick={() => void handleDelete(record.id)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <div className="space-y-4">
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-foreground">Purchase History</p>
+                  <p className="text-xs text-muted-foreground">
+                    Review saved site purchases by material, supplier, receipt number, scope, and date range.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2 text-xs"
+                  onClick={clearFilters}
+                >
+                  Clear filters
+                </Button>
+              </div>
+
+              <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <div className="space-y-1">
+                  <Label htmlFor="history-material" className="text-[11px]">
+                    Material
+                  </Label>
+                  <Input
+                    id="history-material"
+                    className="h-8 text-xs"
+                    value={filters.material}
+                    onChange={(event) => setFilters((current) => ({ ...current, material: event.target.value }))}
+                    placeholder="Search material"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="history-scope" className="text-[11px]">
+                    Scope
+                  </Label>
+                  <Select
+                    value={filters.scopeId}
+                    onValueChange={(value) => setFilters((current) => ({ ...current, scopeId: value }))}
+                  >
+                    <SelectTrigger id="history-scope" className="h-8 text-xs">
+                      <SelectValue placeholder="All scopes" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All scopes</SelectItem>
+                      {scopes.map((scope) => (
+                        <SelectItem key={scope.id} value={scope.id}>
+                          {scope.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="history-supplier" className="text-[11px]">
+                    Supplier
+                  </Label>
+                  <Select
+                    value={filters.supplier}
+                    onValueChange={(value) => setFilters((current) => ({ ...current, supplier: value }))}
+                  >
+                    <SelectTrigger id="history-supplier" className="h-8 text-xs">
+                      <SelectValue placeholder="All suppliers" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All suppliers</SelectItem>
+                      {supplierOptions.map((supplier) => (
+                        <SelectItem key={supplier} value={supplier}>
+                          {supplier}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="history-receipt" className="text-[11px]">
+                    Receipt Number
+                  </Label>
+                  <Input
+                    id="history-receipt"
+                    className="h-8 text-xs"
+                    value={filters.receipt}
+                    onChange={(event) => setFilters((current) => ({ ...current, receipt: event.target.value }))}
+                    placeholder="Search receipt"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="history-date-from" className="text-[11px]">
+                    Date From
+                  </Label>
+                  <Input
+                    id="history-date-from"
+                    type="date"
+                    className="h-8 text-xs"
+                    value={filters.dateFrom}
+                    onChange={(event) => setFilters((current) => ({ ...current, dateFrom: event.target.value }))}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="history-date-to" className="text-[11px]">
+                    Date To
+                  </Label>
+                  <Input
+                    id="history-date-to"
+                    type="date"
+                    className="h-8 text-xs"
+                    value={filters.dateTo}
+                    onChange={(event) => setFilters((current) => ({ ...current, dateTo: event.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
+                <span>{historySummary.recordCount} records</span>
+                <span>{historySummary.supplierCount} suppliers</span>
+                <span>Total purchase value: {formatCurrency(historySummary.totalAmount)}</span>
+              </div>
+            </div>
+
+            {filteredRecords.length === 0 ? (
+              <div className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
+                No purchase records match the current filters.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Receipt No.</TableHead>
+                    <TableHead>Scope</TableHead>
+                    <TableHead>Material</TableHead>
+                    <TableHead>Quantity</TableHead>
+                    <TableHead>Supplier</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Notes</TableHead>
+                    <TableHead className="w-[80px] text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredRecords.map((record) => (
+                    <TableRow key={record.id}>
+                      <TableCell>{record.delivery_date ? new Date(record.delivery_date).toLocaleDateString() : "—"}</TableCell>
+                      <TableCell>{record.transaction_type === "site_purchase" ? "Site Purchase" : "Delivery"}</TableCell>
+                      <TableCell>{record.receipt_number || "—"}</TableCell>
+                      <TableCell>{getScopeName(record)}</TableCell>
+                      <TableCell className="font-medium">{record.item_name}</TableCell>
+                      <TableCell>
+                        {record.quantity || 0} {record.unit || ""}
+                      </TableCell>
+                      <TableCell>{record.supplier || "—"}</TableCell>
+                      <TableCell>{formatCurrency(record.transaction_type === "site_purchase" ? record.amount : null)}</TableCell>
+                      <TableCell className="max-w-[220px] truncate text-sm text-muted-foreground">{record.notes || "—"}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" onClick={() => void handleDelete(record.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>
