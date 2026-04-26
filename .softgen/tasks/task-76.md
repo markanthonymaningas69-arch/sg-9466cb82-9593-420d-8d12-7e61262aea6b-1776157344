@@ -24,6 +24,7 @@ Update the Site Personnel surface by renaming the Deliveries module to Purchase 
 - [x] Add a receipt number input and persist it with Site Purchase records
 - [x] Add an Others option to Select Material and show a manual input when selected
 - [x] Allow direct manual material entry when the needed material is not present in the list
+- [ ] Restore the material field to a dropdown and keep an Others option with manual input
 
 ## Acceptance
 The Site Personnel module shows Purchase & Deliveries instead of Deliveries.
