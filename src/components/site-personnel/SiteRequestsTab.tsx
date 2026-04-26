@@ -65,9 +65,6 @@ function getDefaultFormData() {
     custom_item_name: "",
     quantity: "",
     unit: "",
-    supplier: "",
-    receipt_number: "",
-    requested_by: "",
     request_date: new Date().toISOString().split("T")[0],
     notes: "",
   };
@@ -292,12 +289,12 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
         item_name: formData.item_name,
         quantity: Number(formData.quantity),
         unit: formData.unit,
-        requested_by: formData.requested_by,
+        requested_by: "Site Personnel",
         request_date: formData.request_date,
         status: "pending",
         notes: formData.notes || null,
-        supplier: formData.request_type === "Materials" ? formData.supplier || null : null,
-        receipt_number: formData.request_type === "Materials" ? formData.receipt_number || null : null,
+        supplier: null,
+        receipt_number: null,
       };
 
       if (formData.request_type === "Materials" && formData.bom_scope_id) {
@@ -514,34 +511,6 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
                       )}
                     </div>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label htmlFor="supplier" className="text-[11px]">
-                        Supplier
-                      </Label>
-                      <Input
-                        id="supplier"
-                        className="h-8 text-xs"
-                        value={formData.supplier}
-                        onChange={(event) => setFormData((current) => ({ ...current, supplier: event.target.value }))}
-                        placeholder="Enter supplier name"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label htmlFor="receipt_number" className="text-[11px]">
-                        Receipt Number
-                      </Label>
-                      <Input
-                        id="receipt_number"
-                        className="h-8 text-xs"
-                        value={formData.receipt_number}
-                        onChange={(event) => setFormData((current) => ({ ...current, receipt_number: event.target.value }))}
-                        placeholder="Enter receipt no."
-                      />
-                    </div>
-                  </div>
                 </>
               ) : (
                 <div className="space-y-1">
@@ -596,33 +565,18 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
                 </div>
               ) : null}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label htmlFor="request_date" className="text-[11px]">
-                    Request Date
-                  </Label>
-                  <Input
-                    id="request_date"
-                    type="date"
-                    className="h-8 text-xs"
-                    value={formData.request_date}
-                    onChange={(event) => setFormData((current) => ({ ...current, request_date: event.target.value }))}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <Label htmlFor="requested_by" className="text-[11px]">
-                    Requested By
-                  </Label>
-                  <Input
-                    id="requested_by"
-                    className="h-8 text-xs"
-                    value={formData.requested_by}
-                    onChange={(event) => setFormData((current) => ({ ...current, requested_by: event.target.value }))}
-                    required
-                  />
-                </div>
+              <div className="space-y-1">
+                <Label htmlFor="request_date" className="text-[11px]">
+                  Request Date
+                </Label>
+                <Input
+                  id="request_date"
+                  type="date"
+                  className="h-8 text-xs"
+                  value={formData.request_date}
+                  onChange={(event) => setFormData((current) => ({ ...current, request_date: event.target.value }))}
+                  required
+                />
               </div>
 
               <div className="space-y-1">
