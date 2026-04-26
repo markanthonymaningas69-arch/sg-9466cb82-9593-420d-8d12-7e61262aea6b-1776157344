@@ -1,6 +1,6 @@
 ---
 title: Site warehouse balance display
-status: todo
+status: done
 priority: high
 type: feature
 tags: [site-warehouse, ui, reconciliation, inventory]
@@ -13,10 +13,10 @@ position: 80
 Update the Site Warehouse interface so it displays linked material balance information sourced from Site Purchase & Deliveries and Usage. Include total restock material, total usage, remaining materials, and missing/excess materials in a user-readable layout.
 
 ## Checklist
-- [ ] Update the Site Warehouse tab UI to show total restock, total usage, remaining materials, and missing/excess values
-- [ ] Keep material naming and units aligned with the linked purchase and usage records
-- [ ] Preserve existing warehouse interactions while adding the new linked balance information
-- [ ] Validate the updated Site Warehouse presentation in the running app
+- [x] Update the Site Warehouse tab UI to show total restock, total usage, remaining materials, and missing/excess values
+- [x] Keep material naming and units aligned with the linked purchase and usage records
+- [x] Preserve existing warehouse interactions while adding the new linked balance information
+- [x] Validate the updated Site Warehouse presentation in the running app
 
 ## Acceptance
 The Site Warehouse tab shows total restock and total usage for each tracked material.

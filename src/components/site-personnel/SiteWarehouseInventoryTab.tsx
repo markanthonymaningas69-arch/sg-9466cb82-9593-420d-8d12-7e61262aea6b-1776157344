@@ -1,56 +1,53 @@
 import { useEffect, useMemo, useState } from "react";
-import { Archive, AlertTriangle, Pencil, Plus, Warehouse as WarehouseIcon } from "lucide-react";
-import type { Database } from "@/integrations/supabase/types";
+import { AlertTriangle, ClipboardCheck, PackageSearch, Save, Warehouse as WarehouseIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { warehouseService } from "@/services/warehouseService";
+import { siteService, type WarehouseMaterialLedgerItem } from "@/services/siteService";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-
-type WarehouseItem = Database["public"]["Tables"]["inventory"]["Row"];
 
 interface SiteWarehouseInventoryTabProps {
   projectId: string;
 }
 
-interface WarehouseFormState {
-  name: string;
-  category: string;
-  quantity: string;
-  unit: string;
-  unitCost: string;
-  reorderLevel: string;
-  lastRestocked: string;
+const quantityFormatter = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+});
+
+function formatQuantity(value: number) {
+  return quantityFormatter.format(value);
 }
 
-const initialFormState = (): WarehouseFormState => ({
-  name: "",
-  category: "",
-  quantity: "",
-  unit: "",
-  unitCost: "",
-  reorderLevel: "",
-  lastRestocked: new Date().toISOString().split("T")[0],
-});
+function getTodayDate() {
+  return new Date().toISOString().split("T")[0];
+}
 
-const currencyFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "AED",
-  minimumFractionDigits: 2,
-});
+function getStatusBadge(status: WarehouseMaterialLedgerItem["varianceStatus"]) {
+  if (status === "balanced") {
+    return { label: "Balanced", className: "border-emerald-300 text-emerald-700" };
+  }
+
+  if (status === "missing") {
+    return { label: "Missing", className: "border-amber-300 text-amber-700" };
+  }
+
+  if (status === "excess") {
+    return { label: "Excess", className: "border-sky-300 text-sky-700" };
+  }
+
+  return { label: "Needs Count", className: "border-slate-300 text-slate-700" };
+}
 
 export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryTabProps) {
   const { toast } = useToast();
-  const [items, setItems] = useState<WarehouseItem[]>([]);
+  const [items, setItems] = useState<WarehouseMaterialLedgerItem[]>([]);
+  const [remainingInputs, setRemainingInputs] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<WarehouseItem | null>(null);
-  const [formData, setFormData] = useState<WarehouseFormState>(initialFormState);
+  const [savingKey, setSavingKey] = useState<string | null>(null);
 
   useEffect(() => {
     void loadItems();
@@ -59,23 +56,24 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
   async function loadItems() {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("inventory")
-        .select("*")
-        .eq("project_id", projectId)
-        .eq("is_archived", false)
-        .order("created_at", { ascending: false });
+      const { data, error } = await siteService.getWarehouseMaterialLedger(projectId);
 
       if (error) {
         throw error;
       }
 
-      setItems(data || []);
+      const nextItems = data || [];
+      setItems(nextItems);
+      setRemainingInputs(
+        Object.fromEntries(
+          nextItems.map((item) => [item.key, item.recordedRemaining === null ? "" : String(item.recordedRemaining)])
+        )
+      );
     } catch (error) {
-      console.error("Error loading site warehouse items:", error);
+      console.error("Error loading linked site warehouse ledger:", error);
       toast({
         title: "Error",
-        description: "Failed to load site warehouse items.",
+        description: "Failed to load linked site warehouse data.",
         variant: "destructive",
       });
     } finally {
@@ -83,295 +81,215 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
     }
   }
 
-  function resetForm() {
-    setEditingItem(null);
-    setFormData(initialFormState());
-  }
+  async function handleSaveRemaining(item: WarehouseMaterialLedgerItem) {
+    const rawValue = remainingInputs[item.key];
 
-  function handleEdit(item: WarehouseItem) {
-    setEditingItem(item);
-    setFormData({
-      name: item.name,
-      category: item.category || "",
-      quantity: String(item.quantity || 0),
-      unit: item.unit,
-      unitCost: String(item.unit_cost || 0),
-      reorderLevel: String(item.reorder_level || 0),
-      lastRestocked: item.last_restocked || new Date().toISOString().split("T")[0],
-    });
-    setDialogOpen(true);
-  }
-
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
-
-    const payload = {
-      name: formData.name.trim(),
-      category: formData.category.trim() || null,
-      quantity: Number(formData.quantity) || 0,
-      unit: formData.unit.trim(),
-      unit_cost: Number(formData.unitCost) || 0,
-      reorder_level: Number(formData.reorderLevel) || 0,
-      last_restocked: formData.lastRestocked,
-      project_id: projectId,
-    };
-
-    if (!payload.name || !payload.unit) {
+    if (rawValue === "" || Number.isNaN(Number(rawValue))) {
       toast({
-        title: "Required fields missing",
-        description: "Item name and unit are required.",
+        title: "Remaining materials required",
+        description: "Enter a valid remaining quantity before saving.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!item.unit.trim()) {
+      toast({
+        title: "Unit missing",
+        description: "This material needs a unit before remaining quantity can be saved.",
         variant: "destructive",
       });
       return;
     }
 
     try {
-      const result = editingItem
-        ? await warehouseService.update(editingItem.id, payload)
-        : await warehouseService.create(payload);
+      setSavingKey(item.key);
 
-      if (result.error) {
-        throw result.error;
+      const payload = {
+        project_id: projectId,
+        name: item.name,
+        category: item.category || "Construction Materials",
+        quantity: Number(rawValue),
+        unit: item.unit,
+        unit_cost: 0,
+        reorder_level: 0,
+        last_restocked: item.lastRestocked || getTodayDate(),
+      };
+
+      const query = item.inventoryId
+        ? supabase.from("inventory").update(payload).eq("id", item.inventoryId).select().single()
+        : supabase.from("inventory").insert(payload).select().single();
+
+      const { error } = await query;
+
+      if (error) {
+        throw error;
       }
 
       toast({
-        title: editingItem ? "Item updated" : "Item added",
-        description: editingItem
-          ? "Site warehouse item has been updated."
-          : "New site warehouse item has been added.",
+        title: "Remaining materials saved",
+        description: `${item.name} has been updated in Site Warehouse.`,
       });
 
-      setDialogOpen(false);
-      resetForm();
-      void loadItems();
+      await loadItems();
     } catch (error) {
-      console.error("Error saving site warehouse item:", error);
+      console.error("Error saving remaining materials:", error);
       toast({
         title: "Error",
-        description: "Failed to save site warehouse item.",
+        description: "Failed to save remaining materials.",
         variant: "destructive",
       });
-    }
-  }
-
-  async function handleArchive(id: string) {
-    if (!confirm("Archive this site warehouse item?")) {
-      return;
-    }
-
-    try {
-      const result = await warehouseService.delete(id);
-      if (result.error) {
-        throw result.error;
-      }
-
-      toast({
-        title: "Item archived",
-        description: "The site warehouse item has been archived.",
-      });
-      void loadItems();
-    } catch (error) {
-      console.error("Error archiving site warehouse item:", error);
-      toast({
-        title: "Error",
-        description: "Failed to archive site warehouse item.",
-        variant: "destructive",
-      });
+    } finally {
+      setSavingKey(null);
     }
   }
 
   const totals = useMemo(() => {
-    const lowStock = items.filter((item) => item.quantity <= (item.reorder_level || 0)).length;
-    const inventoryValue = items.reduce((sum, item) => sum + item.quantity * item.unit_cost, 0);
-
     return {
-      count: items.length,
-      lowStock,
-      inventoryValue,
+      materialCount: items.length,
+      counted: items.filter((item) => item.recordedRemaining !== null).length,
+      issues: items.filter((item) => item.varianceStatus === "missing" || item.varianceStatus === "excess").length,
+      needsCount: items.filter((item) => item.varianceStatus === "uncounted").length,
     };
   }, [items]);
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Tracked Items</CardTitle>
+            <CardTitle className="text-sm font-medium">Tracked Materials</CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-semibold">{totals.count}</CardContent>
+          <CardContent className="text-2xl font-semibold">{totals.materialCount}</CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Low Stock Alerts</CardTitle>
+            <CardTitle className="text-sm font-medium">Counted Remaining</CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-semibold">{totals.lowStock}</CardContent>
+          <CardContent className="text-2xl font-semibold">{totals.counted}</CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Inventory Value</CardTitle>
+            <CardTitle className="text-sm font-medium">Missing / Excess</CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-semibold">{currencyFormatter.format(totals.inventoryValue)}</CardContent>
+          <CardContent className="text-2xl font-semibold">{totals.issues}</CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Need Remaining Input</CardTitle>
+          </CardHeader>
+          <CardContent className="text-2xl font-semibold">{totals.needsCount}</CardContent>
         </Card>
       </div>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-4">
+        <CardHeader className="space-y-2">
           <CardTitle className="flex items-center gap-2">
             <WarehouseIcon className="h-5 w-5" />
             Site Warehouse
           </CardTitle>
-
-          <Dialog
-            open={dialogOpen}
-            onOpenChange={(open) => {
-              setDialogOpen(open);
-              if (!open) {
-                resetForm();
-              }
-            }}
-          >
-            <DialogTrigger asChild>
-              <Button size="sm" onClick={resetForm}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Item
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{editingItem ? "Edit Site Warehouse Item" : "Add Site Warehouse Item"}</DialogTitle>
-              </DialogHeader>
-
-              <form className="space-y-4" onSubmit={handleSubmit}>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="site-warehouse-name">Item Name</Label>
-                    <Input
-                      id="site-warehouse-name"
-                      value={formData.name}
-                      onChange={(event) => setFormData((current) => ({ ...current, name: event.target.value }))}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="site-warehouse-category">Category</Label>
-                    <Input
-                      id="site-warehouse-category"
-                      value={formData.category}
-                      onChange={(event) => setFormData((current) => ({ ...current, category: event.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="site-warehouse-quantity">Quantity</Label>
-                    <Input
-                      id="site-warehouse-quantity"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={formData.quantity}
-                      onChange={(event) => setFormData((current) => ({ ...current, quantity: event.target.value }))}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="site-warehouse-unit">Unit</Label>
-                    <Input
-                      id="site-warehouse-unit"
-                      value={formData.unit}
-                      onChange={(event) => setFormData((current) => ({ ...current, unit: event.target.value }))}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="site-warehouse-unit-cost">Unit Cost</Label>
-                    <Input
-                      id="site-warehouse-unit-cost"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={formData.unitCost}
-                      onChange={(event) => setFormData((current) => ({ ...current, unitCost: event.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="site-warehouse-reorder-level">Reorder Level</Label>
-                    <Input
-                      id="site-warehouse-reorder-level"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={formData.reorderLevel}
-                      onChange={(event) => setFormData((current) => ({ ...current, reorderLevel: event.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-2 sm:col-span-2">
-                    <Label htmlFor="site-warehouse-last-restocked">Last Restocked</Label>
-                    <Input
-                      id="site-warehouse-last-restocked"
-                      type="date"
-                      value={formData.lastRestocked}
-                      onChange={(event) => setFormData((current) => ({ ...current, lastRestocked: event.target.value }))}
-                    />
-                  </div>
-                </div>
-
-                <Button className="w-full" type="submit">
-                  {editingItem ? "Save Changes" : "Add Item"}
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <p className="text-sm text-muted-foreground">
+            Linked from Site Purchase & Deliveries and Usage. Enter the actual remaining materials to see missing or excess quantities.
+          </p>
         </CardHeader>
 
         <CardContent>
           {loading ? (
-            <div className="py-8 text-center text-muted-foreground">Loading site warehouse items...</div>
+            <div className="py-8 text-center text-muted-foreground">Loading site warehouse balances...</div>
           ) : items.length === 0 ? (
-            <div className="py-8 text-center text-muted-foreground">No site warehouse items recorded for this project yet.</div>
+            <div className="flex flex-col items-center gap-3 py-10 text-center text-muted-foreground">
+              <PackageSearch className="h-9 w-9" />
+              <div>
+                <p className="font-medium text-foreground">No linked material activity yet.</p>
+                <p className="text-sm">Add Site Purchase records or Usage records to populate the warehouse ledger.</p>
+              </div>
+            </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Item</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Quantity</TableHead>
+                  <TableHead>Material</TableHead>
+                  <TableHead>Scope</TableHead>
+                  <TableHead>Total Restock</TableHead>
+                  <TableHead>Total Usage</TableHead>
+                  <TableHead>Expected Remaining</TableHead>
+                  <TableHead>Remaining Materials</TableHead>
+                  <TableHead>Missing / Excess</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Last Restocked</TableHead>
-                  <TableHead className="text-right">Value</TableHead>
-                  <TableHead className="w-[90px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {items.map((item) => {
-                  const isLowStock = item.quantity <= (item.reorder_level || 0);
+                  const badge = getStatusBadge(item.varianceStatus);
 
                   return (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-medium">{item.name}</TableCell>
-                      <TableCell>{item.category || "-"}</TableCell>
-                      <TableCell>
-                        {item.quantity} {item.unit}
+                    <TableRow key={item.key}>
+                      <TableCell className="font-medium">
+                        <div className="space-y-1">
+                          <div>{item.name}</div>
+                          <div className="text-xs text-muted-foreground">{item.unit || "No unit"}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {item.scopeNames.length > 0 ? item.scopeNames.join(", ") : "—"}
                       </TableCell>
                       <TableCell>
-                        {isLowStock ? (
-                          <Badge variant="outline" className="gap-1 text-amber-700">
-                            <AlertTriangle className="h-3.5 w-3.5" />
-                            Low Stock
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline">Available</Badge>
-                        )}
+                        {formatQuantity(item.totalRestock)} {item.unit}
                       </TableCell>
-                      <TableCell>{item.last_restocked || "-"}</TableCell>
-                      <TableCell className="text-right">{currencyFormatter.format(item.quantity * item.unit_cost)}</TableCell>
                       <TableCell>
-                        <div className="flex justify-end gap-1">
-                          <Button size="icon" variant="ghost" onClick={() => handleEdit(item)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" onClick={() => void handleArchive(item.id)}>
-                            <Archive className="h-4 w-4 text-destructive" />
+                        {formatQuantity(item.totalUsage)} {item.unit}
+                      </TableCell>
+                      <TableCell>
+                        {formatQuantity(item.expectedRemaining)} {item.unit}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex min-w-[180px] items-center gap-2">
+                          <Input
+                            className="h-8 text-xs"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={remainingInputs[item.key] ?? ""}
+                            onChange={(event) =>
+                              setRemainingInputs((current) => ({
+                                ...current,
+                                [item.key]: event.target.value,
+                              }))
+                            }
+                            placeholder="Enter remaining"
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-2 text-xs"
+                            onClick={() => void handleSaveRemaining(item)}
+                            disabled={savingKey === item.key}
+                          >
+                            <Save className="mr-1 h-3.5 w-3.5" />
+                            Save
                           </Button>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {item.missingExcess === null ? (
+                          <span className="text-xs text-muted-foreground">Awaiting remaining input</span>
+                        ) : item.missingExcess === 0 ? (
+                          <span className="inline-flex items-center gap-1 text-emerald-700">
+                            <ClipboardCheck className="h-3.5 w-3.5" />
+                            0 {item.unit}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-amber-700">
+                            <AlertTriangle className="h-3.5 w-3.5" />
+                            {formatQuantity(item.missingExcess)} {item.unit}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={badge.className}>
+                          {badge.label}
+                        </Badge>
                       </TableCell>
                     </TableRow>
                   );

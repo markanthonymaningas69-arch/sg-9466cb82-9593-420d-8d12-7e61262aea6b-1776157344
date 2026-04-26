@@ -10,6 +10,36 @@ type ScopeOfWorkInsert = Database["public"]["Tables"]["bom_scope_of_work"]["Inse
 type ProgressUpdate = Database["public"]["Tables"]["bom_progress_updates"]["Row"];
 type ProgressUpdateInsert = Database["public"]["Tables"]["bom_progress_updates"]["Insert"];
 
+export interface WarehouseMaterialLedgerItem {
+  key: string;
+  inventoryId: string | null;
+  name: string;
+  unit: string;
+  scopeNames: string[];
+  category: string | null;
+  lastRestocked: string | null;
+  totalRestock: number;
+  totalUsage: number;
+  expectedRemaining: number;
+  recordedRemaining: number | null;
+  missingExcess: number | null;
+  varianceStatus: "balanced" | "missing" | "excess" | "uncounted";
+}
+
+function getRelatedScopeName(
+  relation: { name?: string | null } | Array<{ name?: string | null }> | null | undefined
+) {
+  if (Array.isArray(relation)) {
+    return relation[0]?.name || null;
+  }
+
+  return relation?.name || null;
+}
+
+function buildWarehouseLedgerKey(itemName: string, unit: string) {
+  return [itemName.trim().toLowerCase(), unit.trim().toLowerCase()].join("__");
+}
+
 async function resolveInventoryCategory(itemName: string) {
   const { data } = await supabase
     .from("master_items")
@@ -326,6 +356,140 @@ export const siteService = {
     }
     
     return { error };
+  },
+
+  async getWarehouseMaterialLedger(projectId: string) {
+    const [deliveriesResult, usageResult, inventoryResult] = await Promise.all([
+      supabase
+        .from("deliveries")
+        .select("id, item_name, quantity, unit, delivery_date, transaction_type, bom_scope_of_work(name)")
+        .eq("project_id", projectId)
+        .eq("is_archived", false),
+      supabase
+        .from("material_consumption")
+        .select("id, item_name, quantity, unit, date_used, bom_scope_of_work(name)")
+        .eq("project_id", projectId)
+        .eq("is_archived", false),
+      supabase
+        .from("inventory")
+        .select("id, name, category, quantity, unit, last_restocked")
+        .eq("project_id", projectId)
+        .eq("is_archived", false),
+    ]);
+
+    if (deliveriesResult.error) {
+      return { data: [], error: deliveriesResult.error };
+    }
+
+    if (usageResult.error) {
+      return { data: [], error: usageResult.error };
+    }
+
+    if (inventoryResult.error) {
+      return { data: [], error: inventoryResult.error };
+    }
+
+    const ledger = new Map<string, WarehouseMaterialLedgerItem>();
+
+    const getOrCreateItem = (itemName: string, unit: string) => {
+      const normalizedName = itemName.trim();
+      const normalizedUnit = unit.trim();
+      const key = buildWarehouseLedgerKey(normalizedName, normalizedUnit);
+
+      if (!ledger.has(key)) {
+        ledger.set(key, {
+          key,
+          inventoryId: null,
+          name: normalizedName,
+          unit: normalizedUnit,
+          scopeNames: [],
+          category: null,
+          lastRestocked: null,
+          totalRestock: 0,
+          totalUsage: 0,
+          expectedRemaining: 0,
+          recordedRemaining: null,
+          missingExcess: null,
+          varianceStatus: "uncounted",
+        });
+      }
+
+      return ledger.get(key)!;
+    };
+
+    for (const record of deliveriesResult.data || []) {
+      if (!record.item_name) {
+        continue;
+      }
+
+      const item = getOrCreateItem(record.item_name, record.unit || "");
+      item.totalRestock += Number(record.quantity || 0);
+
+      const scopeName = getRelatedScopeName(record.bom_scope_of_work);
+      if (scopeName && !item.scopeNames.includes(scopeName)) {
+        item.scopeNames.push(scopeName);
+      }
+
+      if (record.delivery_date && (!item.lastRestocked || record.delivery_date > item.lastRestocked)) {
+        item.lastRestocked = record.delivery_date;
+      }
+    }
+
+    for (const record of usageResult.data || []) {
+      if (!record.item_name) {
+        continue;
+      }
+
+      const item = getOrCreateItem(record.item_name, record.unit || "");
+      item.totalUsage += Number(record.quantity || 0);
+
+      const scopeName = getRelatedScopeName(record.bom_scope_of_work);
+      if (scopeName && !item.scopeNames.includes(scopeName)) {
+        item.scopeNames.push(scopeName);
+      }
+    }
+
+    for (const record of inventoryResult.data || []) {
+      if (!record.name) {
+        continue;
+      }
+
+      const item = getOrCreateItem(record.name, record.unit || "");
+      item.inventoryId = record.id;
+      item.category = record.category || item.category;
+      item.lastRestocked = record.last_restocked || item.lastRestocked;
+      item.recordedRemaining = Number(record.quantity || 0);
+    }
+
+    const data = Array.from(ledger.values())
+      .map((item) => {
+        const expectedRemaining = item.totalRestock - item.totalUsage;
+
+        if (item.recordedRemaining === null) {
+          return {
+            ...item,
+            scopeNames: [...item.scopeNames].sort((a, b) => a.localeCompare(b)),
+            expectedRemaining,
+            missingExcess: null,
+            varianceStatus: "uncounted" as const,
+          };
+        }
+
+        const rawVariance = Number((item.recordedRemaining - expectedRemaining).toFixed(2));
+        const varianceStatus =
+          rawVariance === 0 ? "balanced" : rawVariance > 0 ? "excess" : "missing";
+
+        return {
+          ...item,
+          scopeNames: [...item.scopeNames].sort((a, b) => a.localeCompare(b)),
+          expectedRemaining,
+          missingExcess: Math.abs(rawVariance),
+          varianceStatus,
+        };
+      })
+      .sort((left, right) => left.name.localeCompare(right.name));
+
+    return { data, error: null };
   },
 
   async getBomMaterials(projectId: string) {
