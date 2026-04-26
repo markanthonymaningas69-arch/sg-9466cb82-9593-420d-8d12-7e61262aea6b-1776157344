@@ -93,14 +93,10 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
   const [formData, setFormData] = useState<FormState>(defaultFormState);
 
   const amount = useMemo(() => {
-    if (formData.transaction_type !== "site_purchase") {
-      return 0;
-    }
-
     const quantity = Number(formData.quantity || 0);
     const unitCost = Number(formData.unit_cost || 0);
     return quantity * unitCost;
-  }, [formData.quantity, formData.transaction_type, formData.unit_cost]);
+  }, [formData.quantity, formData.unit_cost]);
 
   const filteredMaterials = useMemo(() => {
     if (!formData.bom_scope_id) {
@@ -162,14 +158,6 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
     });
   }
 
-  function handleTransactionChange(transactionType: TransactionType) {
-    setFormData((prev) => ({
-      ...prev,
-      transaction_type: transactionType,
-      unit_cost: transactionType === "site_purchase" ? prev.unit_cost : "",
-    }));
-  }
-
   function handleScopeChange(scopeId: string) {
     setFormData((prev) => ({
       ...prev,
@@ -196,7 +184,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
     try {
       await siteService.createDelivery({
         project_id: projectId,
-        transaction_type: formData.transaction_type,
+        transaction_type: "site_purchase",
         bom_scope_id: formData.bom_scope_id || null,
         item_name: formData.item_name,
         quantity: Number(formData.quantity),
@@ -206,13 +194,13 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
         received_by: null,
         notes: formData.notes || null,
         status: "pending",
-        unit_cost: formData.transaction_type === "site_purchase" ? Number(formData.unit_cost || 0) : null,
-        amount: formData.transaction_type === "site_purchase" ? amount : null,
+        unit_cost: Number(formData.unit_cost || 0),
+        amount,
       });
 
       toast({
         title: "Success",
-        description: formData.transaction_type === "site_purchase" ? "Site purchase recorded successfully" : "Delivery recorded successfully",
+        description: "Site purchase recorded successfully",
       });
 
       setDialogOpen(false);
@@ -269,29 +257,9 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
           </DialogTrigger>
           <DialogContent className="sm:max-w-xl">
             <DialogHeader>
-              <DialogTitle>Record Site Purchase or Delivery</DialogTitle>
+              <DialogTitle>Record Site Purchase</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label>Record Type</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    type="button"
-                    variant={formData.transaction_type === "site_purchase" ? "default" : "outline"}
-                    onClick={() => handleTransactionChange("site_purchase")}
-                  >
-                    Site Purchase
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={formData.transaction_type === "delivery" ? "default" : "outline"}
-                    onClick={() => handleTransactionChange("delivery")}
-                  >
-                    Delivery
-                  </Button>
-                </div>
-              </div>
-
               <div>
                 <Label htmlFor="scope">Select Scope</Label>
                 <Select value={formData.bom_scope_id} onValueChange={handleScopeChange}>
@@ -348,26 +316,24 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                 </div>
               </div>
 
-              {formData.transaction_type === "site_purchase" ? (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="unit_cost">Unit Cost</Label>
-                    <Input
-                      id="unit_cost"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={formData.unit_cost}
-                      onChange={(event) => setFormData((prev) => ({ ...prev, unit_cost: event.target.value }))}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="amount">Amount</Label>
-                    <Input id="amount" value={amount ? formatAmount(amount) : "0.00"} readOnly />
-                  </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="unit_cost">Unit Cost</Label>
+                  <Input
+                    id="unit_cost"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.unit_cost}
+                    onChange={(event) => setFormData((prev) => ({ ...prev, unit_cost: event.target.value }))}
+                    required
+                  />
                 </div>
-              ) : null}
+                <div>
+                  <Label htmlFor="amount">Amount</Label>
+                  <Input id="amount" value={amount ? formatAmount(amount) : "0.00"} readOnly />
+                </div>
+              </div>
 
               <div>
                 <Label htmlFor="supplier">Supplier</Label>
@@ -380,9 +346,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
               </div>
 
               <div>
-                <Label htmlFor="delivery_date">
-                  {formData.transaction_type === "site_purchase" ? "Purchase Date" : "Delivery Date"}
-                </Label>
+                <Label htmlFor="delivery_date">Purchase Date</Label>
                 <Input
                   id="delivery_date"
                   type="date"
