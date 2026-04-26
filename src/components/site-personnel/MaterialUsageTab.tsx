@@ -564,36 +564,38 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
                 No usage records match the current filters.
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Usage Date</TableHead>
-                    <TableHead>Scope of Works</TableHead>
-                    <TableHead>Material Name</TableHead>
-                    <TableHead>Quantity Used</TableHead>
-                    <TableHead>Unit</TableHead>
-                    <TableHead>Notes</TableHead>
-                    <TableHead className="w-[80px]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredUsageRecords.map((record) => (
-                    <TableRow key={record.id}>
-                      <TableCell>{new Date(record.date_used).toLocaleDateString()}</TableCell>
-                      <TableCell>{getScopeLabel(record)}</TableCell>
-                      <TableCell className="font-medium">{record.item_name}</TableCell>
-                      <TableCell>{record.quantity}</TableCell>
-                      <TableCell>{record.unit}</TableCell>
-                      <TableCell className="max-w-[220px] truncate text-sm text-muted-foreground">{record.notes || "—"}</TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="icon" onClick={() => void handleDelete(record.id)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </TableCell>
+              <div className="max-h-[420px] overflow-auto rounded-md border text-xs [&_td]:py-2 [&_th]:py-2 [&_th]:text-[11px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Usage Date</TableHead>
+                      <TableHead>Scope of Works</TableHead>
+                      <TableHead>Material Name</TableHead>
+                      <TableHead>Quantity Used</TableHead>
+                      <TableHead>Unit</TableHead>
+                      <TableHead>Notes</TableHead>
+                      <TableHead className="w-[80px]">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredUsageRecords.map((record) => (
+                      <TableRow key={record.id}>
+                        <TableCell>{new Date(record.date_used).toLocaleDateString()}</TableCell>
+                        <TableCell>{getScopeLabel(record)}</TableCell>
+                        <TableCell className="font-medium">{record.item_name}</TableCell>
+                        <TableCell>{record.quantity}</TableCell>
+                        <TableCell>{record.unit}</TableCell>
+                        <TableCell className="max-w-[220px] truncate text-xs text-muted-foreground">{record.notes || "—"}</TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="icon" onClick={() => void handleDelete(record.id)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </div>
         )}

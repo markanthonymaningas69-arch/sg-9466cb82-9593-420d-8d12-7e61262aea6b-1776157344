@@ -352,97 +352,99 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                   No warehouse materials match the current filters.
                 </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Material</TableHead>
-                      <TableHead>Scope</TableHead>
-                      <TableHead>Total Restock</TableHead>
-                      <TableHead>Total Usage</TableHead>
-                      <TableHead>Expected Remaining</TableHead>
-                      <TableHead>Remaining Materials</TableHead>
-                      <TableHead>Missing / Excess</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredItems.map((item) => {
-                      const badge = getStatusBadge(item.varianceStatus);
+                <div className="max-h-[420px] overflow-auto rounded-md border text-xs [&_td]:py-2 [&_th]:py-2 [&_th]:text-[11px]">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Material</TableHead>
+                        <TableHead>Scope</TableHead>
+                        <TableHead>Total Restock</TableHead>
+                        <TableHead>Total Usage</TableHead>
+                        <TableHead>Expected Remaining</TableHead>
+                        <TableHead>Remaining Materials</TableHead>
+                        <TableHead>Missing / Excess</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredItems.map((item) => {
+                        const badge = getStatusBadge(item.varianceStatus);
 
-                      return (
-                        <TableRow key={item.key}>
-                          <TableCell className="font-medium">
-                            <div className="space-y-1">
-                              <div>{item.name}</div>
-                              <div className="text-xs text-muted-foreground">{item.unit || "No unit"}</div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {item.scopeNames.length > 0 ? item.scopeNames.join(", ") : "—"}
-                          </TableCell>
-                          <TableCell>
-                            {formatQuantity(item.totalRestock)} {item.unit}
-                          </TableCell>
-                          <TableCell>
-                            {formatQuantity(item.totalUsage)} {item.unit}
-                          </TableCell>
-                          <TableCell>
-                            {formatQuantity(item.expectedRemaining)} {item.unit}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex min-w-[180px] items-center gap-2">
-                              <Input
-                                className="h-8 text-xs"
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={remainingInputs[item.key] ?? ""}
-                                onChange={(event) =>
-                                  setRemainingInputs((current) => ({
-                                    ...current,
-                                    [item.key]: event.target.value,
-                                  }))
-                                }
-                                placeholder="Enter remaining"
-                              />
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="h-8 px-2 text-xs"
-                                onClick={() => void handleSaveRemaining(item)}
-                                disabled={savingKey === item.key}
-                              >
-                                <Save className="mr-1 h-3.5 w-3.5" />
-                                Save
-                              </Button>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {item.missingExcess === null ? (
-                              <span className="text-xs text-muted-foreground">Awaiting remaining input</span>
-                            ) : item.missingExcess === 0 ? (
-                              <span className="inline-flex items-center gap-1 text-emerald-700">
-                                <ClipboardCheck className="h-3.5 w-3.5" />
-                                0 {item.unit}
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-amber-700">
-                                <AlertTriangle className="h-3.5 w-3.5" />
-                                {formatQuantity(item.missingExcess)} {item.unit}
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className={badge.className}>
-                              {badge.label}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                        return (
+                          <TableRow key={item.key}>
+                            <TableCell className="font-medium">
+                              <div className="space-y-1">
+                                <div>{item.name}</div>
+                                <div className="text-xs text-muted-foreground">{item.unit || "No unit"}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {item.scopeNames.length > 0 ? item.scopeNames.join(", ") : "—"}
+                            </TableCell>
+                            <TableCell>
+                              {formatQuantity(item.totalRestock)} {item.unit}
+                            </TableCell>
+                            <TableCell>
+                              {formatQuantity(item.totalUsage)} {item.unit}
+                            </TableCell>
+                            <TableCell>
+                              {formatQuantity(item.expectedRemaining)} {item.unit}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex min-w-[180px] items-center gap-2">
+                                <Input
+                                  className="h-8 text-xs"
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={remainingInputs[item.key] ?? ""}
+                                  onChange={(event) =>
+                                    setRemainingInputs((current) => ({
+                                      ...current,
+                                      [item.key]: event.target.value,
+                                    }))
+                                  }
+                                  placeholder="Enter remaining"
+                                />
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 px-2 text-xs"
+                                  onClick={() => void handleSaveRemaining(item)}
+                                  disabled={savingKey === item.key}
+                                >
+                                  <Save className="mr-1 h-3.5 w-3.5" />
+                                  Save
+                                </Button>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {item.missingExcess === null ? (
+                                <span className="text-xs text-muted-foreground">Awaiting remaining input</span>
+                              ) : item.missingExcess === 0 ? (
+                                <span className="inline-flex items-center gap-1 text-emerald-700">
+                                  <ClipboardCheck className="h-3.5 w-3.5" />
+                                  0 {item.unit}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-amber-700">
+                                  <AlertTriangle className="h-3.5 w-3.5" />
+                                  {formatQuantity(item.missingExcess)} {item.unit}
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={badge.className}>
+                                {badge.label}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </div>
           )}

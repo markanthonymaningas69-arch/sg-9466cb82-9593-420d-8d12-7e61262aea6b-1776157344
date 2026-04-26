@@ -1,6 +1,6 @@
 ---
 title: Site warehouse table density
-status: todo
+status: done
 priority: medium
 type: chore
 tags: [site-warehouse, table, ui]
@@ -13,10 +13,10 @@ position: 89
 Tighten the Site Warehouse list table so large datasets stay usable. Add a scrollable table region and reduce table font sizing without changing the current data points or actions.
 
 ## Checklist
-- [ ] Find the Site Warehouse list table
-- [ ] Add a constrained scrollable container around the list table
-- [ ] Reduce font sizing and row density for the Site Warehouse table
-- [ ] Keep the current columns and actions intact
+- [x] Find the Site Warehouse list table
+- [x] Add a constrained scrollable container around the list table
+- [x] Reduce font sizing and row density for the Site Warehouse table
+- [x] Keep the current columns and actions intact
 
 ## Acceptance
 The Site Warehouse list can scroll inside its table area.

@@ -1,6 +1,6 @@
 ---
 title: Site purchase table density
-status: in_progress
+status: done
 priority: medium
 type: chore
 tags: [site-purchase, table, ui]
@@ -13,10 +13,10 @@ position: 88
 Tighten the Site Purchase list table so large datasets stay usable. Add a scrollable table region and reduce table font sizing without changing the data structure or actions.
 
 ## Checklist
-- [ ] Find the Site Purchase list table in the warehouse flow
-- [ ] Add a constrained scrollable container around the list table
-- [ ] Reduce font sizing and row density for the Site Purchase table
-- [ ] Keep the current columns and actions intact
+- [x] Find the Site Purchase list table in the warehouse flow
+- [x] Add a constrained scrollable container around the list table
+- [x] Reduce font sizing and row density for the Site Purchase table
+- [x] Keep the current columns and actions intact
 
 ## Acceptance
 The Site Purchase list can scroll inside its table area.

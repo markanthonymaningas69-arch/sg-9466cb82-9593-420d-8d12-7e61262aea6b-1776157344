@@ -954,56 +954,58 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
               </div>
             ) : (
               <>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Receipt No.</TableHead>
-                      <TableHead>Scope</TableHead>
-                      <TableHead>Materials</TableHead>
-                      <TableHead>Supplier</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Notes</TableHead>
-                      <TableHead className="w-[112px] text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {groupedReceipts.map((group) => (
-                      <TableRow key={group.key}>
-                        <TableCell>{group.deliveryDate ? new Date(group.deliveryDate).toLocaleDateString() : "—"}</TableCell>
-                        <TableCell>{group.transactionType === "site_purchase" ? "Site Purchase" : "Delivery"}</TableCell>
-                        <TableCell>{group.receiptNumber || "—"}</TableCell>
-                        <TableCell>
-                          {Array.from(
-                            new Set(group.items.map((item) => getScopeName(item)).filter((scopeName) => scopeName !== "—"))
-                          ).join(", ") || "—"}
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-0.5">
-                            <p className="font-medium">{group.items.length} material{group.items.length > 1 ? "s" : ""}</p>
-                            <p className="max-w-[240px] truncate text-xs text-muted-foreground">
-                              {group.items.map((item) => item.item_name).join(", ")}
-                            </p>
-                          </div>
-                        </TableCell>
-                        <TableCell>{group.supplier || "—"}</TableCell>
-                        <TableCell>{formatCurrency(group.transactionType === "site_purchase" ? group.totalAmount : null)}</TableCell>
-                        <TableCell className="max-w-[220px] truncate text-sm text-muted-foreground">{group.notes || "—"}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button type="button" variant="ghost" size="icon" onClick={() => setSelectedReceiptGroup(group)}>
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button type="button" variant="ghost" size="icon" onClick={() => void handleDeleteGroup(group)}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
+                <div className="max-h-[420px] overflow-auto rounded-md border text-xs [&_td]:py-2 [&_th]:py-2 [&_th]:text-[11px]">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Receipt No.</TableHead>
+                        <TableHead>Scope</TableHead>
+                        <TableHead>Materials</TableHead>
+                        <TableHead>Supplier</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Notes</TableHead>
+                        <TableHead className="w-[112px] text-right">Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {groupedReceipts.map((group) => (
+                        <TableRow key={group.key}>
+                          <TableCell>{group.deliveryDate ? new Date(group.deliveryDate).toLocaleDateString() : "—"}</TableCell>
+                          <TableCell>{group.transactionType === "site_purchase" ? "Site Purchase" : "Delivery"}</TableCell>
+                          <TableCell>{group.receiptNumber || "—"}</TableCell>
+                          <TableCell>
+                            {Array.from(
+                              new Set(group.items.map((item) => getScopeName(item)).filter((scopeName) => scopeName !== "—"))
+                            ).join(", ") || "—"}
+                          </TableCell>
+                          <TableCell>
+                            <div className="space-y-0.5">
+                              <p className="font-medium">{group.items.length} material{group.items.length > 1 ? "s" : ""}</p>
+                              <p className="max-w-[240px] truncate text-xs text-muted-foreground">
+                                {group.items.map((item) => item.item_name).join(", ")}
+                              </p>
+                            </div>
+                          </TableCell>
+                          <TableCell>{group.supplier || "—"}</TableCell>
+                          <TableCell>{formatCurrency(group.transactionType === "site_purchase" ? group.totalAmount : null)}</TableCell>
+                          <TableCell className="max-w-[220px] truncate text-xs text-muted-foreground">{group.notes || "—"}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
+                              <Button type="button" variant="ghost" size="icon" onClick={() => setSelectedReceiptGroup(group)}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button type="button" variant="ghost" size="icon" onClick={() => void handleDeleteGroup(group)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
 
                 <Dialog open={Boolean(selectedReceiptGroup)} onOpenChange={(open) => (!open ? setSelectedReceiptGroup(null) : null)}>
                   <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
