@@ -55,6 +55,14 @@ interface FormState {
   custom_item_name: string;
 }
 
+interface PendingMaterialLine {
+  bom_scope_id: string;
+  item_name: string;
+  quantity: string;
+  unit: string;
+  unit_cost: string;
+}
+
 function getTodayDate() {
   return new Date().toISOString().split("T")[0];
 }
@@ -99,6 +107,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState<FormState>(defaultFormState);
+  const [pendingLines, setPendingLines] = useState<PendingMaterialLine[]>([]);
   const [isOtherMaterial, setIsOtherMaterial] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filters, setFilters] = useState({
@@ -267,6 +276,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
       ...defaultFormState,
       delivery_date: getTodayDate(),
     });
+    setPendingLines([]);
     setIsOtherMaterial(false);
   }
 
@@ -315,30 +325,103 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
     });
   }
 
+  function buildLinePayload(line: PendingMaterialLine | FormState) {
+    return {
+      project_id: projectId,
+      transaction_type: "site_purchase" as const,
+      bom_scope_id: line.bom_scope_id || null,
+      item_name: line.item_name,
+      quantity: Number(line.quantity),
+      unit: line.unit,
+      supplier: formData.supplier,
+      delivery_date: formData.delivery_date,
+      received_by: null,
+      notes: formData.notes || null,
+      status: "pending",
+      unit_cost: Number(line.unit_cost || 0),
+      amount: Number(line.quantity || 0) * Number(line.unit_cost || 0),
+      receipt_number: formData.receipt_number || null,
+    };
+  }
+
+  function resetMaterialFields() {
+    setFormData((prev) => ({
+      ...prev,
+      bom_scope_id: "",
+      item_name: "",
+      quantity: "",
+      unit: "",
+      unit_cost: "",
+      custom_item_name: "",
+    }));
+    setIsOtherMaterial(false);
+  }
+
+  function addCurrentLine() {
+    if (!formData.item_name || !formData.quantity || !formData.unit || !formData.unit_cost) {
+      toast({
+        title: "Incomplete material line",
+        description: "Complete the current material details before adding another material",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setPendingLines((current) => [
+      ...current,
+      {
+        bom_scope_id: formData.bom_scope_id,
+        item_name: formData.item_name,
+        quantity: formData.quantity,
+        unit: formData.unit,
+        unit_cost: formData.unit_cost,
+      },
+    ]);
+    resetMaterialFields();
+  }
+
+  function removePendingLine(index: number) {
+    setPendingLines((current) => current.filter((_, lineIndex) => lineIndex !== index));
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     try {
-      await siteService.createDelivery({
-        project_id: projectId,
-        transaction_type: "site_purchase",
-        bom_scope_id: formData.bom_scope_id || null,
-        item_name: formData.item_name,
-        quantity: Number(formData.quantity),
-        unit: formData.unit,
-        supplier: formData.supplier,
-        delivery_date: formData.delivery_date,
-        received_by: null,
-        notes: formData.notes || null,
-        status: "pending",
-        unit_cost: Number(formData.unit_cost || 0),
-        amount,
-        receipt_number: formData.receipt_number || null,
-      });
+      const linesToSave = [...pendingLines];
+
+      if (formData.item_name && formData.quantity && formData.unit && formData.unit_cost) {
+        linesToSave.push({
+          bom_scope_id: formData.bom_scope_id,
+          item_name: formData.item_name,
+          quantity: formData.quantity,
+          unit: formData.unit,
+          unit_cost: formData.unit_cost,
+        });
+      }
+
+      if (linesToSave.length === 0) {
+        toast({
+          title: "No material lines",
+          description: "Add at least one material for this receipt",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const results = await Promise.all(linesToSave.map((line) => siteService.createDelivery(buildLinePayload(line))));
+      const failedResult = results.find((result) => result.error);
+
+      if (failedResult?.error) {
+        throw failedResult.error;
+      }
 
       toast({
         title: "Success",
-        description: "Site purchase recorded successfully",
+        description:
+          linesToSave.length === 1
+            ? "Site purchase recorded successfully"
+            : "Site purchase recorded successfully with multiple materials",
       });
 
       setDialogOpen(false);
@@ -530,7 +613,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                     className="h-8 text-xs"
                     value={formData.unit_cost}
                     onChange={(event) => setFormData((prev) => ({ ...prev, unit_cost: event.target.value }))}
-                    required
+                    required={pendingLines.length === 0}
                   />
                 </div>
                 <div className="space-y-1">
@@ -595,9 +678,38 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                 />
               </div>
 
-              <Button type="submit" className="h-8 w-full text-xs">
-                Save Record
-              </Button>
+              {pendingLines.length > 0 ? (
+                <div className="space-y-2 rounded-md border border-dashed p-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-foreground">Receipt materials</p>
+                    <p className="text-[11px] text-muted-foreground">{pendingLines.length} added</p>
+                  </div>
+                  <div className="space-y-2">
+                    {pendingLines.map((line, index) => (
+                      <div key={[line.item_name, line.unit, index].join("-")} className="flex items-start justify-between gap-3 rounded-md bg-muted/40 px-3 py-2">
+                        <div className="space-y-0.5 text-xs">
+                          <p className="font-medium text-foreground">{line.item_name}</p>
+                          <p className="text-muted-foreground">
+                            {line.quantity} {line.unit} · {formatCurrency(Number(line.quantity || 0) * Number(line.unit_cost || 0))}
+                          </p>
+                        </div>
+                        <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => removePendingLine(index)}>
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" className="h-8 flex-1 text-xs" onClick={addCurrentLine}>
+                  Add Material to Receipt
+                </Button>
+                <Button type="submit" className="h-8 flex-1 text-xs">
+                  Save Record
+                </Button>
+              </div>
             </form>
           </DialogContent>
         </Dialog>
