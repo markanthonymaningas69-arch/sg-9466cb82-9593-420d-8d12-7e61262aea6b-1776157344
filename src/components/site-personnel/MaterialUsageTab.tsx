@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
+import { Plus, Trash2, TrendingDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { TrendingDown, Plus, Trash2 } from "lucide-react";
 
 interface MaterialUsage {
   id: string;
@@ -57,6 +57,10 @@ function getDefaultFormData(): MaterialUsageFormData {
   };
 }
 
+function getScopeLabel(record: MaterialUsage) {
+  return record.bom_scope_of_work?.name || "Unscoped";
+}
+
 export function MaterialUsageTab({ projectId }: { projectId: string }) {
   const { toast } = useToast();
   const [usageRecords, setUsageRecords] = useState<MaterialUsage[]>([]);
@@ -65,6 +69,13 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState<MaterialUsageFormData>(getDefaultFormData);
+  const [filters, setFilters] = useState({
+    scopeId: "all",
+    material: "",
+    unit: "all",
+    dateFrom: "",
+    dateTo: "",
+  });
 
   const filteredMaterials = useMemo(() => {
     if (formData.bom_scope_id === "none") {
@@ -73,6 +84,59 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
 
     return bomMaterials.filter((material) => material.scope_id === formData.bom_scope_id);
   }, [bomMaterials, formData.bom_scope_id]);
+
+  const unitOptions = useMemo(() => {
+    return Array.from(new Set(usageRecords.map((record) => record.unit).filter(Boolean))).sort((left, right) =>
+      left.localeCompare(right)
+    );
+  }, [usageRecords]);
+
+  const hasUnscopedRecords = useMemo(() => {
+    return usageRecords.some((record) => !record.bom_scope_id);
+  }, [usageRecords]);
+
+  const filteredUsageRecords = useMemo(() => {
+    const materialQuery = filters.material.trim().toLowerCase();
+
+    return usageRecords.filter((record) => {
+      if (filters.scopeId === "unscoped" && record.bom_scope_id) {
+        return false;
+      }
+
+      if (filters.scopeId !== "all" && filters.scopeId !== "unscoped" && record.bom_scope_id !== filters.scopeId) {
+        return false;
+      }
+
+      if (materialQuery && !record.item_name.toLowerCase().includes(materialQuery)) {
+        return false;
+      }
+
+      if (filters.unit !== "all" && record.unit !== filters.unit) {
+        return false;
+      }
+
+      if (filters.dateFrom && record.date_used < filters.dateFrom) {
+        return false;
+      }
+
+      if (filters.dateTo && record.date_used > filters.dateTo) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [filters, usageRecords]);
+
+  const historySummary = useMemo(() => {
+    const scopeCount = new Set(filteredUsageRecords.map((record) => getScopeLabel(record))).size;
+    const totalQuantity = filteredUsageRecords.reduce((sum, record) => sum + Number(record.quantity || 0), 0);
+
+    return {
+      recordCount: filteredUsageRecords.length,
+      scopeCount,
+      totalQuantity,
+    };
+  }, [filteredUsageRecords]);
 
   useEffect(() => {
     void loadData();
@@ -160,8 +224,8 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
     }
   }
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
 
     try {
       const { error } = await supabase.from("material_consumption").insert({
@@ -186,7 +250,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
 
       setDialogOpen(false);
       setFormData(getDefaultFormData());
-      void loadData();
+      await loadData();
     } catch (error) {
       console.error("Error recording usage:", error);
       toast({
@@ -214,7 +278,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
         description: "Usage record deleted",
       });
 
-      void loadData();
+      await loadData();
     } catch (error) {
       console.error("Error deleting usage:", error);
       toast({
@@ -247,9 +311,19 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
     }));
   }
 
+  function clearFilters() {
+    setFilters({
+      scopeId: "all",
+      material: "",
+      unit: "all",
+      dateFrom: "",
+      dateTo: "",
+    });
+  }
+
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-row items-center justify-between gap-4">
         <CardTitle className="flex items-center gap-2">
           <TrendingDown className="h-5 w-5" />
           Material Usage Log
@@ -315,7 +389,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
                     type="number"
                     step="0.01"
                     value={formData.quantity}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, quantity: e.target.value }))}
+                    onChange={(event) => setFormData((prev) => ({ ...prev, quantity: event.target.value }))}
                     required
                   />
                 </div>
@@ -324,7 +398,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
                   <Input
                     id="unit"
                     value={formData.unit}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, unit: e.target.value }))}
+                    onChange={(event) => setFormData((prev) => ({ ...prev, unit: event.target.value }))}
                     required
                   />
                 </div>
@@ -336,7 +410,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
                   id="date_used"
                   type="date"
                   value={formData.date_used}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, date_used: e.target.value }))}
+                  onChange={(event) => setFormData((prev) => ({ ...prev, date_used: event.target.value }))}
                   required
                 />
               </div>
@@ -346,7 +420,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
                 <Input
                   id="notes"
                   value={formData.notes}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
+                  onChange={(event) => setFormData((prev) => ({ ...prev, notes: event.target.value }))}
                 />
               </div>
 
@@ -364,36 +438,147 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
         ) : usageRecords.length === 0 ? (
           <div className="py-8 text-center text-muted-foreground">No usage records yet</div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Usage Date</TableHead>
-                <TableHead>Scope of Works</TableHead>
-                <TableHead>Material Name</TableHead>
-                <TableHead>Quantity Used</TableHead>
-                <TableHead>Notes</TableHead>
-                <TableHead className="w-[80px]">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {usageRecords.map((record) => (
-                <TableRow key={record.id}>
-                  <TableCell>{new Date(record.date_used).toLocaleDateString()}</TableCell>
-                  <TableCell>{record.bom_scope_of_work?.name || "-"}</TableCell>
-                  <TableCell className="font-medium">{record.item_name}</TableCell>
-                  <TableCell>
-                    {record.quantity} {record.unit}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{record.notes || "-"}</TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="icon" onClick={() => void handleDelete(record.id)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <div className="space-y-4">
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-foreground">Usage History</p>
+                  <p className="text-xs text-muted-foreground">
+                    Review saved usage records by scope, material, unit, and date range.
+                  </p>
+                </div>
+                <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              </div>
+
+              <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                <div className="space-y-1">
+                  <Label htmlFor="usage-history-material" className="text-[11px]">
+                    Material
+                  </Label>
+                  <Input
+                    id="usage-history-material"
+                    className="h-8 text-xs"
+                    value={filters.material}
+                    onChange={(event) => setFilters((current) => ({ ...current, material: event.target.value }))}
+                    placeholder="Search material"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="usage-history-scope" className="text-[11px]">
+                    Scope
+                  </Label>
+                  <Select
+                    value={filters.scopeId}
+                    onValueChange={(value) => setFilters((current) => ({ ...current, scopeId: value }))}
+                  >
+                    <SelectTrigger id="usage-history-scope" className="h-8 text-xs">
+                      <SelectValue placeholder="All scopes" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All scopes</SelectItem>
+                      {hasUnscopedRecords ? <SelectItem value="unscoped">Unscoped</SelectItem> : null}
+                      {bomScopes.map((scope) => (
+                        <SelectItem key={scope.id} value={scope.id}>
+                          {scope.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="usage-history-unit" className="text-[11px]">
+                    Unit
+                  </Label>
+                  <Select value={filters.unit} onValueChange={(value) => setFilters((current) => ({ ...current, unit: value }))}>
+                    <SelectTrigger id="usage-history-unit" className="h-8 text-xs">
+                      <SelectValue placeholder="All units" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All units</SelectItem>
+                      {unitOptions.map((unit) => (
+                        <SelectItem key={unit} value={unit}>
+                          {unit}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="usage-history-date-from" className="text-[11px]">
+                    Date From
+                  </Label>
+                  <Input
+                    id="usage-history-date-from"
+                    type="date"
+                    className="h-8 text-xs"
+                    value={filters.dateFrom}
+                    onChange={(event) => setFilters((current) => ({ ...current, dateFrom: event.target.value }))}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="usage-history-date-to" className="text-[11px]">
+                    Date To
+                  </Label>
+                  <Input
+                    id="usage-history-date-to"
+                    type="date"
+                    className="h-8 text-xs"
+                    value={filters.dateTo}
+                    onChange={(event) => setFilters((current) => ({ ...current, dateTo: event.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
+                <span>{historySummary.recordCount} records</span>
+                <span>{historySummary.scopeCount} scopes</span>
+                <span>Total quantity used: {historySummary.totalQuantity}</span>
+              </div>
+            </div>
+
+            {filteredUsageRecords.length === 0 ? (
+              <div className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
+                No usage records match the current filters.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Usage Date</TableHead>
+                    <TableHead>Scope of Works</TableHead>
+                    <TableHead>Material Name</TableHead>
+                    <TableHead>Quantity Used</TableHead>
+                    <TableHead>Unit</TableHead>
+                    <TableHead>Notes</TableHead>
+                    <TableHead className="w-[80px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredUsageRecords.map((record) => (
+                    <TableRow key={record.id}>
+                      <TableCell>{new Date(record.date_used).toLocaleDateString()}</TableCell>
+                      <TableCell>{getScopeLabel(record)}</TableCell>
+                      <TableCell className="font-medium">{record.item_name}</TableCell>
+                      <TableCell>{record.quantity}</TableCell>
+                      <TableCell>{record.unit}</TableCell>
+                      <TableCell className="max-w-[220px] truncate text-sm text-muted-foreground">{record.notes || "—"}</TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="icon" onClick={() => void handleDelete(record.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>

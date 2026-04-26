@@ -1,6 +1,6 @@
 ---
 title: Requests history
-status: todo
+status: in_progress
 priority: high
 type: feature
 tags: [site-personnel, history, filters, requests]
