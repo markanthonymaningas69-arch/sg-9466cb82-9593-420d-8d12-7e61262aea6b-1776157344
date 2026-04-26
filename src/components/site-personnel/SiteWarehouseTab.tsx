@@ -193,22 +193,25 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
   }
 
   function handleMaterialChange(materialName: string) {
-    if (materialName === OTHER_MATERIAL_OPTION) {
+    const normalizedName = materialName.trim();
+
+    if (!normalizedName) {
       setFormData((prev) => ({
         ...prev,
         item_name: "",
         custom_item_name: "",
-        unit: "",
       }));
       return;
     }
 
-    const selectedMaterial = filteredMaterials.find((material) => material.name === materialName);
+    const selectedMaterial = filteredMaterials.find(
+      (material) => material.name.toLowerCase() === normalizedName.toLowerCase()
+    );
 
     setFormData((prev) => ({
       ...prev,
-      item_name: materialName,
-      custom_item_name: "",
+      item_name: normalizedName,
+      custom_item_name: selectedMaterial ? "" : normalizedName,
       unit: selectedMaterial?.unit || prev.unit,
     }));
   }
@@ -316,19 +319,24 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
 
               <div className="space-y-1.5">
                 <Label htmlFor="material">Select Material</Label>
-                <Select value={selectedMaterialValue} onValueChange={handleMaterialChange} disabled={!formData.bom_scope_id}>
-                  <SelectTrigger id="material" className="h-9">
-                    <SelectValue placeholder={formData.bom_scope_id ? "Select material" : "Select scope first"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {filteredMaterials.map((material) => (
-                      <SelectItem key={material.id} value={material.name}>
-                        {material.name}
-                      </SelectItem>
-                    ))}
-                    <SelectItem value={OTHER_MATERIAL_OPTION}>Others</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Input
+                  id="material"
+                  className="h-9"
+                  list="site-purchase-material-options"
+                  value={formData.item_name}
+                  onChange={(event) => handleMaterialChange(event.target.value)}
+                  placeholder={formData.bom_scope_id ? "Type or select material" : "Select scope first"}
+                  disabled={!formData.bom_scope_id}
+                  required
+                />
+                <datalist id="site-purchase-material-options">
+                  {filteredMaterials.map((material) => (
+                    <option key={material.id} value={material.name} />
+                  ))}
+                </datalist>
+                <p className="text-xs text-muted-foreground">
+                  You can type a new material if it is not included in the list.
+                </p>
               </div>
 
               {selectedMaterialValue === OTHER_MATERIAL_OPTION ? (
