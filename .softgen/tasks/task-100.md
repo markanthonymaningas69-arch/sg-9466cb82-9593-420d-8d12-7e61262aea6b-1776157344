@@ -1,6 +1,6 @@
 ---
 title: Purchasing purchase orders compact table
-status: todo
+status: done
 priority: high
 type: feature
 tags: [purchasing, ui, tables, compact-density]
@@ -13,12 +13,12 @@ position: 100
 Apply the same compact, high-density table treatment to the main Purchase Orders list in Purchasing. Prioritize single-line cells, fixed key widths, reduced spacing, and sticky headers where practical so the page can show more procurement data at once.
 
 ## Checklist
-- [ ] Inspect the main Purchase Orders table and any secondary purchasing list tables on the page
-- [ ] Reduce font sizes, spacing, and card padding across purchasing list surfaces
-- [ ] Prevent wrapping in headers and cells with ellipsis for long values
-- [ ] Add hover tooltips for truncated purchase order values
-- [ ] Keep headers aligned and enable horizontal scrolling inside the table container
-- [ ] Convert large action buttons into compact controls where possible while preserving all actions
+- [x] Inspect the main Purchase Orders table and any secondary purchasing list tables on the page
+- [x] Reduce font sizes, spacing, and card padding across purchasing list surfaces
+- [x] Prevent wrapping in headers and cells with ellipsis for long values
+- [x] Add hover tooltips for truncated purchase order values
+- [x] Keep headers aligned and enable horizontal scrolling inside the table container
+- [x] Convert large action buttons into compact controls where possible while preserving all actions
 
 ## Acceptance
 Purchase Orders shows more information per screen without text wrapping.
