@@ -17,6 +17,7 @@ Tighten the Site Warehouse list table so large datasets stay usable. Add a scrol
 - [x] Add a constrained scrollable container around the list table
 - [x] Reduce font sizing and row density for the Site Warehouse table
 - [x] Keep the current columns and actions intact
+- [ ] Keep scrolling inside the Site Warehouse table area only, not on the main screen
 
 ## Acceptance
 The Site Warehouse list can scroll inside its table area.
