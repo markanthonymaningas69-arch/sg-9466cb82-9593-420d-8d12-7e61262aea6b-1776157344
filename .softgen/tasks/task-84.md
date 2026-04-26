@@ -19,9 +19,9 @@ Add a history list and clean filters to the Requests tab. The list should help u
 - [x] Add an easy clear-filters action
 - [x] Preserve current request submission and review flows
 - [ ] Put the request filters behind a Filter button so the Requests tab stays visually clean by default
-- [ ] Replace the request type selector with quick action buttons for Materials, Tools&Equipments, Cash Advance, and Petty Cash
-- [ ] Align the request history table structure and spacing with the other site-personnel tabs
-- [ ] Adjust the request filters so they match the cleaner review pattern used across the other tabs
+- [x] Replace the request type selector with quick action buttons for Materials, Tools&Equipments, Cash Advance, and Petty Cash
+- [x] Align the request history table structure and spacing with the other site-personnel tabs
+- [x] Adjust the request filters so they match the cleaner review pattern used across the other tabs
 
 ## Acceptance
 Users can review request history from the Requests tab.
