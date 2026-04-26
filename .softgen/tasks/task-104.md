@@ -13,12 +13,12 @@ position: 104
 Add the final receiving step in Site Personnel so ready-for-delivery requests can be confirmed on site. Only items with an approved voucher number and ready-for-delivery lifecycle should allow Mark as Received, and the receiving action must preserve traceability back to the site request, purchase, and voucher.
 
 ## Checklist
-- [ ] Inspect the Site Purchase and Deliveries surface and current receiving actions
-- [ ] Load ready-for-delivery records from request execution tracking
-- [ ] Show voucher number, voucher status, and lifecycle state in the site receiving list
-- [ ] Add Mark as Received action with received by, timestamp, actual quantity, and remarks
-- [ ] Restrict receiving to items with voucher number and ready-for-delivery status
-- [ ] Trigger notifications back to Purchasing and Accounting after receiving
+- [x] Inspect the Site Purchase and Deliveries surface and current receiving actions
+- [x] Load ready-for-delivery records from request execution tracking
+- [x] Show voucher number, voucher status, and lifecycle state in the site receiving list
+- [x] Add Mark as Received action with received by, timestamp, actual quantity, and remarks
+- [x] Restrict receiving to items with voucher number and ready-for-delivery status
+- [x] Trigger notifications back to Purchasing and Accounting after receiving
 - [ ] Validate the final receiving flow end to end
 
 ## Acceptance

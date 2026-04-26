@@ -11,12 +11,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ShoppingCart, Plus, Search, Building2, Warehouse as WarehouseIcon, FilterX, List, Edit2, Archive, Printer, ChevronsUpDown, Check, Filter } from "lucide-react";
+import { ShoppingCart, Plus, Search, Building2, Warehouse as WarehouseIcon, FilterX, List, Edit2, Archive, Printer, ChevronsUpDown, Check, Filter, Receipt } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { projectService } from "@/services/projectService";
 import { useSettings } from "@/contexts/SettingsProvider";
 import { cn } from "@/lib/utils";
 import { approvalCenterService, type ApprovalRequest } from "@/services/approvalCenterService";
+import { requestWorkflowService } from "@/services/requestWorkflowService";
 import { RequestDetailsButton } from "@/components/approval/RequestDetailsButton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -90,6 +91,7 @@ export default function Purchasing() {
   const [projects, setProjects] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [vouchers, setVouchers] = useState<any[]>([]);
+  const [voucherRequests, setVoucherRequests] = useState<any[]>([]);
   const [catalogItems, setCatalogItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -99,6 +101,9 @@ export default function Purchasing() {
   const [activeView, setActiveView] = useState<"incoming" | "purchase-orders">("incoming");
   const [incomingRequests, setIncomingRequests] = useState<ApprovalRequest[]>([]);
   const [processingRequestId, setProcessingRequestId] = useState("");
+  const [creatingVoucherId, setCreatingVoucherId] = useState("");
+  const [voucherDialogOpen, setVoucherDialogOpen] = useState(false);
+  const [selectedVoucherRecord, setSelectedVoucherRecord] = useState<any | null>(null);
 
   const [gmSubmitDialogOpen, setGmSubmitDialogOpen] = useState(false);
   const [gmSubmitForm, setGmSubmitForm] = useState<any>(null);
@@ -180,11 +185,12 @@ export default function Purchasing() {
 
   const loadData = async () => {
     setLoading(true);
-    const [{ data: pData }, { data: projData }, { data: supData }, { data: vouchData }, { data: masterData }, incomingData] = await Promise.all([
+    const [{ data: pData }, { data: projData }, { data: supData }, { data: vouchData }, { data: voucherReqData }, { data: masterData }, incomingData] = await Promise.all([
       supabase.from("purchases").select(`*, projects(name)`).eq('is_archived', false).order('created_at', { ascending: false }),
       projectService.getAll(),
       supabase.from("suppliers").select("*").order("name"),
       supabase.from("vouchers").select("*").order("created_at", { ascending: false }),
+      supabase.from("voucher_requests").select("*").order("created_at", { ascending: false }),
       projectService.getMasterItems(),
       approvalCenterService.listModuleInbox("Purchasing")
     ]);
@@ -194,6 +200,7 @@ export default function Purchasing() {
     setProjects(projData || []);
     setSuppliers(supData || []);
     setVouchers(vouchData || []);
+    setVoucherRequests(voucherReqData || []);
     
     // Create unique catalog from master items
     const uniqueItemsMap = new Map();
@@ -355,6 +362,41 @@ export default function Purchasing() {
     return matchSupplier && matchDate && matchItem && matchStatus;
   });
 
+  const getVoucherRequestForPurchase = (purchaseId: string) =>
+    voucherRequests.find((voucherRequest) => voucherRequest.purchase_id === purchaseId) || null;
+
+  const getVoucherDisplayValue = (purchase: any) => {
+    const voucherRequest = getVoucherRequestForPurchase(purchase.id);
+
+    if (purchase.voucher_number) {
+      return purchase.voucher_number;
+    }
+
+    if (voucherRequest?.accounting_status) {
+      return voucherRequest.accounting_status.replaceAll("_", " ");
+    }
+
+    return "—";
+  };
+
+  const openVoucherDialog = (purchase: any) => {
+    const voucherRequest = getVoucherRequestForPurchase(purchase.id);
+    const linkedVoucher = purchase.voucher_number
+      ? vouchers.find((voucher) => voucher.voucher_number === purchase.voucher_number)
+      : null;
+
+    if (!voucherRequest && !linkedVoucher) {
+      return;
+    }
+
+    setSelectedVoucherRecord({
+      request: voucherRequest,
+      voucher: linkedVoucher,
+      purchase,
+    });
+    setVoucherDialogOpen(true);
+  };
+
   const handleGmSubmit = async () => {
     const uc = parseFloat(gmSubmitForm.unit_cost) || 0;
     if (uc <= 0 || !gmSubmitForm.supplier || gmSubmitForm.supplier === 'Pending Selection') {
@@ -488,6 +530,95 @@ export default function Purchasing() {
     `;
     printWindow.document.write(html);
     printWindow.document.close();
+  };
+
+  const handleCreateVoucherRequest = async (purchase: any) => {
+    const existingVoucherRequest = getVoucherRequestForPurchase(purchase.id);
+
+    if (existingVoucherRequest) {
+      openVoucherDialog(purchase);
+      return;
+    }
+
+    if (!purchase.supplier || purchase.supplier === "Pending Selection") {
+      alert("Assign a supplier before creating a voucher request.");
+      return;
+    }
+
+    if (Number(purchase.total_cost || 0) <= 0) {
+      alert("Add a valid total cost before creating a voucher request.");
+      return;
+    }
+
+    try {
+      setCreatingVoucherId(purchase.id);
+      const workflow = await requestWorkflowService.getByPurchaseId(purchase.id);
+
+      if (!workflow?.site_request_id) {
+        alert("This purchase is not linked to a site request yet.");
+        return;
+      }
+
+      const description = `Voucher for ${purchase.order_number} • ${purchase.item_name}`;
+      const timestamp = new Date().toISOString();
+
+      const { data: voucherRequest, error } = await supabase
+        .from("voucher_requests")
+        .insert({
+          purchase_id: purchase.id,
+          site_request_id: workflow.site_request_id,
+          project_id: purchase.project_id || null,
+          source_approval_request_id: workflow.initial_approval_request_id || null,
+          supplier: purchase.supplier,
+          total_amount: Number(purchase.total_cost || 0),
+          description,
+          requested_by: "Purchasing Team",
+          accounting_status: "voucher_pending_approval",
+          updated_at: timestamp,
+        })
+        .select("*")
+        .maybeSingle();
+
+      if (error || !voucherRequest) {
+        throw error || new Error("Failed to create voucher request");
+      }
+
+      await requestWorkflowService.linkVoucherRequest({
+        siteRequestId: workflow.site_request_id,
+        voucherRequestId: voucherRequest.id,
+        supplier: purchase.supplier,
+        totalAmount: Number(purchase.total_cost || 0),
+      });
+
+      await approvalCenterService.createRequest({
+        sourceModule: "Purchasing",
+        sourceTable: "voucher_requests",
+        sourceRecordId: voucherRequest.id,
+        requestType: "Voucher Request",
+        requestedBy: "Purchasing Team",
+        projectId: purchase.project_id || null,
+        summary: `${purchase.order_number}: ${purchase.item_name}`,
+        latestComment: `Supplier: ${purchase.supplier}`,
+        payload: {
+          requestType: "Voucher Request",
+          purchaseId: purchase.id,
+          siteRequestId: workflow.site_request_id,
+          orderNumber: purchase.order_number,
+          itemName: purchase.item_name,
+          supplier: purchase.supplier,
+          totalAmount: Number(purchase.total_cost || 0),
+          description,
+        },
+      });
+
+      await loadData();
+      alert("Voucher request sent to Approval Center.");
+    } catch (error: any) {
+      console.error("Error creating voucher request:", error);
+      alert(error?.message || "Failed to create voucher request.");
+    } finally {
+      setCreatingVoucherId("");
+    }
   };
 
   const handleCompleteIncomingRequest = async (approvalRequestId: string) => {
@@ -997,7 +1128,7 @@ export default function Purchasing() {
                     <TableRow key={p.id} className="border-b last:border-b-0">
                       <TableCell className="px-2 py-1.5 align-middle font-medium text-primary whitespace-nowrap">{p.order_number}</TableCell>
                       <TableCell className="hidden lg:table-cell px-2 py-1.5 align-middle text-muted-foreground whitespace-nowrap">
-                        <TruncatedText value={p.voucher_number || "-"} className="max-w-[90px]" />
+                        <TruncatedText value={getVoucherDisplayValue(p)} className="max-w-[90px]" />
                       </TableCell>
                       <TableCell className="hidden md:table-cell px-2 py-1.5 align-middle text-muted-foreground whitespace-nowrap">{p.order_date}</TableCell>
                       <TableCell className="hidden sm:table-cell px-2 py-1.5 align-middle whitespace-nowrap">
@@ -1063,6 +1194,29 @@ export default function Purchasing() {
                               Submit
                             </Button>
                           )}
+                          {p.status === "approved" && !p.voucher_number && !getVoucherRequestForPurchase(p.id) ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 px-2 text-[11px] border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                              onClick={() => void handleCreateVoucherRequest(p)}
+                              disabled={isLocked || creatingVoucherId === p.id}
+                            >
+                              {creatingVoucherId === p.id ? "Sending..." : "Voucher"}
+                            </Button>
+                          ) : null}
+                          {getVoucherRequestForPurchase(p.id) || p.voucher_number ? (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50"
+                              onClick={() => openVoucherDialog(p)}
+                              title="View Voucher"
+                              disabled={isLocked}
+                            >
+                              <Receipt className="h-3.5 w-3.5" />
+                            </Button>
+                          ) : null}
                           <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-50" onClick={() => handlePrint(p)} title="Print PO" disabled={isLocked}>
                             <Printer className="h-3.5 w-3.5" />
                           </Button>
@@ -1115,6 +1269,62 @@ export default function Purchasing() {
                 </div>
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={voucherDialogOpen} onOpenChange={setVoucherDialogOpen}>
+          <DialogContent className="max-w-[95vw] sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Voucher Details</DialogTitle>
+              <CardDescription>Review linked voucher request and approval status.</CardDescription>
+            </DialogHeader>
+            {selectedVoucherRecord ? (
+              <div className="space-y-3 text-sm">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1 rounded-md border bg-muted/30 p-3">
+                    <p className="text-xs text-muted-foreground">Purchase Order</p>
+                    <p className="font-medium">{selectedVoucherRecord.purchase?.order_number || "—"}</p>
+                  </div>
+                  <div className="space-y-1 rounded-md border bg-muted/30 p-3">
+                    <p className="text-xs text-muted-foreground">Voucher Number</p>
+                    <p className="font-medium">
+                      {selectedVoucherRecord.voucher?.voucher_number || selectedVoucherRecord.request?.voucher_number || "Pending Approval"}
+                    </p>
+                  </div>
+                  <div className="space-y-1 rounded-md border bg-muted/30 p-3">
+                    <p className="text-xs text-muted-foreground">Supplier / Payee</p>
+                    <p className="font-medium">
+                      {selectedVoucherRecord.request?.supplier || selectedVoucherRecord.voucher?.payee || selectedVoucherRecord.purchase?.supplier || "—"}
+                    </p>
+                  </div>
+                  <div className="space-y-1 rounded-md border bg-muted/30 p-3">
+                    <p className="text-xs text-muted-foreground">Voucher Status</p>
+                    <p className="font-medium">
+                      {(selectedVoucherRecord.request?.accounting_status || selectedVoucherRecord.voucher?.status || "Pending").replaceAll("_", " ")}
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-1 rounded-md border bg-muted/20 p-3">
+                  <p className="text-xs text-muted-foreground">Description</p>
+                  <p className="font-medium">
+                    {selectedVoucherRecord.request?.description || selectedVoucherRecord.voucher?.description || "No description available"}
+                  </p>
+                </div>
+                <div className="space-y-1 rounded-md border bg-muted/20 p-3">
+                  <p className="text-xs text-muted-foreground">Amount</p>
+                  <p className="font-medium">
+                    {formatCurrency(
+                      Number(
+                        selectedVoucherRecord.request?.total_amount ||
+                          selectedVoucherRecord.voucher?.amount ||
+                          selectedVoucherRecord.purchase?.total_cost ||
+                          0
+                      )
+                    )}
+                  </p>
+                </div>
+              </div>
+            ) : null}
           </DialogContent>
         </Dialog>
       </div>

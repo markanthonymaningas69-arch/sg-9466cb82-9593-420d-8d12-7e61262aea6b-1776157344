@@ -10,6 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { siteService } from "@/services/siteService";
+import { requestWorkflowService } from "@/services/requestWorkflowService";
+import { notificationService } from "@/services/notificationService";
 
 type TransactionType = "site_purchase" | "delivery";
 const OTHER_MATERIAL_OPTION = "__others__";
@@ -74,6 +76,26 @@ interface ReceiptGroup {
   items: DeliveryRecord[];
 }
 
+interface ReadyForReceivingRecord {
+  id: string;
+  site_request_id: string;
+  purchase_id: string | null;
+  voucher_request_id: string | null;
+  voucher_id: string | null;
+  voucher_number: string | null;
+  lifecycle_status: string;
+  supplier: string | null;
+  total_amount: number | null;
+  actual_quantity: number | null;
+  updated_at: string | null;
+  received_at: string | null;
+  remarks: string | null;
+  initial_approval_request_id: string | null;
+  site_requests?: { item_name?: string | null; quantity?: number | null; unit?: string | null; requested_by?: string | null } | Array<{ item_name?: string | null; quantity?: number | null; unit?: string | null; requested_by?: string | null }> | null;
+  purchases?: { order_number?: string | null; item_name?: string | null } | Array<{ order_number?: string | null; item_name?: string | null }> | null;
+  voucher_requests?: { description?: string | null; total_amount?: number | null } | Array<{ description?: string | null; total_amount?: number | null }> | null;
+}
+
 function getTodayDate() {
   return new Date().toISOString().split("T")[0];
 }
@@ -110,9 +132,18 @@ function formatCurrency(value: number | null) {
   });
 }
 
+function getRelationItem<T>(value: T | T[] | null | undefined) {
+  if (Array.isArray(value)) {
+    return value[0] || null;
+  }
+
+  return value || null;
+}
+
 export function SiteWarehouseTab({ projectId }: { projectId: string }) {
   const { toast } = useToast();
   const [records, setRecords] = useState<DeliveryRecord[]>([]);
+  const [readyForReceiving, setReadyForReceiving] = useState<ReadyForReceivingRecord[]>([]);
   const [scopes, setScopes] = useState<ScopeOption[]>([]);
   const [materials, setMaterials] = useState<MaterialOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -122,14 +153,13 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
   const [isOtherMaterial, setIsOtherMaterial] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedReceiptGroup, setSelectedReceiptGroup] = useState<ReceiptGroup | null>(null);
-  const [filters, setFilters] = useState({
-    scopeId: "all",
-    supplier: "all",
-    material: "",
-    receipt: "",
-    dateFrom: "",
-    dateTo: "",
+  const [selectedReadyRecord, setSelectedReadyRecord] = useState<ReadyForReceivingRecord | null>(null);
+  const [receivingForm, setReceivingForm] = useState({
+    receivedBy: "Site Personnel",
+    actualQuantity: "",
+    remarks: "",
   });
+  const [savingReceipt, setSavingReceipt] = useState(false);
 
   const amount = useMemo(() => {
     const quantity = Number(formData.quantity || 0);
@@ -292,6 +322,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
       }
 
       setRecords((deliveriesResult.data || []) as DeliveryRecord[]);
+      setReadyForReceiving((await requestWorkflowService.getReadyForReceiving(projectId)) as ReadyForReceivingRecord[]);
       setScopes(
         (scopesResult.data || []).map((scope) => ({
           id: scope.id,
@@ -546,6 +577,95 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
         description: "Failed to delete the record",
         variant: "destructive",
       });
+    }
+  }
+
+  function openReceiveDialog(record: ReadyForReceivingRecord) {
+    const linkedSiteRequest = getRelationItem(record.site_requests);
+
+    setSelectedReadyRecord(record);
+    setReceivingForm({
+      receivedBy: linkedSiteRequest?.requested_by || "Site Personnel",
+      actualQuantity: linkedSiteRequest?.quantity ? String(linkedSiteRequest.quantity) : "",
+      remarks: "",
+    });
+    setReceivingDialogOpen(true);
+  }
+
+  async function handleMarkReceived() {
+    if (!selectedReadyRecord) {
+      return;
+    }
+
+    if (!selectedReadyRecord.voucher_number || selectedReadyRecord.lifecycle_status !== "ready_for_delivery" || selectedReadyRecord.received_at) {
+      toast({
+        title: "Receiving locked",
+        description: "Only voucher-approved records that are ready for delivery can be marked as received.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setSavingReceipt(true);
+      const linkedSiteRequest = getRelationItem(selectedReadyRecord.site_requests);
+      const itemLabel = linkedSiteRequest?.item_name || "Request item";
+
+      await requestWorkflowService.markReceived({
+        siteRequestId: selectedReadyRecord.site_request_id,
+        deliveryId: selectedReadyRecord.purchase_id,
+        receivedBy: receivingForm.receivedBy || "Site Personnel",
+        actualQuantity: receivingForm.actualQuantity ? Number(receivingForm.actualQuantity) : null,
+        remarks: receivingForm.remarks || null,
+      });
+
+      if (selectedReadyRecord.initial_approval_request_id) {
+        await notificationService.createNotification({
+          approvalRequestId: selectedReadyRecord.initial_approval_request_id,
+          audienceModule: "Purchasing",
+          targetSurface: "Purchasing",
+          eventType: "request_received",
+          title: "Delivery received on site",
+          message: `${itemLabel} has been marked as received`,
+          payload: {
+            siteRequestId: selectedReadyRecord.site_request_id,
+            purchaseId: selectedReadyRecord.purchase_id,
+            voucherNumber: selectedReadyRecord.voucher_number,
+          },
+        });
+
+        await notificationService.createNotification({
+          approvalRequestId: selectedReadyRecord.initial_approval_request_id,
+          audienceModule: "Accounting",
+          targetSurface: "Accounting",
+          eventType: "request_received",
+          title: "Delivery received on site",
+          message: `${itemLabel} has been marked as received`,
+          payload: {
+            siteRequestId: selectedReadyRecord.site_request_id,
+            purchaseId: selectedReadyRecord.purchase_id,
+            voucherNumber: selectedReadyRecord.voucher_number,
+          },
+        });
+      }
+
+      toast({
+        title: "Received",
+        description: "The delivery was confirmed successfully.",
+      });
+
+      setReceivingDialogOpen(false);
+      setSelectedReadyRecord(null);
+      await loadData();
+    } catch (error) {
+      console.error("Error marking request as received:", error);
+      toast({
+        title: "Error",
+        description: "Failed to confirm receiving.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingReceipt(false);
     }
   }
 
@@ -807,6 +927,69 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
           <div className="py-8 text-center text-muted-foreground">No purchase records match the current filters.</div>
         ) : (
           <div className="space-y-4">
+            <div className="rounded-lg border bg-emerald-50/40 p-3">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-foreground">Ready for Receiving</p>
+                <p className="text-xs text-muted-foreground">
+                  Voucher-approved records appear here when they are ready for delivery and release to site.
+                </p>
+              </div>
+
+              {readyForReceiving.length === 0 ? (
+                <div className="mt-3 rounded-md border border-dashed bg-background/70 py-6 text-center text-sm text-muted-foreground">
+                  No voucher-approved records are ready for receiving.
+                </div>
+              ) : (
+                <div className="mt-3 overflow-auto rounded-md border bg-background">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Item</TableHead>
+                        <TableHead>Supplier</TableHead>
+                        <TableHead>Voucher No.</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Qty</TableHead>
+                        <TableHead>Last Update</TableHead>
+                        <TableHead className="text-right">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {readyForReceiving.map((record) => {
+                        const linkedSiteRequest = getRelationItem(record.site_requests);
+                        const isEligible = Boolean(record.voucher_number) && record.lifecycle_status === "ready_for_delivery" && !record.received_at;
+
+                        return (
+                          <TableRow key={record.id}>
+                            <TableCell className="font-medium">{linkedSiteRequest?.item_name || "—"}</TableCell>
+                            <TableCell>{record.supplier || "—"}</TableCell>
+                            <TableCell>{record.voucher_number || "—"}</TableCell>
+                            <TableCell>
+                              <Badge variant={record.received_at ? "default" : "secondary"}>
+                                {record.received_at ? "received" : record.lifecycle_status.replaceAll("_", " ")}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {linkedSiteRequest?.quantity || 0} {linkedSiteRequest?.unit || ""}
+                            </TableCell>
+                            <TableCell>{record.updated_at ? new Date(record.updated_at).toLocaleString() : "—"}</TableCell>
+                            <TableCell className="text-right">
+                              {record.received_at ? (
+                                <span className="text-xs text-muted-foreground">Received</span>
+                              ) : (
+                                <Button size="sm" disabled={!isEligible} onClick={() => openReceiveDialog(record)}>
+                                  Mark as Received
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+
             <div className="rounded-lg border bg-muted/30 p-3">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div className="space-y-1">
@@ -1074,6 +1257,65 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                           <p className="rounded-md border bg-muted/20 p-3 text-muted-foreground">
                             {selectedReceiptGroup.notes || "—"}
                           </p>
+                        </div>
+                      </div>
+                    ) : null}
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog open={receivingDialogOpen} onOpenChange={setReceivingDialogOpen}>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader className="space-y-1">
+                      <DialogTitle className="text-base">Confirm Receiving</DialogTitle>
+                    </DialogHeader>
+
+                    {selectedReadyRecord ? (
+                      <div className="space-y-4">
+                        <div className="rounded-md border bg-muted/30 p-3 text-sm">
+                          <p className="font-medium text-foreground">{getRelationItem(selectedReadyRecord.site_requests)?.item_name || "Request item"}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Voucher {selectedReadyRecord.voucher_number || "—"} · {selectedReadyRecord.supplier || "No supplier"}
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="received-by">Received by</Label>
+                          <Input
+                            id="received-by"
+                            value={receivingForm.receivedBy}
+                            onChange={(event) => setReceivingForm((current) => ({ ...current, receivedBy: event.target.value }))}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="actual-quantity">Actual quantity received</Label>
+                          <Input
+                            id="actual-quantity"
+                            type="number"
+                            step="0.01"
+                            value={receivingForm.actualQuantity}
+                            onChange={(event) => setReceivingForm((current) => ({ ...current, actualQuantity: event.target.value }))}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="receiving-remarks">Remarks</Label>
+                          <Textarea
+                            id="receiving-remarks"
+                            rows={3}
+                            value={receivingForm.remarks}
+                            onChange={(event) => setReceivingForm((current) => ({ ...current, remarks: event.target.value }))}
+                            placeholder="Optional remarks about the receiving confirmation"
+                          />
+                        </div>
+
+                        <div className="flex justify-end gap-2">
+                          <Button type="button" variant="outline" onClick={() => setReceivingDialogOpen(false)}>
+                            Cancel
+                          </Button>
+                          <Button type="button" onClick={() => void handleMarkReceived()} disabled={savingReceipt}>
+                            {savingReceipt ? "Saving..." : "Confirm Received"}
+                          </Button>
                         </div>
                       </div>
                     ) : null}
