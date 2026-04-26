@@ -152,15 +152,6 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
     }
   }
 
-  const totals = useMemo(() => {
-    return {
-      materialCount: items.length,
-      counted: items.filter((item) => item.recordedRemaining !== null).length,
-      issues: items.filter((item) => item.varianceStatus === "missing" || item.varianceStatus === "excess").length,
-      needsCount: items.filter((item) => item.varianceStatus === "uncounted").length,
-    };
-  }, [items]);
-
   const scopeOptions = useMemo(() => {
     return Array.from(new Set(items.flatMap((item) => item.scopeNames))).sort((left, right) => left.localeCompare(right));
   }, [items]);
@@ -212,33 +203,6 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Tracked Materials</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">{totals.materialCount}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Counted Remaining</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">{totals.counted}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Missing / Excess</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">{totals.issues}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Need Remaining Input</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">{totals.needsCount}</CardContent>
-        </Card>
-      </div>
-
       <Card>
         <CardHeader className="space-y-2">
           <CardTitle className="flex items-center gap-2">
