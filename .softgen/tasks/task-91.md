@@ -1,6 +1,6 @@
 ---
 title: Site request approval routing
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [site-personnel, requests, approval-center]
@@ -17,8 +17,8 @@ Link Site Personnel Requests into the Approval Center so submitted requests appe
 - [x] Route new Site Personnel requests into the Approval Center with enough metadata to review them
 - [x] Show linked request details clearly in the Approval Center UI
 - [x] Keep current Site Requests behavior working after approval routing is added
-- [ ] Ensure Materials, Tools & Equipment, Cash Advance, and Petty Cash requests default to Pending Approval and are tagged by source module and type in Approval Center
-- [ ] Validate the new request-to-approval flow end to end
+- [x] Ensure Materials, Tools & Equipment, Cash Advance, and Petty Cash requests default to Pending Approval and are tagged by source module and type in Approval Center
+- [x] Validate the new request-to-approval flow end to end
 
 ## Acceptance
 A newly submitted Site Personnel request appears in the Approval Center.

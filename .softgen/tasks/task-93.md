@@ -1,6 +1,6 @@
 ---
 title: Approval lifecycle workflow
-status: in_progress
+status: done
 priority: urgent
 type: feature
 tags: [approval-center, workflow, statuses, routing]
@@ -18,7 +18,7 @@ Extend the current request approval implementation into a complete lifecycle wor
 - [x] Update Approval Center actions to move requests through approval and execution states with audit history
 - [x] Ensure approved requests are routed to Purchasing or Accounting based on request type
 - [x] Keep project, requester, approval history, and target module links attached to each request
-- [ ] Validate the request lifecycle from creation to routed execution
+- [x] Validate the request lifecycle from creation to routed execution
 
 ## Acceptance
 A Site Personnel request moves from pending approval into the correct destination module after approval.

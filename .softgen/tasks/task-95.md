@@ -1,6 +1,6 @@
 ---
 title: Accounting incoming requests inbox
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [accounting, inbox, requests]
