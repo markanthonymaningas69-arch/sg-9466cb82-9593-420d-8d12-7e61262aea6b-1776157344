@@ -43,6 +43,12 @@ interface MaterialOption {
   scope_id: string | null;
 }
 
+interface WorkerOption {
+  id: string;
+  name: string;
+  role: string | null;
+}
+
 const REQUEST_TYPE_OPTIONS = [
   { label: "Materials", value: "Materials" },
   { label: "Tools&Equipments", value: "Tools&Equipments" },
@@ -66,6 +72,7 @@ function getDefaultFormData() {
     custom_item_name: "",
     quantity: "",
     unit: "",
+    worker_id: "",
     request_date: new Date().toISOString().split("T")[0],
     notes: "",
   };
@@ -81,6 +88,7 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
   const [requests, setRequests] = useState<SiteRequest[]>([]);
   const [scopes, setScopes] = useState<ScopeOption[]>([]);
   const [materials, setMaterials] = useState<MaterialOption[]>([]);
+  const [workers, setWorkers] = useState<WorkerOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -165,6 +173,10 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
     return Array.from(new Set(filteredMaterials.map((material) => material.unit).filter(Boolean)));
   }, [filteredMaterials, formData.bom_scope_id, formData.item_name, formData.request_type, isOtherMaterial]);
 
+  const selectedWorker = useMemo(() => {
+    return workers.find((worker) => worker.id === formData.worker_id) || null;
+  }, [formData.worker_id, workers]);
+
   const quantityLabel = isCashRequestType(formData.request_type) ? "Amount" : "Quantity";
   const unitLabel = isCashRequestType(formData.request_type) ? "Currency / Ref." : "Unit";
   const itemLabel = isCashRequestType(formData.request_type) ? "Purpose / Description" : "Item / Description";
@@ -217,9 +229,10 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
 
   async function loadScopesAndMaterials() {
     try {
-      const [scopesResult, materialsResult] = await Promise.all([
+      const [scopesResult, materialsResult, personnelResult] = await Promise.all([
         siteService.getScopeOfWorks(projectId),
         siteService.getBomMaterials(projectId),
+        siteService.getProjectPersonnel(projectId),
       ]);
 
       if (scopesResult.error) {
@@ -228,6 +241,10 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
 
       if (materialsResult.error) {
         throw materialsResult.error;
+      }
+
+      if (personnelResult.error) {
+        throw personnelResult.error;
       }
 
       setScopes(
@@ -244,11 +261,18 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
           scope_id: material.scope_id || null,
         }))
       );
+      setWorkers(
+        (personnelResult.data || []).map((person) => ({
+          id: person.id,
+          name: person.name || "Unknown worker",
+          role: person.role || null,
+        }))
+      );
     } catch (error) {
       console.error("Error loading scopes and materials:", error);
       toast({
         title: "Error",
-        description: "Failed to load scopes and materials",
+        description: "Failed to load request form options",
         variant: "destructive",
       });
     }
@@ -301,6 +325,15 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
 
+    if (formData.request_type === "Cash Advance" && !formData.worker_id) {
+      toast({
+        title: "Required",
+        description: "Please select a worker name for the cash advance request",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const insertData: Database["public"]["Tables"]["site_requests"]["Insert"] = {
         project_id: projectId,
@@ -308,7 +341,7 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
         item_name: formData.item_name,
         quantity: Number(formData.quantity),
         unit: formData.unit,
-        requested_by: "Site Personnel",
+        requested_by: formData.request_type === "Cash Advance" ? selectedWorker?.name || "Site Personnel" : "Site Personnel",
         request_date: formData.request_date,
         status: "pending",
         notes: formData.notes || null,
@@ -405,6 +438,7 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
                           ...current,
                           request_type: option.value,
                           unit: option.value === "Cash Advance" || option.value === "Petty Cash" ? currency : current.unit,
+                          worker_id: option.value === "Cash Advance" ? current.worker_id : "",
                         }));
                         setIsOtherMaterial(false);
                       }}
@@ -414,6 +448,26 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
                   ))}
                 </div>
               </div>
+
+              {formData.request_type === "Cash Advance" ? (
+                <div className="space-y-1">
+                  <Label htmlFor="cash-advance-worker" className="text-[11px]">
+                    Worker Name
+                  </Label>
+                  <Select value={formData.worker_id} onValueChange={(value) => setFormData((current) => ({ ...current, worker_id: value }))}>
+                    <SelectTrigger id="cash-advance-worker" className="h-8 text-xs">
+                      <SelectValue placeholder="Select worker" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {workers.map((worker) => (
+                        <SelectItem key={worker.id} value={worker.id}>
+                          {worker.role ? `${worker.name} (${worker.role})` : worker.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
 
               {formData.request_type === "Materials" ? (
                 <>
