@@ -39,7 +39,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
 
   // Form state
   const [formData, setFormData] = useState({
-    material_name: "",
+    item_name: "",
     quantity: "",
     unit: "",
     supplier: "",
@@ -93,7 +93,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
     try {
       const { error } = await supabase.from("deliveries").insert({
         project_id: projectId,
-        item_name: formData.material_name,
+        item_name: formData.item_name,
         quantity: Number(formData.quantity),
         unit: formData.unit,
         supplier: formData.supplier,
@@ -112,7 +112,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
 
       setDialogOpen(false);
       setFormData({
-        material_name: "",
+        item_name: "",
         quantity: "",
         unit: "",
         supplier: "",
@@ -176,12 +176,12 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
               <div>
                 <Label htmlFor="material_name">Material Name</Label>
                 <Select
-                  value={formData.material_name}
+                  value={formData.item_name}
                   onValueChange={(value) => {
                     const item = warehouseItems.find((i) => i.name === value);
                     setFormData((prev) => ({
                       ...prev,
-                      material_name: value,
+                      item_name: value,
                       unit: item?.unit || prev.unit,
                     }));
                   }}

@@ -14,7 +14,7 @@ interface MaterialUsage {
   id: string;
   project_id: string;
   bom_scope_id?: string;
-  material_name: string;
+  item_name: string;
   quantity: number;
   unit: string;
   recorded_by: string;
@@ -47,7 +47,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
 
   // Form state
   const [formData, setFormData] = useState({
-    material_name: "",
+    item_name: "",
     quantity: "",
     unit: "",
     recorded_by: "",
@@ -122,7 +122,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
     try {
       const { error } = await supabase.from("material_consumption").insert({
         project_id: projectId,
-        material_name: formData.material_name,
+        item_name: formData.item_name,
         quantity: Number(formData.quantity),
         unit: formData.unit,
         recorded_by: formData.recorded_by,
@@ -140,7 +140,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
 
       setDialogOpen(false);
       setFormData({
-        material_name: "",
+        item_name: "",
         quantity: "",
         unit: "",
         recorded_by: "",
@@ -202,14 +202,14 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="material_name">Material Name</Label>
+                <Label htmlFor="item_name">Material Name</Label>
                 <Select
-                  value={formData.material_name}
+                  value={formData.item_name}
                   onValueChange={(value) => {
                     const item = warehouseItems.find((i) => i.name === value);
                     setFormData((prev) => ({
                       ...prev,
-                      material_name: value,
+                      item_name: value,
                       unit: item?.unit || prev.unit,
                     }));
                   }}
@@ -327,7 +327,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
               {usageRecords.map((record) => (
                 <TableRow key={record.id}>
                   <TableCell>{new Date(record.date_used).toLocaleDateString()}</TableCell>
-                  <TableCell className="font-medium">{record.material_name}</TableCell>
+                  <TableCell className="font-medium">{record.item_name}</TableCell>
                   <TableCell>
                     {record.quantity} {record.unit}
                   </TableCell>
