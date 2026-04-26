@@ -28,8 +28,28 @@ import { manpowerRateCatalogService, type ManpowerRateCatalogItem } from "@/serv
 type Project = { id: string; name: string; location: string; status: string };
 type Personnel = { id: string; name: string; role: string; daily_rate: number; overtime_rate: number; created_source?: string; updated_source?: string };
 type SiteAttendance = { id: string; personnel_id: string; project_id: string; date: string; status: string; hours_worked: number; overtime_hours?: number; bom_scope_id?: string; notes: string; personnel?: { name: string; role: string; daily_rate: number; overtime_rate: number } };
-type AttendanceRow = { personnel_id: string; name: string; role: string; daily_rate: number; overtime_rate: number; status: string; hours_worked: number; overtime_hours: number; bom_scope_id: string | null };
-type Delivery = { id: string; project_id: string; delivery_date: string; item_name: string; quantity: number; unit: string; supplier: string; received_by: string; status: string; notes: string; receipt_number?: string };
+type AttendanceRow = { personnel_id: string; name: string; role: string; daily_rate: number; overtime_rate: number; status: string; hours_worked: number; overtime_hours: number; bom_scope_id: string | null; notes: string };
+type Delivery = {
+  id: string;
+  project_id: string;
+  delivery_date: string;
+  item_name: string;
+  quantity: number;
+  unit: string;
+  supplier: string;
+  received_by: string;
+  status: string;
+  notes: string;
+  receipt_number?: string;
+  personnel_id?: string;
+  name?: string;
+  role?: string;
+  daily_rate?: number;
+  overtime_rate?: number;
+  hours_worked?: number;
+  overtime_hours?: number;
+  bom_scope_id?: string | null;
+};
 type ScopeOfWork = { id: string; name: string; description?: string; order_number: number; completion_percentage?: number; status?: string; bom_id: string };
 type MaterialConsumption = { id: string; project_id: string; bom_scope_id: string | null; date_used: string; item_name: string; quantity: number; unit: string; recorded_by: string; notes: string; bom_scope_of_work?: { name: string } };
 type CashAdvance = { id: string; personnel_id: string; project_id: string; amount: number; reason: string; status: string; request_date: string; form_number?: string; personnel?: { name: string; role: string } };
@@ -604,6 +624,39 @@ export default function SitePersonnel() {
       siteService.updateScopeOfWork(currentScope.id, { order_number: currentScope.order_number }),
       siteService.updateScopeOfWork(targetScope.id, { order_number: targetScope.order_number })
     ]);
+  };
+
+  const constructionRateCatalogItems = rateCatalogItems
+    .filter((item) => item.status === "active")
+    .sort((a, b) => a.positionName.localeCompare(b.positionName));
+
+  const applyEnrollRate = (item: ManpowerRateCatalogItem) => {
+    setEnrollRateId(item.id);
+    setIsManualRole(!STANDARD_ROLES.includes(item.positionName));
+    setEnrollForm((current) => ({
+      ...current,
+      role: item.positionName,
+      daily_rate: item.dailyRate,
+      overtime_rate: item.overtimeRate,
+    }));
+
+    if (item.hourlyRate > 0 && item.overtimeRate > 0) {
+      setOtFactor(Number((item.overtimeRate / item.hourlyRate).toFixed(2)));
+    }
+  };
+
+  const handleEnrollRateChange = (value: string) => {
+    if (value === MANUAL_RATE_VALUE) {
+      setEnrollRateId("");
+      return;
+    }
+
+    const matchedRate = constructionRateCatalogItems.find((item) => item.id === value);
+    if (!matchedRate) {
+      return;
+    }
+
+    applyEnrollRate(matchedRate);
   };
 
   const handleEnrollSubmit = async (e: React.FormEvent) => {
