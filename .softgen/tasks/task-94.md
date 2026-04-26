@@ -18,7 +18,7 @@ Add an Incoming Requests surface in Purchasing for approved Site Personnel reque
 - [x] Show approved Materials and Tools & Equipment requests with project, requester, summary, and lifecycle status
 - [x] Add clear request actions or state markers for execution handling
 - [x] Show unread/new state for newly routed requests
-- [ ] Investigate and fix the broken submit buttons in Purchasing
+- [x] Investigate and fix the broken submit buttons in Purchasing
 
 ## Acceptance
 Purchasing has an Incoming Requests area for approved Materials and Tools & Equipment requests.

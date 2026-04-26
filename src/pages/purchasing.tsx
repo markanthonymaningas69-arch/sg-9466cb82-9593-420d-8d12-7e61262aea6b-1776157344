@@ -230,14 +230,6 @@ export default function Purchasing() {
       voucher_number: null
     }));
 
-    const { error } = await supabase.from("purchases").insert(payloadArray);
-    
-    if (error) {
-      console.error("Error saving PO items:", error);
-      alert("Failed to save PO: " + error.message);
-      return;
-    }
-
     const { data: createdPurchases, error: insertError } = await supabase
       .from("purchases")
       .insert(payloadArray)
