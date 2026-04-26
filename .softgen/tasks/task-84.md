@@ -23,6 +23,7 @@ Add a history list and clean filters to the Requests tab. The list should help u
 - [x] Align the request history table structure and spacing with the other site-personnel tabs
 - [x] Adjust the request filters so they match the cleaner review pattern used across the other tabs
 - [x] Link Cash Advance and Petty Cash request currency to the shared currency engine and show it as read-only
+- [ ] Add a Worker Name dropdown as the first field in the Cash Advance request form using the existing project worker data source
 
 ## Acceptance
 Users can review request history from the Requests tab.
