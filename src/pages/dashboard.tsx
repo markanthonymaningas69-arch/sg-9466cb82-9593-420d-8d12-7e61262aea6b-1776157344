@@ -381,18 +381,18 @@ export default function Dashboard() {
           <CardHeader>
             <CardTitle>Project Portfolio Status</CardTitle>
           </CardHeader>
-          <CardContent className="p-0 sm:p-6">
+          <CardContent className="p-0 sm:p-4">
             <div className="overflow-x-auto">
-              <Table className="text-xs sm:text-sm">
+              <Table className="text-[10px] sm:text-xs">
                 <TableHeader className="bg-muted/50">
                   <TableRow>
-                    <TableHead className="min-w-[150px] text-[11px] sm:text-xs">Project</TableHead>
-                    <TableHead className="min-w-[120px] text-[11px] sm:text-xs">Date Started</TableHead>
-                    <TableHead className="text-right min-w-[120px] text-[11px] sm:text-xs">Contract Amount</TableHead>
-                    <TableHead className="text-right min-w-[120px] text-[11px] sm:text-xs">Cost to Date</TableHead>
-                    <TableHead className="text-right min-w-[100px] text-[11px] sm:text-xs">Profit Margin</TableHead>
-                    <TableHead className="w-48 text-right min-w-[150px] text-[11px] sm:text-xs">Accomplishment</TableHead>
-                    <TableHead className="w-40 text-right min-w-[180px] text-[11px] sm:text-xs">Action</TableHead>
+                    <TableHead className="min-w-[120px] px-2 text-[10px] sm:text-[11px]">Project</TableHead>
+                    <TableHead className="min-w-[96px] px-2 text-[10px] sm:text-[11px]">Date Started</TableHead>
+                    <TableHead className="min-w-[96px] px-2 text-right text-[10px] sm:text-[11px]">Contract Amount</TableHead>
+                    <TableHead className="min-w-[96px] px-2 text-right text-[10px] sm:text-[11px]">Cost to Date</TableHead>
+                    <TableHead className="min-w-[84px] px-2 text-right text-[10px] sm:text-[11px]">Profit Margin</TableHead>
+                    <TableHead className="min-w-[112px] px-2 text-right text-[10px] sm:text-[11px]">Accomplishment</TableHead>
+                    <TableHead className="min-w-[132px] px-2 text-right text-[10px] sm:text-[11px]">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -405,41 +405,41 @@ export default function Dashboard() {
                   ) : (
                     portfolio.map((project) => (
                       <TableRow key={project.id}>
-                        <TableCell className="py-3">
-                          <div className="font-semibold text-xs sm:text-sm">{project.name}</div>
-                          <div className="text-[11px] text-muted-foreground sm:text-xs">{project.location}</div>
+                        <TableCell className="px-2 py-2">
+                          <div className="font-semibold text-[10px] sm:text-xs">{project.name}</div>
+                          <div className="text-[10px] text-muted-foreground">{project.location}</div>
                         </TableCell>
-                        <TableCell className="py-3">
-                          <span className="text-[11px] text-muted-foreground sm:text-xs">
+                        <TableCell className="px-2 py-2">
+                          <span className="text-[10px] text-muted-foreground">
                             {formatDateStarted(project.dateStarted)}
                           </span>
                         </TableCell>
-                        <TableCell className="py-3 text-right text-xs font-medium sm:text-sm">
+                        <TableCell className="px-2 py-2 text-right text-[10px] font-medium sm:text-xs">
                           {formatCurrency(project.contractAmount)}
                         </TableCell>
-                        <TableCell className="py-3 text-right text-[11px] text-muted-foreground sm:text-xs">
+                        <TableCell className="px-2 py-2 text-right text-[10px] text-muted-foreground">
                           {formatCurrency(project.costToDate)}
                         </TableCell>
-                        <TableCell className="py-3 text-right">
-                          <span className={`text-xs font-semibold sm:text-sm ${project.margin >= 0 ? 'text-success' : 'text-destructive'}`}>
+                        <TableCell className="px-2 py-2 text-right">
+                          <span className={`text-[10px] font-semibold sm:text-xs ${project.margin >= 0 ? 'text-success' : 'text-destructive'}`}>
                             {project.margin.toFixed(2)}%
                           </span>
                         </TableCell>
-                        <TableCell className="py-3 text-right">
-                          <div className="flex flex-col gap-1.5 items-end">
-                            <span className="text-xs font-semibold sm:text-sm">{project.completion.toFixed(2)}%</span>
+                        <TableCell className="px-2 py-2 text-right">
+                          <div className="flex flex-col items-end gap-1">
+                            <span className="text-[10px] font-semibold sm:text-xs">{project.completion.toFixed(2)}%</span>
                             <Progress value={project.completion} className="h-1.5 w-full bg-muted" />
                           </div>
                         </TableCell>
-                        <TableCell className="py-3 text-right">
-                          <div className="flex flex-col items-stretch justify-end gap-2 sm:flex-row sm:items-center">
-                            <Button size="sm" variant="outline" className="h-8 w-full sm:w-auto" onClick={() => openProjectDetails(project)}>
+                        <TableCell className="px-2 py-2 text-right">
+                          <div className="flex flex-col items-stretch justify-end gap-1.5 sm:flex-row sm:items-center">
+                            <Button size="sm" variant="outline" className="h-7 w-full px-2 text-[10px] sm:w-auto" onClick={() => openProjectDetails(project)}>
                               <Eye className="h-3 w-3 sm:mr-1" /> <span className="hidden sm:inline">View</span>
                             </Button>
                             <Button
                               size="sm"
                               variant={project.bom_edit_locked ? "outline" : "destructive"}
-                              className="h-8 w-full sm:w-auto"
+                              className="h-7 w-full px-2 text-[10px] sm:w-auto"
                               disabled={updatingBomLockId === project.id}
                               onClick={() => void handleToggleBomLock(project.id, !project.bom_edit_locked)}
                             >
