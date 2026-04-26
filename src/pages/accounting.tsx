@@ -7,12 +7,9 @@ import { PayrollTab } from "@/components/accounting/PayrollTab";
 import { VouchersTab } from "@/components/accounting/VouchersTab";
 import { LiquidationsTab } from "@/components/accounting/LiquidationsTab";
 import { TaxReportTab } from "@/components/accounting/TaxReportTab";
-import { RequestsViewTab } from "@/components/accounting/RequestsViewTab";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Landmark, FileSpreadsheet, Users, Receipt, CircleDollarSign, FileText, FileSearch, Archive } from "lucide-react";
-import { useSettings } from "@/contexts/SettingsProvider";
-import { useEffect } from "react";
+import { Landmark, FileSpreadsheet, Users, Receipt, CircleDollarSign, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { approvalCenterService, type ApprovalRequest } from "@/services/approvalCenterService";
@@ -77,15 +74,10 @@ function getRequestLinkedStatus(request: ApprovalRequest) {
 }
 
 export default function Accounting() {
-  const { currentPlan } = useSettings();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [approvedVouchersCount, setApprovedVouchersCount] = useState(0);
-  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   const [approvedVoucherIds, setApprovedVoucherIds] = useState("");
-  const [pendingReqIds, setPendingReqIds] = useState("");
   const [seenVoucherIds, setSeenVoucherIds] = useState<string>(() => typeof window !== 'undefined' ? localStorage.getItem('seenVoucherIds') || "" : "");
-  const [seenReqIds, setSeenReqIds] = useState<string>(() => typeof window !== 'undefined' ? localStorage.getItem('seenReqIds') || "" : "");
-  const [archiveOpen, setArchiveOpen] = useState(false);
   const [incomingRequests, setIncomingRequests] = useState<ApprovalRequest[]>([]);
   const [processingRequestId, setProcessingRequestId] = useState("");
 
@@ -96,8 +88,6 @@ export default function Accounting() {
     const channel = supabase
       .channel('accounting_badges')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vouchers' }, () => loadCounts())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'site_requests' }, () => loadCounts())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_advance_requests' }, () => loadCounts())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'approval_requests' }, () => {
         void loadIncomingRequests();
       })
@@ -115,13 +105,6 @@ export default function Accounting() {
     }
   }, [activeTab, approvedVoucherIds]);
 
-  useEffect(() => {
-    if (activeTab === 'requests') {
-      setSeenReqIds(pendingReqIds);
-      if (typeof window !== 'undefined') localStorage.setItem('seenReqIds', pendingReqIds);
-    }
-  }, [activeTab, pendingReqIds]);
-
   const loadCounts = async () => {
     const { data: vData } = await supabase
       .from('vouchers')
@@ -131,20 +114,6 @@ export default function Accounting() {
     const vIds = (vData || []).map(v => v.id).sort().join(',');
     setApprovedVoucherIds(vIds);
     setApprovedVouchersCount(vData?.length || 0);
-
-    const { data: r1 } = await supabase
-      .from('site_requests')
-      .select('id')
-      .eq('status', 'pending');
-      
-    const { data: r2 } = await supabase
-      .from('cash_advance_requests')
-      .select('id')
-      .eq('status', 'pending');
-
-    const rIds = [...(r1 || []), ...(r2 || [])].map(r => r.id).sort().join(',');
-    setPendingReqIds(rIds);
-    setPendingRequestsCount((r1?.length || 0) + (r2?.length || 0));
   };
 
   const loadIncomingRequests = async () => {
@@ -170,10 +139,6 @@ export default function Accounting() {
             <h1 className="text-2xl sm:text-3xl font-heading font-bold">Accounting</h1>
             <p className="text-muted-foreground mt-1">Financial management and reporting</p>
           </div>
-          <Button variant="outline" onClick={() => setArchiveOpen(true)} className="border-orange-200 text-orange-700 hover:bg-orange-50 w-full sm:w-auto">
-            <Archive className="mr-2 h-4 w-4" />
-            Archived Files
-          </Button>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
@@ -199,14 +164,6 @@ export default function Accounting() {
               </TabsTrigger>
               <TabsTrigger value="liquidations" className="flex-1 min-w-[70px] h-9 text-xs data-[state=active]:bg-orange-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-orange-700 bg-orange-50 text-orange-700 hover:bg-orange-100">
                 <CircleDollarSign className="h-3 w-3 mr-1.5 hidden sm:inline" /> Liquidate
-              </TabsTrigger>
-              <TabsTrigger value="requests" className="flex-1 min-w-[70px] h-9 text-xs data-[state=active]:bg-rose-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-rose-700 bg-rose-50 text-rose-700 hover:bg-rose-100 relative">
-                <FileSearch className="h-3 w-3 mr-1.5 hidden sm:inline" /> Requests
-                {pendingRequestsCount > 0 && pendingReqIds !== seenReqIds && activeTab !== 'requests' && (
-                  <Badge variant="destructive" className="ml-1 h-4 min-w-4 flex items-center justify-center p-0 px-1 text-[9px] absolute -top-1 -right-1">
-                    New
-                  </Badge>
-                )}
               </TabsTrigger>
               <TabsTrigger value="incoming" className="flex-1 min-w-[90px] h-9 text-xs data-[state=active]:bg-cyan-700 data-[state=active]:text-white border border-transparent data-[state=active]:border-cyan-800 bg-cyan-50 text-cyan-700 hover:bg-cyan-100 relative">
                 Incoming Requests
@@ -240,10 +197,6 @@ export default function Accounting() {
 
           <TabsContent value="liquidations" className="flex-1 mt-0">
             <LiquidationsTab />
-          </TabsContent>
-
-          <TabsContent value="requests" className="flex-1 mt-0">
-            <RequestsViewTab />
           </TabsContent>
 
           <TabsContent value="incoming" className="flex-1 mt-0">
