@@ -1,6 +1,6 @@
 ---
 title: Requests history
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [site-personnel, history, filters, requests]
@@ -13,11 +13,11 @@ position: 84
 Add a history list and clean filters to the Requests tab. The list should help users inspect prior requests quickly, with filters aligned to request status, requester context, date, and request type or material details if present.
 
 ## Checklist
-- [ ] Review the current Requests tab layout and request list fields
-- [ ] Add a history list section for saved requests
-- [ ] Add clean filters for status, date, scope, requester context, and material details where available
-- [ ] Add an easy clear-filters action
-- [ ] Preserve current request submission and review flows
+- [x] Review the current Requests tab layout and request list fields
+- [x] Add a history list section for saved requests
+- [x] Add clean filters for status, date, requester, request type, and item details
+- [x] Add an easy clear-filters action
+- [x] Preserve current request submission and review flows
 
 ## Acceptance
 Users can review request history from the Requests tab.

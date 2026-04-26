@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +30,38 @@ interface BOMScope {
   name: string;
 }
 
+function getScopeName(update: ProgressUpdate) {
+  return update.bom_scope_of_work?.name || "Unknown Scope";
+}
+
+function matchesCompletionFilter(percentage: number, filter: string) {
+  if (filter === "all") {
+    return true;
+  }
+
+  if (filter === "0-24") {
+    return percentage >= 0 && percentage <= 24.99;
+  }
+
+  if (filter === "25-49") {
+    return percentage >= 25 && percentage <= 49.99;
+  }
+
+  if (filter === "50-74") {
+    return percentage >= 50 && percentage <= 74.99;
+  }
+
+  if (filter === "75-99") {
+    return percentage >= 75 && percentage <= 99.99;
+  }
+
+  if (filter === "100") {
+    return percentage === 100;
+  }
+
+  return true;
+}
+
 export function ProgressTab({ projectId }: { projectId: string }) {
   const { toast } = useToast();
   const [progressUpdates, setProgressUpdates] = useState<ProgressUpdate[]>([]);
@@ -37,6 +69,74 @@ export function ProgressTab({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [bomId, setBomId] = useState<string | null>(null);
+  const [filters, setFilters] = useState({
+    scopeId: "all",
+    completion: "all",
+    updatedBy: "all",
+    dateFrom: "",
+    dateTo: "",
+  });
+
+  const updatedByOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        progressUpdates
+          .map((update) => update.updated_by?.trim())
+          .filter((updatedBy): updatedBy is string => Boolean(updatedBy))
+      )
+    ).sort((left, right) => left.localeCompare(right));
+  }, [progressUpdates]);
+
+  const filteredProgressUpdates = useMemo(() => {
+    return progressUpdates.filter((update) => {
+      if (filters.scopeId !== "all" && update.bom_scope_id !== filters.scopeId) {
+        return false;
+      }
+
+      if (filters.updatedBy !== "all" && update.updated_by !== filters.updatedBy) {
+        return false;
+      }
+
+      if (!matchesCompletionFilter(update.percentage_completed, filters.completion)) {
+        return false;
+      }
+
+      if (filters.dateFrom && update.update_date < filters.dateFrom) {
+        return false;
+      }
+
+      if (filters.dateTo && update.update_date > filters.dateTo) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [filters, progressUpdates]);
+
+  const historySummary = useMemo(() => {
+    const scopeCount = new Set(filteredProgressUpdates.map((update) => getScopeName(update))).size;
+    const averageCompletion =
+      filteredProgressUpdates.length === 0
+        ? 0
+        : filteredProgressUpdates.reduce((sum, update) => sum + update.percentage_completed, 0) /
+          filteredProgressUpdates.length;
+
+    return {
+      recordCount: filteredProgressUpdates.length,
+      scopeCount,
+      averageCompletion,
+    };
+  }, [filteredProgressUpdates]);
+
+  function clearFilters() {
+    setFilters({
+      scopeId: "all",
+      completion: "all",
+      updatedBy: "all",
+      dateFrom: "",
+      dateTo: "",
+    });
+  }
 
   // Form state
   const [formData, setFormData] = useState({
@@ -316,41 +416,163 @@ export function ProgressTab({ projectId }: { projectId: string }) {
           ) : progressUpdates.length === 0 ? (
             <div className="py-8 text-center text-muted-foreground">No progress updates recorded yet</div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Scope</TableHead>
-                  <TableHead>Progress</TableHead>
-                  <TableHead>Updated By</TableHead>
-                  <TableHead>Notes</TableHead>
-                  <TableHead className="w-[80px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {progressUpdates.map((update) => (
-                  <TableRow key={update.id}>
-                    <TableCell>{new Date(update.update_date).toLocaleDateString()}</TableCell>
-                    <TableCell className="font-medium">{update.bom_scope_of_work?.name || "Unknown Scope"}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="w-24">
-                          <Progress value={update.percentage_completed} className="h-2" />
-                        </div>
-                        <span className="text-sm font-medium">{update.percentage_completed}%</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{update.updated_by}</TableCell>
-                    <TableCell className="max-w-[250px] truncate text-sm text-muted-foreground">{update.notes || "-"}</TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="icon" onClick={() => void handleDelete(update.id)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">Progress History</p>
+                    <p className="text-xs text-muted-foreground">
+                      Review updates by scope, completion range, updated by, and date range.
+                    </p>
+                  </div>
+                  <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={clearFilters}>
+                    Clear filters
+                  </Button>
+                </div>
+
+                <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                  <div className="space-y-1">
+                    <Label htmlFor="progress-history-scope" className="text-[11px]">
+                      Scope
+                    </Label>
+                    <Select
+                      value={filters.scopeId}
+                      onValueChange={(value) => setFilters((current) => ({ ...current, scopeId: value }))}
+                    >
+                      <SelectTrigger id="progress-history-scope" className="h-8 text-xs">
+                        <SelectValue placeholder="All scopes" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All scopes</SelectItem>
+                        {bomScopes.map((scope) => (
+                          <SelectItem key={scope.id} value={scope.id}>
+                            {scope.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="progress-history-completion" className="text-[11px]">
+                      Completion
+                    </Label>
+                    <Select
+                      value={filters.completion}
+                      onValueChange={(value) => setFilters((current) => ({ ...current, completion: value }))}
+                    >
+                      <SelectTrigger id="progress-history-completion" className="h-8 text-xs">
+                        <SelectValue placeholder="All completion bands" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All completion bands</SelectItem>
+                        <SelectItem value="0-24">0–24%</SelectItem>
+                        <SelectItem value="25-49">25–49%</SelectItem>
+                        <SelectItem value="50-74">50–74%</SelectItem>
+                        <SelectItem value="75-99">75–99%</SelectItem>
+                        <SelectItem value="100">100%</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="progress-history-updated-by" className="text-[11px]">
+                      Updated By
+                    </Label>
+                    <Select
+                      value={filters.updatedBy}
+                      onValueChange={(value) => setFilters((current) => ({ ...current, updatedBy: value }))}
+                    >
+                      <SelectTrigger id="progress-history-updated-by" className="h-8 text-xs">
+                        <SelectValue placeholder="All updaters" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All updaters</SelectItem>
+                        {updatedByOptions.map((updatedBy) => (
+                          <SelectItem key={updatedBy} value={updatedBy}>
+                            {updatedBy}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="progress-history-date-from" className="text-[11px]">
+                      Date From
+                    </Label>
+                    <Input
+                      id="progress-history-date-from"
+                      type="date"
+                      className="h-8 text-xs"
+                      value={filters.dateFrom}
+                      onChange={(event) => setFilters((current) => ({ ...current, dateFrom: event.target.value }))}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="progress-history-date-to" className="text-[11px]">
+                      Date To
+                    </Label>
+                    <Input
+                      id="progress-history-date-to"
+                      type="date"
+                      className="h-8 text-xs"
+                      value={filters.dateTo}
+                      onChange={(event) => setFilters((current) => ({ ...current, dateTo: event.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
+                  <span>{historySummary.recordCount} updates</span>
+                  <span>{historySummary.scopeCount} scopes</span>
+                  <span>Average completion: {historySummary.averageCompletion.toFixed(1)}%</span>
+                </div>
+              </div>
+
+              {filteredProgressUpdates.length === 0 ? (
+                <div className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
+                  No progress updates match the current filters.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Scope</TableHead>
+                      <TableHead>Progress</TableHead>
+                      <TableHead>Updated By</TableHead>
+                      <TableHead>Notes</TableHead>
+                      <TableHead className="w-[80px]">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredProgressUpdates.map((update) => (
+                      <TableRow key={update.id}>
+                        <TableCell>{new Date(update.update_date).toLocaleDateString()}</TableCell>
+                        <TableCell className="font-medium">{getScopeName(update)}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div className="w-24">
+                              <Progress value={update.percentage_completed} className="h-2" />
+                            </div>
+                            <span className="text-sm font-medium">{update.percentage_completed}%</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>{update.updated_by}</TableCell>
+                        <TableCell className="max-w-[250px] truncate text-sm text-muted-foreground">{update.notes || "-"}</TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="icon" onClick={() => void handleDelete(update.id)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>

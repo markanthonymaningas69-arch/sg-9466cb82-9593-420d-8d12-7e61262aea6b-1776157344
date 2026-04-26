@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +45,82 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
   const [requests, setRequests] = useState<SiteRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [filters, setFilters] = useState({
+    requestType: "all",
+    status: "all",
+    requestedBy: "all",
+    item: "",
+    dateFrom: "",
+    dateTo: "",
+  });
+
+  const requestTypeOptions = useMemo(() => {
+    return Array.from(new Set([...REQUEST_TYPES, ...requests.map((request) => request.request_type).filter(Boolean)])).sort(
+      (left, right) => left.localeCompare(right)
+    );
+  }, [requests]);
+
+  const requesterOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        requests
+          .map((request) => request.requested_by?.trim())
+          .filter((requester): requester is string => Boolean(requester))
+      )
+    ).sort((left, right) => left.localeCompare(right));
+  }, [requests]);
+
+  const filteredRequests = useMemo(() => {
+    const itemQuery = filters.item.trim().toLowerCase();
+
+    return requests.filter((request) => {
+      if (filters.requestType !== "all" && request.request_type !== filters.requestType) {
+        return false;
+      }
+
+      if (filters.status !== "all" && request.status !== filters.status) {
+        return false;
+      }
+
+      if (filters.requestedBy !== "all" && request.requested_by !== filters.requestedBy) {
+        return false;
+      }
+
+      if (itemQuery && !request.item_name.toLowerCase().includes(itemQuery)) {
+        return false;
+      }
+
+      if (filters.dateFrom && request.request_date < filters.dateFrom) {
+        return false;
+      }
+
+      if (filters.dateTo && request.request_date > filters.dateTo) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [filters, requests]);
+
+  const historySummary = useMemo(() => {
+    return {
+      recordCount: filteredRequests.length,
+      pendingCount: filteredRequests.filter((request) => request.status === "pending").length,
+      approvedCount: filteredRequests.filter((request) => request.status === "approved").length,
+      rejectedCount: filteredRequests.filter((request) => request.status === "rejected").length,
+    };
+  }, [filteredRequests]);
+
+  function clearFilters() {
+    setFilters({
+      requestType: "all",
+      status: "all",
+      requestedBy: "all",
+      item: "",
+      dateFrom: "",
+      dateTo: "",
+    });
+  }
 
   // Form state
   const [formData, setFormData] = useState({
@@ -272,58 +348,189 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
         ) : requests.length === 0 ? (
           <div className="py-8 text-center text-muted-foreground">No requests submitted yet</div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Item</TableHead>
-                <TableHead>Quantity</TableHead>
-                <TableHead>Requested By</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Notes</TableHead>
-                <TableHead className="w-[120px]">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {requests.map((request) => {
-                const statusKey = request.status as "pending" | "approved" | "rejected";
-                const statusConfig = STATUS_CONFIG[statusKey] || STATUS_CONFIG.pending;
-                const StatusIcon = statusConfig.icon;
+          <div className="space-y-4">
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-foreground">Request History</p>
+                  <p className="text-xs text-muted-foreground">
+                    Review requests by type, status, requester, item, and request date.
+                  </p>
+                </div>
+                <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              </div>
 
-                return (
-                  <TableRow key={request.id}>
-                    <TableCell>{new Date(request.request_date).toLocaleDateString()}</TableCell>
-                    <TableCell className="text-sm">{request.request_type}</TableCell>
-                    <TableCell className="font-medium">{request.item_name}</TableCell>
-                    <TableCell>
-                      {request.quantity} {request.unit}
-                    </TableCell>
-                    <TableCell>{request.requested_by}</TableCell>
-                    <TableCell>
-                      <Badge variant={statusConfig.variant} className="gap-1">
-                        <StatusIcon className="h-3 w-3" />
-                        {statusConfig.label}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">{request.notes || "-"}</TableCell>
-                    <TableCell>
-                      {request.status === "pending" && (
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => void handleStatusUpdate(request.id, "approved")}>
-                            <CheckCircle className="h-4 w-4 text-green-600" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => void handleStatusUpdate(request.id, "rejected")}>
-                            <XCircle className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      )}
-                    </TableCell>
+              <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <div className="space-y-1">
+                  <Label htmlFor="request-history-item" className="text-[11px]">
+                    Item
+                  </Label>
+                  <Input
+                    id="request-history-item"
+                    className="h-8 text-xs"
+                    value={filters.item}
+                    onChange={(event) => setFilters((current) => ({ ...current, item: event.target.value }))}
+                    placeholder="Search item or description"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="request-history-type" className="text-[11px]">
+                    Request Type
+                  </Label>
+                  <Select
+                    value={filters.requestType}
+                    onValueChange={(value) => setFilters((current) => ({ ...current, requestType: value }))}
+                  >
+                    <SelectTrigger id="request-history-type" className="h-8 text-xs">
+                      <SelectValue placeholder="All request types" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All request types</SelectItem>
+                      {requestTypeOptions.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="request-history-status" className="text-[11px]">
+                    Status
+                  </Label>
+                  <Select value={filters.status} onValueChange={(value) => setFilters((current) => ({ ...current, status: value }))}>
+                    <SelectTrigger id="request-history-status" className="h-8 text-xs">
+                      <SelectValue placeholder="All statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All statuses</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="approved">Approved</SelectItem>
+                      <SelectItem value="rejected">Rejected</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="request-history-requested-by" className="text-[11px]">
+                    Requested By
+                  </Label>
+                  <Select
+                    value={filters.requestedBy}
+                    onValueChange={(value) => setFilters((current) => ({ ...current, requestedBy: value }))}
+                  >
+                    <SelectTrigger id="request-history-requested-by" className="h-8 text-xs">
+                      <SelectValue placeholder="All requesters" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All requesters</SelectItem>
+                      {requesterOptions.map((requester) => (
+                        <SelectItem key={requester} value={requester}>
+                          {requester}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="request-history-date-from" className="text-[11px]">
+                    Date From
+                  </Label>
+                  <Input
+                    id="request-history-date-from"
+                    type="date"
+                    className="h-8 text-xs"
+                    value={filters.dateFrom}
+                    onChange={(event) => setFilters((current) => ({ ...current, dateFrom: event.target.value }))}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="request-history-date-to" className="text-[11px]">
+                    Date To
+                  </Label>
+                  <Input
+                    id="request-history-date-to"
+                    type="date"
+                    className="h-8 text-xs"
+                    value={filters.dateTo}
+                    onChange={(event) => setFilters((current) => ({ ...current, dateTo: event.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
+                <span>{historySummary.recordCount} requests</span>
+                <span>{historySummary.pendingCount} pending</span>
+                <span>{historySummary.approvedCount} approved</span>
+                <span>{historySummary.rejectedCount} rejected</span>
+              </div>
+            </div>
+
+            {filteredRequests.length === 0 ? (
+              <div className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
+                No requests match the current filters.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Item</TableHead>
+                    <TableHead>Quantity</TableHead>
+                    <TableHead>Requested By</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Notes</TableHead>
+                    <TableHead className="w-[120px]">Actions</TableHead>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredRequests.map((request) => {
+                    const statusKey = request.status as "pending" | "approved" | "rejected";
+                    const statusConfig = STATUS_CONFIG[statusKey] || STATUS_CONFIG.pending;
+                    const StatusIcon = statusConfig.icon;
+
+                    return (
+                      <TableRow key={request.id}>
+                        <TableCell>{new Date(request.request_date).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-sm">{request.request_type}</TableCell>
+                        <TableCell className="font-medium">{request.item_name}</TableCell>
+                        <TableCell>
+                          {request.quantity} {request.unit}
+                        </TableCell>
+                        <TableCell>{request.requested_by}</TableCell>
+                        <TableCell>
+                          <Badge variant={statusConfig.variant} className="gap-1">
+                            <StatusIcon className="h-3 w-3" />
+                            {statusConfig.label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">{request.notes || "-"}</TableCell>
+                        <TableCell>
+                          {request.status === "pending" && (
+                            <div className="flex gap-1">
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => void handleStatusUpdate(request.id, "approved")}>
+                                <CheckCircle className="h-4 w-4 text-green-600" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => void handleStatusUpdate(request.id, "rejected")}>
+                                <XCircle className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,6 +47,84 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
   const [personnelList, setPersonnelList] = useState<Personnel[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [filters, setFilters] = useState({
+    personnelId: "all",
+    role: "all",
+    status: "all",
+    dateFrom: "",
+    dateTo: "",
+  });
+
+  const workerOptions = useMemo(() => {
+    return Array.from(
+      new Map(
+        attendance
+          .filter((record) => record.personnel_id && record.personnel?.name)
+          .map((record) => [
+            record.personnel_id,
+            {
+              id: record.personnel_id,
+              name: record.personnel?.name || "Unknown",
+            },
+          ])
+      ).values()
+    ).sort((left, right) => left.name.localeCompare(right.name));
+  }, [attendance]);
+
+  const roleOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        attendance
+          .map((record) => record.personnel?.role?.trim())
+          .filter((role): role is string => Boolean(role))
+      )
+    ).sort((left, right) => left.localeCompare(right));
+  }, [attendance]);
+
+  const filteredAttendance = useMemo(() => {
+    return attendance.filter((record) => {
+      if (filters.personnelId !== "all" && record.personnel_id !== filters.personnelId) {
+        return false;
+      }
+
+      if (filters.role !== "all" && record.personnel?.role !== filters.role) {
+        return false;
+      }
+
+      if (filters.status !== "all" && record.status !== filters.status) {
+        return false;
+      }
+
+      if (filters.dateFrom && record.date < filters.dateFrom) {
+        return false;
+      }
+
+      if (filters.dateTo && record.date > filters.dateTo) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [attendance, filters]);
+
+  const historySummary = useMemo(() => {
+    return {
+      recordCount: filteredAttendance.length,
+      presentCount: filteredAttendance.filter((record) => record.status === "present").length,
+      absentCount: filteredAttendance.filter((record) => record.status === "absent").length,
+      lateCount: filteredAttendance.filter((record) => record.status === "late").length,
+    };
+  }, [filteredAttendance]);
+
+  function clearFilters() {
+    setFilters({
+      personnelId: "all",
+      role: "all",
+      status: "all",
+      dateFrom: "",
+      dateTo: "",
+    });
+  }
 
   // Form state
   const [formData, setFormData] = useState({
@@ -317,48 +395,168 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
           ) : attendance.length === 0 ? (
             <div className="py-8 text-center text-muted-foreground">No attendance records yet</div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Worker Name</TableHead>
-                  <TableHead>Position</TableHead>
-                  <TableHead>Hours</TableHead>
-                  <TableHead>Overtime</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Notes</TableHead>
-                  <TableHead className="w-[80px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {attendance.map((record) => {
-                  const statusConfig = ATTENDANCE_STATUS.find((s) => s.value === record.status);
-                  const StatusIcon = statusConfig?.icon || CheckCircle;
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">Attendance History</p>
+                    <p className="text-xs text-muted-foreground">
+                      Review attendance by worker, position, attendance status, and date range.
+                    </p>
+                  </div>
+                  <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={clearFilters}>
+                    Clear filters
+                  </Button>
+                </div>
 
-                  return (
-                    <TableRow key={record.id}>
-                      <TableCell>{new Date(record.date).toLocaleDateString()}</TableCell>
-                      <TableCell className="font-medium">{record.personnel?.name || "Unknown"}</TableCell>
-                      <TableCell>{record.personnel?.role || "-"}</TableCell>
-                      <TableCell>{record.hours_worked || 0}</TableCell>
-                      <TableCell>{record.overtime_hours || 0}</TableCell>
-                      <TableCell>
-                        <Badge variant={statusConfig?.variant} className="gap-1">
-                          <StatusIcon className="h-3 w-3" />
-                          {statusConfig?.label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{record.notes || "-"}</TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="icon" onClick={() => void handleDelete(record.id)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </TableCell>
+                <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                  <div className="space-y-1">
+                    <Label htmlFor="attendance-history-worker" className="text-[11px]">
+                      Worker
+                    </Label>
+                    <Select
+                      value={filters.personnelId}
+                      onValueChange={(value) => setFilters((current) => ({ ...current, personnelId: value }))}
+                    >
+                      <SelectTrigger id="attendance-history-worker" className="h-8 text-xs">
+                        <SelectValue placeholder="All workers" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All workers</SelectItem>
+                        {workerOptions.map((worker) => (
+                          <SelectItem key={worker.id} value={worker.id}>
+                            {worker.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="attendance-history-role" className="text-[11px]">
+                      Position
+                    </Label>
+                    <Select value={filters.role} onValueChange={(value) => setFilters((current) => ({ ...current, role: value }))}>
+                      <SelectTrigger id="attendance-history-role" className="h-8 text-xs">
+                        <SelectValue placeholder="All positions" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All positions</SelectItem>
+                        {roleOptions.map((role) => (
+                          <SelectItem key={role} value={role}>
+                            {role}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="attendance-history-status" className="text-[11px]">
+                      Status
+                    </Label>
+                    <Select
+                      value={filters.status}
+                      onValueChange={(value) => setFilters((current) => ({ ...current, status: value }))}
+                    >
+                      <SelectTrigger id="attendance-history-status" className="h-8 text-xs">
+                        <SelectValue placeholder="All statuses" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All statuses</SelectItem>
+                        {ATTENDANCE_STATUS.map((status) => (
+                          <SelectItem key={status.value} value={status.value}>
+                            {status.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="attendance-history-date-from" className="text-[11px]">
+                      Date From
+                    </Label>
+                    <Input
+                      id="attendance-history-date-from"
+                      type="date"
+                      className="h-8 text-xs"
+                      value={filters.dateFrom}
+                      onChange={(event) => setFilters((current) => ({ ...current, dateFrom: event.target.value }))}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="attendance-history-date-to" className="text-[11px]">
+                      Date To
+                    </Label>
+                    <Input
+                      id="attendance-history-date-to"
+                      type="date"
+                      className="h-8 text-xs"
+                      value={filters.dateTo}
+                      onChange={(event) => setFilters((current) => ({ ...current, dateTo: event.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
+                  <span>{historySummary.recordCount} records</span>
+                  <span>{historySummary.presentCount} present</span>
+                  <span>{historySummary.absentCount} absent</span>
+                  <span>{historySummary.lateCount} late</span>
+                </div>
+              </div>
+
+              {filteredAttendance.length === 0 ? (
+                <div className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
+                  No attendance records match the current filters.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Worker Name</TableHead>
+                      <TableHead>Position</TableHead>
+                      <TableHead>Hours</TableHead>
+                      <TableHead>Overtime</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Notes</TableHead>
+                      <TableHead className="w-[80px]">Actions</TableHead>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredAttendance.map((record) => {
+                      const statusConfig = ATTENDANCE_STATUS.find((s) => s.value === record.status);
+                      const StatusIcon = statusConfig?.icon || CheckCircle;
+
+                      return (
+                        <TableRow key={record.id}>
+                          <TableCell>{new Date(record.date).toLocaleDateString()}</TableCell>
+                          <TableCell className="font-medium">{record.personnel?.name || "Unknown"}</TableCell>
+                          <TableCell>{record.personnel?.role || "-"}</TableCell>
+                          <TableCell>{record.hours_worked || 0}</TableCell>
+                          <TableCell>{record.overtime_hours || 0}</TableCell>
+                          <TableCell>
+                            <Badge variant={statusConfig?.variant} className="gap-1">
+                              <StatusIcon className="h-3 w-3" />
+                              {statusConfig?.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{record.notes || "-"}</TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="icon" onClick={() => void handleDelete(record.id)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>

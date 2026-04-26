@@ -1,6 +1,6 @@
 ---
 title: Progress history
-status: todo
+status: done
 priority: high
 type: feature
 tags: [site-personnel, history, filters, progress]
@@ -10,16 +10,16 @@ position: 85
 ---
 
 ## Notes
-Add a history list and clean filters to the Progress tab so teams can inspect earlier progress updates without scrolling through mixed content. Filters should support date, scope, and completion-related review.
+Add a history list and clean filters to the Progress tab so users can review prior updates quickly. Filters should line up with progress review needs such as scope, date, updated-by context, and completion range.
 
 ## Checklist
-- [ ] Review the current Progress tab and how progress entries are displayed
-- [ ] Add a history list section for saved progress updates
-- [ ] Add clean filters for date, scope, completion state, and related progress fields
-- [ ] Add a clear-filters action
-- [ ] Preserve current progress entry and summary behavior
+- [x] Review the current Progress tab summary, entry flow, and updates list
+- [x] Add a history list section for saved progress updates
+- [x] Add clean filters for scope, completion range, updated by, and date range
+- [x] Add a clear or reset filters action
+- [x] Preserve current progress entry and summary workflows
 
 ## Acceptance
-Users can inspect a dedicated list of past progress updates.
-Users can filter progress history by the most relevant project fields.
+Users can browse progress history from the Progress tab.
+Users can filter progress updates by the most relevant project fields.
 Current progress entry and summary workflows continue to work.
