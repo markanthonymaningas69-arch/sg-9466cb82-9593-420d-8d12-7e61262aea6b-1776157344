@@ -557,13 +557,12 @@ export default function SchedulePage() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <h1 className="text-base font-semibold text-foreground">Project Manager</h1>
-                    <Badge variant="outline" className="hidden sm:inline-flex">
-                      {activeViewLabel}
-                    </Badge>
                   </div>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {selectedProject ? selectedProjectName : "Select a project to manage schedule, resources, and S-Curve forecasting."}
-                  </p>
+                  {selectedProject ? (
+                    <p className="truncate text-xs text-muted-foreground">
+                      {selectedProjectName}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
@@ -619,7 +618,6 @@ export default function SchedulePage() {
             <div className="flex h-full min-h-0 flex-col">
               <div className="flex items-center justify-between border-b px-3 py-2">
                 <div>
-                  <p className="text-sm font-semibold text-foreground">{activeViewLabel}</p>
                   <p className="text-xs text-muted-foreground">
                     {selectedTask ? `Selected task: ${selectedTask.name}` : "Select a task to open the configuration panel."}
                   </p>
