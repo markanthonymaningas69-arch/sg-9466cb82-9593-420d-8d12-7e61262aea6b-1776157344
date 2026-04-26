@@ -18,8 +18,8 @@ Add a history list and clean filters to the Progress tab so users can review pri
 - [x] Add clean filters for scope, date range, and the most relevant project fields
 - [x] Make clear-filter behavior easy to access
 - [x] Preserve current progress entry and summary workflows
-- [ ] Remove the top progress summary blocks to maximize vertical space
-- [ ] Remove the Updated By filter from the Progress history filter set
+- [x] Remove the top progress summary blocks to maximize vertical space
+- [x] Remove the Updated By filter from the Progress history filter set
 
 ## Acceptance
 Users can browse progress history from the Progress tab.

@@ -73,28 +73,13 @@ export function ProgressTab({ projectId }: { projectId: string }) {
   const [filters, setFilters] = useState({
     scopeId: "all",
     completion: "all",
-    updatedBy: "all",
     dateFrom: "",
     dateTo: "",
   });
 
-  const updatedByOptions = useMemo(() => {
-    return Array.from(
-      new Set(
-        progressUpdates
-          .map((update) => update.updated_by?.trim())
-          .filter((updatedBy): updatedBy is string => Boolean(updatedBy))
-      )
-    ).sort((left, right) => left.localeCompare(right));
-  }, [progressUpdates]);
-
   const filteredProgressUpdates = useMemo(() => {
     return progressUpdates.filter((update) => {
       if (filters.scopeId !== "all" && update.bom_scope_id !== filters.scopeId) {
-        return false;
-      }
-
-      if (filters.updatedBy !== "all" && update.updated_by !== filters.updatedBy) {
         return false;
       }
 
@@ -114,26 +99,10 @@ export function ProgressTab({ projectId }: { projectId: string }) {
     });
   }, [filters, progressUpdates]);
 
-  const historySummary = useMemo(() => {
-    const scopeCount = new Set(filteredProgressUpdates.map((update) => getScopeName(update))).size;
-    const averageCompletion =
-      filteredProgressUpdates.length === 0
-        ? 0
-        : filteredProgressUpdates.reduce((sum, update) => sum + update.percentage_completed, 0) /
-          filteredProgressUpdates.length;
-
-    return {
-      recordCount: filteredProgressUpdates.length,
-      scopeCount,
-      averageCompletion,
-    };
-  }, [filteredProgressUpdates]);
-
   function clearFilters() {
     setFilters({
       scopeId: "all",
       completion: "all",
-      updatedBy: "all",
       dateFrom: "",
       dateTo: "",
     });
@@ -297,31 +266,6 @@ export function ProgressTab({ projectId }: { projectId: string }) {
 
   return (
     <div className="space-y-6">
-      {/* Summary Cards */}
-      {Object.keys(latestProgressByScope).length > 0 && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {Object.entries(latestProgressByScope).map(([scopeName, update]) => (
-            <Card key={update.id}>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">{scopeName}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Progress</span>
-                    <span className="font-semibold">{update.percentage_completed}%</span>
-                  </div>
-                  <Progress value={update.percentage_completed} className="h-2" />
-                  <p className="text-xs text-muted-foreground">
-                    Updated {new Date(update.update_date).toLocaleDateString()}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
       {/* Progress Updates Table */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -423,7 +367,7 @@ export function ProgressTab({ projectId }: { projectId: string }) {
                   <div className="space-y-1">
                     <p className="text-sm font-medium text-foreground">Progress History</p>
                     <p className="text-xs text-muted-foreground">
-                      Review updates by scope, completion range, updated by, and date range.
+                      Review updates by scope, completion range, and date range.
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -446,7 +390,7 @@ export function ProgressTab({ projectId }: { projectId: string }) {
                 </div>
 
                 {filtersOpen ? (
-                  <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                  <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <div className="space-y-1">
                       <Label htmlFor="progress-history-scope" className="text-[11px]">
                         Scope
@@ -487,28 +431,6 @@ export function ProgressTab({ projectId }: { projectId: string }) {
                           <SelectItem value="50-74">50–74%</SelectItem>
                           <SelectItem value="75-99">75–99%</SelectItem>
                           <SelectItem value="100">100%</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label htmlFor="progress-history-updated-by" className="text-[11px]">
-                        Updated By
-                      </Label>
-                      <Select
-                        value={filters.updatedBy}
-                        onValueChange={(value) => setFilters((current) => ({ ...current, updatedBy: value }))}
-                      >
-                        <SelectTrigger id="progress-history-updated-by" className="h-8 text-xs">
-                          <SelectValue placeholder="All updaters" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All updaters</SelectItem>
-                          {updatedByOptions.map((updatedBy) => (
-                            <SelectItem key={updatedBy} value={updatedBy}>
-                              {updatedBy}
-                            </SelectItem>
-                          ))}
                         </SelectContent>
                       </Select>
                     </div>
