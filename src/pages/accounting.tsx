@@ -19,6 +19,63 @@ import { approvalCenterService, type ApprovalRequest } from "@/services/approval
 import { RequestDetailsButton } from "@/components/approval/RequestDetailsButton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
+function getRequestPayload(request: ApprovalRequest) {
+  if (!request.payload || Array.isArray(request.payload) || typeof request.payload !== "object") {
+    return null;
+  }
+
+  return request.payload as Record<string, unknown>;
+}
+
+function getRequestReference(request: ApprovalRequest) {
+  const payload = getRequestPayload(request);
+  const voucherNumber = typeof payload?.voucherNumber === "string" ? payload.voucherNumber : null;
+  const orderNumber = typeof payload?.orderNumber === "string" ? payload.orderNumber : null;
+  const siteRequestId = typeof payload?.siteRequestId === "string" ? payload.siteRequestId : null;
+
+  if (voucherNumber) {
+    return voucherNumber;
+  }
+
+  if (orderNumber) {
+    return orderNumber;
+  }
+
+  if (siteRequestId) {
+    return siteRequestId;
+  }
+
+  return request.sourceRecordId;
+}
+
+function getRequestAmount(request: ApprovalRequest) {
+  const payload = getRequestPayload(request);
+  const totalAmount = payload?.totalAmount;
+  const numericAmount =
+    typeof totalAmount === "number"
+      ? totalAmount
+      : typeof totalAmount === "string" && totalAmount.trim()
+        ? Number(totalAmount)
+        : null;
+
+  if (numericAmount === null || Number.isNaN(numericAmount)) {
+    return "—";
+  }
+
+  return numericAmount.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function getRequestLinkedStatus(request: ApprovalRequest) {
+  const payload = getRequestPayload(request);
+  const accountingStatus = typeof payload?.accountingStatus === "string" ? payload.accountingStatus : null;
+  const voucherStatus = typeof payload?.voucherStatus === "string" ? payload.voucherStatus : null;
+
+  return accountingStatus || voucherStatus || "—";
+}
+
 export default function Accounting() {
   const { currentPlan } = useSettings();
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -199,6 +256,8 @@ export default function Accounting() {
                         <TableHead>Request</TableHead>
                         <TableHead>Project</TableHead>
                         <TableHead>Requested By</TableHead>
+                        <TableHead>Reference</TableHead>
+                        <TableHead>Amount</TableHead>
                         <TableHead>Routed</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Summary</TableHead>
@@ -209,7 +268,7 @@ export default function Accounting() {
                     <TableBody>
                       {incomingRequests.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+                          <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">
                             No incoming Accounting requests.
                           </TableCell>
                         </TableRow>
@@ -219,6 +278,13 @@ export default function Accounting() {
                             <TableCell className="font-medium">{request.requestType}</TableCell>
                             <TableCell>{request.projectName || "No project"}</TableCell>
                             <TableCell>{request.requestedBy}</TableCell>
+                            <TableCell>
+                              <div className="space-y-1">
+                                <p className="font-medium">{getRequestReference(request)}</p>
+                                <p className="text-xs text-muted-foreground">{getRequestLinkedStatus(request).replaceAll("_", " ")}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell>{getRequestAmount(request)}</TableCell>
                             <TableCell>{request.routedAt ? new Date(request.routedAt).toLocaleString() : "—"}</TableCell>
                             <TableCell>
                               <Badge variant={request.workflowStatus === "completed" ? "default" : "secondary"}>

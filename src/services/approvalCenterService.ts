@@ -229,6 +229,7 @@ async function processApprovedRequest(request: {
     if (error || !voucherRequest) return;
 
     const voucherNumber = voucherRequest.voucher_number || createVoucherNumber();
+    const approvedAt = new Date().toISOString();
     let voucher = await supabase
       .from("vouchers")
       .select("id")
@@ -256,11 +257,29 @@ async function processApprovedRequest(request: {
       .from("voucher_requests")
       .update({
         voucher_number: voucherNumber,
-        approved_at: new Date().toISOString(),
+        approved_at: approvedAt,
         accounting_status: "ready_for_delivery",
-        updated_at: new Date().toISOString(),
+        updated_at: approvedAt,
       })
       .eq("id", voucherRequest.id);
+
+    await supabase
+      .from("approval_requests")
+      .update({
+        payload: {
+          purchaseId: voucherRequest.purchase_id,
+          siteRequestId: voucherRequest.site_request_id,
+          voucherRequestId: voucherRequest.id,
+          voucherNumber,
+          supplier: voucherRequest.supplier,
+          totalAmount: Number(voucherRequest.total_amount || 0),
+          description: voucherRequest.description || `Voucher for purchase ${voucherRequest.purchase_id}`,
+          voucherStatus: "approved",
+          accountingStatus: "ready_for_delivery",
+        },
+        updated_at: approvedAt,
+      })
+      .eq("id", request.approvalRequestId);
 
     await supabase.from("purchases").update({ voucher_number: voucherNumber, status: "approved" }).eq("id", voucherRequest.purchase_id);
 
