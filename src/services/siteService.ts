@@ -161,7 +161,7 @@ export const siteService = {
   async getDeliveries(projectId: string, dateFilter?: string) {
     let query = supabase
       .from("deliveries")
-      .select("*, projects(name)")
+      .select("*, projects(name), bom_scope_of_work(name)")
       .eq("project_id", projectId)
       .eq("is_archived", false)
       .order("delivery_date", { ascending: false });

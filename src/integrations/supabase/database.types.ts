@@ -721,6 +721,8 @@ export type Database = {
       }
       deliveries: {
         Row: {
+          amount: number | null
+          bom_scope_id: string | null
           company_id: string | null
           created_at: string | null
           delivery_date: string
@@ -734,9 +736,13 @@ export type Database = {
           received_by: string | null
           status: string | null
           supplier: string
+          transaction_type: string
           unit: string | null
+          unit_cost: number | null
         }
         Insert: {
+          amount?: number | null
+          bom_scope_id?: string | null
           company_id?: string | null
           created_at?: string | null
           delivery_date: string
@@ -750,9 +756,13 @@ export type Database = {
           received_by?: string | null
           status?: string | null
           supplier: string
+          transaction_type?: string
           unit?: string | null
+          unit_cost?: number | null
         }
         Update: {
+          amount?: number | null
+          bom_scope_id?: string | null
           company_id?: string | null
           created_at?: string | null
           delivery_date?: string
@@ -766,9 +776,18 @@ export type Database = {
           received_by?: string | null
           status?: string | null
           supplier?: string
+          transaction_type?: string
           unit?: string | null
+          unit_cost?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "deliveries_bom_scope_id_fkey"
+            columns: ["bom_scope_id"]
+            isOneToOne: false
+            referencedRelation: "bom_scope_of_work"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "deliveries_company_id_fkey"
             columns: ["company_id"]

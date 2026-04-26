@@ -136,7 +136,7 @@ export default function SitePersonnelPage() {
 
   return (
     <Layout>
-      <SEO title="Site Personnel Management" description="Manage site deliveries, warehouse, material usage, requests, progress, and attendance" />
+      <SEO title="Site Personnel Management" description="Manage site purchase and deliveries, warehouse, material usage, requests, progress, and attendance" />
       
       <div className="space-y-6">
         {/* Header */}
@@ -144,7 +144,7 @@ export default function SitePersonnelPage() {
           <div>
             <h1 className="text-3xl font-bold">Site Personnel</h1>
             <p className="text-muted-foreground">
-              Manage site operations, deliveries, warehouse, and workforce
+              Manage site operations, purchase deliveries, warehouse, and workforce
             </p>
           </div>
 
@@ -169,7 +169,7 @@ export default function SitePersonnelPage() {
           <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="deliveries" className="gap-2">
               <Package className="h-4 w-4" />
-              <span className="hidden sm:inline">Deliveries</span>
+              <span className="hidden sm:inline">Site Purchase & Deliveries</span>
             </TabsTrigger>
             <TabsTrigger value="site-warehouse" className="gap-2">
               <WarehouseIcon className="h-4 w-4" />
