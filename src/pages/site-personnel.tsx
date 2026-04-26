@@ -7,10 +7,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Package, TrendingDown, FileText, TrendingUp, Users } from "lucide-react";
+import { Package, TrendingDown, FileText, TrendingUp, Users, Warehouse as WarehouseIcon } from "lucide-react";
 
 // Import modular tab components
 import { SiteWarehouseTab } from "@/components/site-personnel/SiteWarehouseTab";
+import { SiteWarehouseInventoryTab } from "@/components/site-personnel/SiteWarehouseInventoryTab";
 import { MaterialUsageTab } from "@/components/site-personnel/MaterialUsageTab";
 import { SiteRequestsTab } from "@/components/site-personnel/SiteRequestsTab";
 import { ProgressTab } from "@/components/site-personnel/ProgressTab";
@@ -135,7 +136,7 @@ export default function SitePersonnelPage() {
 
   return (
     <Layout>
-      <SEO title="Site Personnel Management" description="Manage site deliveries, material usage, requests, progress, and attendance" />
+      <SEO title="Site Personnel Management" description="Manage site deliveries, warehouse, material usage, requests, progress, and attendance" />
       
       <div className="space-y-6">
         {/* Header */}
@@ -143,7 +144,7 @@ export default function SitePersonnelPage() {
           <div>
             <h1 className="text-3xl font-bold">Site Personnel</h1>
             <p className="text-muted-foreground">
-              Manage site operations, deliveries, and workforce
+              Manage site operations, deliveries, warehouse, and workforce
             </p>
           </div>
 
@@ -165,10 +166,14 @@ export default function SitePersonnelPage() {
 
         {/* Tabs */}
         <Tabs defaultValue="deliveries" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="deliveries" className="gap-2">
               <Package className="h-4 w-4" />
               <span className="hidden sm:inline">Deliveries</span>
+            </TabsTrigger>
+            <TabsTrigger value="site-warehouse" className="gap-2">
+              <WarehouseIcon className="h-4 w-4" />
+              <span className="hidden sm:inline">Site Warehouse</span>
             </TabsTrigger>
             <TabsTrigger value="usage" className="gap-2">
               <TrendingDown className="h-4 w-4" />
@@ -190,6 +195,10 @@ export default function SitePersonnelPage() {
 
           <TabsContent value="deliveries">
             <SiteWarehouseTab projectId={selectedProjectId} />
+          </TabsContent>
+
+          <TabsContent value="site-warehouse">
+            <SiteWarehouseInventoryTab projectId={selectedProjectId} />
           </TabsContent>
 
           <TabsContent value="usage">
