@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
-type JsonPrimitive = string | number | boolean | null;
-type JsonValue = JsonPrimitive | { [key: string]: JsonValue } | JsonValue[];
+export type JsonPrimitive = string | number | boolean | null;
+export type JsonValue = JsonPrimitive | { [key: string]: JsonValue } | JsonValue[];
 
 export type ApprovalStatus = "pending" | "approved" | "rejected" | "returned_for_revision";
 
@@ -18,6 +18,7 @@ export interface ApprovalRequest {
   status: ApprovalStatus;
   summary: string | null;
   latestComment: string | null;
+  payload: JsonValue | null;
 }
 
 export interface ApprovalAction {
@@ -311,7 +312,7 @@ export const approvalCenterService = {
   async listRequests() {
     const { data, error } = await supabase
       .from("approval_requests")
-      .select("id, source_module, source_table, source_record_id, request_type, requested_by, requested_at, project_id, status, summary, latest_comment, projects(name)")
+      .select("id, source_module, source_table, source_record_id, request_type, requested_by, requested_at, project_id, status, summary, latest_comment, payload, projects(name)")
       .order("requested_at", { ascending: false });
 
     if (error) {
@@ -335,6 +336,7 @@ export const approvalCenterService = {
         status: item.status as ApprovalStatus,
         summary: item.summary,
         latestComment: item.latest_comment,
+        payload: item.payload as JsonValue | null,
       })) as ApprovalRequest[];
   },
 

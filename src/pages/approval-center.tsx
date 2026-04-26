@@ -63,6 +63,31 @@ function canArchiveRequest(request: ApprovalRequest) {
   );
 }
 
+function getLinkedRequestDetails(request: ApprovalRequest) {
+  if (request.sourceTable !== "site_requests" || !request.payload || Array.isArray(request.payload) || typeof request.payload !== "object") {
+    return [];
+  }
+
+  const payload = request.payload as Record<string, unknown>;
+  const quantity = payload.quantity;
+  const unit = payload.unit;
+  const amount = payload.amount;
+  const quantityLabel =
+    typeof quantity === "number" || typeof quantity === "string"
+      ? `${quantity}${typeof unit === "string" && unit ? ` ${unit}` : ""}`
+      : null;
+
+  return [
+    { label: "Requested item", value: typeof payload.itemName === "string" ? payload.itemName : null },
+    { label: "Quantity / Amount", value: quantityLabel },
+    { label: "Request date", value: typeof payload.requestDate === "string" ? new Date(payload.requestDate).toLocaleDateString() : null },
+    { label: "Scope", value: typeof payload.scopeName === "string" && payload.scopeName ? payload.scopeName : null },
+    { label: "Requested by", value: typeof payload.requestedBy === "string" ? payload.requestedBy : null },
+    { label: "Recorded amount", value: typeof amount === "number" ? amount.toLocaleString("en-US") : null },
+    { label: "Notes", value: typeof payload.notes === "string" && payload.notes ? payload.notes : null },
+  ].filter((detail): detail is { label: string; value: string } => Boolean(detail.value));
+}
+
 export default function ApprovalCenterPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<ApprovalTabKey>("all");
@@ -86,6 +111,16 @@ export default function ApprovalCenterPage() {
   const selectedRequest = useMemo(
     () => requests.find((request) => request.id === selectedRequestId) || filteredRequests[0] || null,
     [filteredRequests, requests, selectedRequestId]
+  );
+
+  const selectedRequestDetails = useMemo(
+    () => (selectedRequest ? getLinkedRequestDetails(selectedRequest) : []),
+    [selectedRequest]
+  );
+
+  const viewRequestDetails = useMemo(
+    () => (viewRequest ? getLinkedRequestDetails(viewRequest) : []),
+    [viewRequest]
   );
 
   const pendingCounts = useMemo(() => {
@@ -375,6 +410,15 @@ export default function ApprovalCenterPage() {
                             <p><span className="font-medium text-foreground">Latest comment:</span> {selectedRequest.latestComment}</p>
                           ) : null}
                         </div>
+                        {selectedRequestDetails.length > 0 ? (
+                          <div className="grid gap-1.5 border-t pt-2 text-xs text-muted-foreground">
+                            {selectedRequestDetails.map((detail) => (
+                              <p key={detail.label}>
+                                <span className="font-medium text-foreground">{detail.label}:</span> {detail.value}
+                              </p>
+                            ))}
+                          </div>
+                        ) : null}
                       </div>
 
                       <div className="space-y-1.5">
@@ -451,6 +495,17 @@ export default function ApprovalCenterPage() {
                       <p className="mt-1"><span className="font-medium text-foreground">Latest comment:</span> {viewRequest.latestComment}</p>
                     ) : null}
                   </div>
+                  {viewRequestDetails.length > 0 ? (
+                    <div className="sm:col-span-2">
+                      <div className="grid gap-1.5 border-t pt-3 text-xs text-muted-foreground">
+                        {viewRequestDetails.map((detail) => (
+                          <p key={detail.label}>
+                            <span className="font-medium text-foreground">{detail.label}:</span> {detail.value}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="space-y-2">

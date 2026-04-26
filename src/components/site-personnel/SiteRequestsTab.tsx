@@ -14,6 +14,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useSettings } from "@/contexts/SettingsProvider";
 import { FileText, Plus, CheckCircle, XCircle, Clock, Filter } from "lucide-react";
 import { siteService } from "@/services/siteService";
+import { approvalCenterService } from "@/services/approvalCenterService";
+import { useRouter } from "next/router";
 
 interface SiteRequest {
   id: string;
@@ -85,6 +87,7 @@ function isCashRequestType(requestType: string) {
 }
 
 export function SiteRequestsTab({ projectId }: { projectId: string }) {
+  const router = useRouter();
   const { toast } = useToast();
   const { currency } = useSettings();
   const [requests, setRequests] = useState<SiteRequest[]>([]);
@@ -360,13 +363,15 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
     }
 
     try {
+      const requestedBy = formData.request_type === "Cash Advance" ? selectedWorker?.name || "Site Personnel" : "Site Personnel";
+
       const insertData: Database["public"]["Tables"]["site_requests"]["Insert"] = {
         project_id: projectId,
         request_type: formData.request_type,
         item_name: formData.item_name,
         quantity: Number(formData.quantity),
         unit: formData.unit,
-        requested_by: formData.request_type === "Cash Advance" ? selectedWorker?.name || "Site Personnel" : "Site Personnel",
+        requested_by: requestedBy,
         request_date: formData.request_date,
         status: "pending",
         notes: formData.notes || null,
@@ -378,9 +383,44 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
         insertData.bom_scope_id = formData.bom_scope_id;
       }
 
-      const { error } = await supabase.from("site_requests").insert(insertData);
+      const { data: createdRequest, error } = await supabase
+        .from("site_requests")
+        .insert(insertData)
+        .select("id, project_id, request_type, item_name, quantity, unit, requested_by, request_date, notes, bom_scope_id, amount")
+        .maybeSingle();
 
-      if (error) throw error;
+      if (error || !createdRequest) {
+        throw error || new Error("Failed to create request");
+      }
+
+      const scopeName = scopes.find((scope) => scope.id === createdRequest.bom_scope_id)?.name || null;
+
+      try {
+        await approvalCenterService.createRequest({
+          sourceModule: "Site Personnel",
+          sourceTable: "site_requests",
+          sourceRecordId: createdRequest.id,
+          requestType: `${createdRequest.request_type} Request`,
+          requestedBy: createdRequest.requested_by,
+          projectId: createdRequest.project_id,
+          summary: `${createdRequest.item_name} • ${createdRequest.quantity} ${createdRequest.unit}`,
+          latestComment: createdRequest.notes || null,
+          payload: {
+            requestType: createdRequest.request_type,
+            itemName: createdRequest.item_name,
+            quantity: createdRequest.quantity,
+            unit: createdRequest.unit,
+            requestDate: createdRequest.request_date,
+            requestedBy: createdRequest.requested_by,
+            notes: createdRequest.notes || null,
+            scopeName,
+            amount: createdRequest.amount ?? null,
+          },
+        });
+      } catch (approvalError) {
+        await supabase.from("site_requests").delete().eq("id", createdRequest.id);
+        throw approvalError;
+      }
 
       toast({
         title: "Success",
@@ -871,14 +911,9 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
                         <TableCell className="max-w-[220px] truncate text-sm text-muted-foreground">{request.notes || "—"}</TableCell>
                         <TableCell>
                           {request.status === "pending" ? (
-                            <div className="flex gap-1">
-                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => void handleStatusUpdate(request.id, "approved")}>
-                                <CheckCircle className="h-4 w-4 text-green-600" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => void handleStatusUpdate(request.id, "rejected")}>
-                                <XCircle className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </div>
+                            <Button variant="outline" size="sm" className="h-8 px-2 text-xs" onClick={() => void router.push("/approval-center")}>
+                              Review
+                            </Button>
                           ) : (
                             <span className="text-xs text-muted-foreground">—</span>
                           )}

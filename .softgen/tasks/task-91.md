@@ -13,10 +13,10 @@ position: 91
 Link Site Personnel Requests into the Approval Center so submitted requests appear in the approval workflow instead of living only in the request list. Reuse the current approval data model and current site request records where possible. Keep the existing request form intact.
 
 ## Checklist
-- [ ] Inspect the current Site Requests save flow and the Approval Center data model
-- [ ] Route new Site Personnel requests into the Approval Center with enough metadata to review them
-- [ ] Show linked request details clearly in the Approval Center UI
-- [ ] Keep current Site Requests behavior working after approval routing is added
+- [x] Inspect the current Site Requests save flow and the Approval Center data model
+- [x] Route new Site Personnel requests into the Approval Center with enough metadata to review them
+- [x] Show linked request details clearly in the Approval Center UI
+- [x] Keep current Site Requests behavior working after approval routing is added
 - [ ] Validate the new request-to-approval flow end to end
 
 ## Acceptance

@@ -1,6 +1,6 @@
 ---
 title: Approval notifications engine
-status: todo
+status: in_progress
 priority: high
 type: feature
 tags: [notifications, approval-center, requests]
