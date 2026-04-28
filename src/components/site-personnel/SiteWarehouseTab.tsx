@@ -542,6 +542,10 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
         title: "Success",
         description: "Record deleted",
       });
+      toast({
+        title: "Moved to recycle bin",
+        description: "Record archived from Deliveries",
+      });
       await loadData();
     } catch (error) {
       console.error("Error deleting record:", error);
@@ -579,6 +583,10 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
       toast({
         title: "Success",
         description: group.items.length > 1 ? "Receipt records deleted" : "Record deleted",
+      });
+      toast({
+        title: "Moved to recycle bin",
+        description: group.items.length > 1 ? "Receipt records archived from Deliveries" : "Record archived from Deliveries",
       });
       await loadData();
     } catch (error) {

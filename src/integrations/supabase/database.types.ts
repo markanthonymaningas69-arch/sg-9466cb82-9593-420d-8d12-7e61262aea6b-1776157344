@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -588,30 +588,36 @@ export type Database = {
       }
       bom_progress_updates: {
         Row: {
+          archived_at: string | null
           bom_scope_id: string | null
           company_id: string | null
           created_at: string | null
           id: string
+          is_archived: boolean | null
           notes: string | null
           percentage_completed: number | null
           update_date: string | null
           updated_by: string | null
         }
         Insert: {
+          archived_at?: string | null
           bom_scope_id?: string | null
           company_id?: string | null
           created_at?: string | null
           id?: string
+          is_archived?: boolean | null
           notes?: string | null
           percentage_completed?: number | null
           update_date?: string | null
           updated_by?: string | null
         }
         Update: {
+          archived_at?: string | null
           bom_scope_id?: string | null
           company_id?: string | null
           created_at?: string | null
           id?: string
+          is_archived?: boolean | null
           notes?: string | null
           percentage_completed?: number | null
           update_date?: string | null
@@ -703,6 +709,7 @@ export type Database = {
       cash_advance_requests: {
         Row: {
           amount: number
+          archived_at: string | null
           company_id: string | null
           created_at: string | null
           form_number: string | null
@@ -716,6 +723,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          archived_at?: string | null
           company_id?: string | null
           created_at?: string | null
           form_number?: string | null
@@ -729,6 +737,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          archived_at?: string | null
           company_id?: string | null
           created_at?: string | null
           form_number?: string | null
@@ -823,6 +832,7 @@ export type Database = {
       deliveries: {
         Row: {
           amount: number | null
+          archived_at: string | null
           bom_scope_id: string | null
           company_id: string | null
           created_at: string | null
@@ -843,6 +853,7 @@ export type Database = {
         }
         Insert: {
           amount?: number | null
+          archived_at?: string | null
           bom_scope_id?: string | null
           company_id?: string | null
           created_at?: string | null
@@ -863,6 +874,7 @@ export type Database = {
         }
         Update: {
           amount?: number | null
+          archived_at?: string | null
           bom_scope_id?: string | null
           company_id?: string | null
           created_at?: string | null
@@ -1318,6 +1330,7 @@ export type Database = {
       }
       material_consumption: {
         Row: {
+          archived_at: string | null
           bom_scope_id: string | null
           company_id: string | null
           created_at: string | null
@@ -1333,6 +1346,7 @@ export type Database = {
           unit: string
         }
         Insert: {
+          archived_at?: string | null
           bom_scope_id?: string | null
           company_id?: string | null
           created_at?: string | null
@@ -1348,6 +1362,7 @@ export type Database = {
           unit: string
         }
         Update: {
+          archived_at?: string | null
           bom_scope_id?: string | null
           company_id?: string | null
           created_at?: string | null
@@ -1460,6 +1475,7 @@ export type Database = {
       }
       personnel: {
         Row: {
+          archived_at: string | null
           company_id: string | null
           created_at: string | null
           created_source: string | null
@@ -1482,6 +1498,7 @@ export type Database = {
           worker_type: string | null
         }
         Insert: {
+          archived_at?: string | null
           company_id?: string | null
           created_at?: string | null
           created_source?: string | null
@@ -1504,6 +1521,7 @@ export type Database = {
           worker_type?: string | null
         }
         Update: {
+          archived_at?: string | null
           company_id?: string | null
           created_at?: string | null
           created_source?: string | null
@@ -2190,12 +2208,14 @@ export type Database = {
       }
       site_attendance: {
         Row: {
+          archived_at: string | null
           bom_scope_id: string | null
           company_id: string | null
           created_at: string | null
           date: string
           hours_worked: number | null
           id: string
+          is_archived: boolean | null
           notes: string | null
           overtime_hours: number | null
           personnel_id: string
@@ -2204,12 +2224,14 @@ export type Database = {
           time_in: string | null
         }
         Insert: {
+          archived_at?: string | null
           bom_scope_id?: string | null
           company_id?: string | null
           created_at?: string | null
           date: string
           hours_worked?: number | null
           id?: string
+          is_archived?: boolean | null
           notes?: string | null
           overtime_hours?: number | null
           personnel_id: string
@@ -2218,12 +2240,14 @@ export type Database = {
           time_in?: string | null
         }
         Update: {
+          archived_at?: string | null
           bom_scope_id?: string | null
           company_id?: string | null
           created_at?: string | null
           date?: string
           hours_worked?: number | null
           id?: string
+          is_archived?: boolean | null
           notes?: string | null
           overtime_hours?: number | null
           personnel_id?: string
@@ -2265,6 +2289,7 @@ export type Database = {
       site_requests: {
         Row: {
           amount: number | null
+          archived_at: string | null
           bom_scope_id: string | null
           company_id: string | null
           created_at: string | null
@@ -2285,6 +2310,7 @@ export type Database = {
         }
         Insert: {
           amount?: number | null
+          archived_at?: string | null
           bom_scope_id?: string | null
           company_id?: string | null
           created_at?: string | null
@@ -2305,6 +2331,7 @@ export type Database = {
         }
         Update: {
           amount?: number | null
+          archived_at?: string | null
           bom_scope_id?: string | null
           company_id?: string | null
           created_at?: string | null

@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Package, TrendingDown, FileText, TrendingUp, Users, Warehouse as WarehouseIcon } from "lucide-react";
+import { Package, TrendingDown, FileText, TrendingUp, Users, Warehouse as WarehouseIcon, Trash2 } from "lucide-react";
 
 // Import modular tab components
 import { SiteWarehouseTab } from "@/components/site-personnel/SiteWarehouseTab";
@@ -16,6 +16,7 @@ import { MaterialUsageTab } from "@/components/site-personnel/MaterialUsageTab";
 import { SiteRequestsTab } from "@/components/site-personnel/SiteRequestsTab";
 import { ProgressTab } from "@/components/site-personnel/ProgressTab";
 import { AttendanceTab } from "@/components/site-personnel/AttendanceTab";
+import { SitePersonnelRecycleBin } from "@/components/site-personnel/SitePersonnelRecycleBin";
 
 interface Project {
   id: string;
@@ -29,6 +30,7 @@ export default function SitePersonnelPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [recycleBinVersion, setRecycleBinVersion] = useState(0);
 
   useEffect(() => {
     void checkAuth();
@@ -212,31 +214,45 @@ export default function SitePersonnelPage() {
                     <Users className="h-3.5 w-3.5" />
                     <span>Attendance</span>
                   </TabsTrigger>
+                  <TabsTrigger
+                    value="recycle-bin"
+                    className="h-7 shrink-0 gap-1.5 whitespace-nowrap rounded-md px-2 text-[11px] font-semibold leading-none text-slate-700 data-[state=active]:bg-slate-200 data-[state=active]:text-slate-950"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Recycle Bin</span>
+                  </TabsTrigger>
                 </TabsList>
 
                 <CardContent className="px-4 pb-4 pt-0">
                   <TabsContent value="deliveries" className="mt-0">
-                    <SiteWarehouseTab projectId={selectedProjectId} />
+                    <SiteWarehouseTab key={`deliveries-${selectedProjectId}-${recycleBinVersion}`} projectId={selectedProjectId} />
                   </TabsContent>
 
                   <TabsContent value="site-warehouse" className="mt-0">
-                    <SiteWarehouseInventoryTab projectId={selectedProjectId} />
+                    <SiteWarehouseInventoryTab key={`inventory-${selectedProjectId}-${recycleBinVersion}`} projectId={selectedProjectId} />
                   </TabsContent>
 
                   <TabsContent value="usage" className="mt-0">
-                    <MaterialUsageTab projectId={selectedProjectId} />
+                    <MaterialUsageTab key={`usage-${selectedProjectId}-${recycleBinVersion}`} projectId={selectedProjectId} />
                   </TabsContent>
 
                   <TabsContent value="requests" className="mt-0">
-                    <SiteRequestsTab projectId={selectedProjectId} />
+                    <SiteRequestsTab key={`requests-${selectedProjectId}-${recycleBinVersion}`} projectId={selectedProjectId} />
                   </TabsContent>
 
                   <TabsContent value="progress" className="mt-0">
-                    <ProgressTab projectId={selectedProjectId} />
+                    <ProgressTab key={`progress-${selectedProjectId}-${recycleBinVersion}`} projectId={selectedProjectId} />
                   </TabsContent>
 
                   <TabsContent value="attendance" className="mt-0">
-                    <AttendanceTab projectId={selectedProjectId} />
+                    <AttendanceTab key={`attendance-${selectedProjectId}-${recycleBinVersion}`} projectId={selectedProjectId} />
+                  </TabsContent>
+
+                  <TabsContent value="recycle-bin" className="mt-0">
+                    <SitePersonnelRecycleBin
+                      projectId={selectedProjectId}
+                      onChange={() => setRecycleBinVersion((current) => current + 1)}
+                    />
                   </TabsContent>
                 </CardContent>
               </Tabs>

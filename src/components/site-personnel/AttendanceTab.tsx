@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Users, Plus, Trash2, CheckCircle, XCircle, Clock, Filter } from "lucide-react";
+import { siteService } from "@/services/siteService";
 
 interface AttendanceRecord {
   id: string;
@@ -232,13 +233,13 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
     if (!confirm("Delete this attendance record?")) return;
 
     try {
-      const { error } = await supabase.from("site_attendance").delete().eq("id", id);
+      const { error } = await siteService.deleteAttendance(id);
 
       if (error) throw error;
 
       toast({
-        title: "Success",
-        description: "Attendance record deleted",
+        title: "Moved to recycle bin",
+        description: "Attendance record archived",
       });
       void loadData();
     } catch (error) {

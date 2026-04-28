@@ -10,6 +10,17 @@ type ScopeOfWorkInsert = Database["public"]["Tables"]["bom_scope_of_work"]["Inse
 type ProgressUpdate = Database["public"]["Tables"]["bom_progress_updates"]["Row"];
 type ProgressUpdateInsert = Database["public"]["Tables"]["bom_progress_updates"]["Insert"];
 
+export interface SitePersonnelRecycleBinItem {
+  id: string;
+  sourceTable: "deliveries" | "material_consumption" | "site_attendance" | "bom_progress_updates";
+  sourceTab: "Deliveries" | "Usage" | "Attendance" | "Accomplishments";
+  recordType: string;
+  title: string;
+  description: string;
+  deletedAt: string | null;
+  createdAt: string | null;
+}
+
 export interface WarehouseMaterialLedgerItem {
   key: string;
   inventoryId: string | null;
@@ -128,7 +139,7 @@ export const siteService = {
   async deletePersonnel(id: string) {
     const { error } = await supabase
       .from("personnel")
-      .update({ is_archived: true } as any)
+      .update({ is_archived: true, archived_at: new Date().toISOString() } as any)
       .eq("id", id);
     return { error };
   },
@@ -147,6 +158,7 @@ export const siteService = {
       .from("site_attendance")
       .select("*, personnel(name, role, daily_rate, overtime_rate), projects(name)")
       .eq("project_id", projectId)
+      .eq("is_archived", false)
       .order("date", { ascending: false });
     
     if (date) {
@@ -181,7 +193,7 @@ export const siteService = {
   async deleteAttendance(id: string) {
     const { error } = await supabase
       .from("site_attendance")
-      .delete()
+      .update({ is_archived: true, archived_at: new Date().toISOString() } as any)
       .eq("id", id);
     
     return { error };
@@ -228,7 +240,7 @@ export const siteService = {
   async deleteDelivery(id: string) {
     const { error } = await supabase
       .from("deliveries")
-      .update({ is_archived: true } as any)
+      .update({ is_archived: true, archived_at: new Date().toISOString() } as any)
       .eq("id", id);
     
     return { error };
@@ -343,7 +355,7 @@ export const siteService = {
 
     const { error } = await supabase
       .from("material_consumption")
-      .update({ is_archived: true } as any)
+      .update({ is_archived: true, archived_at: new Date().toISOString() } as any)
       .eq("id", id);
 
     if (existing && !error) {
@@ -570,6 +582,7 @@ export const siteService = {
       .from("bom_progress_updates")
       .select("*, bom_scope_of_work(name)")
       .eq("bom_scope_id", scopeId)
+      .eq("is_archived", false)
       .order("update_date", { ascending: false });
     
     return { data: data || [], error };
@@ -613,7 +626,7 @@ export const siteService = {
   async deleteProgressUpdate(id: string) {
     const { error } = await supabase
       .from("bom_progress_updates")
-      .delete()
+      .update({ is_archived: true, archived_at: new Date().toISOString() } as any)
       .eq("id", id);
     
     return { error };
@@ -652,8 +665,188 @@ export const siteService = {
   async deleteCashAdvance(id: string) {
     const { error } = await supabase
       .from("cash_advance_requests")
-      .update({ is_archived: true } as any)
+      .update({ is_archived: true, archived_at: new Date().toISOString() } as any)
       .eq("id", id);
     return { error };
+  },
+
+  async getRecycleBinItems(projectId: string) {
+    const [deliveriesResult, usageResult, attendanceResult, progressResult] = await Promise.all([
+      supabase
+        .from("deliveries")
+        .select("id, item_name, quantity, unit, supplier, delivery_date, archived_at, created_at")
+        .eq("project_id", projectId)
+        .eq("is_archived", true),
+      supabase
+        .from("material_consumption")
+        .select("id, item_name, quantity, unit, date_used, archived_at, created_at")
+        .eq("project_id", projectId)
+        .eq("is_archived", true),
+      supabase
+        .from("site_attendance")
+        .select("id, date, status, hours_worked, overtime_hours, archived_at, created_at, personnel(name, role)")
+        .eq("project_id", projectId)
+        .eq("is_archived", true),
+      supabase
+        .from("bom_progress_updates")
+        .select("id, update_date, percentage_completed, archived_at, created_at, bom_scope_of_work(name)")
+        .eq("is_archived", true)
+        .in(
+          "bom_scope_id",
+          (
+            await supabase
+              .from("bom_scope_of_work")
+              .select("id")
+              .eq(
+                "bom_id",
+                (
+                  await supabase
+                    .from("bill_of_materials")
+                    .select("id")
+                    .eq("project_id", projectId)
+                    .maybeSingle()
+                ).data?.id || "00000000-0000-0000-0000-000000000000"
+              )
+          ).data?.map((scope) => scope.id) || []
+        ),
+    ]);
+
+    if (deliveriesResult.error) {
+      return { data: [], error: deliveriesResult.error };
+    }
+
+    if (usageResult.error) {
+      return { data: [], error: usageResult.error };
+    }
+
+    if (attendanceResult.error) {
+      return { data: [], error: attendanceResult.error };
+    }
+
+    if (progressResult.error) {
+      return { data: [], error: progressResult.error };
+    }
+
+    const attendanceItems: SitePersonnelRecycleBinItem[] = (attendanceResult.data || []).map((record) => {
+      const relatedPersonnel = Array.isArray(record.personnel) ? record.personnel[0] : record.personnel;
+
+      return {
+        id: record.id,
+        sourceTable: "site_attendance",
+        sourceTab: "Attendance",
+        recordType: "Attendance record",
+        title: relatedPersonnel?.name || "Unknown worker",
+        description: `${record.date || "No date"} • ${record.status || "present"} • ${Number(record.hours_worked || 0)}h + ${Number(record.overtime_hours || 0)}h OT`,
+        deletedAt: record.archived_at || null,
+        createdAt: record.created_at || null,
+      };
+    });
+
+    const progressItems: SitePersonnelRecycleBinItem[] = (progressResult.data || []).map((record) => {
+      const relatedScope = Array.isArray(record.bom_scope_of_work) ? record.bom_scope_of_work[0] : record.bom_scope_of_work;
+
+      return {
+        id: record.id,
+        sourceTable: "bom_progress_updates",
+        sourceTab: "Accomplishments",
+        recordType: "Progress update",
+        title: relatedScope?.name || "Scope update",
+        description: `${Number(record.percentage_completed || 0)}% completed • ${record.update_date || "No date"}`,
+        deletedAt: record.archived_at || null,
+        createdAt: record.created_at || null,
+      };
+    });
+
+    const data: SitePersonnelRecycleBinItem[] = [
+      ...(deliveriesResult.data || []).map((record) => ({
+        id: record.id,
+        sourceTable: "deliveries" as const,
+        sourceTab: "Deliveries" as const,
+        recordType: "Delivery record",
+        title: record.item_name,
+        description: `${Number(record.quantity || 0)} ${record.unit || ""} • ${record.supplier || "No supplier"} • ${record.delivery_date || "No date"}`,
+        deletedAt: record.archived_at || null,
+        createdAt: record.created_at || null,
+      })),
+      ...(usageResult.data || []).map((record) => ({
+        id: record.id,
+        sourceTable: "material_consumption" as const,
+        sourceTab: "Usage" as const,
+        recordType: "Material usage",
+        title: record.item_name,
+        description: `${Number(record.quantity || 0)} ${record.unit || ""} • ${record.date_used || "No date"}`,
+        deletedAt: record.archived_at || null,
+        createdAt: record.created_at || null,
+      })),
+      ...attendanceItems,
+      ...progressItems,
+    ].sort((left, right) => {
+      const leftTime = new Date(left.deletedAt || left.createdAt || 0).getTime();
+      const rightTime = new Date(right.deletedAt || right.createdAt || 0).getTime();
+      return rightTime - leftTime;
+    });
+
+    return { data, error: null };
+  },
+
+  async restoreRecycleBinItem(item: Pick<SitePersonnelRecycleBinItem, "id" | "sourceTable">) {
+    if (item.sourceTable === "deliveries") {
+      return await supabase
+        .from("deliveries")
+        .update({ is_archived: false, archived_at: null } as any)
+        .eq("id", item.id);
+    }
+
+    if (item.sourceTable === "material_consumption") {
+      const { data: existing } = await supabase
+        .from("material_consumption")
+        .select("project_id, item_name, unit, quantity")
+        .eq("id", item.id)
+        .maybeSingle();
+
+      const result = await supabase
+        .from("material_consumption")
+        .update({ is_archived: false, archived_at: null } as any)
+        .eq("id", item.id);
+
+      if (!result.error && existing) {
+        await adjustProjectInventoryBalance({
+          projectId: existing.project_id,
+          itemName: existing.item_name,
+          unit: existing.unit,
+          quantityDelta: -Number(existing.quantity || 0),
+        });
+      }
+
+      return result;
+    }
+
+    if (item.sourceTable === "site_attendance") {
+      return await supabase
+        .from("site_attendance")
+        .update({ is_archived: false, archived_at: null } as any)
+        .eq("id", item.id);
+    }
+
+    return await supabase
+      .from("bom_progress_updates")
+      .update({ is_archived: false, archived_at: null } as any)
+      .eq("id", item.id);
+  },
+
+  async permanentlyDeleteRecycleBinItem(item: Pick<SitePersonnelRecycleBinItem, "id" | "sourceTable">) {
+    if (item.sourceTable === "deliveries") {
+      return await supabase.from("deliveries").delete().eq("id", item.id);
+    }
+
+    if (item.sourceTable === "material_consumption") {
+      return await supabase.from("material_consumption").delete().eq("id", item.id);
+    }
+
+    if (item.sourceTable === "site_attendance") {
+      return await supabase.from("site_attendance").delete().eq("id", item.id);
+    }
+
+    return await supabase.from("bom_progress_updates").delete().eq("id", item.id);
   }
 };
