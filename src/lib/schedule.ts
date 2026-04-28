@@ -73,8 +73,12 @@ export function toNumber(value: unknown, fallback = 0): number {
 }
 
 function parseRoleAllocations(value: unknown, fallback = DEFAULT_ROLE_ALLOCATION): TaskRoleAllocation[] {
-  if (!Array.isArray(value) || value.length === 0) {
+  if (!Array.isArray(value)) {
     return fallback.map((item) => ({ ...item }));
+  }
+
+  if (value.length === 0) {
+    return [];
   }
 
   return value.map((item, index) => {

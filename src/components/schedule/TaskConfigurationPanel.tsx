@@ -6,22 +6,26 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { TeamCompositionEditor } from "@/components/schedule/TeamCompositionEditor";
 import type { TaskDependency, TaskFormData } from "@/lib/schedule";
 import type {
   SaveTaskMaterialDeliveryPlanInput,
   TaskLaborCostSummary,
 } from "@/services/taskPlanningService";
+import type { ProjectManpowerCatalogItem } from "@/services/projectManpowerCatalogService";
 import {
-  applyTeamTemplate,
   calculateRequiredDurationDays,
   calculateTotalDailyOutput,
+  calculateTotalTeamDailyCost,
+  calculateTotalTeamMembers,
+  getMemberDailyRate,
   getProductivitySummary,
   getTaskConfigurationValidation,
   normalizeTaskConfiguration,
   type TaskConfiguration,
 } from "@/lib/scheduleTaskConfig";
 import type { MasterTeamTemplate } from "@/services/masterCatalogService";
-import { AlignLeft, Clock, Package, Settings2, Wrench } from "lucide-react";
+import { AlignLeft, Clock, Settings2, Wrench } from "lucide-react";
 
 type EditableTaskScope = NonNullable<TaskFormData["bom_scope"]>;
 
@@ -40,9 +44,8 @@ interface ManpowerRateOption {
 interface TaskConfigurationPanelProps {
   task: EditableProjectTask | null;
   tasks: EditableProjectTask[];
-  teamTemplates?: MasterTeamTemplate[];
   materialDeliveryPlans?: SaveTaskMaterialDeliveryPlanInput[];
-  manpowerRates?: ManpowerRateOption[];
+  manpowerCatalogItems?: ProjectManpowerCatalogItem[];
   laborCostSummary?: Pick<TaskLaborCostSummary, "dailyCost" | "totalCost" | "durationDays" | "rateSnapshot"> | null;
   saving: boolean;
   embedded?: boolean;
@@ -110,7 +113,7 @@ export function TaskConfigurationPanel({
   tasks,
   teamTemplates = [],
   materialDeliveryPlans = [],
-  manpowerRates = [],
+  manpowerCatalogItems = [],
   laborCostSummary = null,
   saving,
   onTaskChange,
@@ -151,12 +154,14 @@ export function TaskConfigurationPanel({
   const linkedMaterials = Array.isArray(task.bom_scope?.materials) ? task.bom_scope.materials : [];
   const equipmentValue = Array.isArray(task.equipment) ? task.equipment.join("\n") : "";
   const productivitySummary = getProductivitySummary(taskConfig);
-  const validation = getTaskConfigurationValidation(taskConfig);
+  const validation = getTaskConfigurationValidation(taskConfig, manpowerCatalogItems);
   const estimatedDuration = calculateRequiredDurationDays(taskConfig);
   const totalDailyOutput = calculateTotalDailyOutput(taskConfig);
+  const totalTeamMembers = calculateTotalTeamMembers(taskConfig);
+  const totalDailyLaborCost = calculateTotalTeamDailyCost(taskConfig);
   const selectedTemplate = teamTemplates.find((template) => template.id === taskConfig.teamTemplateId) || null;
   const ratesByPosition = new Map(
-    manpowerRates.map((rate) => [rate.positionName.trim().toLowerCase(), rate] as const)
+    manpowerCatalogItems.map((item) => [item.positionName.trim().toLowerCase(), item] as const)
   );
   const resourceMaterialPlans =
     materialDeliveryPlans.length > 0
@@ -553,39 +558,58 @@ export function TaskConfigurationPanel({
                   <div>
                     <h3 className="text-sm font-semibold text-foreground">Team Assignment</h3>
                     <p className="text-[11px] text-muted-foreground">
-                      Labor rates are pulled from the HR manpower catalog and multiplied by the assigned teams.
+                      Member positions and default rates come from the project Manpower Catalog only.
                     </p>
                   </div>
-                  <Badge variant="outline">{taskConfig.numberOfTeams} team(s)</Badge>
+                  <Badge variant="outline">{taskConfig.teams.length} team setup(s)</Badge>
                 </div>
 
-                {taskConfig.teamRoles.length > 0 ? (
-                  <div className="space-y-2">
-                    {taskConfig.teamRoles.map((role) => {
-                      const matchedRate = ratesByPosition.get(role.role.trim().toLowerCase());
-                      const totalAssigned = Math.max(1, Math.round(role.quantity)) * taskConfig.numberOfTeams;
-                      const dailySubtotal = totalAssigned * Number(matchedRate?.dailyRate || 0);
-
-                      return (
-                        <div key={role.id} className="rounded-md border bg-muted/20 p-3 text-xs">
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <p className="font-semibold text-foreground">{role.role}</p>
-                              <p className="text-muted-foreground">{totalAssigned} assigned across all teams</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="font-medium text-foreground">
-                                AED {Number(matchedRate?.dailyRate || 0).toFixed(2)}/day
-                              </p>
-                              <p className="text-muted-foreground">Daily subtotal AED {dailySubtotal.toFixed(2)}</p>
-                            </div>
+                {taskConfig.teams.length > 0 ? (
+                  <div className="space-y-3">
+                    {taskConfig.teams.map((team) => (
+                      <div key={team.id} className="rounded-md border bg-muted/20 p-3 text-xs">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="font-semibold text-foreground">{team.teamName}</p>
+                            <p className="text-muted-foreground">
+                              {team.members.length} member(s) per team × {team.numberOfTeams} team(s)
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium text-foreground">
+                              {team.members.length * team.numberOfTeams} total personnel
+                            </p>
+                            <p className="text-muted-foreground">
+                              Daily subtotal AED {calculateTotalTeamDailyCost({ ...taskConfig, teams: [team] }).toFixed(2)}
+                            </p>
                           </div>
                         </div>
-                      );
-                    })}
+
+                        <div className="mt-3 space-y-2">
+                          {team.members.map((member) => (
+                            <div key={member.id} className="flex items-center justify-between rounded-md border bg-background px-3 py-2">
+                              <div>
+                                <p className="font-medium text-foreground">{member.positionName || "Unassigned"}</p>
+                                <p className="text-muted-foreground">
+                                  Rate can be overridden per member while keeping the catalog default available.
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-foreground">
+                                  AED {Number(member.rate || 0).toFixed(2)}/{member.unit === "hour" ? "hr" : "day"}
+                                </p>
+                                <p className="text-muted-foreground">
+                                  Daily equivalent AED {getMemberDailyRate(member, taskConfig.workHoursPerDay).toFixed(2)}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground">Select a team type to populate the manpower assignment list.</p>
+                  <p className="text-xs text-muted-foreground">Add at least one team in Parameters to populate this manpower plan.</p>
                 )}
               </section>
 

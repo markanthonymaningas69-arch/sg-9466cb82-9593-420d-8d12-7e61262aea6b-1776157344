@@ -3,6 +3,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { Layout } from "@/components/Layout";
 import { CalendarView } from "@/components/schedule/CalendarView";
 import { GanttView } from "@/components/schedule/GanttView";
+import { ProjectManpowerCatalogTab } from "@/components/schedule/ProjectManpowerCatalogTab";
 import { SCurveView } from "@/components/schedule/SCurveView";
 import { TaskConfigurationPanel, type EditableProjectTask } from "@/components/schedule/TaskConfigurationPanel";
 import { Badge } from "@/components/ui/badge";
@@ -10,10 +11,26 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { createDraftTask, applyDependencyScheduling, type TaskDependency, type TaskFormData, type TaskRoleAllocation } from "@/lib/schedule";
-import { calculateRequiredDurationDays, createDefaultTaskConfiguration, normalizeTaskConfiguration } from "@/lib/scheduleTaskConfig";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  applyDependencyScheduling,
+  createDraftTask,
+  type TaskDependency,
+  type TaskFormData,
+  type TaskRoleAllocation,
+} from "@/lib/schedule";
+import {
+  calculateRequiredDurationDays,
+  calculateTotalTeamDailyCost,
+  createDefaultTaskConfiguration,
+  flattenTeamsToRoleAllocations,
+  getMemberDailyRate,
+  normalizeTaskConfiguration,
+} from "@/lib/scheduleTaskConfig";
 import { projectService } from "@/services/projectService";
+import {
+  projectManpowerCatalogService,
+  type ProjectManpowerCatalogItem,
+} from "@/services/projectManpowerCatalogService";
 import { scheduleService } from "@/services/scheduleService";
 import { scurveService } from "@/services/scurveService";
 import { taskPlanningService, type SaveTaskMaterialDeliveryPlanInput } from "@/services/taskPlanningService";
@@ -111,11 +128,17 @@ function normalizeEditableTask(task: ScheduleTaskRecord): EditableProjectTask {
 }
 
 function createTaskRoleAllocations(task: EditableProjectTask): TaskRoleAllocation[] {
-  return normalizeTaskConfiguration(task.task_config, {
-    quantity: task.bom_scope?.quantity,
-    unit: task.bom_scope?.unit,
-    assignedTeamName: task.assigned_team,
-  }).teamRoles.map((role) => ({ id: role.id, role: role.role, count: Math.max(1, Math.round(role.quantity)) }));
+  return flattenTeamsToRoleAllocations(
+    normalizeTaskConfiguration(task.task_config, {
+      quantity: task.bom_scope?.quantity,
+      unit: task.bom_scope?.unit,
+      assignedTeamName: task.assigned_team,
+    })
+  ).map((role) => ({
+    id: role.id,
+    role: role.role,
+    count: Math.max(1, Math.round(role.quantity)),
+  }));
 }
 
 function toTaskFormData(task: EditableProjectTask): TaskFormData {
@@ -231,26 +254,60 @@ function mergeMaterialDeliveryPlans(task: EditableProjectTask, storedPlans: Save
   });
 }
 
-function calculateTaskLaborCostSummary(task: EditableProjectTask, rates: ManpowerRateRecord[]): ComputedTaskLaborCostSummary {
+function calculateTaskLaborCostSummary(
+  task: EditableProjectTask,
+  catalogItems: ProjectManpowerCatalogItem[]
+): ComputedTaskLaborCostSummary {
   const taskConfig = normalizeTaskConfiguration(task.task_config, {
     quantity: task.bom_scope?.quantity,
     unit: task.bom_scope?.unit,
     assignedTeamName: task.assigned_team,
   });
-  const rateMap = new Map(rates.map((rate) => [rate.positionName.trim().toLowerCase(), rate] as const));
-  const teams = Math.max(1, Number(taskConfig.numberOfTeams || task.number_of_teams || 1));
   const durationDays = Math.max(1, Number(task.duration_days || calculateRequiredDurationDays(taskConfig)));
-  const rateSnapshot = taskConfig.teamRoles.map((role) => {
-    const matched = rateMap.get(role.role.trim().toLowerCase());
-    return {
-      role: role.role,
-      count: Math.max(1, Math.round(role.quantity)) * teams,
-      dailyRate: Number(matched?.dailyRate || 0),
-      overtimeRate: Number(matched?.overtimeRate || 0),
-    };
+  const catalogByName = new Map(
+    catalogItems.map((item) => [item.positionName.trim().toLowerCase(), item] as const)
+  );
+  const rateSnapshotMap = new Map<string, { role: string; count: number; dailyRate: number; overtimeRate: number }>();
+
+  taskConfig.teams.forEach((team) => {
+    const teamMultiplier = Math.max(1, Number(team.numberOfTeams || 1));
+
+    team.members.forEach((member) => {
+      const matchedCatalog = catalogByName.get(member.positionName.trim().toLowerCase()) || null;
+      const dailyRate = getMemberDailyRate(
+        {
+          ...member,
+          rate: Number(member.rate || matchedCatalog?.standardRate || 0),
+          unit: matchedCatalog?.unit || member.unit,
+        },
+        taskConfig.workHoursPerDay
+      );
+      const key = `${member.positionName.trim().toLowerCase()}-${dailyRate}`;
+      const existing = rateSnapshotMap.get(key);
+
+      if (existing) {
+        existing.count += teamMultiplier;
+        return;
+      }
+
+      rateSnapshotMap.set(key, {
+        role: member.positionName || "Unassigned",
+        count: teamMultiplier,
+        dailyRate,
+        overtimeRate: 0,
+      });
+    });
   });
-  const dailyCost = rateSnapshot.reduce((total, item) => total + item.count * item.dailyRate, 0);
-  return { taskId: task.id || "", dailyCost: Number(dailyCost.toFixed(2)), totalCost: Number((dailyCost * durationDays).toFixed(2)), durationDays, rateSnapshot };
+
+  const dailyCost = calculateTotalTeamDailyCost(taskConfig);
+
+  return {
+    taskId: task.id || "",
+    dailyCost: Number(dailyCost.toFixed(2)),
+    totalCost: Number((dailyCost * durationDays).toFixed(2)),
+    durationDays,
+    rateSnapshot: Array.from(rateSnapshotMap.values()),
+  };
 }
 
 export default function SchedulePage() {
@@ -259,9 +316,9 @@ export default function SchedulePage() {
   const [selectedProject, setSelectedProject] = useState("");
   const [tasks, setTasks] = useState<EditableProjectTask[]>([]);
   const [selectedTask, setSelectedTask] = useState<EditableProjectTask | null>(null);
-  const [viewMode, setViewMode] = useState<"list" | "gantt" | "calendar" | "scurve">("list");
+  const [viewMode, setViewMode] = useState<"list" | "gantt" | "calendar" | "scurve" | "catalog">("list");
   const [panelOpen, setPanelOpen] = useState(false);
-  const [manpowerRates, setManpowerRates] = useState<ManpowerRateRecord[]>([]);
+  const [manpowerCatalogItems, setManpowerCatalogItems] = useState<ProjectManpowerCatalogItem[]>([]);
   const [materialDeliveryPlansByTask, setMaterialDeliveryPlansByTask] = useState<Record<string, SaveTaskMaterialDeliveryPlanInput[]>>({});
   const [laborCostSummaries, setLaborCostSummaries] = useState<Record<string, ComputedTaskLaborCostSummary | null>>({});
   const [loading, setLoading] = useState(true);
@@ -292,10 +349,25 @@ export default function SchedulePage() {
         ? "Calendar"
         : viewMode === "scurve"
           ? "S-Curve"
-          : "Task List";
+          : viewMode === "catalog"
+            ? "Manpower Catalog"
+            : "Task List";
 
-  useEffect(() => { void loadProjects(); void loadManpowerRates(); }, []);
-  useEffect(() => { if (selectedProject) { void loadTasks(selectedProject); } else { setTasks([]); setSelectedTask(null); setLoading(false); } }, [selectedProject]);
+  useEffect(() => {
+    void loadProjects();
+  }, []);
+
+  useEffect(() => {
+    if (selectedProject) {
+      void loadTasks(selectedProject);
+      void loadProjectManpowerCatalog(selectedProject);
+    } else {
+      setTasks([]);
+      setSelectedTask(null);
+      setLoading(false);
+      setManpowerCatalogItems([]);
+    }
+  }, [selectedProject]);
 
   async function loadProjects() {
     try {
@@ -339,6 +411,20 @@ export default function SchedulePage() {
       toast({ title: "Error", description: "Failed to load schedule", variant: "destructive" });
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadProjectManpowerCatalog(projectId: string) {
+    try {
+      const data = await projectManpowerCatalogService.listByProject(projectId);
+      setManpowerCatalogItems(data);
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: "Error",
+        description: "Failed to load the project manpower catalog",
+        variant: "destructive",
+      });
     }
   }
 
@@ -416,7 +502,10 @@ export default function SchedulePage() {
   }
 
   const currentMaterialDeliveryPlans = useMemo(() => selectedTask ? mergeMaterialDeliveryPlans(selectedTask, selectedTask.id ? materialDeliveryPlansByTask[selectedTask.id] || [] : []) : [], [selectedTask, materialDeliveryPlansByTask]);
-  const currentLaborCostSummary = useMemo(() => selectedTask ? calculateTaskLaborCostSummary(selectedTask, manpowerRates) : null, [selectedTask, manpowerRates]);
+  const currentLaborCostSummary = useMemo(
+    () => (selectedTask ? calculateTaskLaborCostSummary(selectedTask, manpowerCatalogItems) : null),
+    [selectedTask, manpowerCatalogItems]
+  );
 
   useEffect(() => {
     const taskId = selectedTask?.id;
@@ -543,7 +632,7 @@ export default function SchedulePage() {
               task={selectedTask}
               tasks={sortedTasks}
               materialDeliveryPlans={currentMaterialDeliveryPlans}
-              manpowerRates={manpowerRates}
+              manpowerCatalogItems={manpowerCatalogItems}
               laborCostSummary={selectedTask?.id ? laborCostSummaries[selectedTask.id] || currentLaborCostSummary : currentLaborCostSummary}
               saving={saving}
               embedded
@@ -578,6 +667,9 @@ export default function SchedulePage() {
                     </Button>
                     <Button type="button" variant={viewMode === "scurve" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("scurve")}>
                       S-Curve
+                    </Button>
+                    <Button type="button" variant={viewMode === "catalog" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("catalog")}>
+                      Manpower Catalog
                     </Button>
                   </div>
 
@@ -705,6 +797,11 @@ export default function SchedulePage() {
                       <GanttView tasks={sortedTasks} />
                     ) : viewMode === "calendar" ? (
                       <CalendarView tasks={sortedTasks} projectName={selectedProjectName} />
+                    ) : viewMode === "catalog" ? (
+                      <ProjectManpowerCatalogTab
+                        projectId={selectedProject}
+                        onCatalogChanged={setManpowerCatalogItems}
+                      />
                     ) : (
                       <SCurveView projectId={selectedProject} projectName={selectedProjectName} />
                     )}
