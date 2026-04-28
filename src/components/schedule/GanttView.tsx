@@ -165,6 +165,10 @@ export function GanttView({
 
   const dependencyPaths = scheduledTasks.flatMap((task) =>
     task.dependencies.map((dependency) => {
+      if (selectedTaskId && (task.id === selectedTaskId || dependency.taskId === selectedTaskId)) {
+        return null;
+      }
+
       const predecessor = taskGeometry.get(dependency.taskId);
       const successor = taskGeometry.get(task.id);
 
@@ -337,14 +341,16 @@ export function GanttView({
                               Selected
                             </span>
                           ) : null}
-                          {task.dependencies.map((dependency) => (
-                            <span
-                              key={`${task.id}-${dependency.taskId}-${dependency.type}`}
-                              className="rounded-full border border-border bg-muted px-2 py-0.5 text-[9px] text-muted-foreground"
-                            >
-                              {getDependencyLabel(dependency)}
-                            </span>
-                          ))}
+                          {!isSelected
+                            ? task.dependencies.map((dependency) => (
+                                <span
+                                  key={`${task.id}-${dependency.taskId}-${dependency.type}`}
+                                  className="rounded-full border border-border bg-muted px-2 py-0.5 text-[9px] text-muted-foreground"
+                                >
+                                  {getDependencyLabel(dependency)}
+                                </span>
+                              ))
+                            : null}
                         </div>
                       </div>
                     </div>
