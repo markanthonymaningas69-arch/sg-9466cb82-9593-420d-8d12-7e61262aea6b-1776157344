@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import {
   applyDependencyScheduling,
+  calculateCriticalPathTaskIds,
   createDraftTask,
   type TaskDependency,
   type TaskFormData,
@@ -371,6 +372,14 @@ export default function SchedulePage() {
   const dependentTaskCount = useMemo(
     () => sortedTasks.filter((task) => task.dependencies.length > 0).length,
     [sortedTasks]
+  );
+  const criticalPathTaskIds = useMemo(
+    () => calculateCriticalPathTaskIds(sortedTasks.map(toTaskFormData)),
+    [sortedTasks]
+  );
+  const criticalPathTaskIdSet = useMemo(
+    () => new Set(criticalPathTaskIds),
+    [criticalPathTaskIds]
   );
   const activeViewLabel =
     viewMode === "gantt"
@@ -779,6 +788,9 @@ export default function SchedulePage() {
               <div className="hidden flex-wrap items-center gap-2 xl:flex">
                 <Badge variant="outline">Tasks {sortedTasks.length}</Badge>
                 <Badge variant="outline">Dependencies {dependentTaskCount}</Badge>
+                <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-700">
+                  Critical Path {criticalPathTaskIds.length}
+                </Badge>
                 <Badge variant="outline">Daily Labor AED {Number(currentLaborCostSummary?.dailyCost || 0).toFixed(0)}</Badge>
               </div>
             </div>
@@ -843,46 +855,61 @@ export default function SchedulePage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {sortedTasks.map((task) => (
-                          <tr
-                            key={task.id || task.name}
-                            className={`cursor-pointer border-b ${selectedTask?.id === task.id ? "bg-primary/5" : "hover:bg-muted/30"}`}
-                            onClick={() => handleTaskSelect(task)}
-                          >
-                            <td className="px-3 py-3 font-medium">
-                              {task.name}
-                              <div className="mt-1">
-                                <Badge variant="outline">{task.dependencies.length} predecessor(s)</Badge>
-                              </div>
-                            </td>
-                            <td className="px-3 py-3">{task.start_date || "-"}</td>
-                            <td className="px-3 py-3">{task.duration_days || 0} day(s)</td>
-                            <td className="px-3 py-3">
-                              {task.dependencies.map((dependency) => `${dependency.type}${dependency.lagDays ? ` +${dependency.lagDays}` : ""}`).join(", ") || "-"}
-                            </td>
-                            <td className="px-3 py-3 text-right">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  if (task.id) void handleDeleteTask(task.id);
-                                }}
-                                disabled={!task.id || saving}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
+                        {sortedTasks.map((task) => {
+                          const isCritical = task.id ? criticalPathTaskIdSet.has(task.id) : false;
+
+                          return (
+                            <tr
+                              key={task.id || task.name}
+                              className={`cursor-pointer border-b ${
+                                selectedTask?.id === task.id
+                                  ? "bg-primary/5"
+                                  : isCritical
+                                    ? "bg-amber-500/5 hover:bg-amber-500/10"
+                                    : "hover:bg-muted/30"
+                              }`}
+                              onClick={() => handleTaskSelect(task)}
+                            >
+                              <td className="px-3 py-3 font-medium">
+                                {task.name}
+                                <div className="mt-1 flex flex-wrap gap-1.5">
+                                  <Badge variant="outline">{task.dependencies.length} predecessor(s)</Badge>
+                                  {isCritical ? (
+                                    <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-700">
+                                      Critical path
+                                    </Badge>
+                                  ) : null}
+                                </div>
+                              </td>
+                              <td className="px-3 py-3">{task.start_date || "-"}</td>
+                              <td className="px-3 py-3">{task.duration_days || 0} day(s)</td>
+                              <td className="px-3 py-3">
+                                {task.dependencies.map((dependency) => `${dependency.type}${dependency.lagDays ? ` +${dependency.lagDays}` : ""}`).join(", ") || "-"}
+                              </td>
+                              <td className="px-3 py-3 text-right">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    if (task.id) void handleDeleteTask(task.id);
+                                  }}
+                                  disabled={!task.id || saving}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
                 ) : (
                   <div className="h-full overflow-auto p-3">
                     {viewMode === "gantt" ? (
-                      <GanttView tasks={sortedTasks} />
+                      <GanttView tasks={sortedTasks} criticalTaskIds={criticalPathTaskIds} />
                     ) : viewMode === "calendar" ? (
                       <CalendarView tasks={sortedTasks} projectName={selectedProjectName} />
                     ) : viewMode === "catalog" ? (

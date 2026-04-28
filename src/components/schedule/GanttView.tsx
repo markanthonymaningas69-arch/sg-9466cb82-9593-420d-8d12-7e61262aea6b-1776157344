@@ -13,6 +13,7 @@ interface GanttTaskItem {
 
 interface GanttViewProps {
   tasks: GanttTaskItem[];
+  criticalTaskIds?: string[];
 }
 
 const DAY_WIDTH = 38;
@@ -74,7 +75,12 @@ function getDependencyLabel(dependency: TaskDependency) {
   return dependency.lagDays > 0 ? `${dependency.type} +${dependency.lagDays}` : dependency.type;
 }
 
-export function GanttView({ tasks }: GanttViewProps) {
+function getCriticalTaskClasses(isCritical: boolean) {
+  return isCritical ? "border-amber-500/60 bg-amber-500/12 text-amber-800 shadow-[0_0_0_1px_rgba(245,158,11,0.25)]" : "";
+}
+
+export function GanttView({ tasks, criticalTaskIds = [] }: GanttViewProps) {
+  const criticalTaskIdSet = new Set(criticalTaskIds);
   const scheduledTasks = tasks
     .filter((task) => task.id && task.start_date && task.end_date)
     .sort((left, right) => {
@@ -186,6 +192,10 @@ export function GanttView({ tasks }: GanttViewProps) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2 rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-700">
+          <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+          <span>Critical path</span>
+        </div>
         {(["FS", "SS", "FF", "SF"] as TaskDependency["type"][]).map((type) => (
           <div key={type} className="flex items-center gap-2 rounded-full border bg-background px-3 py-1 text-xs text-muted-foreground">
             <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: dependencyColors[type] }} />
@@ -279,6 +289,8 @@ export function GanttView({ tasks }: GanttViewProps) {
             <div className="relative z-20">
               {scheduledTasks.map((task) => {
                 const geometry = taskGeometry.get(task.id);
+                const isCritical = criticalTaskIdSet.has(task.id);
+
                 if (!geometry) {
                   return null;
                 }
@@ -299,6 +311,11 @@ export function GanttView({ tasks }: GanttViewProps) {
                           <span className={`rounded-full border px-2 py-0.5 text-[9px] font-medium ${getTaskTone(task.status)}`}>
                             {task.status?.replaceAll("_", " ") || "pending"}
                           </span>
+                          {isCritical ? (
+                            <span className="rounded-full border border-amber-500/50 bg-amber-500/10 px-2 py-0.5 text-[9px] font-medium text-amber-700">
+                              Critical path
+                            </span>
+                          ) : null}
                           {task.dependencies.map((dependency) => (
                             <span
                               key={`${task.id}-${dependency.taskId}-${dependency.type}`}
@@ -313,7 +330,7 @@ export function GanttView({ tasks }: GanttViewProps) {
 
                     <div className="relative" style={{ width: timelineWidth, height: ROW_HEIGHT }}>
                       <div
-                        className={`absolute flex flex-col justify-center overflow-hidden rounded-lg border px-2 py-1 shadow-sm ${getTaskTone(task.status)}`}
+                        className={`absolute flex flex-col justify-center overflow-hidden rounded-lg border px-2 py-1 shadow-sm ${getTaskTone(task.status)} ${getCriticalTaskClasses(isCritical)}`}
                         style={{
                           left: geometry.barLeft,
                           top: geometry.barInsetTop,

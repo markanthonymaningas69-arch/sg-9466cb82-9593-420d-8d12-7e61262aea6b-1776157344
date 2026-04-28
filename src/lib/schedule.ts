@@ -210,6 +210,47 @@ function getDependencyConstraintStartDate(
   return null;
 }
 
+function getDependencyStartOffset(
+  predecessorDurationDays: number,
+  successorDurationDays: number,
+  dependency: TaskDependency
+) {
+  if (dependency.type === "SS") {
+    return dependency.lagDays;
+  }
+
+  if (dependency.type === "FF") {
+    return predecessorDurationDays + dependency.lagDays - successorDurationDays;
+  }
+
+  if (dependency.type === "SF") {
+    return dependency.lagDays - successorDurationDays + 1;
+  }
+
+  return predecessorDurationDays + dependency.lagDays;
+}
+
+function getLatestPredecessorStart(
+  successorLatestStart: number,
+  predecessorDurationDays: number,
+  successorDurationDays: number,
+  dependency: TaskDependency
+) {
+  if (dependency.type === "SS") {
+    return successorLatestStart - dependency.lagDays;
+  }
+
+  if (dependency.type === "FF") {
+    return successorLatestStart + successorDurationDays - predecessorDurationDays - dependency.lagDays;
+  }
+
+  if (dependency.type === "SF") {
+    return successorLatestStart + successorDurationDays - 1 - dependency.lagDays;
+  }
+
+  return successorLatestStart - dependency.lagDays - predecessorDurationDays;
+}
+
 export function syncTaskDerivedFields(task: TaskFormData, forceAuto = false): TaskFormData {
   const durationSource = forceAuto ? "auto" : task.duration_source || "auto";
   const normalizedTask: TaskFormData = {
@@ -309,6 +350,120 @@ export function applyDependencyScheduling(tasks: TaskFormData[]) {
   }
 
   return orderedTasks;
+}
+
+export function calculateCriticalPathTaskIds(tasks: TaskFormData[]) {
+  const scheduledTasks = applyDependencyScheduling(tasks).filter((task) => Boolean(task.id));
+
+  if (scheduledTasks.length === 0) {
+    return [];
+  }
+
+  const orderedTasks = [...scheduledTasks].sort((left, right) => {
+    const sortDelta = Number(left.sort_order || 0) - Number(right.sort_order || 0);
+    if (sortDelta !== 0) {
+      return sortDelta;
+    }
+
+    const leftStart = left.start_date || "";
+    const rightStart = right.start_date || "";
+    return leftStart.localeCompare(rightStart) || left.name.localeCompare(right.name);
+  });
+
+  const durationById = new Map(
+    orderedTasks.map((task) => [task.id, Math.max(1, Math.round(toNumber(task.duration_days, 1)))] as const)
+  );
+  const earliestStartById = new Map(orderedTasks.map((task) => [task.id, 0] as const));
+  const successorsById = new Map<string, Array<{ taskId: string; dependency: TaskDependency }>>();
+
+  orderedTasks.forEach((task) => {
+    task.dependencies.forEach((dependency) => {
+      if (!durationById.has(dependency.taskId) || dependency.taskId === task.id) {
+        return;
+      }
+
+      const existing = successorsById.get(dependency.taskId) || [];
+      existing.push({ taskId: task.id, dependency });
+      successorsById.set(dependency.taskId, existing);
+    });
+  });
+
+  for (let passIndex = 0; passIndex < orderedTasks.length; passIndex += 1) {
+    let changed = false;
+
+    orderedTasks.forEach((task) => {
+      const successorLinks = successorsById.get(task.id) || [];
+      const taskEarliestStart = earliestStartById.get(task.id) || 0;
+      const predecessorDurationDays = durationById.get(task.id) || 1;
+
+      successorLinks.forEach(({ taskId, dependency }) => {
+        const successorDurationDays = durationById.get(taskId) || 1;
+        const currentSuccessorStart = earliestStartById.get(taskId) || 0;
+        const candidateSuccessorStart =
+          taskEarliestStart +
+          getDependencyStartOffset(predecessorDurationDays, successorDurationDays, dependency);
+
+        if (candidateSuccessorStart > currentSuccessorStart) {
+          earliestStartById.set(taskId, candidateSuccessorStart);
+          changed = true;
+        }
+      });
+    });
+
+    if (!changed) {
+      break;
+    }
+  }
+
+  const projectFinish = orderedTasks.reduce((latestFinish, task) => {
+    const earliestStart = earliestStartById.get(task.id) || 0;
+    const durationDays = durationById.get(task.id) || 1;
+    return Math.max(latestFinish, earliestStart + durationDays - 1);
+  }, 0);
+
+  const latestStartById = new Map(
+    orderedTasks.map((task) => {
+      const durationDays = durationById.get(task.id) || 1;
+      return [task.id, projectFinish - durationDays + 1] as const;
+    })
+  );
+
+  for (let passIndex = 0; passIndex < orderedTasks.length; passIndex += 1) {
+    let changed = false;
+
+    [...orderedTasks].reverse().forEach((task) => {
+      const successorLatestStart = latestStartById.get(task.id) || 0;
+      const successorDurationDays = durationById.get(task.id) || 1;
+
+      task.dependencies.forEach((dependency) => {
+        if (!durationById.has(dependency.taskId) || dependency.taskId === task.id) {
+          return;
+        }
+
+        const predecessorDurationDays = durationById.get(dependency.taskId) || 1;
+        const currentPredecessorLatestStart = latestStartById.get(dependency.taskId) || 0;
+        const candidatePredecessorLatestStart = getLatestPredecessorStart(
+          successorLatestStart,
+          predecessorDurationDays,
+          successorDurationDays,
+          dependency
+        );
+
+        if (candidatePredecessorLatestStart < currentPredecessorLatestStart) {
+          latestStartById.set(dependency.taskId, candidatePredecessorLatestStart);
+          changed = true;
+        }
+      });
+    });
+
+    if (!changed) {
+      break;
+    }
+  }
+
+  return orderedTasks
+    .filter((task) => (latestStartById.get(task.id) || 0) === (earliestStartById.get(task.id) || 0))
+    .map((task) => task.id);
 }
 
 export function hydrateTask(
