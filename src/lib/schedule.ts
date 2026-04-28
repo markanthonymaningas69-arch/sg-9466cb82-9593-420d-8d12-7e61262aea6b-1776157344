@@ -370,10 +370,10 @@ export function calculateCriticalPathTaskIds(tasks: TaskFormData[]) {
     return leftStart.localeCompare(rightStart) || left.name.localeCompare(right.name);
   });
 
-  const durationById = new Map(
-    orderedTasks.map((task) => [task.id, Math.max(1, Math.round(toNumber(task.duration_days, 1)))] as const)
+  const durationById = new Map<string, number>(
+    orderedTasks.map((task) => [task.id, Math.max(1, Math.round(toNumber(task.duration_days, 1)))])
   );
-  const earliestStartById = new Map(orderedTasks.map((task) => [task.id, 0] as const));
+  const earliestStartById = new Map<string, number>(orderedTasks.map((task) => [task.id, 0]));
   const successorsById = new Map<string, Array<{ taskId: string; dependency: TaskDependency }>>();
 
   orderedTasks.forEach((task) => {
@@ -421,10 +421,10 @@ export function calculateCriticalPathTaskIds(tasks: TaskFormData[]) {
     return Math.max(latestFinish, earliestStart + durationDays - 1);
   }, 0);
 
-  const latestStartById = new Map(
+  const latestStartById = new Map<string, number>(
     orderedTasks.map((task) => {
       const durationDays = durationById.get(task.id) || 1;
-      return [task.id, projectFinish - durationDays + 1] as const;
+      return [task.id, projectFinish - durationDays + 1];
     })
   );
 
