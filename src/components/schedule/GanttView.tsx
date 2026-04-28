@@ -163,16 +163,22 @@ export function GanttView({ tasks }: GanttViewProps) {
         dependency.type === "SS" || dependency.type === "FS" ? successorBarLeft : successorBarRight;
       const startY = predecessor.connectorY;
       const endY = successor.connectorY;
-      const horizontalGap = Math.max(16, Math.abs(endX - startX) / 2);
-      const elbowX = startX + (endX >= startX ? horizontalGap : -horizontalGap);
+      const elbowPadding = 18;
+      const elbowX =
+        endX >= startX
+          ? Math.max(predecessorBarRight, successorBarRight) + elbowPadding
+          : Math.min(predecessorBarLeft, successorBarLeft) - elbowPadding;
+      const label = getDependencyLabel(dependency);
+      const labelWidth = Math.max(44, label.length * 7 + 16);
 
       return {
         key: `${task.id}-${dependency.taskId}-${dependency.type}-${dependency.lagDays}`,
         color: dependencyColors[dependency.type],
         points: `${LABEL_WIDTH + startX},${startY} ${LABEL_WIDTH + elbowX},${startY} ${LABEL_WIDTH + elbowX},${endY} ${LABEL_WIDTH + endX},${endY}`,
-        label: getDependencyLabel(dependency),
-        labelX: LABEL_WIDTH + elbowX + (endX >= startX ? 5 : -5),
-        labelY: startY === endY ? startY - 9 : Math.min(startY, endY) + Math.abs(endY - startY) / 2 - 5,
+        label,
+        labelWidth,
+        labelX: LABEL_WIDTH + elbowX,
+        labelY: startY === endY ? startY - 10 : Math.min(startY, endY) + Math.abs(endY - startY) / 2 - 5,
       };
     })
   ).filter((item): item is NonNullable<typeof item> => Boolean(item));
@@ -247,9 +253,9 @@ export function GanttView({ tasks }: GanttViewProps) {
                     style={{ color: path.color }}
                   />
                   <rect
-                    x={path.labelX - 4}
+                    x={path.labelX - path.labelWidth / 2}
                     y={path.labelY - 11}
-                    width={44}
+                    width={path.labelWidth}
                     height={18}
                     rx={9}
                     fill="hsl(var(--card))"
@@ -257,7 +263,7 @@ export function GanttView({ tasks }: GanttViewProps) {
                     strokeWidth="1"
                   />
                   <text
-                    x={path.labelX + 18}
+                    x={path.labelX}
                     y={path.labelY + 1}
                     textAnchor="middle"
                     fontSize="9"
