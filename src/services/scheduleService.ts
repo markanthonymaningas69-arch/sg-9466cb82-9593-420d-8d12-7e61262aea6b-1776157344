@@ -12,6 +12,7 @@ type TaskWithScope = ProjectTaskRow & {
 };
 
 type MaterialRow = {
+  id: string;
   scope_id: string | null;
   material_name: string | null;
 };
@@ -33,7 +34,7 @@ const taskSelect = `
 export type ProjectTask = TaskFormData;
 
 function attachScopeMaterials(tasks: TaskWithScope[], materials: MaterialRow[]) {
-  const materialsByScopeId = new Map<string, string[]>();
+  const materialsByScopeId = new Map<string, Array<{ id: string; material_name: string }>>();
 
   materials.forEach((material) => {
     if (!material.scope_id || !material.material_name) {
@@ -46,8 +47,11 @@ function attachScopeMaterials(tasks: TaskWithScope[], materials: MaterialRow[]) 
     }
 
     const existing = materialsByScopeId.get(material.scope_id) || [];
-    if (!existing.includes(materialName)) {
-      existing.push(materialName);
+    if (!existing.some((item) => item.id === material.id)) {
+      existing.push({
+        id: material.id,
+        material_name: materialName,
+      });
       materialsByScopeId.set(material.scope_id, existing);
     }
   });
@@ -57,9 +61,7 @@ function attachScopeMaterials(tasks: TaskWithScope[], materials: MaterialRow[]) 
     bom_scope: task.bom_scope
       ? {
           ...task.bom_scope,
-          bom_materials: (materialsByScopeId.get(task.bom_scope_id || "") || []).map((material_name) => ({
-            material_name,
-          })),
+          bom_materials: materialsByScopeId.get(task.bom_scope_id || "") || [],
         }
       : null,
   }));
@@ -72,7 +74,7 @@ async function fetchScopeMaterials(scopeIds: string[]) {
 
   const { data, error } = await supabase
     .from("bom_materials")
-    .select("scope_id, material_name")
+    .select("id, scope_id, material_name")
     .in("scope_id", scopeIds);
 
   if (error) {

@@ -58,6 +58,11 @@ interface ComputedTaskLaborCostSummary {
   rateSnapshot: Array<{ role: string; count: number; dailyRate: number; overtimeRate: number }>;
 }
 
+interface TaskScopeMaterialOption {
+  id: string;
+  name: string;
+}
+
 const toDateOnly = (value: Date) => value.toISOString().split("T")[0];
 
 function addDays(dateValue: string, days: number) {
@@ -192,13 +197,27 @@ function createNewTask(projectId: string) {
   });
 }
 
+function getTaskScopeMaterials(task: EditableProjectTask): TaskScopeMaterialOption[] {
+  if (!Array.isArray(task.bom_scope?.materials)) {
+    return [];
+  }
+
+  return task.bom_scope.materials
+    .map((material) => ({
+      id: material.id,
+      name: material.name,
+    }))
+    .filter((material) => Boolean(material.id && material.name));
+}
+
 function buildDefaultMaterialDeliveryPlans(task: EditableProjectTask): SaveTaskMaterialDeliveryPlanInput[] {
-  const materials = Array.isArray(task.bom_scope?.materials) ? task.bom_scope.materials : [];
+  const materials = getTaskScopeMaterials(task);
   const startDate = task.start_date || null;
   const endDate = task.end_date || startDate || null;
-  return materials.map((materialName, index) => ({
-    materialId: `${task.id || "draft"}-${index}-${materialName.toLowerCase().replace(/\s+/g, "-")}`,
-    materialName,
+
+  return materials.map((material) => ({
+    materialId: material.id,
+    materialName: material.name,
     deliveryScheduleType: "one_time",
     deliveryStartDate: startDate,
     deliveryFrequency: "daily",
@@ -214,17 +233,21 @@ function buildDefaultMaterialDeliveryPlans(task: EditableProjectTask): SaveTaskM
 
 function mergeMaterialDeliveryPlans(task: EditableProjectTask, storedPlans: SaveTaskMaterialDeliveryPlanInput[] = []): SaveTaskMaterialDeliveryPlanInput[] {
   const defaults = buildDefaultMaterialDeliveryPlans(task);
-  const defaultsByName = new Map(defaults.map((plan) => [plan.materialName, plan] as const));
-  const linkedMaterials = Array.isArray(task.bom_scope?.materials) ? task.bom_scope.materials : [];
-  return linkedMaterials.map<SaveTaskMaterialDeliveryPlanInput>((materialName) => {
-    const fallback = defaultsByName.get(materialName);
-    const stored = storedPlans.find((plan) => plan.materialName === materialName);
+  const defaultsById = new Map(defaults.map((plan) => [plan.materialId, plan] as const));
+  const linkedMaterials = getTaskScopeMaterials(task);
+
+  return linkedMaterials.map<SaveTaskMaterialDeliveryPlanInput>((material) => {
+    const fallback = defaultsById.get(material.id);
+    const stored =
+      storedPlans.find((plan) => plan.materialId === material.id) ||
+      storedPlans.find((plan) => plan.materialName === material.name);
 
     if (fallback && stored) {
       return {
         ...fallback,
         ...stored,
-        materialName,
+        materialId: material.id,
+        materialName: material.name,
         plannedUsagePeriod: fallback.plannedUsagePeriod,
       };
     }
@@ -233,9 +256,9 @@ function mergeMaterialDeliveryPlans(task: EditableProjectTask, storedPlans: Save
       return fallback;
     }
 
-    const fallbackPlan: SaveTaskMaterialDeliveryPlanInput = {
-      materialId: materialName,
-      materialName,
+    return {
+      materialId: material.id,
+      materialName: material.name,
       deliveryScheduleType: "one_time",
       deliveryStartDate: task.start_date || null,
       deliveryFrequency: "daily",
@@ -249,8 +272,6 @@ function mergeMaterialDeliveryPlans(task: EditableProjectTask, storedPlans: Save
       totalQuantity: 0,
       unit: task.scope_unit || task.bom_scope?.unit || "unit",
     };
-
-    return fallbackPlan;
   });
 }
 

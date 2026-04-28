@@ -20,6 +20,11 @@ export interface TaskDependency {
   lagDays: number;
 }
 
+export interface TaskScopeMaterialSummary {
+  id: string;
+  name: string;
+}
+
 export interface TaskScopeSummary {
   id: string;
   name: string;
@@ -29,7 +34,7 @@ export interface TaskScopeSummary {
   description?: string | null;
   total_materials?: number | null;
   total_labor?: number | null;
-  materials?: string[];
+  materials?: TaskScopeMaterialSummary[];
 }
 
 export interface TaskFormData
@@ -308,7 +313,7 @@ export function applyDependencyScheduling(tasks: TaskFormData[]) {
 
 export function hydrateTask(
   task: ProjectTaskRow & {
-    bom_scope?: (Partial<ScopeRow> & { bom_materials?: { material_name: string | null }[] | null }) | null;
+    bom_scope?: (Partial<ScopeRow> & { bom_materials?: { id: string | null; material_name: string | null }[] | null }) | null;
   }
 ): TaskFormData {
   return syncTaskDerivedFields({
@@ -336,11 +341,22 @@ export function hydrateTask(
           total_labor: task.bom_scope.total_labor ?? null,
           materials: Array.isArray(task.bom_scope.bom_materials)
             ? Array.from(
-                new Set(
+                new Map(
                   task.bom_scope.bom_materials
-                    .map((material) => String(material.material_name || "").trim())
-                    .filter(Boolean)
-                )
+                    .map((material) => {
+                      const id = String(material.id || "").trim();
+                      const name = String(material.material_name || "").trim();
+
+                      if (!id || !name) {
+                        return null;
+                      }
+
+                      return [id, { id, name }] as const;
+                    })
+                    .filter(
+                      (entry): entry is readonly [string, TaskScopeMaterialSummary] => Boolean(entry)
+                    )
+                ).values()
               )
             : [],
         }
