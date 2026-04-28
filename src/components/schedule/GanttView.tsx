@@ -111,15 +111,15 @@ export function GanttView({ tasks }: GanttViewProps) {
   const totalDays = diffInDays(timelineStart, timelineEnd) + 1;
   const dates = Array.from({ length: totalDays }, (_, index) => toDateKey(addDays(timelineStart, index)));
   const timelineWidth = dates.length * DAY_WIDTH;
-  const chartHeight = HEADER_HEIGHT + scheduledTasks.length * ROW_HEIGHT;
-  const rowCenterY = (rowIndex: number) => HEADER_HEIGHT + rowIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
+  const chartHeight = scheduledTasks.length * ROW_HEIGHT;
+  const rowCenterY = (rowIndex: number) => rowIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
 
   const taskGeometry = new Map(
     scheduledTasks.map((task, index) => {
       const barStart = diffInDays(timelineStart, parseDate(task.start_date || toDateKey(new Date()))) * DAY_WIDTH;
       const duration = Math.max(1, Number(task.duration_days || 1));
       const fullBarWidth = duration * DAY_WIDTH;
-      const barTop = HEADER_HEIGHT + index * ROW_HEIGHT + (ROW_HEIGHT - BAR_HEIGHT) / 2;
+      const barTop = index * ROW_HEIGHT + (ROW_HEIGHT - BAR_HEIGHT) / 2;
       const barLeft = barStart + BAR_HORIZONTAL_INSET;
       const barWidth = Math.max(BAR_MIN_WIDTH, fullBarWidth - BAR_HORIZONTAL_INSET * 2);
       const connectorY = barTop + BAR_HEIGHT / 2;
@@ -218,7 +218,7 @@ export function GanttView({ tasks }: GanttViewProps) {
             </div>
           </div>
 
-          <div className="relative" style={{ height: chartHeight - HEADER_HEIGHT }}>
+          <div className="relative" style={{ height: chartHeight }}>
             <svg
               className="pointer-events-none absolute left-0 top-0 z-30"
               width={LABEL_WIDTH + timelineWidth}
