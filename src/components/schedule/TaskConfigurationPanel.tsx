@@ -192,9 +192,9 @@ export function TaskConfigurationPanel({
   const resourceMaterialPlans =
     materialDeliveryPlans.length > 0
       ? materialDeliveryPlans
-      : linkedMaterials.map((materialName, index) => ({
-          materialId: `${task.id || "draft"}-${index}-${materialName.toLowerCase().replace(/\s+/g, "-")}`,
-          materialName,
+      : linkedMaterials.map((material) => ({
+          materialId: material.id,
+          materialName: material.name,
           deliveryScheduleType: "one_time" as const,
           deliveryStartDate: task.start_date || null,
           deliveryFrequency: "daily" as const,
