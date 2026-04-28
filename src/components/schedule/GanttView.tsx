@@ -214,7 +214,7 @@ export function GanttView({ tasks }: GanttViewProps) {
 
           <div className="relative" style={{ height: chartHeight - HEADER_HEIGHT }}>
             <svg
-              className="pointer-events-none absolute left-0 top-0 z-10"
+              className="pointer-events-none absolute left-0 top-0 z-30"
               width={LABEL_WIDTH + timelineWidth}
               height={chartHeight}
               viewBox={`0 0 ${LABEL_WIDTH + timelineWidth} ${chartHeight}`}
@@ -230,7 +230,7 @@ export function GanttView({ tasks }: GanttViewProps) {
                   orient="auto"
                   markerUnits="strokeWidth"
                 >
-                  <path d="M0 0 L3.4 1.6 L0 3.2 Z" fill="context-stroke" />
+                  <path d="M0 0 L3.4 1.6 L0 3.2 Z" fill="currentColor" />
                 </marker>
               </defs>
 
@@ -239,11 +239,12 @@ export function GanttView({ tasks }: GanttViewProps) {
                   <polyline
                     points={path.points}
                     stroke={path.color}
-                    strokeWidth="1"
+                    strokeWidth="1.25"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     fill="none"
                     markerEnd="url(#gantt-arrow)"
+                    style={{ color: path.color }}
                   />
                   <rect
                     x={path.labelX - 4}
