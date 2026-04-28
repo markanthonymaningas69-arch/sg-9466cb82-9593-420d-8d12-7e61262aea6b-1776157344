@@ -149,7 +149,7 @@ export function TaskConfigurationPanel({
 }: TaskConfigurationPanelProps) {
   const containerClassName = embedded
     ? "flex h-full min-h-0 flex-col overflow-hidden rounded-none border-0 shadow-none"
-    : "lg:col-span-1 flex flex-col h-[600px] overflow-hidden";
+    : "lg:col-span-1 flex h-[560px] flex-col overflow-hidden";
 
   if (!task) {
     return (
@@ -318,29 +318,29 @@ export function TaskConfigurationPanel({
 
   return (
     <Card className={containerClassName}>
-      <CardHeader className="pb-3 border-b shrink-0 bg-muted/10">
-        <CardTitle className="text-base flex items-center">
-          <Settings2 className="h-4 w-4 mr-2 text-primary" />
+      <CardHeader className="border-b bg-muted/10 px-4 py-3">
+        <CardTitle className="flex items-center text-sm">
+          <Settings2 className="mr-2 h-4 w-4 text-primary" />
           Task Configuration
         </CardTitle>
       </CardHeader>
 
-      <div className="flex-1 overflow-y-auto">
-        <Tabs defaultValue="parameters" className="w-full">
-          <TabsList className="w-full rounded-none border-b bg-transparent p-0 h-10">
-            <TabsTrigger value="parameters" className="flex-1 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none">
-              Parameters
-            </TabsTrigger>
-            <TabsTrigger value="schedule" className="flex-1 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none">
-              Schedule
-            </TabsTrigger>
-            <TabsTrigger value="resources" className="flex-1 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none">
-              Resources
-            </TabsTrigger>
-          </TabsList>
+      <Tabs defaultValue="parameters" className="flex h-full min-h-0 w-full flex-col">
+        <TabsList className="h-10 w-full shrink-0 rounded-none border-b bg-transparent p-0">
+          <TabsTrigger value="parameters" className="flex-1 rounded-none text-xs data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none sm:text-sm">
+            Parameters
+          </TabsTrigger>
+          <TabsTrigger value="schedule" className="flex-1 rounded-none text-xs data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none sm:text-sm">
+            Schedule
+          </TabsTrigger>
+          <TabsTrigger value="resources" className="flex-1 rounded-none text-xs data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none sm:text-sm">
+            Resources
+          </TabsTrigger>
+        </TabsList>
 
-          <div className="p-4 space-y-4">
-            <TabsContent value="parameters" className="space-y-4 mt-0">
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="space-y-4 p-3">
+            <TabsContent value="parameters" className="mt-0 space-y-4">
               <section className="space-y-3 rounded-md border p-3">
                 <div className="space-y-1">
                   <h3 className="text-sm font-semibold text-foreground">Basic Info</h3>
@@ -908,13 +908,8 @@ export function TaskConfigurationPanel({
               </div>
             </TabsContent>
           </div>
-        </Tabs>
-      </div>
-
-      <div className="p-4 border-t bg-muted/10 shrink-0">
-        <p className="text-xs font-medium text-foreground">{saving ? "Auto-saving task changes..." : "Changes save automatically."}</p>
-        <p className="text-[11px] text-muted-foreground mt-1">Delete tasks from the main task list only.</p>
-      </div>
+        </div>
+      </Tabs>
     </Card>
   );
 }

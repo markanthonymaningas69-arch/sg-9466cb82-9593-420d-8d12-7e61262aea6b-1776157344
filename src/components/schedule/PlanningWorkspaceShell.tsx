@@ -82,13 +82,13 @@ export function PlanningWorkspaceShell({
       {isMobile ? (
         <Sheet open={panelOpen} onOpenChange={onPanelOpenChange}>
           <SheetContent side="right" className="w-full max-w-[420px] p-0 lg:hidden">
-            <SheetHeader className="border-b px-4 py-3 text-left">
+            <SheetHeader className="border-b px-3 py-2 text-left">
               <SheetTitle>{panelTitle}</SheetTitle>
               {panelDescription ? (
                 <SheetDescription>{panelDescription}</SheetDescription>
               ) : null}
             </SheetHeader>
-            <div className="h-[calc(100vh-4.75rem)] overflow-y-auto px-4 py-4">
+            <div className="h-[calc(100vh-4rem)] overflow-y-auto px-3 py-3">
               {sidePanelPlaceholder || sidePanel}
             </div>
           </SheetContent>

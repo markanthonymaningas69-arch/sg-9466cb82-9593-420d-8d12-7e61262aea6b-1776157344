@@ -612,11 +612,7 @@ export default function SchedulePage() {
           panelOpen={panelOpen}
           onPanelOpenChange={setPanelOpen}
           panelTitle={selectedTask ? selectedTask.name || "Task Configuration" : "Task Configuration"}
-          panelDescription={
-            selectedTask
-              ? "Changes save automatically while you adjust schedule logic, resources, and cost planning."
-              : "Select a task to open the configuration panel."
-          }
+          panelDescription={undefined}
           sidePanel={
             <TaskConfigurationPanel
               task={selectedTask}
@@ -683,9 +679,6 @@ export default function SchedulePage() {
                     <Plus className="mr-2 h-4 w-4" />
                     Add Task
                   </Button>
-                  <Button type="button" size="sm" variant="outline" onClick={() => setPanelOpen((current) => !current)}>
-                    {panelOpen ? "Hide Panel" : "Show Panel"}
-                  </Button>
                 </div>
               </div>
 
@@ -698,15 +691,26 @@ export default function SchedulePage() {
           }
           mainContent={
             <div className="flex h-full min-h-0 flex-col">
-              <div className="flex items-center justify-between border-b px-3 py-2">
-                <div>
-                  <p className="text-xs text-muted-foreground">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2">
+                <div className="min-w-0">
+                  <p className="truncate text-xs text-muted-foreground">
                     {selectedTask ? `Selected task: ${selectedTask.name}` : "Select a task to open the configuration panel."}
                   </p>
                 </div>
-                <Badge variant="secondary" className="hidden md:inline-flex">
-                  Auto-save enabled
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="hidden xl:inline-flex">
+                    {saving ? "Auto-saving" : "Auto-save enabled"}
+                  </Badge>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8"
+                    onClick={() => setPanelOpen((current) => !current)}
+                  >
+                    {panelOpen ? "Hide Panel" : "Show Panel"}
+                  </Button>
+                </div>
               </div>
 
               <div className="min-h-0 flex-1 overflow-hidden">
