@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
+import { siteService } from "@/services/siteService";
 
 interface MaterialUsage {
   id: string;
@@ -162,6 +163,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
           bom_scope_of_work (name)
         `)
         .eq("project_id", projectId)
+        .eq("is_archived", false)
         .order("date_used", { ascending: false });
 
       if (usageError) {
@@ -268,15 +270,15 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
     }
 
     try {
-      const { error } = await supabase.from("material_consumption").delete().eq("id", id);
+      const { error } = await siteService.deleteMaterialConsumption(id);
 
       if (error) {
         throw error;
       }
 
       toast({
-        title: "Success",
-        description: "Usage record deleted",
+        title: "Moved to recycle bin",
+        description: "Usage record archived",
       });
 
       await loadData();

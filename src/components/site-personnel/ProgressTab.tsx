@@ -12,6 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { TrendingUp, Plus, Trash2, Filter } from "lucide-react";
 import { CompactText } from "@/components/site-personnel/CompactText";
+import { siteService } from "@/services/siteService";
 
 interface ProgressUpdate {
   id: string;
@@ -160,6 +161,7 @@ export function ProgressTab({ projectId }: { projectId: string }) {
             bom_scope_of_work (name)
           `)
           .in("bom_scope_id", scopeIds)
+          .eq("is_archived", false)
           .order("update_date", { ascending: false });
 
         if (progressError) throw progressError;
@@ -233,13 +235,13 @@ export function ProgressTab({ projectId }: { projectId: string }) {
     if (!confirm("Delete this progress update?")) return;
 
     try {
-      const { error } = await supabase.from("bom_progress_updates").delete().eq("id", id);
+      const { error } = await siteService.deleteProgressUpdate(id);
 
       if (error) throw error;
 
       toast({
-        title: "Success",
-        description: "Progress update deleted",
+        title: "Moved to recycle bin",
+        description: "Progress update archived",
       });
       void loadData();
     } catch (error) {

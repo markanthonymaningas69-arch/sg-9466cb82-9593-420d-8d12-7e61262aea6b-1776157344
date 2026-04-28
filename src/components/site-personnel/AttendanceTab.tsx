@@ -165,6 +165,7 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
           personnel (name, role)
         `)
         .eq("project_id", projectId)
+        .eq("is_archived", false)
         .order("date", { ascending: false });
 
       if (error) throw error;
