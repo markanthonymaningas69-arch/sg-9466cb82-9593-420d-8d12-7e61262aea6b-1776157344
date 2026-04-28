@@ -16,10 +16,10 @@ position: 119
 Add drag-and-drop reordering directly inside the Gantt view so users can change activity order without returning to the task list. Preserve existing task selection behavior, keep dependency rendering intact during normal viewing, and persist the new sort order through the existing schedule save flow.
 
 ## Checklist
-- [ ] Inspect the current Gantt rendering, task selection flow, and sort_order persistence path
-- [ ] Add drag handles or draggable row behavior in the Gantt view for task reordering
-- [ ] Update the schedule page state flow to reorder tasks in memory and persist revised sort_order values
-- [ ] Keep selected task opening behavior working after reorder
+- [x] Inspect the current Gantt rendering, task selection flow, and sort_order persistence path
+- [x] Add drag handles or draggable row behavior in the Gantt view for task reordering
+- [x] Update the schedule page state flow to reorder tasks in memory and persist revised sort_order values
+- [x] Keep selected task opening behavior working after reorder
 - [ ] Validate the schedule build and confirm the Gantt still renders dependencies and task bars correctly
 
 ## Acceptance

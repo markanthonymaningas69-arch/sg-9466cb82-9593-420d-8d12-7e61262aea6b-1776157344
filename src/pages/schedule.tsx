@@ -190,6 +190,32 @@ function buildTaskSignatureMap(taskList: EditableProjectTask[]) {
   );
 }
 
+function reorderTasksBySortOrder(
+  taskList: EditableProjectTask[],
+  draggedTaskId: string,
+  targetTaskId: string
+) {
+  const orderedTasks = [...taskList].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+  const draggedIndex = orderedTasks.findIndex((task) => task.id === draggedTaskId);
+  const targetIndex = orderedTasks.findIndex((task) => task.id === targetTaskId);
+
+  if (draggedIndex < 0 || targetIndex < 0 || draggedIndex === targetIndex) {
+    return orderedTasks;
+  }
+
+  const [draggedTask] = orderedTasks.splice(draggedIndex, 1);
+  orderedTasks.splice(targetIndex, 0, draggedTask);
+
+  return applyScheduleToEditableTasks(
+    orderedTasks.map((task, index) =>
+      syncTaskWithConfiguration({
+        ...task,
+        sort_order: index + 1,
+      })
+    )
+  ).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+}
+
 function createNewTask(projectId: string) {
   const draftTask = createDraftTask(projectId);
   const taskConfig = createDefaultTaskConfiguration();
@@ -460,6 +486,65 @@ export default function SchedulePage() {
     }
   }
 
+  async function persistTaskOrder(
+    nextTasks: EditableProjectTask[],
+    previousTasks: EditableProjectTask[],
+    selectedTaskId: string | null
+  ) {
+    const changedTasks = nextTasks.filter(
+      (task) => task.id && getTaskPersistenceSignature(task) !== persistedTaskSignaturesRef.current[task.id]
+    );
+
+    if (changedTasks.length === 0) {
+      persistedTaskSignaturesRef.current = buildTaskSignatureMap(nextTasks);
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const savedTasks = await Promise.all(
+        changedTasks.map((task) => scheduleService.updateTask(task.id as string, toTaskFormData(task)))
+      );
+      const savedTaskMap = new Map(
+        savedTasks.map((task) => {
+          const normalizedTask = normalizeEditableTask(task as ScheduleTaskRecord);
+          return [normalizedTask.id, normalizedTask] as const;
+        })
+      );
+      const finalizedTasks = applyScheduleToEditableTasks(
+        nextTasks.map((task) => (task.id && savedTaskMap.has(task.id) ? savedTaskMap.get(task.id)! : task))
+      ).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      const finalizedSelectedTask = selectedTaskId
+        ? finalizedTasks.find((task) => task.id === selectedTaskId) || null
+        : null;
+
+      persistedTaskSignaturesRef.current = buildTaskSignatureMap(finalizedTasks);
+      if (finalizedSelectedTask) {
+        lastSavedSignatureRef.current = getTaskPersistenceSignature(finalizedSelectedTask);
+      }
+      setTasks(finalizedTasks);
+      setSelectedTask(finalizedSelectedTask);
+      if (selectedProject) {
+        void recalculateProjectSCurve(selectedProject);
+      }
+    } catch (error) {
+      console.error(error);
+      const revertedSelectedTask = selectedTaskId
+        ? previousTasks.find((task) => task.id === selectedTaskId) || null
+        : null;
+
+      persistedTaskSignaturesRef.current = buildTaskSignatureMap(previousTasks);
+      if (revertedSelectedTask) {
+        lastSavedSignatureRef.current = getTaskPersistenceSignature(revertedSelectedTask);
+      }
+      setTasks(previousTasks);
+      setSelectedTask(revertedSelectedTask);
+      toast({ title: "Error", description: "Failed to save task order", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleGenerateFromBOM() {
     if (!selectedProject) return;
     try {
@@ -708,6 +793,30 @@ export default function SchedulePage() {
     handleTaskSelect(matchedTask);
   };
 
+  const handleGanttTaskReorder = (draggedTaskId: string, targetTaskId: string) => {
+    const reorderedTasks = reorderTasksBySortOrder(sortedTasks, draggedTaskId, targetTaskId);
+
+    if (
+      reorderedTasks.length === sortedTasks.length &&
+      reorderedTasks.every((task, index) => task.id === sortedTasks[index]?.id)
+    ) {
+      return;
+    }
+
+    const currentSelectedTaskId = selectedTask?.id || null;
+    const reorderedSelectedTask = currentSelectedTaskId
+      ? reorderedTasks.find((task) => task.id === currentSelectedTaskId) || null
+      : null;
+
+    if (reorderedSelectedTask) {
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(reorderedSelectedTask);
+    }
+
+    setTasks(reorderedTasks);
+    setSelectedTask(reorderedSelectedTask);
+    void persistTaskOrder(reorderedTasks, sortedTasks, currentSelectedTaskId);
+  };
+
   const handleCreateTask = () => {
     if (!selectedProject) return;
     lastSavedSignatureRef.current = "";
@@ -923,6 +1032,7 @@ export default function SchedulePage() {
                         criticalTaskIds={criticalPathTaskIds}
                         selectedTaskId={selectedTask?.id || null}
                         onTaskSelect={handleGanttTaskSelect}
+                        onTaskReorder={handleGanttTaskReorder}
                       />
                     ) : viewMode === "calendar" ? (
                       <CalendarView tasks={sortedTasks} projectName={selectedProjectName} />

@@ -1,4 +1,6 @@
 import type { TaskDependency } from "@/lib/schedule";
+import { useState } from "react";
+import { GripVertical } from "lucide-react";
 
 interface GanttTaskItem {
   id: string;
@@ -16,6 +18,7 @@ interface GanttViewProps {
   criticalTaskIds?: string[];
   selectedTaskId?: string | null;
   onTaskSelect?: (taskId: string) => void;
+  onTaskReorder?: (draggedTaskId: string, targetTaskId: string) => void;
 }
 
 const DAY_WIDTH = 38;
@@ -92,7 +95,10 @@ export function GanttView({
   criticalTaskIds = [],
   selectedTaskId = null,
   onTaskSelect,
+  onTaskReorder,
 }: GanttViewProps) {
+  const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
+  const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
   const criticalTaskIdSet = new Set(criticalTaskIds);
   const scheduledTasks = tasks
     .filter((task) => task.id && task.start_date && task.end_date)
@@ -316,8 +322,27 @@ export function GanttView({
                 return (
                   <div
                     key={task.id}
-                    className="flex border-b"
+                    className={`flex border-b transition-colors ${
+                      dragOverTaskId === task.id && draggingTaskId !== task.id ? "bg-primary/5" : ""
+                    }`}
                     style={{ minHeight: ROW_HEIGHT }}
+                    onDragOver={(event) => {
+                      if (!draggingTaskId || draggingTaskId === task.id) {
+                        return;
+                      }
+                      event.preventDefault();
+                      if (dragOverTaskId !== task.id) {
+                        setDragOverTaskId(task.id);
+                      }
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      if (draggingTaskId && draggingTaskId !== task.id) {
+                        onTaskReorder?.(draggingTaskId, task.id);
+                      }
+                      setDraggingTaskId(null);
+                      setDragOverTaskId(null);
+                    }}
                   >
                     <div
                       className={`sticky left-0 z-30 flex shrink-0 items-center border-r px-4 transition-colors ${
