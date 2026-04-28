@@ -12,8 +12,8 @@ type ProgressUpdateInsert = Database["public"]["Tables"]["bom_progress_updates"]
 
 export interface SitePersonnelRecycleBinItem {
   id: string;
-  sourceTable: "deliveries" | "material_consumption" | "site_attendance" | "bom_progress_updates";
-  sourceTab: "Deliveries" | "Usage" | "Attendance" | "Accomplishments";
+  sourceTable: "deliveries" | "material_consumption" | "site_attendance" | "bom_progress_updates" | "site_requests";
+  sourceTab: "Deliveries" | "Usage" | "Attendance" | "Accomplishments" | "Requests";
   recordType: string;
   title: string;
   description: string;
@@ -311,6 +311,15 @@ export const siteService = {
       .single();
       
     return { data, error, autoApproved: autoApprove };
+  },
+
+  async deleteSiteRequest(id: string) {
+    const { error } = await supabase
+      .from("site_requests")
+      .update({ is_archived: true, archived_at: new Date().toISOString() } as any)
+      .eq("id", id);
+
+    return { error };
   },
 
   async updateMaterialConsumption(id: string, updates: any) {
@@ -671,7 +680,7 @@ export const siteService = {
   },
 
   async getRecycleBinItems(projectId: string) {
-    const [deliveriesResult, usageResult, attendanceResult, progressResult] = await Promise.all([
+    const [deliveriesResult, usageResult, attendanceResult, progressResult, siteRequestsResult] = await Promise.all([
       supabase
         .from("deliveries")
         .select("id, item_name, quantity, unit, supplier, delivery_date, archived_at, created_at")
@@ -709,6 +718,11 @@ export const siteService = {
               )
           ).data?.map((scope) => scope.id) || []
         ),
+      supabase
+        .from("site_requests")
+        .select("id, request_type, item_name, quantity, unit, requested_by, request_date, archived_at, created_at")
+        .eq("project_id", projectId)
+        .eq("is_archived", true),
     ]);
 
     if (deliveriesResult.error) {
@@ -725,6 +739,10 @@ export const siteService = {
 
     if (progressResult.error) {
       return { data: [], error: progressResult.error };
+    }
+
+    if (siteRequestsResult.error) {
+      return { data: [], error: siteRequestsResult.error };
     }
 
     const attendanceItems: SitePersonnelRecycleBinItem[] = (attendanceResult.data || []).map((record) => {
@@ -778,6 +796,16 @@ export const siteService = {
         deletedAt: record.archived_at || null,
         createdAt: record.created_at || null,
       })),
+      ...(siteRequestsResult.data || []).map((record) => ({
+        id: record.id,
+        sourceTable: "site_requests" as const,
+        sourceTab: "Requests" as const,
+        recordType: "Site request",
+        title: record.item_name,
+        description: `${record.request_type || "Request"} • ${Number(record.quantity || 0)} ${record.unit || ""} • ${record.requested_by || "No requester"} • ${record.request_date || "No date"}`,
+        deletedAt: record.archived_at || null,
+        createdAt: record.created_at || null,
+      })),
       ...attendanceItems,
       ...progressItems,
     ].sort((left, right) => {
@@ -821,6 +849,13 @@ export const siteService = {
       return result;
     }
 
+    if (item.sourceTable === "site_requests") {
+      return await supabase
+        .from("site_requests")
+        .update({ is_archived: false, archived_at: null } as any)
+        .eq("id", item.id);
+    }
+
     if (item.sourceTable === "site_attendance") {
       return await supabase
         .from("site_attendance")
@@ -841,6 +876,10 @@ export const siteService = {
 
     if (item.sourceTable === "material_consumption") {
       return await supabase.from("material_consumption").delete().eq("id", item.id);
+    }
+
+    if (item.sourceTable === "site_requests") {
+      return await supabase.from("site_requests").delete().eq("id", item.id);
     }
 
     if (item.sourceTable === "site_attendance") {

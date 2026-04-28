@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useSettings } from "@/contexts/SettingsProvider";
-import { FileText, Plus, CheckCircle, XCircle, Clock, Filter } from "lucide-react";
+import { FileText, Plus, CheckCircle, XCircle, Clock, Filter, Trash2 } from "lucide-react";
 import { siteService } from "@/services/siteService";
 import { approvalCenterService } from "@/services/approvalCenterService";
 import { CompactText } from "@/components/site-personnel/CompactText";
@@ -225,6 +225,7 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
         .from("site_requests")
         .select("*")
         .eq("project_id", projectId)
+        .eq("is_archived", false)
         .order("request_date", { ascending: false });
 
       if (error) throw error;
@@ -464,6 +465,27 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
       toast({
         title: "Error",
         description: "Failed to update request",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function handleDeleteRequest(id: string) {
+    try {
+      const { error } = await siteService.deleteSiteRequest(id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Moved to recycle bin",
+        description: "Request archived from Request History",
+      });
+      void loadRequests();
+    } catch (error) {
+      console.error("Error archiving request:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete request",
         variant: "destructive",
       });
     }
@@ -886,7 +908,7 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
                       <TableHead className="h-8 w-[140px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Requested By</TableHead>
                       <TableHead className="h-8 w-[120px] whitespace-nowrap px-2 text-center text-[11px] uppercase tracking-wide">Status</TableHead>
                       <TableHead className="h-8 w-[210px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Notes</TableHead>
-                      <TableHead className="h-8 w-[110px] whitespace-nowrap px-2 text-right text-[11px] uppercase tracking-wide">Action</TableHead>
+                      <TableHead className="h-8 w-[170px] whitespace-nowrap px-2 text-right text-[11px] uppercase tracking-wide">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -924,13 +946,22 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
                             <CompactText value={request.notes || "—"} className="max-w-[194px]" />
                           </TableCell>
                           <TableCell className="px-2 py-1.5 text-right align-middle">
-                            {request.status === "pending" ? (
-                              <Button variant="outline" size="sm" className="h-7 px-2 text-[11px]" onClick={() => void router.push("/approval-center")}>
-                                Review
+                            <div className="flex justify-end gap-1.5">
+                              {request.status === "pending" ? (
+                                <Button variant="outline" size="sm" className="h-7 px-2 text-[11px]" onClick={() => void router.push("/approval-center")}>
+                                  Review
+                                </Button>
+                              ) : null}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2 text-[11px] text-destructive hover:text-destructive"
+                                onClick={() => void handleDeleteRequest(request.id)}
+                              >
+                                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                                Delete
                               </Button>
-                            ) : (
-                              <span className="text-[11px] text-muted-foreground">—</span>
-                            )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       );

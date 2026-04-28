@@ -1,6 +1,6 @@
 ---
 title: Site request history delete action
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -16,10 +16,10 @@ position: 123
 Add a delete action to the request history area inside the Site Personnel requests tab. The action should fit the existing row/card controls, remove the request from the active history view, and follow the established Site Personnel deletion pattern so users can recover it if the tab already uses the recycle bin flow.
 
 ## Checklist
-- [ ] Inspect the request history rendering and current request actions in the Site Personnel requests tab
-- [ ] Add a visible delete control for each history item in the request history view
-- [ ] Connect the delete action to the correct service flow and refresh the history list after deletion
-- [ ] Keep the delete affordance consistent with the existing Site Personnel action styling and messaging
+- [x] Inspect the Site Personnel request history table and existing site request data flow
+- [x] Add a delete action in each request history row without disrupting the existing review action
+- [x] Wire deletion to the module's request archive/delete flow so the record leaves the active table state
+- [x] Validate the request history table still renders correctly with the new action cell
 
 ## Acceptance
 Users can delete an item directly from the request history tab in Site Personnel.
