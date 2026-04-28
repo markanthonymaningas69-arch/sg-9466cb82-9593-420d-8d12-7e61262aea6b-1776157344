@@ -181,6 +181,14 @@ const syncTaskWithConfiguration = (task: EditableProjectTask) => normalizeEditab
 const applyScheduleToEditableTasks = (taskList: EditableProjectTask[]) => applyDependencyScheduling(taskList.map(toTaskFormData)).map((task) => normalizeEditableTask(task as ScheduleTaskRecord));
 const getTaskPersistenceSignature = (task: EditableProjectTask) => JSON.stringify(toTaskFormData(syncTaskWithConfiguration(task)));
 
+function buildTaskSignatureMap(taskList: EditableProjectTask[]) {
+  return Object.fromEntries(
+    taskList
+      .filter((task) => Boolean(task.id))
+      .map((task) => [task.id, getTaskPersistenceSignature(task)])
+  );
+}
+
 function createNewTask(projectId: string) {
   const draftTask = createDraftTask(projectId);
   const taskConfig = createDefaultTaskConfiguration();
@@ -348,6 +356,7 @@ export default function SchedulePage() {
   const planningSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const laborCostSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedSignatureRef = useRef("");
+  const persistedTaskSignaturesRef = useRef<Record<string, string>>({});
   const lastSavedMaterialPlanSignatureRef = useRef<Record<string, string>>({});
   const lastSavedLaborCostSignatureRef = useRef<Record<string, string>>({});
 
@@ -387,6 +396,8 @@ export default function SchedulePage() {
       setSelectedTask(null);
       setLoading(false);
       setManpowerCatalogItems([]);
+      lastSavedSignatureRef.current = "";
+      persistedTaskSignaturesRef.current = {};
     }
   }, [selectedProject]);
 
@@ -415,6 +426,7 @@ export default function SchedulePage() {
       setLoading(true);
       const data = await scheduleService.getTasksByProject(projectId);
       const normalizedTasks = applyScheduleToEditableTasks((data || []).map((task) => normalizeEditableTask(task as ScheduleTaskRecord)));
+      persistedTaskSignaturesRef.current = buildTaskSignatureMap(normalizedTasks);
       setTasks(normalizedTasks);
       setSelectedTask((current) => current?.id ? normalizedTasks.find((task) => task.id === current.id) || null : null);
     } catch (error) {
@@ -463,16 +475,76 @@ export default function SchedulePage() {
 
   async function persistTask(taskToPersist: EditableProjectTask) {
     const syncedTask = syncTaskWithConfiguration(taskToPersist);
-    const signature = getTaskPersistenceSignature(syncedTask);
-    if (!selectedProject || signature === lastSavedSignatureRef.current) return;
+    if (!selectedProject) return;
+
+    const draftScheduledTasks = applyScheduleToEditableTasks(
+      syncedTask.id
+        ? tasks.map((item) => (item.id === syncedTask.id ? syncedTask : item))
+        : [...tasks, syncedTask]
+    );
+    const draftSelectedTask = syncedTask.id
+      ? draftScheduledTasks.find((item) => item.id === syncedTask.id) || syncedTask
+      : syncedTask;
+    const draftSignature = getTaskPersistenceSignature(draftSelectedTask);
+
+    if (draftSelectedTask.id && draftSignature === persistedTaskSignaturesRef.current[draftSelectedTask.id]) {
+      return;
+    }
+
+    if (!draftSelectedTask.id && draftSignature === lastSavedSignatureRef.current) {
+      return;
+    }
 
     try {
       setSaving(true);
-      const savedTask = syncedTask.id ? await scheduleService.updateTask(syncedTask.id, toTaskFormData(syncedTask)) : await scheduleService.createTask(toTaskFormData(syncedTask));
+      const savedTask = draftSelectedTask.id
+        ? await scheduleService.updateTask(draftSelectedTask.id, toTaskFormData(draftSelectedTask))
+        : await scheduleService.createTask(toTaskFormData(draftSelectedTask));
       const normalizedSavedTask = normalizeEditableTask(savedTask as ScheduleTaskRecord);
-      lastSavedSignatureRef.current = getTaskPersistenceSignature(normalizedSavedTask);
-      setTasks((current) => applyScheduleToEditableTasks([...current.filter((item) => item.id !== normalizedSavedTask.id), normalizedSavedTask]).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
-      setSelectedTask(normalizedSavedTask);
+
+      const rescheduledTasks = applyScheduleToEditableTasks(
+        draftSelectedTask.id
+          ? draftScheduledTasks.map((item) => (item.id === draftSelectedTask.id ? normalizedSavedTask : item))
+          : [...tasks, normalizedSavedTask]
+      );
+
+      const persistedTasks: EditableProjectTask[] = [];
+
+      for (const scheduledTask of rescheduledTasks) {
+        if (!scheduledTask.id) {
+          persistedTasks.push(scheduledTask);
+          continue;
+        }
+
+        if (scheduledTask.id === normalizedSavedTask.id) {
+          persistedTasks.push(scheduledTask);
+          continue;
+        }
+
+        const scheduledSignature = getTaskPersistenceSignature(scheduledTask);
+
+        if (scheduledSignature === persistedTaskSignaturesRef.current[scheduledTask.id]) {
+          persistedTasks.push(scheduledTask);
+          continue;
+        }
+
+        const updatedTask = await scheduleService.updateTask(
+          scheduledTask.id,
+          toTaskFormData(scheduledTask)
+        );
+        persistedTasks.push(normalizeEditableTask(updatedTask as ScheduleTaskRecord));
+      }
+
+      const finalizedTasks = applyScheduleToEditableTasks(persistedTasks).sort(
+        (a, b) => (a.sort_order || 0) - (b.sort_order || 0)
+      );
+      const finalizedSelectedTask =
+        finalizedTasks.find((item) => item.id === normalizedSavedTask.id) || normalizedSavedTask;
+
+      persistedTaskSignaturesRef.current = buildTaskSignatureMap(finalizedTasks);
+      lastSavedSignatureRef.current = getTaskPersistenceSignature(finalizedSelectedTask);
+      setTasks(finalizedTasks);
+      setSelectedTask(finalizedSelectedTask);
       void recalculateProjectSCurve(selectedProject);
     } catch (error) {
       console.error(error);
@@ -495,6 +567,7 @@ export default function SchedulePage() {
     try {
       setSaving(true);
       await scheduleService.deleteTask(taskId);
+      delete persistedTaskSignaturesRef.current[taskId];
       setTasks((current) => current.filter((task) => task.id !== taskId));
       setSelectedTask((current) => current?.id === taskId ? null : current);
       if (selectedTask?.id === taskId) {
