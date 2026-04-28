@@ -140,51 +140,52 @@ export function TeamCompositionEditor({
         const totalMembers = calculateTeamMemberCount(team);
 
         return (
-          <div key={team.id} className="space-y-4 rounded-md border p-4">
-            <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_140px_auto]">
-              <div className="min-w-0 space-y-2">
-                <Label className="text-xs">Team Name</Label>
-                <Input
-                  value={team.teamName}
-                  onChange={(event) =>
-                    updateTeam(team.id, (current) => ({
-                      ...current,
-                      teamName: event.target.value,
-                    }))
-                  }
-                  placeholder={`Team ${teamIndex + 1}`}
-                  className="h-9"
-                />
+          <div key={team.id} className="space-y-3 rounded-md border p-3">
+            <div className="flex items-start gap-2">
+              <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-[minmax(0,1fr)_128px]">
+                <div className="min-w-0 space-y-1.5">
+                  <Label className="text-xs">Team Name</Label>
+                  <Input
+                    value={team.teamName}
+                    onChange={(event) =>
+                      updateTeam(team.id, (current) => ({
+                        ...current,
+                        teamName: event.target.value,
+                      }))
+                    }
+                    placeholder={`Team ${teamIndex + 1}`}
+                    className="h-9"
+                  />
+                </div>
+
+                <div className="space-y-1.5 sm:max-w-[128px]">
+                  <Label className="text-xs">No. of Teams</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={team.numberOfTeams}
+                    onChange={(event) =>
+                      updateTeam(team.id, (current) => ({
+                        ...current,
+                        numberOfTeams: Math.max(1, Math.round(Number(event.target.value) || 1)),
+                      }))
+                    }
+                    className="h-9"
+                  />
+                </div>
               </div>
 
-              <div className="space-y-2 xl:max-w-[140px]">
-                <Label className="text-xs">No. of Teams</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={team.numberOfTeams}
-                  onChange={(event) =>
-                    updateTeam(team.id, (current) => ({
-                      ...current,
-                      numberOfTeams: Math.max(1, Math.round(Number(event.target.value) || 1)),
-                    }))
-                  }
-                  className="h-9"
-                />
-              </div>
-
-              <div className="flex items-end justify-start xl:justify-end">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removeTeam(team.id)}
-                  disabled={teams.length === 1}
-                >
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="mt-6 h-9 w-9 shrink-0"
+                onClick={() => removeTeam(team.id)}
+                disabled={teams.length === 1}
+              >
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
             </div>
 
             <div className="space-y-3">
@@ -207,69 +208,71 @@ export function TeamCompositionEditor({
                       catalogItems.find((item) => item.id === getSelectedCatalogId(member, catalogItems)) || null;
 
                     return (
-                      <div key={member.id} className="rounded-md border bg-muted/20 p-3">
-                        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_132px_auto]">
-                          <div className="min-w-0 space-y-2">
-                            <Label className="text-[11px]">Position</Label>
-                            <Select
-                              value={getSelectedCatalogId(member, catalogItems)}
-                              onValueChange={(value) => {
-                                const selectedItem = catalogItems.find((item) => item.id === value);
-                                if (!selectedItem) {
-                                  return;
+                      <div key={member.id} className="rounded-md border bg-muted/20 p-2.5">
+                        <div className="flex items-start gap-2">
+                          <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-[minmax(0,1fr)_128px]">
+                            <div className="min-w-0 space-y-1.5">
+                              <Label className="text-[11px]">Position</Label>
+                              <Select
+                                value={getSelectedCatalogId(member, catalogItems)}
+                                onValueChange={(value) => {
+                                  const selectedItem = catalogItems.find((item) => item.id === value);
+                                  if (!selectedItem) {
+                                    return;
+                                  }
+
+                                  updateMember(team.id, member.id, (current) => ({
+                                    ...current,
+                                    catalogPositionId: selectedItem.id,
+                                    positionName: selectedItem.positionName,
+                                    rate: selectedItem.standardRate,
+                                    unit: selectedItem.unit,
+                                    manualRate: false,
+                                    description: selectedItem.description,
+                                  }));
+                                }}
+                              >
+                                <SelectTrigger className="h-9 w-full text-xs">
+                                  <SelectValue placeholder="Select position" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {catalogItems.map((item) => (
+                                    <SelectItem key={item.id} value={item.id}>
+                                      {item.positionName}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="space-y-1.5 sm:max-w-[128px]">
+                              <Label className="text-[11px]">
+                                Rate / {member.unit === "hour" ? "Hour" : "Day"}
+                              </Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={member.rate}
+                                onChange={(event) =>
+                                  updateMember(team.id, member.id, (current) => ({
+                                    ...current,
+                                    rate: Number(event.target.value) || 0,
+                                    manualRate: true,
+                                  }))
                                 }
-
-                                updateMember(team.id, member.id, (current) => ({
-                                  ...current,
-                                  catalogPositionId: selectedItem.id,
-                                  positionName: selectedItem.positionName,
-                                  rate: selectedItem.standardRate,
-                                  unit: selectedItem.unit,
-                                  manualRate: false,
-                                  description: selectedItem.description,
-                                }));
-                              }}
-                            >
-                              <SelectTrigger className="h-9 w-full text-xs">
-                                <SelectValue placeholder="Select position" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {catalogItems.map((item) => (
-                                  <SelectItem key={item.id} value={item.id}>
-                                    {item.positionName}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                                className="h-9"
+                              />
+                            </div>
                           </div>
 
-                          <div className="space-y-2 xl:max-w-[132px]">
-                            <Label className="text-[11px]">
-                              Rate / {member.unit === "hour" ? "Hour" : "Day"}
-                            </Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={member.rate}
-                              onChange={(event) =>
-                                updateMember(team.id, member.id, (current) => ({
-                                  ...current,
-                                  rate: Number(event.target.value) || 0,
-                                  manualRate: true,
-                                }))
-                              }
-                              className="h-9"
-                            />
-                          </div>
-
-                          <div className="flex flex-wrap items-end justify-start gap-2 xl:justify-end">
+                          <div className="mt-5 flex shrink-0 items-center gap-1">
                             {matchedCatalog && member.manualRate ? (
                               <Button
                                 type="button"
                                 variant="ghost"
                                 size="sm"
-                                className="h-9 px-3"
+                                className="h-8 px-2.5 text-xs"
                                 onClick={() =>
                                   updateMember(team.id, member.id, (current) => ({
                                     ...current,
@@ -279,7 +282,7 @@ export function TeamCompositionEditor({
                                   }))
                                 }
                               >
-                                <RotateCcw className="mr-2 h-3.5 w-3.5" />
+                                <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
                                 Default
                               </Button>
                             ) : null}
@@ -287,6 +290,7 @@ export function TeamCompositionEditor({
                               type="button"
                               variant="ghost"
                               size="icon"
+                              className="h-8 w-8"
                               onClick={() => removeMember(team.id, member.id)}
                               disabled={team.members.length === 1}
                             >
@@ -307,7 +311,7 @@ export function TeamCompositionEditor({
               )}
             </div>
 
-            <div className="grid gap-3 rounded-md border bg-primary/5 p-3 md:grid-cols-2">
+            <div className="grid gap-2 rounded-md border bg-primary/5 p-2.5 md:grid-cols-2">
               <div>
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Total Members</p>
                 <p className="mt-1 text-base font-semibold text-foreground">{totalMembers}</p>
