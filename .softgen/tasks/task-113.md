@@ -1,6 +1,6 @@
 ---
 title: Team Composition parameters
-status: done
+status: in_progress
 priority: urgent
 type: feature
 tags:
@@ -23,6 +23,8 @@ Replace the old team composition flow in Project Manager → Task Configuration 
 - [x] Add Number of Teams per team setup for multiple identical teams
 - [x] Show automatic summaries for total manpower and total labor cost
 - [x] Enforce validation for member count, valid position, positive rate, and number of teams
+- [ ] Tighten Team Composition field widths and responsive layout so inputs fit inside the panel body
+- [ ] Add a direct Manpower Catalog link/action from the Team Composition setup area
 
 ## Acceptance
 A user can define one team composition once and apply it to multiple identical teams.
