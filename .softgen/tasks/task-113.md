@@ -1,28 +1,29 @@
 ---
 title: Team Composition parameters
-status: todo
+status: done
 priority: urgent
 type: feature
 tags:
   - project-manager
-  - team-composition
   - manpower
+  - task-configuration
 created_by: agent
-created_at: 2026-04-28T15:11:46Z
+created_at: 2026-04-28 15:35:34 UTC
 position: 113
 ---
 
 ## Notes
-Enhance Project Manager → Task Configuration → Parameters → Team Composition so users can define multiple team types, assign members from the project manpower catalog, override rates when needed, and set Number of Teams for repeated identical crews. The composition is defined once per team type and multiplied by team count.
+Replace the old team composition flow in Project Manager → Task Configuration → Parameters with a clean project-based manpower setup. Users should be able to add team types, add members inside each team, select positions from the project Manpower Catalog only, auto-fill rates, override rates manually, and set the number of identical teams for each composition.
 
 ## Checklist
-- [ ] Inspect the existing Team Composition UI and current parameter data structure
-- [ ] Add team-level fields for team name and number of teams with validation for values greater than or equal to 1
-- [ ] Add member rows inside each team with position dropdown sourced only from Manpower Catalog and auto-filled rate
-- [ ] Support manual rate override per member while keeping catalog default as the starting value
-- [ ] Add computed summaries per team for total members and total labor cost multiplied by number of teams
-- [ ] Enforce validation: at least one member per team, valid catalog position, rate greater than 0, number of teams greater than or equal to 1
+- [x] Replace legacy team template flow with editable team composition blocks
+- [x] Allow users to add teams and add members inside each team
+- [x] Populate member positions from the project Manpower Catalog only
+- [x] Auto-fill member rates from the selected catalog position with manual override support
+- [x] Add Number of Teams per team setup for multiple identical teams
+- [x] Show automatic summaries for total manpower and total labor cost
+- [x] Enforce validation for member count, valid position, positive rate, and number of teams
 
 ## Acceptance
-Users can create a team type once, set the number of identical teams, and see total manpower and cost update automatically.
-Each member position is selected from the project Manpower Catalog and starts with its default rate.
+A user can define one team composition once and apply it to multiple identical teams.
+Each team summary shows total members and labor cost updating automatically as members or team count change.

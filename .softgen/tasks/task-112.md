@@ -1,6 +1,6 @@
 ---
 title: Manpower Catalog tab
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -8,20 +8,19 @@ tags:
   - manpower
   - supabase
 created_by: agent
-created_at: 2026-04-28T15:11:46Z
+created_at: 2026-04-28 15:35:34 UTC
 position: 112
 ---
 
 ## Notes
-Add a new Project Manager tab named Manpower Catalog that is fully independent from the HR module. It must store project-level position records with position name, standard rate, unit, and optional description. This catalog will be the only source for team composition position options and default rates.
+Add a project-level Manpower Catalog inside Project Manager so each project maintains its own manpower positions and rates without any HR dependency. This tab must support create, edit, and delete actions and become the single source of default positions and rates for Team Composition inside task configuration.
 
 ## Checklist
-- [ ] Review the current Project Manager / Task Configuration structure and identify where to add the new Manpower Catalog tab
-- [ ] Create Supabase storage for project-level manpower catalog entries with project association, rate, unit, and optional description
-- [ ] Build add, edit, and delete flows for manpower catalog positions
-- [ ] Ensure the catalog does not import, fetch, or depend on HR module data
-- [ ] Expose catalog data through a dedicated project-level service for reuse by team composition
+- [x] Add a project-scoped manpower catalog data source and service independent from HR
+- [x] Add a Manpower Catalog workspace tab inside Project Manager
+- [x] Support add, edit, and delete for position name, standard rate, unit, and optional description
+- [x] Ensure Team Composition dropdown options come only from this catalog
 
 ## Acceptance
-The Project Manager area includes a Manpower Catalog tab where users can manage project-specific positions and rates.
-Team Composition position options come only from this catalog, not from HR data.
+Users can open Project Manager and manage manpower positions in a dedicated Manpower Catalog tab.
+Catalog positions and rates are stored per project and are not pulled from HR.

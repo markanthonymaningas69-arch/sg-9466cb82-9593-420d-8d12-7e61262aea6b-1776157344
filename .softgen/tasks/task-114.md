@@ -1,27 +1,27 @@
 ---
 title: Planning integration for manpower teams
-status: todo
+status: done
 priority: high
 type: feature
 tags:
   - project-manager
-  - scheduling
-  - scurve
-  - labor-cost
+  - planning
+  - schedule
 created_by: agent
-created_at: 2026-04-28T15:11:46Z
+created_at: 2026-04-28 15:35:34 UTC
 position: 114
 ---
 
 ## Notes
-Use the new team composition data for labor cost computation, task duration estimation, scheduling manpower loading, and S-Curve manpower distribution. Keep the implementation project-based and independent from HR records.
+Use the new project-based manpower team composition data for labor cost computation, task duration estimation, scheduling outputs, and downstream planning logic in Project Manager. Remove the practical dependency on HR-based manpower rates for these planning calculations.
 
 ## Checklist
-- [ ] Trace where task parameters feed labor cost, scheduling, calendar loading, and S-Curve calculations
-- [ ] Update the relevant computation helpers and services to consume the new team composition structure
-- [ ] Preserve compatibility for existing tasks without new team data by using safe fallbacks
-- [ ] Verify that downstream modules receive team counts, total members, and effective rates correctly
+- [x] Feed project manpower catalog rates into task labor cost summaries
+- [x] Use team composition totals for manpower and duration calculations
+- [x] Preserve scheduling and planning outputs with the new team structure
+- [x] Remove the remaining HR manpower loading path from Project Manager schedule logic
+- [x] Validate the updated implementation with lint and type checks
 
 ## Acceptance
-Task planning outputs use the project-based team composition data for manpower and labor cost calculations.
-Existing planning screens continue to load without HR dependencies.
+Project Manager calculations use the project manpower catalog and team composition data instead of HR manpower rates.
+The schedule workspace compiles cleanly and continues to support labor summaries, duration estimation, and planning views.
