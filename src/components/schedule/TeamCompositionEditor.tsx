@@ -54,6 +54,20 @@ export function TeamCompositionEditor({
   workHoursPerDay,
   onChange,
 }: TeamCompositionEditorProps) {
+  const openCatalogView = () => {
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    const catalogButton = Array.from(
+      document.querySelectorAll<HTMLButtonElement>("button")
+    ).find((button) => button.textContent?.trim().toLowerCase() === "manpower catalog");
+
+    if (catalogButton) {
+      catalogButton.click();
+    }
+  };
+
   const updateTeam = (teamId: string, updater: (team: TaskTeamConfiguration) => TaskTeamConfiguration) => {
     onChange(teams.map((team) => (team.id === teamId ? updater(team) : team)));
   };
@@ -93,23 +107,31 @@ export function TeamCompositionEditor({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/20 p-3">
-        <div className="space-y-1">
+      <div className="flex flex-wrap items-start justify-between gap-3 rounded-md border bg-muted/20 p-3">
+        <div className="min-w-0 space-y-1">
           <h3 className="text-sm font-semibold text-foreground">Team Composition</h3>
           <p className="text-[11px] text-muted-foreground">
             Build task crews from this project&apos;s Manpower Catalog only. Each team setup can be repeated using
             the Number of Teams field.
           </p>
         </div>
-        <Button type="button" size="sm" onClick={addTeam}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Team
-        </Button>
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+          <Button type="button" size="sm" variant="outline" onClick={openCatalogView}>
+            Manpower Catalog
+          </Button>
+          <Button type="button" size="sm" onClick={addTeam}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Team
+          </Button>
+        </div>
       </div>
 
       {catalogItems.length === 0 ? (
-        <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-          Add positions in the Manpower Catalog tab first to use them in Team Composition.
+        <div className="flex flex-col gap-3 rounded-md border border-dashed p-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <p>Add positions in the Manpower Catalog tab first to use them in Team Composition.</p>
+          <Button type="button" size="sm" variant="outline" onClick={openCatalogView}>
+            Open Manpower Catalog
+          </Button>
         </div>
       ) : null}
 
@@ -119,8 +141,8 @@ export function TeamCompositionEditor({
 
         return (
           <div key={team.id} className="space-y-4 rounded-md border p-4">
-            <div className="grid gap-3 lg:grid-cols-[1fr_180px_auto]">
-              <div className="space-y-2">
+            <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_140px_auto]">
+              <div className="min-w-0 space-y-2">
                 <Label className="text-xs">Team Name</Label>
                 <Input
                   value={team.teamName}
@@ -135,8 +157,8 @@ export function TeamCompositionEditor({
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-xs">Number of Teams</Label>
+              <div className="space-y-2 xl:max-w-[140px]">
+                <Label className="text-xs">No. of Teams</Label>
                 <Input
                   type="number"
                   min="1"
@@ -152,7 +174,7 @@ export function TeamCompositionEditor({
                 />
               </div>
 
-              <div className="flex items-end justify-end">
+              <div className="flex items-end justify-start xl:justify-end">
                 <Button
                   type="button"
                   variant="ghost"
@@ -186,8 +208,8 @@ export function TeamCompositionEditor({
 
                     return (
                       <div key={member.id} className="rounded-md border bg-muted/20 p-3">
-                        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px_auto]">
-                          <div className="space-y-2">
+                        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_132px_auto]">
+                          <div className="min-w-0 space-y-2">
                             <Label className="text-[11px]">Position</Label>
                             <Select
                               value={getSelectedCatalogId(member, catalogItems)}
@@ -208,7 +230,7 @@ export function TeamCompositionEditor({
                                 }));
                               }}
                             >
-                              <SelectTrigger className="h-9 text-xs">
+                              <SelectTrigger className="h-9 w-full text-xs">
                                 <SelectValue placeholder="Select position" />
                               </SelectTrigger>
                               <SelectContent>
@@ -221,9 +243,9 @@ export function TeamCompositionEditor({
                             </Select>
                           </div>
 
-                          <div className="space-y-2">
+                          <div className="space-y-2 xl:max-w-[132px]">
                             <Label className="text-[11px]">
-                              Rate ({member.unit === "hour" ? "Hour" : "Day"})
+                              Rate / {member.unit === "hour" ? "Hour" : "Day"}
                             </Label>
                             <Input
                               type="number"
@@ -241,7 +263,7 @@ export function TeamCompositionEditor({
                             />
                           </div>
 
-                          <div className="flex items-end justify-end gap-2">
+                          <div className="flex flex-wrap items-end justify-start gap-2 xl:justify-end">
                             {matchedCatalog && member.manualRate ? (
                               <Button
                                 type="button"
