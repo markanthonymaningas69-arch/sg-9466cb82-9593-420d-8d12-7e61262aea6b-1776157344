@@ -1,11 +1,11 @@
-import type { TaskRoleAllocation } from "@/lib/schedule";
+import type { TaskRoleAllocation, TaskScopeMaterialSummary } from "@/lib/schedule";
 
 export type CalendarViewMode = "month" | "week" | "day";
 export type CalendarResourceType = "all" | "labor" | "materials" | "equipment";
 
 export interface CalendarTaskScope {
   name?: string | null;
-  materials?: string[] | null;
+  materials?: TaskScopeMaterialSummary[] | null;
 }
 
 export interface CalendarTaskLike {
@@ -202,7 +202,13 @@ export function aggregateCalendarDays(tasks: CalendarTaskLike[], dateKeys: strin
 
     const roles = getTaskRoles(task);
     const materials = Array.isArray(task.bom_scope?.materials)
-      ? Array.from(new Set(task.bom_scope?.materials.filter(Boolean)))
+      ? Array.from(
+          new Set(
+            task.bom_scope.materials
+              .map((material) => material.name.trim())
+              .filter(Boolean)
+          )
+        )
       : [];
     const equipment = Array.isArray(task.equipment)
       ? Array.from(new Set(task.equipment.map((item) => item.trim()).filter(Boolean)))
