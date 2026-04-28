@@ -14,6 +14,8 @@ interface GanttTaskItem {
 interface GanttViewProps {
   tasks: GanttTaskItem[];
   criticalTaskIds?: string[];
+  selectedTaskId?: string | null;
+  onTaskSelect?: (taskId: string) => void;
 }
 
 const DAY_WIDTH = 38;
@@ -79,7 +81,18 @@ function getCriticalTaskClasses(isCritical: boolean) {
   return isCritical ? "border-amber-500/60 bg-amber-500/12 text-amber-800 shadow-[0_0_0_1px_rgba(245,158,11,0.25)]" : "";
 }
 
-export function GanttView({ tasks, criticalTaskIds = [] }: GanttViewProps) {
+function getSelectedTaskClasses(isSelected: boolean) {
+  return isSelected
+    ? "ring-2 ring-primary/60 ring-offset-1 ring-offset-card shadow-md"
+    : "hover:border-primary/40 hover:bg-primary/5 hover:shadow-md";
+}
+
+export function GanttView({
+  tasks,
+  criticalTaskIds = [],
+  selectedTaskId = null,
+  onTaskSelect,
+}: GanttViewProps) {
   const criticalTaskIdSet = new Set(criticalTaskIds);
   const scheduledTasks = tasks
     .filter((task) => task.id && task.start_date && task.end_date)
@@ -290,6 +303,7 @@ export function GanttView({ tasks, criticalTaskIds = [] }: GanttViewProps) {
               {scheduledTasks.map((task) => {
                 const geometry = taskGeometry.get(task.id);
                 const isCritical = criticalTaskIdSet.has(task.id);
+                const isSelected = selectedTaskId === task.id;
 
                 if (!geometry) {
                   return null;
@@ -302,7 +316,9 @@ export function GanttView({ tasks, criticalTaskIds = [] }: GanttViewProps) {
                     style={{ minHeight: ROW_HEIGHT }}
                   >
                     <div
-                      className="sticky left-0 z-30 flex shrink-0 items-center border-r bg-card px-4"
+                      className={`sticky left-0 z-30 flex shrink-0 items-center border-r px-4 transition-colors ${
+                        isSelected ? "bg-primary/5" : "bg-card"
+                      }`}
                       style={{ width: LABEL_WIDTH }}
                     >
                       <div className="space-y-1.5">
@@ -314,6 +330,11 @@ export function GanttView({ tasks, criticalTaskIds = [] }: GanttViewProps) {
                           {isCritical ? (
                             <span className="rounded-full border border-amber-500/50 bg-amber-500/10 px-2 py-0.5 text-[9px] font-medium text-amber-700">
                               Critical path
+                            </span>
+                          ) : null}
+                          {isSelected ? (
+                            <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[9px] font-medium text-primary">
+                              Selected
                             </span>
                           ) : null}
                           {task.dependencies.map((dependency) => (
@@ -329,8 +350,12 @@ export function GanttView({ tasks, criticalTaskIds = [] }: GanttViewProps) {
                     </div>
 
                     <div className="relative" style={{ width: timelineWidth, height: ROW_HEIGHT }}>
-                      <div
-                        className={`absolute flex flex-col justify-center overflow-hidden rounded-lg border px-2 py-1 shadow-sm ${getTaskTone(task.status)} ${getCriticalTaskClasses(isCritical)}`}
+                      <button
+                        type="button"
+                        onClick={() => onTaskSelect?.(task.id)}
+                        aria-pressed={isSelected}
+                        title={`Open ${task.name}`}
+                        className={`absolute flex flex-col justify-center overflow-hidden rounded-lg border px-2 py-1 text-left shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-1 focus-visible:ring-offset-card ${getTaskTone(task.status)} ${getCriticalTaskClasses(isCritical)} ${getSelectedTaskClasses(isSelected)}`}
                         style={{
                           left: geometry.barLeft,
                           top: geometry.barInsetTop,
@@ -344,7 +369,7 @@ export function GanttView({ tasks, criticalTaskIds = [] }: GanttViewProps) {
                             {task.start_date} → {task.end_date}
                           </p>
                         ) : null}
-                      </div>
+                      </button>
                     </div>
                   </div>
                 );

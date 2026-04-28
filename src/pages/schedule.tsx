@@ -699,6 +699,15 @@ export default function SchedulePage() {
     setPanelOpen(true);
   };
 
+  const handleGanttTaskSelect = (taskId: string) => {
+    const matchedTask = sortedTasks.find((task) => task.id === taskId);
+    if (!matchedTask) {
+      return;
+    }
+
+    handleTaskSelect(matchedTask);
+  };
+
   const handleCreateTask = () => {
     if (!selectedProject) return;
     lastSavedSignatureRef.current = "";
@@ -909,7 +918,12 @@ export default function SchedulePage() {
                 ) : (
                   <div className="h-full overflow-auto p-3">
                     {viewMode === "gantt" ? (
-                      <GanttView tasks={sortedTasks} criticalTaskIds={criticalPathTaskIds} />
+                      <GanttView
+                        tasks={sortedTasks}
+                        criticalTaskIds={criticalPathTaskIds}
+                        selectedTaskId={selectedTask?.id || null}
+                        onTaskSelect={handleGanttTaskSelect}
+                      />
                     ) : viewMode === "calendar" ? (
                       <CalendarView tasks={sortedTasks} projectName={selectedProjectName} />
                     ) : viewMode === "catalog" ? (
