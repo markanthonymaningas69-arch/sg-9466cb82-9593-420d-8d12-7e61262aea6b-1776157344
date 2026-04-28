@@ -362,23 +362,54 @@ export function TaskConfigurationPanel({
               <section className="space-y-3 rounded-md border p-3">
                 <div className="space-y-1">
                   <h3 className="text-sm font-semibold text-foreground">Productivity</h3>
-                  <p className="text-[11px] text-muted-foreground">Enter the daily output of one team. The schedule will multiply it by the number of teams.</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Set the output of one team per working day or per working hour. Calculated duration uses scope quantity,
+                    productivity unit, work hours per day, and the configured number of teams.
+                  </p>
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-xs">Output per team per day</Label>
-                  <Input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    value={taskConfig.productivityOutput}
-                    onChange={(event) =>
-                      handleTaskConfigChange({
-                        productivityOutput: Number(event.target.value) || 0,
-                      })
-                    }
-                    className="h-8 text-sm"
-                  />
+                <div className="grid grid-cols-[1fr_120px] gap-2">
+                  <div className="space-y-2">
+                    <Label className="text-xs">
+                      Productivity of one team
+                    </Label>
+                    <Input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={taskConfig.productivityOutput}
+                      onChange={(event) =>
+                        handleTaskConfigChange({
+                          productivityOutput: Number(event.target.value) || 0,
+                        })
+                      }
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Unit</Label>
+                    <Select
+                      value={taskConfig.productivityUnit}
+                      onValueChange={(value) =>
+                        handleTaskConfigChange({
+                          productivityUnit: value as TaskConfiguration["productivityUnit"],
+                        })
+                      }
+                    >
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue placeholder="Unit" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="day">Per day</SelectItem>
+                        <SelectItem value="hour">Per hour</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {taskConfig.productivityUnit === "hour"
+                    ? `Total daily output = productivity × ${taskConfig.workHoursPerDay} work hour(s) × ${Math.max(1, taskConfig.numberOfTeams)} team(s).`
+                    : `Total daily output = productivity × ${Math.max(1, taskConfig.numberOfTeams)} team(s).`}
+                </p>
                 {!validation.productivityValid && <p className="text-[11px] text-destructive">Productivity must be greater than 0.</p>}
               </section>
 
