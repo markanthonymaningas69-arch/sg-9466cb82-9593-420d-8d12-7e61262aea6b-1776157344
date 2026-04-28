@@ -111,7 +111,6 @@ function buildMaterialDeliveryDates(plan: SaveTaskMaterialDeliveryPlanInput) {
 export function TaskConfigurationPanel({
   task,
   tasks,
-  teamTemplates = [],
   materialDeliveryPlans = [],
   manpowerCatalogItems = [],
   laborCostSummary = null,

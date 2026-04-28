@@ -389,16 +389,6 @@ export default function SchedulePage() {
     }
   }
 
-  async function loadManpowerRates() {
-    try {
-      const { data, error } = await supabase.from("manpower_rate_catalog").select("id, position_name, daily_rate, overtime_rate").order("position_name", { ascending: true });
-      if (error) throw error;
-      setManpowerRates((data || []).map((rate) => ({ id: rate.id, positionName: rate.position_name, dailyRate: Number(rate.daily_rate || 0), overtimeRate: Number(rate.overtime_rate || 0) })));
-    } catch (error) {
-      console.error(error);
-    }
-  }
-
   async function loadTasks(projectId: string) {
     try {
       setLoading(true);
