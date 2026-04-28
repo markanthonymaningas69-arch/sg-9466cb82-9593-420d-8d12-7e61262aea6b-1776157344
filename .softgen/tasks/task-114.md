@@ -22,6 +22,7 @@ Use the new project-based manpower team composition data for labor cost computat
 - [x] Keep scheduling, duration estimation, calendar loading, and S-curve manpower calculations aligned with the new team structure
 - [ ] Polish the Material Delivery Planning layout so controls and computed distribution details are clearly visible inside the panel
 - [ ] Fix even distribution computation so planned quantities and schedule breakdown render correctly per generated delivery date
+- [ ] Fix material delivery autosave to persist valid BOM material UUIDs instead of generated placeholder ids
 
 ## Acceptance
 Project Manager calculations use the project manpower catalog and team composition data instead of HR manpower rates.
