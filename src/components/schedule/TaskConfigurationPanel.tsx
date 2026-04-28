@@ -108,6 +108,34 @@ function buildMaterialDeliveryDates(plan: SaveTaskMaterialDeliveryPlanInput) {
   return dates;
 }
 
+function buildEvenDistributionRows(totalQuantity: number, deliveryDates: string[]) {
+  const normalizedTotal = Math.max(0, Number(totalQuantity || 0));
+
+  if (normalizedTotal <= 0 || deliveryDates.length === 0) {
+    return [];
+  }
+
+  const totalCents = Math.round(normalizedTotal * 100);
+  const deliveryCount = deliveryDates.length;
+  const baseCents = Math.floor(totalCents / deliveryCount);
+  const remainder = totalCents - baseCents * deliveryCount;
+
+  return deliveryDates.map((date, index) => ({
+    date,
+    quantity: (baseCents + (index < remainder ? 1 : 0)) / 100,
+  }));
+}
+
+function formatDistributionQuantity(value: number) {
+  const normalizedValue = Number(value || 0);
+  const minimumFractionDigits = Number.isInteger(normalizedValue) ? 0 : 2;
+
+  return normalizedValue.toLocaleString("en-US", {
+    minimumFractionDigits,
+    maximumFractionDigits: 2,
+  });
+}
+
 export function TaskConfigurationPanel({
   task,
   tasks,
@@ -579,148 +607,219 @@ export function TaskConfigurationPanel({
                   <Badge variant="outline">{resourceMaterialPlans.length} material(s)</Badge>
                 </div>
 
-                {resourceMaterialPlans.length > 0 ? (
-                  <div className="space-y-3">
-                    {resourceMaterialPlans.map((plan) => (
-                      <div key={plan.materialId} className="rounded-md border bg-muted/20 p-3 space-y-3">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                          <div>
-                            <p className="text-sm font-semibold text-foreground">{plan.materialName}</p>
-                            <p className="text-[11px] text-muted-foreground">
-                              Planned usage: {plan.plannedUsagePeriod?.startDate || "-"} → {plan.plannedUsagePeriod?.endDate || "-"}
-                            </p>
-                          </div>
-                          <Badge variant="outline">{plan.unit}</Badge>
+                {resourceMaterialPlans.map((plan) => {
+                  const distributionRows = buildEvenDistributionRows(
+                    Number(plan.totalQuantity || 0),
+                    plan.deliveryDates
+                  );
+                  const averageQuantityPerDelivery =
+                    distributionRows.length > 0
+                      ? Number((Number(plan.totalQuantity || 0) / distributionRows.length).toFixed(2))
+                      : 0;
+
+                  return (
+                    <div key={plan.materialId} className="rounded-md border bg-muted/20 p-3 space-y-4">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-foreground">{plan.materialName}</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            Planned usage: {plan.plannedUsagePeriod?.startDate || "-"} → {plan.plannedUsagePeriod?.endDate || "-"}
+                          </p>
                         </div>
+                        <Badge variant="outline">{plan.unit}</Badge>
+                      </div>
 
-                        <div className="grid gap-3 md:grid-cols-2">
-                          <div className="space-y-2">
-                            <Label className="text-[11px]">Delivery Type</Label>
-                            <Select
-                              value={plan.deliveryScheduleType}
-                              onValueChange={(value) =>
-                                updateMaterialPlan(plan.materialId, {
-                                  deliveryScheduleType: value as "one_time" | "staggered",
-                                })
-                              }
-                            >
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue placeholder="Select delivery type" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="one_time">One-time delivery</SelectItem>
-                                <SelectItem value="staggered">Staggered delivery</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label className="text-[11px]">Delivery Start Date</Label>
-                            <Input
-                              type="date"
-                              value={plan.deliveryStartDate || ""}
-                              onChange={(event) =>
-                                updateMaterialPlan(plan.materialId, {
-                                  deliveryStartDate: event.target.value || null,
-                                })
-                              }
-                              className="h-8 text-xs"
-                            />
-                          </div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label className="text-[11px]">Delivery Type</Label>
+                          <Select
+                            value={plan.deliveryScheduleType}
+                            onValueChange={(value) =>
+                              updateMaterialPlan(plan.materialId, {
+                                deliveryScheduleType: value as "one_time" | "staggered",
+                              })
+                            }
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="Select delivery type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="one_time">One-time delivery</SelectItem>
+                              <SelectItem value="staggered">Staggered delivery</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
-
-                        <div className="grid gap-3 md:grid-cols-3">
-                          <div className="space-y-2">
-                            <Label className="text-[11px]">Frequency</Label>
-                            <Select
-                              value={plan.deliveryFrequency}
-                              onValueChange={(value) =>
-                                updateMaterialPlan(plan.materialId, {
-                                  deliveryFrequency: value as "daily" | "weekly" | "custom",
-                                })
-                              }
-                              disabled={plan.deliveryScheduleType === "one_time"}
-                            >
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue placeholder="Select frequency" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="daily">Daily</SelectItem>
-                                <SelectItem value="weekly">Weekly</SelectItem>
-                                <SelectItem value="custom">Custom interval</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label className="text-[11px]">Delivery Duration (days)</Label>
-                            <Input
-                              type="number"
-                              min="1"
-                              step="1"
-                              value={plan.deliveryScheduleType === "one_time" ? 1 : plan.deliveryDurationDays}
-                              onChange={(event) =>
-                                updateMaterialPlan(plan.materialId, {
-                                  deliveryDurationDays: Math.max(
-                                    1,
-                                    Math.round(Number(event.target.value) || 1)
-                                  ),
-                                })
-                              }
-                              className="h-8 text-xs"
-                              disabled={plan.deliveryScheduleType === "one_time"}
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label className="text-[11px]">Quantity Option</Label>
-                            <Input value="Even distribution" readOnly className="h-8 text-xs bg-muted/50" />
-                          </div>
-                        </div>
-
-                        {plan.deliveryScheduleType === "staggered" && plan.deliveryFrequency === "custom" ? (
-                          <div className="space-y-2">
-                            <Label className="text-[11px]">Custom Interval (days)</Label>
-                            <Input
-                              type="number"
-                              min="1"
-                              step="1"
-                              value={plan.customIntervalDays || 1}
-                              onChange={(event) =>
-                                updateMaterialPlan(plan.materialId, {
-                                  customIntervalDays: Math.max(
-                                    1,
-                                    Math.round(Number(event.target.value) || 1)
-                                  ),
-                                })
-                              }
-                              className="h-8 text-xs"
-                            />
-                          </div>
-                        ) : null}
 
                         <div className="space-y-2">
-                          <Label className="text-[11px]">Delivery Timeline</Label>
-                          {plan.deliveryDates.length > 0 ? (
-                            <div className="flex flex-wrap gap-2">
-                              {plan.deliveryDates.map((date) => (
-                                <Badge key={`${plan.materialId}-${date}`} variant="outline" className="text-[10px]">
-                                  {date}
-                                </Badge>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-[11px] text-muted-foreground">
-                              Set the delivery start date to generate the material delivery timeline.
-                            </p>
-                          )}
+                          <Label className="text-[11px]">Delivery Start Date</Label>
+                          <Input
+                            type="date"
+                            value={plan.deliveryStartDate || ""}
+                            onChange={(event) =>
+                              updateMaterialPlan(plan.materialId, {
+                                deliveryStartDate: event.target.value || null,
+                              })
+                            }
+                            className="h-8 text-xs"
+                          />
                         </div>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground">No BOM materials are linked to this task scope yet.</p>
-                )}
+
+                      <div className="grid gap-3 xl:grid-cols-4">
+                        <div className="space-y-2">
+                          <Label className="text-[11px]">Frequency</Label>
+                          <Select
+                            value={plan.deliveryFrequency}
+                            onValueChange={(value) =>
+                              updateMaterialPlan(plan.materialId, {
+                                deliveryFrequency: value as "daily" | "weekly" | "custom",
+                              })
+                            }
+                            disabled={plan.deliveryScheduleType === "one_time"}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="Select frequency" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="daily">Daily</SelectItem>
+                              <SelectItem value="weekly">Weekly</SelectItem>
+                              <SelectItem value="custom">Custom interval</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-[11px]">Delivery Duration (days)</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={plan.deliveryScheduleType === "one_time" ? 1 : plan.deliveryDurationDays}
+                            onChange={(event) =>
+                              updateMaterialPlan(plan.materialId, {
+                                deliveryDurationDays: Math.max(
+                                  1,
+                                  Math.round(Number(event.target.value) || 1)
+                                ),
+                              })
+                            }
+                            className="h-8 text-xs"
+                            disabled={plan.deliveryScheduleType === "one_time"}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-[11px]">Total Planned Quantity ({plan.unit})</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={plan.totalQuantity}
+                            onChange={(event) =>
+                              updateMaterialPlan(plan.materialId, {
+                                totalQuantity: Math.max(0, Number(event.target.value) || 0),
+                              })
+                            }
+                            className="h-8 text-xs"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-[11px]">Quantity Option</Label>
+                          <div className="flex h-8 items-center rounded-md border bg-muted/50 px-3 text-xs text-foreground">
+                            Even distribution
+                          </div>
+                        </div>
+                      </div>
+
+                      {plan.deliveryScheduleType === "staggered" && plan.deliveryFrequency === "custom" ? (
+                        <div className="space-y-2">
+                          <Label className="text-[11px]">Custom Interval (days)</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={plan.customIntervalDays || 1}
+                            onChange={(event) =>
+                              updateMaterialPlan(plan.materialId, {
+                                customIntervalDays: Math.max(
+                                  1,
+                                  Math.round(Number(event.target.value) || 1)
+                                ),
+                              })
+                            }
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                      ) : null}
+
+                      <div className="grid gap-3 rounded-md border bg-background/70 p-3 md:grid-cols-3">
+                        <div>
+                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Deliveries</p>
+                          <p className="mt-1 text-sm font-semibold text-foreground">{plan.deliveryDates.length}</p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Qty / Delivery</p>
+                          <p className="mt-1 text-sm font-semibold text-foreground">
+                            {distributionRows.length > 0
+                              ? `${formatDistributionQuantity(averageQuantityPerDelivery)} ${plan.unit}`
+                              : "-"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Total Planned</p>
+                          <p className="mt-1 text-sm font-semibold text-foreground">
+                            {formatDistributionQuantity(Number(plan.totalQuantity || 0))} {plan.unit}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-[11px]">Delivery Timeline</Label>
+                        {plan.deliveryDates.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {plan.deliveryDates.map((date) => (
+                              <Badge key={`${plan.materialId}-${date}`} variant="outline" className="text-[10px]">
+                                {date}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-muted-foreground">
+                            Set the delivery start date to generate the material delivery timeline.
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-[11px]">Distribution Breakdown</Label>
+                        {distributionRows.length > 0 ? (
+                          <div className="space-y-2">
+                            {distributionRows.map((row, index) => (
+                              <div
+                                key={`${plan.materialId}-${row.date}-${index}`}
+                                className="flex items-center justify-between rounded-md border bg-background px-3 py-2 text-xs"
+                              >
+                                <span className="text-muted-foreground">{row.date}</span>
+                                <span className="font-medium text-foreground">
+                                  {formatDistributionQuantity(row.quantity)} {plan.unit}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : plan.deliveryDates.length === 0 ? (
+                          <p className="text-[11px] text-muted-foreground">
+                            Generate delivery dates first to see how the quantity will be distributed.
+                          </p>
+                        ) : (
+                          <p className="text-[11px] text-muted-foreground">
+                            Enter the total planned quantity to compute the even distribution per delivery date.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </section>
 
               <section className="space-y-3 rounded-md border p-3">
