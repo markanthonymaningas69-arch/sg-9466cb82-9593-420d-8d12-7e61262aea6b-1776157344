@@ -158,7 +158,6 @@ export function TaskConfigurationPanel({
   const totalDailyOutput = calculateTotalDailyOutput(taskConfig);
   const totalTeamMembers = calculateTotalTeamMembers(taskConfig);
   const totalDailyLaborCost = calculateTotalTeamDailyCost(taskConfig);
-  const selectedTemplate = teamTemplates.find((template) => template.id === taskConfig.teamTemplateId) || null;
   const ratesByPosition = new Map(
     manpowerCatalogItems.map((item) => [item.positionName.trim().toLowerCase(), item] as const)
   );
@@ -356,98 +355,55 @@ export function TaskConfigurationPanel({
               </section>
 
               <section className="space-y-3 rounded-md border p-3">
-                <div className="space-y-1">
-                  <h3 className="text-sm font-semibold text-foreground">Team Composition</h3>
-                  <p className="text-[11px] text-muted-foreground">Choose a team template from the Master Catalog Engine and set how many teams will work on this scope.</p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-xs">Team Type</Label>
-                  <Select
-                    value={taskConfig.teamTemplateId || undefined}
-                    onValueChange={(templateId) => {
-                      const template = teamTemplates.find((item) => item.id === templateId);
-                      if (!template) {
-                        return;
+                <TeamCompositionEditor
+                  teams={taskConfig.teams}
+                  catalogItems={manpowerCatalogItems}
+                  workHoursPerDay={taskConfig.workHoursPerDay}
+                  onChange={(teams) => {
+                    const nextConfig = normalizeTaskConfiguration(
+                      {
+                        ...taskConfig,
+                        teams,
+                      },
+                      {
+                        quantity: task.bom_scope?.quantity,
+                        unit: task.bom_scope?.unit,
+                        assignedTeamName: teams[0]?.teamName || task.assigned_team,
                       }
+                    );
 
-                      const nextConfig = applyTeamTemplate(taskConfig, template);
+                    onTaskChange({
+                      ...task,
+                      assigned_team: nextConfig.assignedTeamName || null,
+                      number_of_teams: nextConfig.numberOfTeams,
+                      task_config: nextConfig,
+                    });
+                  }}
+                />
 
-                      onTaskChange({
-                        ...task,
-                        assigned_team: template.name,
-                        team_template_id: template.id,
-                        number_of_teams: nextConfig.numberOfTeams,
-                        task_config: nextConfig,
-                      });
-                    }}
-                  >
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue placeholder="Select a team template" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {teamTemplates.map((template) => (
-                        <SelectItem key={template.id} value={template.id}>
-                          {template.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {teamTemplates.length === 0 && (
-                    <p className="text-[11px] text-muted-foreground">No team templates found in the Master Catalog Engine yet.</p>
-                  )}
-                  {!validation.teamTemplateValid && teamTemplates.length > 0 && (
-                    <p className="text-[11px] text-destructive">Team Type is required.</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-xs">Team Members</Label>
-                  <div className="rounded-md border bg-muted/20 p-3">
-                    {taskConfig.teamRoles.length > 0 ? (
-                      <div className="space-y-2">
-                        {taskConfig.teamRoles.map((role) => (
-                          <div key={role.id} className="flex items-center justify-between text-xs">
-                            <span className="text-foreground">{role.role}</span>
-                            <Badge variant="outline">{role.quantity}</Badge>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">Select a team type to load the member breakdown.</p>
-                    )}
-                  </div>
-                  {selectedTemplate && <p className="text-[11px] text-muted-foreground">Template: {selectedTemplate.name}</p>}
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-xs">Number of Teams</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    step="1"
-                    value={taskConfig.numberOfTeams}
-                    onChange={(event) => {
-                      const value = Math.max(1, Math.round(Number(event.target.value) || 1));
-                      handleTaskConfigChange({ numberOfTeams: value });
-                      onTaskChange({
-                        ...task,
-                        number_of_teams: value,
-                      });
-                    }}
-                    className="h-8 text-sm"
-                  />
-                  {!validation.numberOfTeamsValid && <p className="text-[11px] text-destructive">Number of Teams must be at least 1.</p>}
-                </div>
+                {!validation.teamStructureValid ? (
+                  <p className="text-[11px] text-destructive">Each team needs at least one member.</p>
+                ) : null}
+                {!validation.positionsValid ? (
+                  <p className="text-[11px] text-destructive">Each member must use a position from this project&apos;s Manpower Catalog.</p>
+                ) : null}
+                {!validation.memberRatesValid ? (
+                  <p className="text-[11px] text-destructive">Each member rate must be greater than 0.</p>
+                ) : null}
+                {!validation.numberOfTeamsValid ? (
+                  <p className="text-[11px] text-destructive">Number of Teams must be at least 1 for every team setup.</p>
+                ) : null}
 
                 <div className="rounded-md border bg-primary/5 p-3 space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-foreground">Estimated Duration</span>
                     <Badge>{estimatedDuration} days</Badge>
                   </div>
-                  <p className="text-xs text-muted-foreground">{productivitySummary.teamLabel || "No team members selected"}</p>
+                  <p className="text-xs text-muted-foreground">{productivitySummary.teamLabel || "No teams configured yet"}</p>
                   <p className="text-xs text-muted-foreground">Output per team: {productivitySummary.perTeamOutputLabel}</p>
-                  <p className="text-xs text-muted-foreground">Total output with {taskConfig.numberOfTeams} team(s): {totalDailyOutput} {taskConfig.scopeUnit} per day</p>
+                  <p className="text-xs text-muted-foreground">Total output with configured teams: {totalDailyOutput} {taskConfig.scopeUnit} per day</p>
+                  <p className="text-xs text-muted-foreground">Total manpower: {totalTeamMembers} personnel</p>
+                  <p className="text-xs text-muted-foreground">Total daily labor cost: AED {totalDailyLaborCost.toFixed(2)}</p>
                 </div>
               </section>
             </TabsContent>
