@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -1686,6 +1686,50 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_manpower_catalog: {
+        Row: {
+          company_id: string
+          created_at: string
+          description: string | null
+          id: string
+          position_name: string
+          project_id: string
+          standard_rate: number
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          position_name: string
+          project_id: string
+          standard_rate?: number
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          position_name?: string
+          project_id?: string
+          standard_rate?: number
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_manpower_catalog_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
