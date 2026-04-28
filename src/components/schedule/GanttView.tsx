@@ -16,9 +16,12 @@ interface GanttViewProps {
 }
 
 const DAY_WIDTH = 38;
-const ROW_HEIGHT = 64;
-const HEADER_HEIGHT = 44;
+const ROW_HEIGHT = 52;
+const HEADER_HEIGHT = 40;
 const LABEL_WIDTH = 280;
+const BAR_HEIGHT = 30;
+const BAR_HORIZONTAL_INSET = 4;
+const BAR_MIN_WIDTH = 52;
 
 const dependencyColors: Record<TaskDependency["type"], string> = {
   FS: "#2563eb",
@@ -115,19 +118,27 @@ export function GanttView({ tasks }: GanttViewProps) {
     scheduledTasks.map((task, index) => {
       const barStart = diffInDays(timelineStart, parseDate(task.start_date || toDateKey(new Date()))) * DAY_WIDTH;
       const duration = Math.max(1, Number(task.duration_days || 1));
-      const barWidth = duration * DAY_WIDTH;
+      const fullBarWidth = duration * DAY_WIDTH;
+      const barTop = HEADER_HEIGHT + index * ROW_HEIGHT + (ROW_HEIGHT - BAR_HEIGHT) / 2;
+      const barLeft = barStart + BAR_HORIZONTAL_INSET;
+      const barWidth = Math.max(BAR_MIN_WIDTH, fullBarWidth - BAR_HORIZONTAL_INSET * 2);
+      const connectorY = barTop + BAR_HEIGHT / 2;
+
       return [
         task.id,
         {
           rowIndex: index,
           startX: barStart,
-          endX: barStart + barWidth,
+          endX: barStart + fullBarWidth,
           startY: rowCenterY(index),
-          barInsetTop: 12,
-          barTop: HEADER_HEIGHT + index * ROW_HEIGHT + 12,
-          barHeight: 40,
-          barLeft: barStart + 6,
-          barWidth: Math.max(56, barWidth - 12),
+          barInsetTop: (ROW_HEIGHT - BAR_HEIGHT) / 2,
+          barTop,
+          barHeight: BAR_HEIGHT,
+          barLeft,
+          barWidth,
+          connectorLeft: barLeft,
+          connectorRight: barLeft + barWidth,
+          connectorY,
         },
       ] as const;
     })
@@ -142,17 +153,17 @@ export function GanttView({ tasks }: GanttViewProps) {
         return null;
       }
 
-      const predecessorBarLeft = predecessor.barLeft;
-      const predecessorBarRight = predecessor.barLeft + predecessor.barWidth;
-      const successorBarLeft = successor.barLeft;
-      const successorBarRight = successor.barLeft + successor.barWidth;
+      const predecessorBarLeft = predecessor.connectorLeft;
+      const predecessorBarRight = predecessor.connectorRight;
+      const successorBarLeft = successor.connectorLeft;
+      const successorBarRight = successor.connectorRight;
       const startX =
         dependency.type === "SS" || dependency.type === "SF" ? predecessorBarLeft : predecessorBarRight;
       const endX =
         dependency.type === "SS" || dependency.type === "FS" ? successorBarLeft : successorBarRight;
-      const startY = predecessor.barTop + predecessor.barHeight / 2;
-      const endY = successor.barTop + successor.barHeight / 2;
-      const horizontalGap = Math.max(12, Math.abs(endX - startX) / 2);
+      const startY = predecessor.connectorY;
+      const endY = successor.connectorY;
+      const horizontalGap = Math.max(16, Math.abs(endX - startX) / 2);
       const elbowX = startX + (endX >= startX ? horizontalGap : -horizontalGap);
 
       return {
@@ -240,7 +251,7 @@ export function GanttView({ tasks }: GanttViewProps) {
                     width={44}
                     height={18}
                     rx={9}
-                    fill="white"
+                    fill="hsl(var(--card))"
                     stroke={path.color}
                     strokeWidth="1"
                   />
@@ -275,16 +286,16 @@ export function GanttView({ tasks }: GanttViewProps) {
                       className="sticky left-0 z-30 flex shrink-0 items-center border-r bg-card px-4"
                       style={{ width: LABEL_WIDTH }}
                     >
-                      <div className="space-y-2">
-                        <p className="text-sm font-semibold text-foreground">{task.name}</p>
-                        <div className="flex flex-wrap gap-2">
-                          <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${getTaskTone(task.status)}`}>
+                      <div className="space-y-1.5">
+                        <p className="text-sm font-semibold leading-tight text-foreground">{task.name}</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          <span className={`rounded-full border px-2 py-0.5 text-[9px] font-medium ${getTaskTone(task.status)}`}>
                             {task.status?.replaceAll("_", " ") || "pending"}
                           </span>
                           {task.dependencies.map((dependency) => (
                             <span
                               key={`${task.id}-${dependency.taskId}-${dependency.type}`}
-                              className="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] text-muted-foreground"
+                              className="rounded-full border border-border bg-muted px-2 py-0.5 text-[9px] text-muted-foreground"
                             >
                               {getDependencyLabel(dependency)}
                             </span>
@@ -295,7 +306,7 @@ export function GanttView({ tasks }: GanttViewProps) {
 
                     <div className="relative" style={{ width: timelineWidth, height: ROW_HEIGHT }}>
                       <div
-                        className={`absolute flex flex-col justify-center overflow-hidden rounded-xl border px-2 py-1.5 shadow-sm ${getTaskTone(task.status)}`}
+                        className={`absolute flex flex-col justify-center overflow-hidden rounded-lg border px-2 py-1 shadow-sm ${getTaskTone(task.status)}`}
                         style={{
                           left: geometry.barLeft,
                           top: geometry.barInsetTop,
@@ -303,9 +314,9 @@ export function GanttView({ tasks }: GanttViewProps) {
                           height: geometry.barHeight,
                         }}
                       >
-                        <p className="truncate text-[10px] font-semibold leading-[1.1]">{task.name}</p>
-                        {geometry.barWidth >= 118 ? (
-                          <p className="mt-0.5 truncate text-[9px] leading-[1.05] opacity-75">
+                        <p className="truncate text-[10px] font-semibold leading-none">{task.name}</p>
+                        {geometry.barWidth >= 128 ? (
+                          <p className="mt-0.5 truncate text-[8px] leading-none opacity-75">
                             {task.start_date} → {task.end_date}
                           </p>
                         ) : null}
