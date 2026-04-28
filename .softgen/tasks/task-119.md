@@ -1,6 +1,6 @@
 ---
 title: Gantt drag reorder
-status: in_progress
+status: done
 priority: high
 type: feature
 tags:
@@ -20,7 +20,7 @@ Add drag-and-drop reordering directly inside the Gantt view so users can change 
 - [x] Add drag handles or draggable row behavior in the Gantt view for task reordering
 - [x] Update the schedule page state flow to reorder tasks in memory and persist revised sort_order values
 - [x] Keep selected task opening behavior working after reorder
-- [ ] Validate the schedule build and confirm the Gantt still renders dependencies and task bars correctly
+- [x] Validate the schedule build and confirm the Gantt still renders dependencies and task bars correctly
 
 ## Acceptance
 Dragging a task in the Gantt changes its position in the activity order immediately.
