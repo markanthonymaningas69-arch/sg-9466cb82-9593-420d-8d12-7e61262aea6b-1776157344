@@ -25,6 +25,9 @@ Replace the old team composition flow in Project Manager → Task Configuration 
 - [x] Enforce validation for member count, valid position, positive rate, and number of teams
 - [ ] Tighten Team Composition field widths and responsive layout so inputs fit inside the panel body
 - [ ] Add a direct Manpower Catalog link/action from the Team Composition setup area
+- [ ] Restore a visible hide/show panel control in the Project Manager workspace
+- [ ] Reduce Task Configuration panel vertical footprint and remove the footer helper line
+- [ ] Keep the Parameters, Schedule, and Resources tabs outside the scrollable content area
 
 ## Acceptance
 A user can define one team composition once and apply it to multiple identical teams.
