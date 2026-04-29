@@ -334,6 +334,21 @@ export default function Purchasing() {
     );
 
     setDialogOpen(false);
+    setPoHeader({
+      order_number: generateNextPONumber([...purchases, ...createdPurchases]),
+      order_date: new Date().toISOString().split("T")[0],
+      supplier: "",
+      destination_type: "main_warehouse",
+      project_id: "none"
+    });
+    setPoItems([]);
+    setCurrentItem({
+      item_name: "",
+      category: "Construction Materials",
+      quantity: "",
+      unit: "Pc",
+      unit_cost: ""
+    });
     loadData();
   };
 
