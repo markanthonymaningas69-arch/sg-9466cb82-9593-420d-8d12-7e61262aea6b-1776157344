@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ShoppingCart, Plus, Search, Building2, Warehouse as WarehouseIcon, FilterX, List, Edit2, Archive, Printer, ChevronsUpDown, Check, Filter, Receipt } from "lucide-react";
+import { ShoppingCart, Plus, Search, Building2, Warehouse as WarehouseIcon, FilterX, List, Edit2, Archive, Printer, ChevronsUpDown, Check, Filter, Receipt, Eye, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { projectService } from "@/services/projectService";
 import { useSettings } from "@/contexts/SettingsProvider";
@@ -105,6 +105,8 @@ export default function Purchasing() {
   const [creatingVoucherId, setCreatingVoucherId] = useState("");
   const [voucherDialogOpen, setVoucherDialogOpen] = useState(false);
   const [selectedVoucherRecord, setSelectedVoucherRecord] = useState<any | null>(null);
+  const [viewGroupDialogOpen, setViewGroupDialogOpen] = useState(false);
+  const [selectedPurchaseGroup, setSelectedPurchaseGroup] = useState<any[] | null>(null);
 
   const [gmSubmitDialogOpen, setGmSubmitDialogOpen] = useState(false);
   const [gmSubmitForm, setGmSubmitForm] = useState<any>(null);
@@ -197,7 +199,38 @@ export default function Purchasing() {
     ]);
     
     const loadedPurchases = pData || [];
-    setPurchases(loadedPurchases);
+    const loadedIncoming = incomingData || [];
+
+    // Merge incoming requests with purchases
+    const mergedList = [
+      ...loadedPurchases,
+      ...loadedIncoming
+        .filter((req) => req.workflowStatus === "in_purchasing")
+        .map((req) => {
+          const payload = req.payload && typeof req.payload === "object" && !Array.isArray(req.payload) ? req.payload : {};
+          return {
+            id: req.sourceRecordId,
+            order_number: (payload.orderNumber as string) || `AR-${req.id.slice(0, 8)}`,
+            order_date: req.requestedAt.split("T")[0],
+            supplier: (payload.supplier as string) || "Pending Selection",
+            item_name: (payload.itemName as string) || req.summary || "Request item",
+            category: (payload.category as string) || "Materials",
+            quantity: typeof payload.quantity === "number" ? payload.quantity : 0,
+            unit: (payload.unit as string) || "unit",
+            unit_cost: 0,
+            destination_type: "project_warehouse",
+            project_id: req.projectId,
+            status: "pending",
+            voucher_number: null,
+            is_archived: false,
+            approval_request_id: req.id,
+            is_from_approval: true,
+            projects: req.projectName ? { name: req.projectName } : null,
+          };
+        }),
+    ];
+
+    setPurchases(mergedList);
     setProjects(projData || []);
     setSuppliers(supData || []);
     setVouchers(vouchData || []);
@@ -213,10 +246,10 @@ export default function Purchasing() {
       });
     }
     setCatalogItems(Array.from(uniqueItemsMap.values()));
-    setIncomingRequests(incomingData || []);
+    setIncomingRequests(loadedIncoming || []);
     
     if (!editingId && !poHeader.order_number) {
-      setPoHeader(prev => ({ ...prev, order_number: generateNextPONumber(loadedPurchases) }));
+      setPoHeader(prev => ({ ...prev, order_number: generateNextPONumber(mergedList) }));
     }
     setLoading(false);
   };
@@ -321,16 +354,122 @@ export default function Purchasing() {
     setDialogOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, approvalRequestId?: string) => {
     if (!confirm("Are you sure you want to delete this purchase order item?")) return;
-    const { error } = await supabase.from("purchases").delete().eq("id", id);
-    if (!error) loadData();
+
+    try {
+      const { error: purchaseError } = await supabase.from("purchases").delete().eq("id", id);
+      if (purchaseError) throw purchaseError;
+
+      if (approvalRequestId) {
+        const { error: approvalError } = await supabase.from("approval_requests").delete().eq("id", approvalRequestId);
+        if (approvalError) console.error("Failed to delete approval request:", approvalError);
+      }
+
+      loadData();
+    } catch (error) {
+      console.error("Error deleting purchase:", error);
+      alert("Failed to delete purchase order item");
+    }
   };
 
   const handleArchive = async (id: string) => {
     if (!confirm("Are you sure you want to archive this purchase order item?")) return;
     const { error } = await supabase.from("purchases").update({ is_archived: true }).eq("id", id);
     if (!error) loadData();
+  };
+
+  const handleArchiveGroup = async (groupKey: string) => {
+    if (!confirm("Are you sure you want to archive all items in this group?")) return;
+    
+    const groupItems = filteredPurchases.filter((p) => getGroupKey(p) === groupKey);
+    const hasApprovalResults = groupItems.some((p) => p.status === "approved" || p.status === "rejected");
+
+    if (!hasApprovalResults) {
+      alert("Can only archive items that have been approved or rejected in Approval Center.");
+      return;
+    }
+
+    try {
+      await Promise.all(
+        groupItems.map((p) => supabase.from("purchases").update({ is_archived: true }).eq("id", p.id))
+      );
+      loadData();
+    } catch (error) {
+      console.error("Error archiving group:", error);
+      alert("Failed to archive group");
+    }
+  };
+
+  const handleDeleteGroup = async (groupKey: string) => {
+    if (!confirm("Are you sure you want to delete all pending items in this group?")) return;
+    
+    const groupItems = filteredPurchases.filter((p) => getGroupKey(p) === groupKey);
+    const allPending = groupItems.every((p) => p.status === "pending");
+
+    if (!allPending) {
+      alert("Can only delete items that are still pending (not yet approved/rejected).");
+      return;
+    }
+
+    try {
+      await Promise.all(
+        groupItems.map(async (p) => {
+          await supabase.from("purchases").delete().eq("id", p.id);
+          if (p.approval_request_id) {
+            await supabase.from("approval_requests").delete().eq("id", p.approval_request_id);
+          }
+        })
+      );
+      loadData();
+    } catch (error) {
+      console.error("Error deleting group:", error);
+      alert("Failed to delete group");
+    }
+  };
+
+  const getGroupKey = (purchase: any) => {
+    if (purchase.voucher_number) return purchase.voucher_number;
+    if (purchase.order_number) return purchase.order_number;
+    return `ungrouped-${purchase.id}`;
+  };
+
+  const groupedPurchases = useMemo(() => {
+    const groups = new Map<string, any[]>();
+
+    filteredPurchases.forEach((purchase) => {
+      const key = getGroupKey(purchase);
+      if (!groups.has(key)) {
+        groups.set(key, []);
+      }
+      groups.get(key)!.push(purchase);
+    });
+
+    return Array.from(groups.entries()).map(([key, items]) => ({
+      key,
+      displayKey: key.startsWith("ungrouped-") ? items[0].order_number || "—" : key,
+      items,
+      firstItem: items[0],
+      totalCost: items.reduce((sum, item) => sum + (item.total_cost || 0), 0),
+      itemCount: items.length,
+    }));
+  }, [filteredPurchases]);
+
+  const openViewGroupDialog = (group: any) => {
+    setSelectedPurchaseGroup(group.items);
+    setViewGroupDialogOpen(true);
+  };
+
+  const canArchiveGroup = (group: any) => {
+    return group.items.some((item: any) => item.status === "approved" || item.status === "rejected");
+  };
+
+  const canDeleteGroup = (group: any) => {
+    return group.items.every((item: any) => item.status === "pending");
+  };
+
+  const canPriceAndSubmit = (group: any) => {
+    return group.items.some((item: any) => item.status === "pending" && item.order_number?.startsWith("PR-"));
   };
 
   const handleOpenChange = (open: boolean) => {
@@ -913,109 +1052,9 @@ export default function Purchasing() {
         </div>
 
         <div className="overflow-x-auto overflow-y-hidden rounded-lg border bg-card p-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <Tabs value={activeView} onValueChange={(value) => setActiveView(value as "incoming" | "purchase-orders")} className="w-full">
-            <TabsList className="inline-flex h-9 min-w-max flex-nowrap items-center justify-start gap-1 bg-transparent p-0">
-              <TabsTrigger
-                value="incoming"
-                className="h-7 shrink-0 whitespace-nowrap rounded-md border border-amber-200 bg-amber-50 px-2.5 text-[11px] font-medium text-amber-800 data-[state=active]:border-amber-700 data-[state=active]:bg-amber-600 data-[state=active]:text-white"
-              >
-                Incoming Requests
-                {incomingRequests.filter((request) => request.workflowStatus === "in_purchasing").length > 0 ? (
-                  <Badge variant="secondary" className="ml-2 h-4 min-w-[18px] px-1 text-[10px]">
-                    {incomingRequests.filter((request) => request.workflowStatus === "in_purchasing").length}
-                  </Badge>
-                ) : null}
-              </TabsTrigger>
-              <TabsTrigger
-                value="purchase-orders"
-                className="h-7 shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-slate-50 px-2.5 text-[11px] font-medium text-slate-700 data-[state=active]:border-slate-700 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
-              >
-                Purchase Orders
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <div className="text-sm font-medium text-muted-foreground px-2">Purchase Orders</div>
         </div>
 
-        {activeView === "incoming" ? (
-          <Card className="border-0 shadow-none">
-            <CardHeader className="px-0 pb-2 pt-0 sm:px-6">
-              <CardTitle className="text-sm sm:text-base">Incoming Requests</CardTitle>
-              <CardDescription className="text-xs">Approved Materials and Tools & Equipment requests routed from Approval Center.</CardDescription>
-            </CardHeader>
-            <CardContent className="px-0 sm:px-6">
-              <div className="overflow-auto rounded-md border">
-                <Table className="min-w-[1100px] table-fixed text-xs">
-                  <TableHeader className="sticky top-0 z-10 bg-background">
-                    <TableRow className="border-b">
-                      <TableHead className="h-8 w-[160px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Request</TableHead>
-                      <TableHead className="h-8 w-[150px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Project</TableHead>
-                      <TableHead className="h-8 w-[130px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Requested By</TableHead>
-                      <TableHead className="h-8 w-[150px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Routed</TableHead>
-                      <TableHead className="h-8 w-[120px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Status</TableHead>
-                      <TableHead className="h-8 w-[260px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Summary</TableHead>
-                      <TableHead className="h-8 w-[120px] whitespace-nowrap px-2 text-right text-[11px] uppercase tracking-wide">View Details</TableHead>
-                      <TableHead className="h-8 w-[120px] whitespace-nowrap px-2 text-right text-[11px] uppercase tracking-wide">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {incomingRequests.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={8} className="py-8 text-center text-xs text-muted-foreground">
-                          No incoming Purchasing requests.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      incomingRequests.map((request) => (
-                        <TableRow key={request.id} className="border-b last:border-b-0">
-                          <TableCell className="px-2 py-1.5 align-middle">
-                            <TruncatedText value={request.requestType} className="max-w-[140px] font-medium text-foreground" />
-                          </TableCell>
-                          <TableCell className="px-2 py-1.5 align-middle">
-                            <TruncatedText value={request.projectName || "No project"} className="max-w-[130px]" />
-                          </TableCell>
-                          <TableCell className="px-2 py-1.5 align-middle">
-                            <TruncatedText value={request.requestedBy} className="max-w-[110px]" />
-                          </TableCell>
-                          <TableCell className="px-2 py-1.5 align-middle text-muted-foreground">
-                            <TruncatedText value={formatCompactDateTime(request.routedAt)} className="max-w-[140px]" />
-                          </TableCell>
-                          <TableCell className="px-2 py-1.5 align-middle">
-                            <Badge variant={request.workflowStatus === "completed" ? "default" : "secondary"} className="h-5 whitespace-nowrap px-1.5 text-[10px]">
-                              {request.workflowStatus.replaceAll("_", " ")}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="px-2 py-1.5 align-middle text-muted-foreground">
-                            <TruncatedText value={request.summary || "—"} className="max-w-[240px]" />
-                          </TableCell>
-                          <TableCell className="px-2 py-1.5 text-right align-middle">
-                            <RequestDetailsButton request={request} />
-                          </TableCell>
-                          <TableCell className="px-2 py-1.5 text-right align-middle">
-                            {request.workflowStatus === "completed" ? (
-                              <span className="text-[11px] text-muted-foreground">Completed</span>
-                            ) : (
-                              <Button
-                                type="button"
-                                size="sm"
-                                className="h-7 px-2 text-[11px]"
-                                onClick={() => void handleCompleteIncomingRequest(request.id)}
-                                disabled={processingRequestId === request.id}
-                              >
-                                {processingRequestId === request.id ? "Saving..." : "Complete"}
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        ) : null}
-
-        {activeView === "purchase-orders" ? (
         <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none">
           <div className="flex justify-end mb-3 shrink-0">
             <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="h-8 px-2 text-xs">
@@ -1099,141 +1138,208 @@ export default function Purchasing() {
           )}
 
           <div className="overflow-auto rounded-md border h-full relative -mx-3 sm:mx-0">
-            <Table className="min-w-[1340px] table-fixed text-xs">
+            <Table className="min-w-[1200px] table-fixed text-xs">
               <TableHeader className="sticky top-0 bg-background z-10">
                 <TableRow className="border-b">
-                  <TableHead className="h-8 min-w-[100px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">PO Number</TableHead>
-                  <TableHead className="hidden lg:table-cell h-8 min-w-[100px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Voucher No.</TableHead>
+                  <TableHead className="h-8 min-w-[120px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Group ID</TableHead>
                   <TableHead className="hidden md:table-cell h-8 min-w-[96px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Date</TableHead>
                   <TableHead className="hidden sm:table-cell h-8 min-w-[140px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Supplier</TableHead>
-                  <TableHead className="h-8 min-w-[250px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Item</TableHead>
-                  <TableHead className="text-right hidden xl:table-cell h-8 min-w-[90px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Qty</TableHead>
-                  <TableHead className="text-right hidden xl:table-cell h-8 min-w-[110px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Unit Cost</TableHead>
+                  <TableHead className="h-8 min-w-[200px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Items</TableHead>
                   <TableHead className="text-right h-8 min-w-[110px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Total Cost</TableHead>
                   <TableHead className="hidden lg:table-cell h-8 min-w-[140px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Destination</TableHead>
                   <TableHead className="h-8 min-w-[100px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Status</TableHead>
-                  <TableHead className="text-right h-8 min-w-[108px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Actions</TableHead>
+                  <TableHead className="text-right h-8 min-w-[200px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center py-8 text-xs text-muted-foreground">Loading purchases...</TableCell>
+                    <TableCell colSpan={8} className="text-center py-8 text-xs text-muted-foreground">Loading purchases...</TableCell>
                   </TableRow>
-                ) : filteredPurchases.length === 0 ? (
+                ) : groupedPurchases.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center py-8 text-xs text-muted-foreground">No purchase orders found.</TableCell>
+                    <TableCell colSpan={8} className="text-center py-8 text-xs text-muted-foreground">No purchase orders found.</TableCell>
                   </TableRow>
                 ) : (
-                  filteredPurchases.map((p) => (
-                    <TableRow key={p.id} className="border-b last:border-b-0">
-                      <TableCell className="px-2 py-1.5 align-middle font-medium text-primary whitespace-nowrap">{p.order_number}</TableCell>
-                      <TableCell className="hidden lg:table-cell px-2 py-1.5 align-middle text-muted-foreground whitespace-nowrap">
-                        <TruncatedText value={getVoucherDisplayValue(p)} className="max-w-[90px]" />
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell px-2 py-1.5 align-middle text-muted-foreground whitespace-nowrap">{p.order_date}</TableCell>
-                      <TableCell className="hidden sm:table-cell px-2 py-1.5 align-middle whitespace-nowrap">
-                        <TruncatedText value={p.supplier || "—"} className="max-w-[124px]" />
-                      </TableCell>
-                      <TableCell className="px-2 py-1.5 align-middle">
-                        <div className="min-w-0 space-y-0.5">
-                          <TruncatedText value={p.item_name} className="max-w-[220px] font-medium text-foreground" />
-                          <TruncatedText value={p.category || "—"} className="max-w-[220px] text-[11px] text-muted-foreground" />
-                          <TruncatedText value={`${p.quantity} ${p.unit}`} className="max-w-[220px] text-[11px] text-muted-foreground xl:hidden" />
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right hidden xl:table-cell px-2 py-1.5 align-middle whitespace-nowrap">{p.quantity} {p.unit}</TableCell>
-                      <TableCell className="text-right hidden xl:table-cell px-2 py-1.5 align-middle whitespace-nowrap">{formatCurrency(p.unit_cost)}</TableCell>
-                      <TableCell className="text-right px-2 py-1.5 align-middle font-semibold whitespace-nowrap">{formatCurrency(p.total_cost)}</TableCell>
-                      <TableCell className="hidden lg:table-cell px-2 py-1.5 align-middle">
-                        <TooltipProvider delayDuration={150}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="flex items-center gap-1 overflow-hidden whitespace-nowrap text-[11px]">
-                                {p.destination_type === "main_warehouse" ? (
-                                  <WarehouseIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                                ) : (
-                                  <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                                )}
-                                <span className="truncate">
-                                  {p.destination_type === "main_warehouse" ? "Main Warehouse" : p.projects?.name || "Project"}
-                                </span>
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent className="text-xs">
-                              {p.destination_type === "main_warehouse" ? "Main Warehouse" : p.projects?.name || "Project"}
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </TableCell>
-                      <TableCell className="px-2 py-1.5 align-middle whitespace-nowrap">
-                        <Badge 
-                          variant="outline" 
-                          className={
-                            p.status === "received" ? "h-5 whitespace-nowrap bg-green-500 hover:bg-green-600 border-transparent px-1.5 text-[10px] text-white" : 
-                            p.status === "approved" ? "h-5 whitespace-nowrap bg-blue-500 hover:bg-blue-600 border-transparent px-1.5 text-[10px] text-white" : 
-                            p.status === "pending_approval" ? "h-5 whitespace-nowrap bg-purple-500 hover:bg-purple-600 border-transparent px-1.5 text-[10px] text-white" : 
-                            "h-5 whitespace-nowrap bg-orange-500 hover:bg-orange-600 border-transparent px-1.5 text-[10px] text-white"
-                          }
-                        >
-                          {p.status === "pending_approval" ? "P. APPROVAL" : p.status.toUpperCase()}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right px-2 py-1.5 align-middle">
-                        <div className="flex justify-end gap-1 whitespace-nowrap">
-                          {p.status === "pending" && p.order_number?.startsWith("PR-") && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 px-2 text-[11px] bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 hidden sm:inline-flex"
-                              onClick={() => {
-                                setGmSubmitForm({ ...p, unit_cost: p.unit_cost || "" });
-                                setGmSubmitDialogOpen(true);
-                              }}
-                              disabled={isLocked}
-                            >
-                              Submit
-                            </Button>
-                          )}
-                          {p.status === "approved" && !p.voucher_number && !getVoucherRequestForPurchase(p.id) ? (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 px-2 text-[11px] border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                              onClick={() => void handleCreateVoucherRequest(p)}
-                              disabled={isLocked || creatingVoucherId === p.id}
-                            >
-                              {creatingVoucherId === p.id ? "Sending..." : "Voucher"}
-                            </Button>
-                          ) : null}
-                          {getVoucherRequestForPurchase(p.id) || p.voucher_number ? (
+                  groupedPurchases.map((group) => {
+                    const p = group.firstItem;
+                    return (
+                      <TableRow key={group.key} className="border-b last:border-b-0">
+                        <TableCell className="px-2 py-1.5 align-middle font-medium text-primary whitespace-nowrap">{group.displayKey}</TableCell>
+                        <TableCell className="hidden md:table-cell px-2 py-1.5 align-middle text-muted-foreground whitespace-nowrap">{p.order_date}</TableCell>
+                        <TableCell className="hidden sm:table-cell px-2 py-1.5 align-middle whitespace-nowrap">
+                          <TruncatedText value={p.supplier || "—"} className="max-w-[124px]" />
+                        </TableCell>
+                        <TableCell className="px-2 py-1.5 align-middle">
+                          <div className="min-w-0 space-y-0.5">
+                            <TruncatedText value={group.itemCount === 1 ? p.item_name : `${group.itemCount} items`} className="max-w-[180px] font-medium text-foreground" />
+                            {group.itemCount > 1 ? (
+                              <TruncatedText value={group.items.map((item: any) => item.item_name).join(", ")} className="max-w-[180px] text-[11px] text-muted-foreground" />
+                            ) : null}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right px-2 py-1.5 align-middle font-semibold whitespace-nowrap">{formatCurrency(group.totalCost)}</TableCell>
+                        <TableCell className="hidden lg:table-cell px-2 py-1.5 align-middle">
+                          <TooltipProvider delayDuration={150}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center gap-1 overflow-hidden whitespace-nowrap text-[11px]">
+                                  {p.destination_type === "main_warehouse" ? (
+                                    <WarehouseIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                  ) : (
+                                    <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                  )}
+                                  <span className="truncate">
+                                    {p.destination_type === "main_warehouse" ? "Main Warehouse" : p.projects?.name || "Project"}
+                                  </span>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent className="text-xs">
+                                {p.destination_type === "main_warehouse" ? "Main Warehouse" : p.projects?.name || "Project"}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </TableCell>
+                        <TableCell className="px-2 py-1.5 align-middle whitespace-nowrap">
+                          <Badge 
+                            variant="outline" 
+                            className={
+                              p.status === "received" ? "h-5 whitespace-nowrap bg-green-500 hover:bg-green-600 border-transparent px-1.5 text-[10px] text-white" : 
+                              p.status === "approved" ? "h-5 whitespace-nowrap bg-blue-500 hover:bg-blue-600 border-transparent px-1.5 text-[10px] text-white" : 
+                              p.status === "pending_approval" ? "h-5 whitespace-nowrap bg-purple-500 hover:bg-purple-600 border-transparent px-1.5 text-[10px] text-white" : 
+                              "h-5 whitespace-nowrap bg-orange-500 hover:bg-orange-600 border-transparent px-1.5 text-[10px] text-white"
+                            }
+                          >
+                            {p.status === "pending_approval" ? "P. APPROVAL" : p.status.toUpperCase()}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right px-2 py-1.5 align-middle">
+                          <div className="flex justify-end gap-1 whitespace-nowrap">
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-7 w-7 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50"
-                              onClick={() => openVoucherDialog(p)}
-                              title="View Voucher"
-                              disabled={isLocked}
+                              className="h-7 w-7"
+                              onClick={() => openViewGroupDialog(group)}
+                              title="View Details"
                             >
-                              <Receipt className="h-3.5 w-3.5" />
+                              <Eye className="h-3.5 w-3.5" />
                             </Button>
-                          ) : null}
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-50" onClick={() => handlePrint(p)} title="Print PO" disabled={isLocked}>
-                            <Printer className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-orange-600 hover:text-orange-700 hover:bg-orange-50" onClick={() => handleArchive(p.id)} title="Archive" disabled={isLocked}>
-                            <Archive className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                            {canPriceAndSubmit(group) && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2 text-[11px] bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
+                                onClick={() => {
+                                  setGmSubmitForm({ ...group.firstItem, unit_cost: group.firstItem.unit_cost || "" });
+                                  setGmSubmitDialogOpen(true);
+                                }}
+                                disabled={isLocked}
+                              >
+                                Price & Submit
+                              </Button>
+                            )}
+                            {canArchiveGroup(group) && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                onClick={() => void handleArchiveGroup(group.key)}
+                                title="Archive"
+                                disabled={isLocked}
+                              >
+                                <Archive className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            {canDeleteGroup(group) && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                onClick={() => void handleDeleteGroup(group.key)}
+                                title="Delete"
+                                disabled={isLocked}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
           </div>
         </Card>
-        ) : null}
+
+        <Dialog open={viewGroupDialogOpen} onOpenChange={setViewGroupDialogOpen}>
+          <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Purchase Order Details</DialogTitle>
+              <CardDescription>
+                {selectedPurchaseGroup && selectedPurchaseGroup.length > 0
+                  ? `${selectedPurchaseGroup[0].order_number} • ${selectedPurchaseGroup.length} item${selectedPurchaseGroup.length > 1 ? "s" : ""}`
+                  : ""}
+              </CardDescription>
+            </DialogHeader>
+            {selectedPurchaseGroup && selectedPurchaseGroup.length > 0 ? (
+              <div className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1 rounded-md border bg-muted/30 p-3">
+                    <p className="text-xs text-muted-foreground">Order Number</p>
+                    <p className="font-medium">{selectedPurchaseGroup[0].order_number}</p>
+                  </div>
+                  <div className="space-y-1 rounded-md border bg-muted/30 p-3">
+                    <p className="text-xs text-muted-foreground">Order Date</p>
+                    <p className="font-medium">{new Date(selectedPurchaseGroup[0].order_date).toLocaleDateString()}</p>
+                  </div>
+                  <div className="space-y-1 rounded-md border bg-muted/30 p-3">
+                    <p className="text-xs text-muted-foreground">Supplier</p>
+                    <p className="font-medium">{selectedPurchaseGroup[0].supplier || "—"}</p>
+                  </div>
+                  <div className="space-y-1 rounded-md border bg-muted/30 p-3">
+                    <p className="text-xs text-muted-foreground">Status</p>
+                    <p className="font-medium">{selectedPurchaseGroup[0].status.replaceAll("_", " ")}</p>
+                  </div>
+                </div>
+
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Item</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead className="text-right">Qty</TableHead>
+                        <TableHead className="text-right">Unit Cost</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {selectedPurchaseGroup.map((item: any) => (
+                        <TableRow key={item.id}>
+                          <TableCell className="font-medium">{item.item_name}</TableCell>
+                          <TableCell>{item.category || "—"}</TableCell>
+                          <TableCell className="text-right">
+                            {item.quantity} {item.unit}
+                          </TableCell>
+                          <TableCell className="text-right">{formatCurrency(item.unit_cost)}</TableCell>
+                          <TableCell className="text-right font-semibold">{formatCurrency(item.total_cost || 0)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                <div className="flex justify-between items-center pt-4 border-t">
+                  <p className="text-sm font-semibold">
+                    Total: {formatCurrency(selectedPurchaseGroup.reduce((sum, item) => sum + (item.total_cost || 0), 0))}
+                  </p>
+                </div>
+              </div>
+            ) : null}
+          </DialogContent>
+        </Dialog>
 
         {/* GM Submit Dialog */}
         <Dialog open={gmSubmitDialogOpen} onOpenChange={setGmSubmitDialogOpen}>
