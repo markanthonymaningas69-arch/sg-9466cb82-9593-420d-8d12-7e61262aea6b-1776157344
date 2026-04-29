@@ -200,16 +200,28 @@ export default function Purchasing() {
     
     const loadedPurchases = pData || [];
     const loadedIncoming = incomingData || [];
+    const loadedPurchaseIds = new Set(loadedPurchases.map((purchase) => purchase.id));
 
     // Merge incoming requests with purchases
     const mergedList = [
       ...loadedPurchases,
       ...loadedIncoming
-        .filter((req) => req.workflowStatus === "in_purchasing")
+        .filter((req) => {
+          if (req.workflowStatus !== "in_purchasing") {
+            return false;
+          }
+
+          const payload = req.payload && typeof req.payload === "object" && !Array.isArray(req.payload) ? req.payload : {};
+          const purchaseId = typeof payload.purchaseId === "string" ? payload.purchaseId : null;
+
+          return !purchaseId || !loadedPurchaseIds.has(purchaseId);
+        })
         .map((req) => {
           const payload = req.payload && typeof req.payload === "object" && !Array.isArray(req.payload) ? req.payload : {};
+          const linkedPurchaseId = typeof payload.purchaseId === "string" ? payload.purchaseId : null;
+
           return {
-            id: req.sourceRecordId,
+            id: linkedPurchaseId || req.sourceRecordId,
             order_number: (payload.orderNumber as string) || `AR-${req.id.slice(0, 8)}`,
             order_date: req.requestedAt.split("T")[0],
             supplier: (payload.supplier as string) || "Pending Selection",
@@ -220,7 +232,7 @@ export default function Purchasing() {
             unit_cost: 0,
             destination_type: "project_warehouse",
             project_id: req.projectId,
-            status: "pending",
+            status: typeof payload.purchaseStatus === "string" ? payload.purchaseStatus : "pending",
             voucher_number: null,
             is_archived: false,
             approval_request_id: req.id,

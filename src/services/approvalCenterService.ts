@@ -163,7 +163,7 @@ async function processApprovedRequest(request: {
   if (request.sourceTable === "site_requests") {
     const { data: source, error } = await supabase
       .from("site_requests")
-      .select("id, form_number, request_date, item_name, quantity, unit, amount, request_type, project_id")
+      .select("id, form_number, request_date, item_name, quantity, unit, amount, request_type, project_id, requested_by, notes")
       .eq("id", request.sourceRecordId)
       .maybeSingle();
 
@@ -174,7 +174,7 @@ async function processApprovedRequest(request: {
       const orderNumber = source.form_number || createPurchaseNumber();
       let purchase = await supabase
         .from("purchases")
-        .select("id, supplier, total_cost")
+        .select("id, order_number, supplier, total_cost, status")
         .eq("order_number", orderNumber)
         .eq("item_name", source.item_name)
         .maybeSingle();
@@ -196,7 +196,7 @@ async function processApprovedRequest(request: {
             status: "pending",
             notes: `Linked Site Request ${source.id}`,
           })
-          .select("id, supplier, total_cost")
+          .select("id, order_number, supplier, total_cost, status")
           .maybeSingle();
       }
 
@@ -207,6 +207,27 @@ async function processApprovedRequest(request: {
           supplier: purchase.data.supplier,
           totalAmount: Number(purchase.data.total_cost || 0),
         });
+
+        await supabase
+          .from("approval_requests")
+          .update({
+            payload: {
+              requestType: source.request_type,
+              itemName: source.item_name,
+              quantity: Number(source.quantity || 0),
+              unit: source.unit || "unit",
+              requestDate: source.request_date,
+              requestedBy: source.requested_by,
+              notes: source.notes || null,
+              purchaseId: purchase.data.id,
+              orderNumber: purchase.data.order_number || orderNumber,
+              supplier: purchase.data.supplier,
+              totalAmount: Number(purchase.data.total_cost || 0),
+              purchaseStatus: purchase.data.status || "pending",
+            },
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", request.approvalRequestId);
       }
       return;
     }
