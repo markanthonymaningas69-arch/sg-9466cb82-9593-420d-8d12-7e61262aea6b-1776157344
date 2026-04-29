@@ -379,6 +379,16 @@ export default function Purchasing() {
     if (!error) loadData();
   };
 
+  const uniqueSuppliers = Array.from(new Set(purchases.map(p => p.supplier))).filter(Boolean);
+
+  const filteredPurchases = purchases.filter(p => {
+    const matchSupplier = filterSupplier === "all" || p.supplier === filterSupplier;
+    const matchDate = !filterDate || p.order_date === filterDate;
+    const matchItem = !filterItem || p.item_name.toLowerCase().includes(filterItem.toLowerCase());
+    const matchStatus = filterStatus === "all" || p.status === filterStatus;
+    return matchSupplier && matchDate && matchItem && matchStatus;
+  });
+
   const handleArchiveGroup = async (groupKey: string) => {
     if (!confirm("Are you sure you want to archive all items in this group?")) return;
     
@@ -491,16 +501,6 @@ export default function Purchasing() {
       setPoHeader(prev => ({ ...prev, order_number: generateNextPONumber(purchases) }));
     }
   };
-
-  const uniqueSuppliers = Array.from(new Set(purchases.map(p => p.supplier))).filter(Boolean);
-
-  const filteredPurchases = purchases.filter(p => {
-    const matchSupplier = filterSupplier === "all" || p.supplier === filterSupplier;
-    const matchDate = !filterDate || p.order_date === filterDate;
-    const matchItem = !filterItem || p.item_name.toLowerCase().includes(filterItem.toLowerCase());
-    const matchStatus = filterStatus === "all" || p.status === filterStatus;
-    return matchSupplier && matchDate && matchItem && matchStatus;
-  });
 
   const getVoucherRequestForPurchase = (purchaseId: string) =>
     voucherRequests.find((voucherRequest) => voucherRequest.purchase_id === purchaseId) || null;
