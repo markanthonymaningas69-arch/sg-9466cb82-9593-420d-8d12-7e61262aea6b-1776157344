@@ -293,6 +293,8 @@ export default function Purchasing() {
       return;
     }
     
+    console.log("Submitting PO with items:", poItems);
+    
     const payloadArray = poItems.map(item => ({
       order_number: poHeader.order_number,
       order_date: poHeader.order_date,
@@ -308,6 +310,8 @@ export default function Purchasing() {
       voucher_number: null
     }));
 
+    console.log("Inserting purchases:", payloadArray);
+
     const { data: createdPurchases, error: insertError } = await supabase
       .from("purchases")
       .insert(payloadArray)
@@ -319,19 +323,28 @@ export default function Purchasing() {
       return;
     }
 
-    await Promise.all(
-      (createdPurchases || []).map((purchase) =>
-        approvalCenterService.createRequest({
-          sourceModule: "Purchasing",
-          sourceTable: "purchases",
-          sourceRecordId: purchase.id,
-          requestType: "Purchase Order",
-          requestedBy: "Purchasing Team",
-          projectId: purchase.project_id,
-          summary: `${purchase.order_number}: ${purchase.item_name}`,
+    console.log("Created purchases:", createdPurchases);
+
+    try {
+      await Promise.all(
+        (createdPurchases || []).map(async (purchase) => {
+          console.log("Creating approval request for purchase:", purchase.id);
+          return approvalCenterService.createRequest({
+            sourceModule: "Purchasing",
+            sourceTable: "purchases",
+            sourceRecordId: purchase.id,
+            requestType: "Purchase Order",
+            requestedBy: "Purchasing Team",
+            projectId: purchase.project_id,
+            summary: `${purchase.order_number}: ${purchase.item_name}`,
+          });
         })
-      )
-    );
+      );
+      console.log("All approval requests created successfully");
+    } catch (approvalError) {
+      console.error("Error creating approval requests:", approvalError);
+      alert("PO saved but failed to send to Approval Center: " + (approvalError as any).message);
+    }
 
     setDialogOpen(false);
     setPoHeader({
@@ -349,7 +362,7 @@ export default function Purchasing() {
       unit: "Pc",
       unit_cost: ""
     });
-    loadData();
+    await loadData();
   };
 
   const handleEdit = (p: any) => {
@@ -486,15 +499,27 @@ export default function Purchasing() {
   };
 
   const canArchiveGroup = (group: any) => {
-    return group.items.some((item: any) => item.status === "approved" || item.status === "rejected");
+    const hasApprovalResult = group.items.some((item: any) => 
+      item.status === "approved" || item.status === "rejected"
+    );
+    console.log("Can archive group?", group.key, "hasApprovalResult:", hasApprovalResult);
+    return hasApprovalResult;
   };
 
   const canDeleteGroup = (group: any) => {
-    return group.items.every((item: any) => item.status === "pending");
+    const allPendingOrPendingApproval = group.items.every((item: any) => 
+      item.status === "pending" || item.status === "pending_approval"
+    );
+    console.log("Can delete group?", group.key, "allPending:", allPendingOrPendingApproval, "statuses:", group.items.map((i: any) => i.status));
+    return allPendingOrPendingApproval;
   };
 
   const canPriceAndSubmit = (group: any) => {
-    return group.items.some((item: any) => item.status === "pending" && item.order_number?.startsWith("PR-"));
+    const hasPendingPR = group.items.some((item: any) => 
+      item.status === "pending" && item.order_number?.startsWith("PR-")
+    );
+    console.log("Can price & submit?", group.key, "hasPendingPR:", hasPendingPR);
+    return hasPendingPR;
   };
 
   const handleOpenChange = (open: boolean) => {
