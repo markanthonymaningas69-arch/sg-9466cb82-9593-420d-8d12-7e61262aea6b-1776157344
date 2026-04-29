@@ -1,26 +1,34 @@
 ---
-title: Manpower Catalog tab
-status: done
-priority: high
+title: Purchasing unified request list
+status: in_progress
+priority: urgent
 type: feature
-tags:
-  - project-manager
-  - manpower
-  - supabase
+tags: [purchasing, consolidation, workflow]
 created_by: agent
-created_at: 2026-04-28 15:35:34 UTC
+created_at: 2026-04-29T04:11:59 UTC
 position: 112
 ---
 
 ## Notes
-Add a project-level Manpower Catalog inside Project Manager so each project maintains its own manpower positions and rates without any HR dependency. This tab must support create, edit, and delete actions and become the single source of default positions and rates for Team Composition inside task configuration.
+Remove the Incoming Requests tab and merge all purchasing-related records (incoming approval requests, purchase orders, voucher-linked items) into a single Purchase Orders list. Group records by Purchase Number, Order Number, or Voucher Number and allow users to view grouped details via a View action. Actions (Price & Submit, Archive, Delete) must follow conditional rules based on status and approval state.
 
 ## Checklist
-- [x] Add a project-scoped manpower catalog data source and service independent from HR
-- [x] Add a Manpower Catalog workspace tab inside Project Manager
-- [x] Support add, edit, and delete for position name, standard rate, unit, and optional description
-- [x] Ensure Team Composition dropdown options come only from this catalog
+- [ ] Remove Incoming Requests tab and related state/effects from Purchasing
+- [ ] Load incoming approval requests alongside purchase orders
+- [ ] Merge approval requests and purchases into a unified data structure
+- [ ] Group records by Purchase Number, Order Number, or Voucher Number
+- [ ] Add View action to show grouped item details in a dialog
+- [ ] Implement conditional action visibility:
+  - Price & Submit: only for pending PR- items
+  - Archive: only if request has approval results (approved/rejected)
+  - Delete: only if status is pending
+- [ ] Wire Delete to remove from both purchases and approval_requests tables
+- [ ] Wire Archive to only affect purchases table (not approval_requests)
+- [ ] Validate the unified list with grouped view and conditional actions
 
 ## Acceptance
-Users can open Project Manager and manage manpower positions in a dedicated Manpower Catalog tab.
-Catalog positions and rates are stored per project and are not pulled from HR.
+Purchasing shows a single unified list with incoming requests and purchase orders merged.
+Records are grouped by Purchase/Order/Voucher number with a View action to see details.
+Delete removes pending items from both Purchasing and Approval Center.
+Archive removes approved/rejected items from Purchasing only (Approval Center keeps history).
+Price & Submit, Archive, and Delete actions follow the specified conditional rules.
