@@ -5,6 +5,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useSettings } from "@/contexts/SettingsProvider";
 import { projectService } from "@/services/projectService";
@@ -39,6 +42,8 @@ export default function Analytics() {
 
   // Filters
   const [usageScopeFilter, setUsageScopeFilter] = useState<string>("all");
+  const [swaAsOfDate, setSwaAsOfDate] = useState<string>("");
+  const [swaSourceFilter, setSwaSourceFilter] = useState<string>("all");
 
   useEffect(() => {
     loadProjects();
@@ -205,12 +210,45 @@ export default function Analytics() {
     }) : null;
   }, [attendance]);
 
+  const latestProgressUpdateDate = useMemo(() => {
+    if (!progressUpdates || progressUpdates.length === 0) return null;
+    const availableDates = progressUpdates
+      .map((update) => update.update_date)
+      .filter(Boolean)
+      .sort((left, right) => new Date(left).getTime() - new Date(right).getTime());
+
+    return availableDates.length > 0 ? availableDates[availableDates.length - 1] : null;
+  }, [progressUpdates]);
+
   // 1. SWA Data
   const swaData = useMemo(() => {
-    if (!bom?.bom_scope_of_work || !Array.isArray(bom.bom_scope_of_work)) return { rows: [], totals: { cost: 0, wtPercentage: 0, accomplishment: 0, amountOfCompletion: 0 } };
+    if (!bom?.bom_scope_of_work || !Array.isArray(bom.bom_scope_of_work)) {
+      return {
+        rows: [],
+        totals: { cost: 0, wtPercentage: 0, accomplishment: 0, amountOfCompletion: 0 },
+        linkedUpdateCount: 0,
+        appliedAsOfDate: swaAsOfDate || null,
+      };
+    }
 
     const scopes = [...bom.bom_scope_of_work].sort((a: any, b: any) => (a.order_number || 0) - (b.order_number || 0));
     const indirects = Array.isArray(bom.bom_indirect_costs) ? bom.bom_indirect_costs : [];
+    const applicableProgressUpdates = [...(progressUpdates || [])]
+      .filter((update: any) => {
+        if (!update?.update_date) return false;
+        if (swaAsOfDate && update.update_date > swaAsOfDate) return false;
+        return true;
+      })
+      .sort((a: any, b: any) => new Date(a.update_date).getTime() - new Date(b.update_date).getTime());
+
+    const progressByScope = new Map<string, any[]>();
+    applicableProgressUpdates.forEach((update: any) => {
+      if (!update?.bom_scope_id) return;
+      if (!progressByScope.has(update.bom_scope_id)) {
+        progressByScope.set(update.bom_scope_id, []);
+      }
+      progressByScope.get(update.bom_scope_id)?.push(update);
+    });
 
     let grandTotalCost = 0;
 
@@ -221,7 +259,13 @@ export default function Analytics() {
       const labCost = Array.isArray(scope.bom_labor)
         ? scope.bom_labor.reduce((sum: number, l: any) => sum + Number(l.total_cost || (Number(l.hours || 0) * Number(l.hourly_rate || 0))), 0)
         : 0;
-      
+
+      const linkedUpdates = progressByScope.get(scope.id) || [];
+      const latestLinkedUpdate = linkedUpdates.length > 0 ? linkedUpdates[linkedUpdates.length - 1] : null;
+      const completion = latestLinkedUpdate
+        ? Number(latestLinkedUpdate.percentage_completed || 0)
+        : Number(scope.completion_percentage || 0);
+
       const cost = matCost + labCost;
       grandTotalCost += cost;
 
@@ -230,29 +274,37 @@ export default function Analytics() {
         name: scope.name || "Unknown Scope",
         type: "scope",
         cost,
-        completion: Number(scope.completion_percentage || 0),
-        order_number: scope.order_number || 0
+        completion,
+        order_number: scope.order_number || 0,
+        hasLinkedUpdate: Boolean(latestLinkedUpdate),
+        updateCount: linkedUpdates.length,
+        lastUpdateDate: latestLinkedUpdate?.update_date || null,
+        sourceLabel: latestLinkedUpdate ? "Site Personnel" : "BOM",
       };
     });
 
-    const avgCompletion = scopeRows.length > 0 
-      ? scopeRows.reduce((sum, r) => sum + r.completion, 0) / scopeRows.length 
+    const avgCompletion = scopeRows.length > 0
+      ? scopeRows.reduce((sum, row) => sum + row.completion, 0) / scopeRows.length
       : 0;
 
-    const icRows = indirects.map((ic: any) => {
-      const cost = Number(ic.total_indirect || 0); // Get value straight from BOM
+    const indirectRows = indirects.map((indirect: any) => {
+      const cost = Number(indirect.total_indirect || 0);
       grandTotalCost += cost;
 
       return {
-        id: ic.id || "indirect",
+        id: indirect.id || "indirect",
         name: "Indirect Cost",
         type: "indirect",
         cost,
-        completion: avgCompletion // Average completion of all scopes
+        completion: avgCompletion,
+        hasLinkedUpdate: applicableProgressUpdates.length > 0,
+        updateCount: applicableProgressUpdates.length,
+        lastUpdateDate: latestProgressUpdateDate,
+        sourceLabel: applicableProgressUpdates.length > 0 ? "Derived from Site Personnel" : "BOM",
       };
     });
 
-    const allRows = [...scopeRows, ...icRows].map(row => {
+    const allRows = [...scopeRows, ...indirectRows].map((row) => {
       const wtPercentage = grandTotalCost > 0 ? (row.cost / grandTotalCost) * 100 : 0;
       const accomplishment = wtPercentage * (row.completion / 100);
       const amountOfCompletion = row.cost * (row.completion / 100);
@@ -261,19 +313,36 @@ export default function Analytics() {
         ...row,
         wtPercentage,
         accomplishment,
-        amountOfCompletion
+        amountOfCompletion,
       };
     });
 
+    const filteredRows = allRows.filter((row) => {
+      if (swaSourceFilter === "linked_only") {
+        return row.hasLinkedUpdate;
+      }
+
+      if (swaSourceFilter === "bom_only") {
+        return !row.hasLinkedUpdate;
+      }
+
+      return true;
+    });
+
     const totals = {
-      cost: grandTotalCost,
-      wtPercentage: grandTotalCost > 0 ? 100 : 0,
-      accomplishment: allRows.reduce((sum, r) => sum + r.accomplishment, 0),
-      amountOfCompletion: allRows.reduce((sum, r) => sum + r.amountOfCompletion, 0)
+      cost: filteredRows.reduce((sum, row) => sum + row.cost, 0),
+      wtPercentage: filteredRows.reduce((sum, row) => sum + row.wtPercentage, 0),
+      accomplishment: filteredRows.reduce((sum, row) => sum + row.accomplishment, 0),
+      amountOfCompletion: filteredRows.reduce((sum, row) => sum + row.amountOfCompletion, 0),
     };
 
-    return { rows: allRows, totals };
-  }, [bom]);
+    return {
+      rows: filteredRows,
+      totals,
+      linkedUpdateCount: scopeRows.filter((row) => row.hasLinkedUpdate).length,
+      appliedAsOfDate: swaAsOfDate || null,
+    };
+  }, [bom, progressUpdates, swaAsOfDate, swaSourceFilter, latestProgressUpdateDate]);
 
   // 2. Material Usage vs Allocated
   const materialUsageData = useMemo(() => {
@@ -592,6 +661,70 @@ export default function Analytics() {
                     )}
                   </CardHeader>
                   <CardContent className="p-0 sm:p-6">
+                    <div className="border-b border-border/60 bg-muted/20 px-4 py-3 sm:px-0 sm:pb-4 sm:pt-0">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                        <div className="space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="outline" className="text-[11px]">
+                              {swaData.linkedUpdateCount} scope{swaData.linkedUpdateCount === 1 ? "" : "s"} linked to Site Personnel updates
+                            </Badge>
+                            <Badge variant="secondary" className="text-[11px]">
+                              {swaData.appliedAsOfDate ? `As of ${new Date(swaData.appliedAsOfDate).toLocaleDateString()}` : "Using latest accomplishment updates"}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            SWA completion now reads the latest Accomplishments entries from Site Personnel for each scope.
+                          </p>
+                        </div>
+
+                        <div className="grid gap-2 sm:grid-cols-3">
+                          <div className="space-y-1">
+                            <Label htmlFor="swa-as-of-date" className="text-[11px]">
+                              As of Date
+                            </Label>
+                            <Input
+                              id="swa-as-of-date"
+                              type="date"
+                              className="h-8 text-xs"
+                              value={swaAsOfDate}
+                              max={latestProgressUpdateDate || undefined}
+                              onChange={(event) => setSwaAsOfDate(event.target.value)}
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <Label htmlFor="swa-source-filter" className="text-[11px]">
+                              Source Filter
+                            </Label>
+                            <Select value={swaSourceFilter} onValueChange={setSwaSourceFilter}>
+                              <SelectTrigger id="swa-source-filter" className="h-8 text-xs">
+                                <SelectValue placeholder="All rows" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All rows</SelectItem>
+                                <SelectItem value="linked_only">Linked site updates only</SelectItem>
+                                <SelectItem value="bom_only">BOM fallback only</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="flex items-end">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="h-8 w-full text-xs"
+                              onClick={() => {
+                                setSwaAsOfDate("");
+                                setSwaSourceFilter("all");
+                              }}
+                            >
+                              Clear
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
@@ -600,6 +733,7 @@ export default function Analytics() {
                             <TableHead className="text-right min-w-[120px]">Total Cost</TableHead>
                             <TableHead className="text-right min-w-[80px]">Wt. %</TableHead>
                             <TableHead className="text-right min-w-[100px]">Completed %</TableHead>
+                            <TableHead className="min-w-[120px]">Last Update</TableHead>
                             <TableHead className="text-right min-w-[120px]">Accomplishment</TableHead>
                             <TableHead className="text-right min-w-[150px]">Amount of Completion</TableHead>
                           </TableRow>
@@ -607,8 +741,8 @@ export default function Analytics() {
                         <TableBody>
                           {swaData.rows.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                                No scopes or indirect costs defined in BOM.
+                              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                                No SWA rows match the selected accomplishment filters.
                               </TableCell>
                             </TableRow>
                           ) : (
@@ -616,12 +750,20 @@ export default function Analytics() {
                               {swaData.rows.map((row: any) => (
                                 <TableRow key={row.id}>
                                   <TableCell className="font-medium">
-                                    {row.name}
-                                    {row.type === "indirect" && <Badge variant="outline" className="ml-2 text-[10px] h-5">Indirect Cost</Badge>}
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <span>{row.name}</span>
+                                      {row.type === "indirect" && <Badge variant="outline" className="text-[10px] h-5">Indirect Cost</Badge>}
+                                      <Badge variant={row.hasLinkedUpdate ? "default" : "secondary"} className="text-[10px] h-5">
+                                        {row.sourceLabel}
+                                      </Badge>
+                                    </div>
                                   </TableCell>
                                   <TableCell className="text-right">{formatCurrency(row.cost)}</TableCell>
                                   <TableCell className="text-right">{row.wtPercentage.toFixed(2)}%</TableCell>
                                   <TableCell className="text-right">{row.completion.toFixed(2)}%</TableCell>
+                                  <TableCell>
+                                    {row.lastUpdateDate ? new Date(row.lastUpdateDate).toLocaleDateString() : "—"}
+                                  </TableCell>
                                   <TableCell className="text-right font-bold text-primary">{row.accomplishment.toFixed(2)}%</TableCell>
                                   <TableCell className="text-right font-bold text-primary">{formatCurrency(row.amountOfCompletion)}</TableCell>
                                 </TableRow>
@@ -631,6 +773,7 @@ export default function Analytics() {
                                 <TableCell className="text-right text-primary">{formatCurrency(swaData.totals.cost)}</TableCell>
                                 <TableCell className="text-right text-primary">{swaData.totals.wtPercentage.toFixed(2)}%</TableCell>
                                 <TableCell className="text-right">-</TableCell>
+                                <TableCell>{swaData.appliedAsOfDate ? new Date(swaData.appliedAsOfDate).toLocaleDateString() : "Latest"}</TableCell>
                                 <TableCell className="text-right text-primary">{swaData.totals.accomplishment.toFixed(2)}%</TableCell>
                                 <TableCell className="text-right text-primary">{formatCurrency(swaData.totals.amountOfCompletion)}</TableCell>
                               </TableRow>
