@@ -43,7 +43,6 @@ export default function Analytics() {
   // Filters
   const [usageScopeFilter, setUsageScopeFilter] = useState<string>("all");
   const [swaAsOfDate, setSwaAsOfDate] = useState<string>("");
-  const [swaSourceFilter, setSwaSourceFilter] = useState<string>("all");
 
   useEffect(() => {
     loadProjects();
@@ -226,7 +225,6 @@ export default function Analytics() {
       return {
         rows: [],
         totals: { cost: 0, wtPercentage: 0, accomplishment: 0, amountOfCompletion: 0 },
-        linkedUpdateCount: 0,
         appliedAsOfDate: swaAsOfDate || null,
       };
     }
@@ -276,10 +274,6 @@ export default function Analytics() {
         cost,
         completion,
         order_number: scope.order_number || 0,
-        hasLinkedUpdate: Boolean(latestLinkedUpdate),
-        updateCount: linkedUpdates.length,
-        lastUpdateDate: latestLinkedUpdate?.update_date || null,
-        sourceLabel: latestLinkedUpdate ? "Site Personnel" : "BOM",
       };
     });
 
@@ -297,10 +291,6 @@ export default function Analytics() {
         type: "indirect",
         cost,
         completion: avgCompletion,
-        hasLinkedUpdate: applicableProgressUpdates.length > 0,
-        updateCount: applicableProgressUpdates.length,
-        lastUpdateDate: latestProgressUpdateDate,
-        sourceLabel: applicableProgressUpdates.length > 0 ? "Derived from Site Personnel" : "BOM",
       };
     });
 
@@ -317,32 +307,19 @@ export default function Analytics() {
       };
     });
 
-    const filteredRows = allRows.filter((row) => {
-      if (swaSourceFilter === "linked_only") {
-        return row.hasLinkedUpdate;
-      }
-
-      if (swaSourceFilter === "bom_only") {
-        return !row.hasLinkedUpdate;
-      }
-
-      return true;
-    });
-
     const totals = {
-      cost: filteredRows.reduce((sum, row) => sum + row.cost, 0),
-      wtPercentage: filteredRows.reduce((sum, row) => sum + row.wtPercentage, 0),
-      accomplishment: filteredRows.reduce((sum, row) => sum + row.accomplishment, 0),
-      amountOfCompletion: filteredRows.reduce((sum, row) => sum + row.amountOfCompletion, 0),
+      cost: allRows.reduce((sum, row) => sum + row.cost, 0),
+      wtPercentage: allRows.reduce((sum, row) => sum + row.wtPercentage, 0),
+      accomplishment: allRows.reduce((sum, row) => sum + row.accomplishment, 0),
+      amountOfCompletion: allRows.reduce((sum, row) => sum + row.amountOfCompletion, 0),
     };
 
     return {
-      rows: filteredRows,
+      rows: allRows,
       totals,
-      linkedUpdateCount: scopeRows.filter((row) => row.hasLinkedUpdate).length,
       appliedAsOfDate: swaAsOfDate || null,
     };
-  }, [bom, progressUpdates, swaAsOfDate, swaSourceFilter, latestProgressUpdateDate]);
+  }, [bom, progressUpdates, swaAsOfDate, latestProgressUpdateDate]);
 
   // 2. Material Usage vs Allocated
   const materialUsageData = useMemo(() => {
@@ -664,20 +641,12 @@ export default function Analytics() {
                     <div className="border-b border-border/60 bg-muted/20 px-4 py-3 sm:px-0 sm:pb-4 sm:pt-0">
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                         <div className="space-y-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="outline" className="text-[11px]">
-                              {swaData.linkedUpdateCount} scope{swaData.linkedUpdateCount === 1 ? "" : "s"} linked to Site Personnel updates
-                            </Badge>
-                            <Badge variant="secondary" className="text-[11px]">
-                              {swaData.appliedAsOfDate ? `As of ${new Date(swaData.appliedAsOfDate).toLocaleDateString()}` : "Using latest accomplishment updates"}
-                            </Badge>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            SWA completion now reads the latest Accomplishments entries from Site Personnel for each scope.
-                          </p>
+                          <Badge variant="secondary" className="text-[11px]">
+                            {swaData.appliedAsOfDate ? `As of ${new Date(swaData.appliedAsOfDate).toLocaleDateString()}` : "Latest"}
+                          </Badge>
                         </div>
 
-                        <div className="grid gap-2 sm:grid-cols-3">
+                        <div className="grid gap-2 sm:grid-cols-2">
                           <div className="space-y-1">
                             <Label htmlFor="swa-as-of-date" className="text-[11px]">
                               As of Date
@@ -692,22 +661,6 @@ export default function Analytics() {
                             />
                           </div>
 
-                          <div className="space-y-1">
-                            <Label htmlFor="swa-source-filter" className="text-[11px]">
-                              Source Filter
-                            </Label>
-                            <Select value={swaSourceFilter} onValueChange={setSwaSourceFilter}>
-                              <SelectTrigger id="swa-source-filter" className="h-8 text-xs">
-                                <SelectValue placeholder="All rows" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="all">All rows</SelectItem>
-                                <SelectItem value="linked_only">Linked site updates only</SelectItem>
-                                <SelectItem value="bom_only">BOM fallback only</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-
                           <div className="flex items-end">
                             <Button
                               type="button"
@@ -715,7 +668,6 @@ export default function Analytics() {
                               className="h-8 w-full text-xs"
                               onClick={() => {
                                 setSwaAsOfDate("");
-                                setSwaSourceFilter("all");
                               }}
                             >
                               Clear
@@ -733,7 +685,6 @@ export default function Analytics() {
                             <TableHead className="text-right min-w-[120px]">Total Cost</TableHead>
                             <TableHead className="text-right min-w-[80px]">Wt. %</TableHead>
                             <TableHead className="text-right min-w-[100px]">Completed %</TableHead>
-                            <TableHead className="min-w-[120px]">Last Update</TableHead>
                             <TableHead className="text-right min-w-[120px]">Accomplishment</TableHead>
                             <TableHead className="text-right min-w-[150px]">Amount of Completion</TableHead>
                           </TableRow>
@@ -741,7 +692,7 @@ export default function Analytics() {
                         <TableBody>
                           {swaData.rows.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                              <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                                 No SWA rows match the selected accomplishment filters.
                               </TableCell>
                             </TableRow>
@@ -753,17 +704,11 @@ export default function Analytics() {
                                     <div className="flex flex-wrap items-center gap-2">
                                       <span>{row.name}</span>
                                       {row.type === "indirect" && <Badge variant="outline" className="text-[10px] h-5">Indirect Cost</Badge>}
-                                      <Badge variant={row.hasLinkedUpdate ? "default" : "secondary"} className="text-[10px] h-5">
-                                        {row.sourceLabel}
-                                      </Badge>
                                     </div>
                                   </TableCell>
                                   <TableCell className="text-right">{formatCurrency(row.cost)}</TableCell>
                                   <TableCell className="text-right">{row.wtPercentage.toFixed(2)}%</TableCell>
                                   <TableCell className="text-right">{row.completion.toFixed(2)}%</TableCell>
-                                  <TableCell>
-                                    {row.lastUpdateDate ? new Date(row.lastUpdateDate).toLocaleDateString() : "—"}
-                                  </TableCell>
                                   <TableCell className="text-right font-bold text-primary">{row.accomplishment.toFixed(2)}%</TableCell>
                                   <TableCell className="text-right font-bold text-primary">{formatCurrency(row.amountOfCompletion)}</TableCell>
                                 </TableRow>
@@ -773,7 +718,6 @@ export default function Analytics() {
                                 <TableCell className="text-right text-primary">{formatCurrency(swaData.totals.cost)}</TableCell>
                                 <TableCell className="text-right text-primary">{swaData.totals.wtPercentage.toFixed(2)}%</TableCell>
                                 <TableCell className="text-right">-</TableCell>
-                                <TableCell>{swaData.appliedAsOfDate ? new Date(swaData.appliedAsOfDate).toLocaleDateString() : "Latest"}</TableCell>
                                 <TableCell className="text-right text-primary">{swaData.totals.accomplishment.toFixed(2)}%</TableCell>
                                 <TableCell className="text-right text-primary">{formatCurrency(swaData.totals.amountOfCompletion)}</TableCell>
                               </TableRow>
