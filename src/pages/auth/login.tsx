@@ -22,6 +22,10 @@ export default function LoginPage() {
 
     // Super Admin Bypass
     if (email === "theax5565@gmail.com" && password === "MariaAlthea#16") {
+      // Set a flag in sessionStorage to indicate super admin bypass
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("super_admin_bypass", "true");
+      }
       router.replace("/system-monitor");
       return;
     }
