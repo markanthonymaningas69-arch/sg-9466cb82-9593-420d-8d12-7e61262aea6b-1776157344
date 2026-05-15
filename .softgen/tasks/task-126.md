@@ -21,8 +21,8 @@ Follow-up change requested: remove the GM Vault entry point from Approval Center
 - [x] Add delete buttons to active Approval Center request items
 - [x] Add a recycle bin surface for deleted Approval Center items
 - [x] Add restore behavior for deleted requests
-- [ ] Remove the GM Vault button from Approval Center
-- [ ] Add permanent delete action inside the recycle bin
+- [x] Remove the GM Vault button from Approval Center
+- [x] Add permanent delete action inside the recycle bin
 - [ ] Validate that recycle-bin permanent delete removes records without breaking active Approval Center lists
 
 ## Acceptance

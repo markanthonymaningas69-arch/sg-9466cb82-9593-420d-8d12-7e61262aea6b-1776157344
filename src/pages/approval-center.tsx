@@ -14,7 +14,6 @@ import {
   type ApprovalStatus,
   type WorkflowStatus,
 } from "@/services/approvalCenterService";
-import { ArchiveViewer } from "@/components/ArchiveViewer";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { RotateCcw, Trash2 } from "lucide-react";
 
@@ -176,31 +175,6 @@ export default function ApprovalCenterPage() {
     }
   }, [filteredRequests, selectedRequestId]);
 
-  async function handleArchive(request: ApprovalRequest) {
-    try {
-      setArchivingId(request.id);
-      await approvalCenterService.archiveRequest(request.id);
-      await loadRequests();
-      if (selectedRequestId === request.id) {
-        setSelectedRequestId("");
-      }
-      setArchiveOpen(true);
-      toast({
-        title: "Moved to GM Vault",
-        description: "The approved record was archived and is now available in the GM Vault.",
-      });
-    } catch (error) {
-      console.error(error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to archive record to GM Vault",
-        variant: "destructive",
-      });
-    } finally {
-      setArchivingId("");
-    }
-  }
-
   async function handleDelete(request: ApprovalRequest) {
     try {
       setDeletingId(request.id);
@@ -338,7 +312,6 @@ export default function ApprovalCenterPage() {
                             <TableHead className="h-9 text-[11px] uppercase tracking-wide">Project</TableHead>
                             <TableHead className="h-9 text-[11px] uppercase tracking-wide">Status</TableHead>
                             <TableHead className="h-9 text-[11px] uppercase tracking-wide">Lifecycle</TableHead>
-                            <TableHead className="h-9 text-right text-[11px] uppercase tracking-wide">Archive</TableHead>
                             <TableHead className="h-9 text-right text-[11px] uppercase tracking-wide">Delete</TableHead>
                             <TableHead className="h-9 text-right text-[11px] uppercase tracking-wide">View Details</TableHead>
                           </TableRow>
@@ -373,24 +346,6 @@ export default function ApprovalCenterPage() {
                                 </div>
                               </TableCell>
                               <TableCell className="py-2.5 text-right">
-                                {canArchiveRequest(request) ? (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 border-amber-200 px-2 text-xs text-amber-800 hover:bg-amber-50"
-                                    disabled={archivingId === request.id}
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      void handleArchive(request);
-                                    }}
-                                  >
-                                    {archivingId === request.id ? "Archiving..." : "Archive"}
-                                  </Button>
-                                ) : (
-                                  <span className="text-[11px] text-muted-foreground">—</span>
-                                )}
-                              </TableCell>
-                              <TableCell className="py-2.5 text-right">
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -419,7 +374,6 @@ export default function ApprovalCenterPage() {
           </TabsContent>
         </Tabs>
 
-        <ArchiveViewer open={archiveOpen} onOpenChange={setArchiveOpen} />
         <Dialog open={recycleBinOpen} onOpenChange={setRecycleBinOpen}>
           <DialogContent className="max-w-5xl">
             <DialogHeader>
