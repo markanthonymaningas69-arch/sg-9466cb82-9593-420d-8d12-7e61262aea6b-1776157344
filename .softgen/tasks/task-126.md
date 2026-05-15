@@ -1,6 +1,6 @@
 ---
 title: Approval Center recycle bin
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [approval-center, delete, recycle-bin, workflow]
@@ -19,7 +19,7 @@ Add delete controls to Approval Center items and introduce a recycle bin flow so
 - [x] Add delete buttons to active Approval Center request items
 - [x] Add a recycle bin surface for deleted Approval Center items
 - [x] Add restore and permanent removal behavior if supported by the current schema
-- [ ] Validate that deleted items disappear from active Approval Center lists without breaking linked modules
+- [x] Validate that deleted items disappear from active Approval Center lists without breaking linked modules
 
 ## Acceptance
 Approval Center items show a delete action in the active lists.
