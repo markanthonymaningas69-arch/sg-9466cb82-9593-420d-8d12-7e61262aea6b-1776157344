@@ -13,12 +13,12 @@ position: 126
 Add delete controls to Approval Center items and introduce a recycle bin flow so removed requests can still be reviewed and restored if needed. The implementation should preserve the current approval workflow, keep deleted items out of the active lists, and provide a clear way to inspect or recover deleted records.
 
 ## Checklist
-- [ ] Inspect the current Approval Center page structure, tabs, and request actions
-- [ ] Inspect the request service and database schema for approval request lifecycle fields
-- [ ] Add a safe soft-delete model for approval requests
-- [ ] Add delete buttons to active Approval Center request items
-- [ ] Add a recycle bin surface for deleted Approval Center items
-- [ ] Add restore and permanent removal behavior if supported by the current schema
+- [x] Inspect the current Approval Center page structure, tabs, and request actions
+- [x] Inspect the request service and database schema for approval request lifecycle fields
+- [x] Add a safe soft-delete model for approval requests
+- [x] Add delete buttons to active Approval Center request items
+- [x] Add a recycle bin surface for deleted Approval Center items
+- [x] Add restore and permanent removal behavior if supported by the current schema
 - [ ] Validate that deleted items disappear from active Approval Center lists without breaking linked modules
 
 ## Acceptance

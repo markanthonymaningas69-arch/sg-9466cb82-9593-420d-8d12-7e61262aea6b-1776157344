@@ -34,6 +34,8 @@ export interface ApprovalRequest {
   summary: string | null;
   latestComment: string | null;
   payload: JsonValue | null;
+  deletedAt?: string | null;
+  deletedBy?: string | null;
 }
 
 export interface ApprovalAction {
@@ -384,7 +386,8 @@ export const approvalCenterService = {
   async listRequests() {
     const { data, error } = await supabase
       .from("approval_requests")
-      .select("id, source_module, source_table, source_record_id, request_type, requested_by, requested_at, project_id, status, workflow_status, target_module, routed_at, processed_at, completed_at, summary, latest_comment, payload, projects(name)")
+      .select("id, source_module, source_table, source_record_id, request_type, requested_by, requested_at, project_id, status, workflow_status, target_module, routed_at, processed_at, completed_at, summary, latest_comment, payload, deleted_at, deleted_by, is_deleted, projects(name)")
+      .eq("is_deleted", false)
       .order("requested_at", { ascending: false });
 
     if (error) throw error;
@@ -411,7 +414,42 @@ export const approvalCenterService = {
         summary: item.summary,
         latestComment: item.latest_comment,
         payload: item.payload as JsonValue | null,
+        deletedAt: item.deleted_at,
+        deletedBy: item.deleted_by,
       })) as ApprovalRequest[];
+  },
+
+  async listDeletedRequests() {
+    const { data, error } = await supabase
+      .from("approval_requests")
+      .select("id, source_module, source_table, source_record_id, request_type, requested_by, requested_at, project_id, status, workflow_status, target_module, routed_at, processed_at, completed_at, summary, latest_comment, payload, deleted_at, deleted_by, projects(name)")
+      .eq("is_deleted", true)
+      .order("deleted_at", { ascending: false });
+
+    if (error) throw error;
+
+    return (data || []).map((item) => ({
+      id: item.id,
+      sourceModule: item.source_module,
+      sourceTable: item.source_table,
+      sourceRecordId: item.source_record_id,
+      requestType: item.request_type,
+      requestedBy: item.requested_by,
+      requestedAt: item.requested_at,
+      projectId: item.project_id,
+      projectName: Array.isArray(item.projects) ? item.projects[0]?.name || null : item.projects?.name || null,
+      status: item.status as ApprovalStatus,
+      workflowStatus: item.workflow_status as WorkflowStatus,
+      targetModule: item.target_module,
+      routedAt: item.routed_at,
+      processedAt: item.processed_at,
+      completedAt: item.completed_at,
+      summary: item.summary,
+      latestComment: item.latest_comment,
+      payload: item.payload as JsonValue | null,
+      deletedAt: item.deleted_at,
+      deletedBy: item.deleted_by,
+    })) as ApprovalRequest[];
   },
 
   async listActions(approvalRequestId: string) {
@@ -561,8 +599,9 @@ export const approvalCenterService = {
 
     const { data, error } = await supabase
       .from("approval_requests")
-      .select("id, source_module, source_table, source_record_id, request_type, requested_by, requested_at, project_id, status, workflow_status, target_module, routed_at, processed_at, completed_at, summary, latest_comment, payload, projects(name)")
+      .select("id, source_module, source_table, source_record_id, request_type, requested_by, requested_at, project_id, status, workflow_status, target_module, routed_at, processed_at, completed_at, summary, latest_comment, payload, deleted_at, deleted_by, projects(name)")
       .eq("target_module", targetModule)
+      .eq("is_deleted", false)
       .in("workflow_status", workflowStates)
       .order("updated_at", { ascending: false });
 
@@ -587,6 +626,8 @@ export const approvalCenterService = {
       summary: item.summary,
       latestComment: item.latest_comment,
       payload: item.payload as JsonValue | null,
+      deletedAt: item.deleted_at,
+      deletedBy: item.deleted_by,
     })) as ApprovalRequest[];
   },
 
@@ -642,5 +683,37 @@ export const approvalCenterService = {
 
     const { error: archiveError } = await supabase.from(request.source_table).update({ is_archived: true }).eq("id", request.source_record_id);
     if (archiveError) throw archiveError;
+  },
+
+  async softDeleteRequest(approvalRequestId: string) {
+    const { data: authData } = await supabase.auth.getUser();
+    if (!authData.user) throw new Error("Unauthorized");
+
+    const timestamp = new Date().toISOString();
+    const { error } = await supabase
+      .from("approval_requests")
+      .update({
+        is_deleted: true,
+        deleted_at: timestamp,
+        deleted_by: authData.user.id,
+        updated_at: timestamp,
+      })
+      .eq("id", approvalRequestId);
+
+    if (error) throw error;
+  },
+
+  async restoreRequest(approvalRequestId: string) {
+    const { error } = await supabase
+      .from("approval_requests")
+      .update({
+        is_deleted: false,
+        deleted_at: null,
+        deleted_by: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", approvalRequestId);
+
+    if (error) throw error;
   },
 };

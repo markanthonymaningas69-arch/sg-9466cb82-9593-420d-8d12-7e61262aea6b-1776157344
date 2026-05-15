@@ -245,7 +245,10 @@ export type Database = {
           company_id: string
           completed_at: string | null
           created_at: string
+          deleted_at: string | null
+          deleted_by: string | null
           id: string
+          is_deleted: boolean
           latest_comment: string | null
           payload: Json
           processed_at: string | null
@@ -269,7 +272,10 @@ export type Database = {
           company_id?: string
           completed_at?: string | null
           created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           id?: string
+          is_deleted?: boolean
           latest_comment?: string | null
           payload?: Json
           processed_at?: string | null
@@ -293,7 +299,10 @@ export type Database = {
           company_id?: string
           completed_at?: string | null
           created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           id?: string
+          is_deleted?: boolean
           latest_comment?: string | null
           payload?: Json
           processed_at?: string | null
@@ -319,6 +328,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_requests_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {

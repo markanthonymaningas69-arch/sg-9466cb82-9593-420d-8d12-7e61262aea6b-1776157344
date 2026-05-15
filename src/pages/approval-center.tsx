@@ -15,6 +15,8 @@ import {
   type WorkflowStatus,
 } from "@/services/approvalCenterService";
 import { ArchiveViewer } from "@/components/ArchiveViewer";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { RotateCcw, Trash2 } from "lucide-react";
 
 type ApprovalTabKey = "all" | "Purchasing" | "Accounting" | "HR" | "Site Personnel" | "Project Manager";
 
@@ -103,7 +105,11 @@ export default function ApprovalCenterPage() {
   const [selectedRequestId, setSelectedRequestId] = useState("");
   const [loading, setLoading] = useState(true);
   const [archivingId, setArchivingId] = useState("");
+  const [deletingId, setDeletingId] = useState("");
+  const [restoringId, setRestoringId] = useState("");
+  const [deletedRequests, setDeletedRequests] = useState<ApprovalRequest[]>([]);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [recycleBinOpen, setRecycleBinOpen] = useState(false);
 
   const filteredRequests = useMemo(() => {
     if (activeTab === "all") return requests;
@@ -129,8 +135,12 @@ export default function ApprovalCenterPage() {
   }, [requests]);
 
   async function loadRequests() {
-    const data = await approvalCenterService.listRequests();
-    setRequests(data);
+    const [activeData, deletedData] = await Promise.all([
+      approvalCenterService.listRequests(),
+      approvalCenterService.listDeletedRequests(),
+    ]);
+    setRequests(activeData);
+    setDeletedRequests(deletedData);
   }
 
   useEffect(() => {
@@ -192,6 +202,51 @@ export default function ApprovalCenterPage() {
     }
   }
 
+  async function handleDelete(request: ApprovalRequest) {
+    try {
+      setDeletingId(request.id);
+      await approvalCenterService.softDeleteRequest(request.id);
+      await loadRequests();
+      if (selectedRequestId === request.id) {
+        setSelectedRequestId("");
+      }
+      toast({
+        title: "Moved to recycle bin",
+        description: "The approval request was removed from the active list.",
+      });
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to move request to recycle bin",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingId("");
+    }
+  }
+
+  async function handleRestore(request: ApprovalRequest) {
+    try {
+      setRestoringId(request.id);
+      await approvalCenterService.restoreRequest(request.id);
+      await loadRequests();
+      toast({
+        title: "Request restored",
+        description: "The approval request is back in the active list.",
+      });
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to restore request",
+        variant: "destructive",
+      });
+    } finally {
+      setRestoringId("");
+    }
+  }
+
   return (
     <Layout>
       <div className="space-y-4">
@@ -204,6 +259,14 @@ export default function ApprovalCenterPage() {
           </div>
           <Button variant="outline" className="border-amber-200 text-amber-800 hover:bg-amber-50" onClick={() => setArchiveOpen(true)}>
             Open GM Vault
+          </Button>
+          <Button variant="outline" className="border-slate-200 text-slate-700 hover:bg-slate-50" onClick={() => setRecycleBinOpen(true)}>
+            Recycle Bin
+            {deletedRequests.length > 0 ? (
+              <Badge className="ml-2 h-5 rounded-sm bg-slate-700 px-1.5 text-[10px] text-white">
+                {deletedRequests.length}
+              </Badge>
+            ) : null}
           </Button>
         </div>
 
@@ -256,6 +319,7 @@ export default function ApprovalCenterPage() {
                             <TableHead className="h-9 text-[11px] uppercase tracking-wide">Status</TableHead>
                             <TableHead className="h-9 text-[11px] uppercase tracking-wide">Lifecycle</TableHead>
                             <TableHead className="h-9 text-right text-[11px] uppercase tracking-wide">Archive</TableHead>
+                            <TableHead className="h-9 text-right text-[11px] uppercase tracking-wide">Delete</TableHead>
                             <TableHead className="h-9 text-right text-[11px] uppercase tracking-wide">View Details</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -307,6 +371,20 @@ export default function ApprovalCenterPage() {
                                 )}
                               </TableCell>
                               <TableCell className="py-2.5 text-right">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 border-rose-200 px-2 text-xs text-rose-700 hover:bg-rose-50"
+                                  disabled={deletingId === request.id}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    void handleDelete(request);
+                                  }}
+                                >
+                                  {deletingId === request.id ? "Deleting..." : "Delete"}
+                                </Button>
+                              </TableCell>
+                              <TableCell className="py-2.5 text-right">
                                 <RequestDetailsButton request={request} allowActions onStatusUpdated={loadRequests} />
                               </TableCell>
                             </TableRow>
@@ -322,6 +400,66 @@ export default function ApprovalCenterPage() {
         </Tabs>
 
         <ArchiveViewer open={archiveOpen} onOpenChange={setArchiveOpen} />
+        <Dialog open={recycleBinOpen} onOpenChange={setRecycleBinOpen}>
+          <DialogContent className="max-w-5xl">
+            <DialogHeader>
+              <DialogTitle>Approval Center Recycle Bin</DialogTitle>
+              <DialogDescription>
+                Deleted approval requests are removed from the live queue and can be restored here.
+              </DialogDescription>
+            </DialogHeader>
+
+            {deletedRequests.length === 0 ? (
+              <div className="rounded-lg border border-dashed py-10 text-center text-sm text-muted-foreground">
+                No deleted approval requests.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-y">
+                      <TableHead className="h-9 text-[11px] uppercase tracking-wide">Source</TableHead>
+                      <TableHead className="h-9 text-[11px] uppercase tracking-wide">Type</TableHead>
+                      <TableHead className="h-9 text-[11px] uppercase tracking-wide">Requested By</TableHead>
+                      <TableHead className="h-9 text-[11px] uppercase tracking-wide">Project</TableHead>
+                      <TableHead className="h-9 text-[11px] uppercase tracking-wide">Deleted At</TableHead>
+                      <TableHead className="h-9 text-right text-[11px] uppercase tracking-wide">Restore</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {deletedRequests.map((request) => (
+                      <TableRow key={request.id} className="text-xs">
+                        <TableCell className="py-2.5">
+                          <Badge variant="outline" className={`border text-[10px] ${getModuleTone(request.sourceModule)}`}>
+                            {request.sourceModule}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="py-2.5 font-medium">{request.requestType}</TableCell>
+                        <TableCell className="py-2.5">{request.requestedBy}</TableCell>
+                        <TableCell className="py-2.5">{request.projectName || "No project"}</TableCell>
+                        <TableCell className="py-2.5 text-muted-foreground">
+                          {request.deletedAt ? formatDateTime(request.deletedAt) : "—"}
+                        </TableCell>
+                        <TableCell className="py-2.5 text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 border-emerald-200 px-2 text-xs text-emerald-700 hover:bg-emerald-50"
+                            disabled={restoringId === request.id}
+                            onClick={() => void handleRestore(request)}
+                          >
+                            <RotateCcw className="mr-1 h-3.5 w-3.5" />
+                            {restoringId === request.id ? "Restoring..." : "Restore"}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
