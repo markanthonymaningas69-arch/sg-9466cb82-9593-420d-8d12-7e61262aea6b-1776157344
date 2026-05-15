@@ -1,6 +1,6 @@
 ---
 title: Approval Center recycle bin
-status: done
+status: in_progress
 priority: high
 type: feature
 tags: [approval-center, delete, recycle-bin, workflow]
@@ -12,16 +12,22 @@ position: 126
 ## Notes
 Add delete controls to Approval Center items and introduce a recycle bin flow so removed requests can still be reviewed and restored if needed. The implementation should preserve the current approval workflow, keep deleted items out of the active lists, and provide a clear way to inspect or recover deleted records.
 
+Follow-up change requested: remove the GM Vault entry point from Approval Center and add permanent delete inside the recycle bin so users can fully remove deleted approval requests there.
+
 ## Checklist
 - [x] Inspect the current Approval Center page structure, tabs, and request actions
 - [x] Inspect the request service and database schema for approval request lifecycle fields
 - [x] Add a safe soft-delete model for approval requests
 - [x] Add delete buttons to active Approval Center request items
 - [x] Add a recycle bin surface for deleted Approval Center items
-- [x] Add restore and permanent removal behavior if supported by the current schema
-- [x] Validate that deleted items disappear from active Approval Center lists without breaking linked modules
+- [x] Add restore behavior for deleted requests
+- [ ] Remove the GM Vault button from Approval Center
+- [ ] Add permanent delete action inside the recycle bin
+- [ ] Validate that recycle-bin permanent delete removes records without breaking active Approval Center lists
 
 ## Acceptance
 Approval Center items show a delete action in the active lists.
 Deleted Approval Center items move to a recycle bin instead of disappearing permanently.
 Users can review deleted requests separately from active approval items.
+GM Vault is no longer shown in Approval Center.
+Recycle bin items can be permanently deleted.
