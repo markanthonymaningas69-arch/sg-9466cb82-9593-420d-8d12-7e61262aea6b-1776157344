@@ -1,6 +1,6 @@
 ---
 title: Approval Center recycle bin
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [approval-center, delete, recycle-bin, workflow]
@@ -23,7 +23,7 @@ Follow-up change requested: remove the GM Vault entry point from Approval Center
 - [x] Add restore behavior for deleted requests
 - [x] Remove the GM Vault button from Approval Center
 - [x] Add permanent delete action inside the recycle bin
-- [ ] Validate that recycle-bin permanent delete removes records without breaking active Approval Center lists
+- [x] Validate that recycle-bin permanent delete removes records without breaking active Approval Center lists
 
 ## Acceptance
 Approval Center items show a delete action in the active lists.
