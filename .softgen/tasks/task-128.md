@@ -13,11 +13,11 @@ position: 128
 Audit and fix the Approval Center workflow so requests originating from Site Personnel, Purchasing, Accounting, and Human Resource are consistently created, routed, visible, and linked back to their source records. The flow should be clean and functional, with each module handing off requests into Approval Center using the same lifecycle expectations.
 
 ## Checklist
-- [ ] Inspect how Site Personnel creates and links approval requests
-- [ ] Inspect how Purchasing creates and links approval requests
+- [x] Inspect how Site Personnel creates and links approval requests
+- [x] Inspect how Purchasing creates and links approval requests
 - [ ] Inspect how Accounting creates and links approval requests
-- [ ] Inspect how Human Resource creates and links approval requests
-- [ ] Inspect Approval Center request ingestion, filtering, and routing logic
+- [x] Inspect how Human Resource creates and links approval requests
+- [x] Inspect Approval Center request ingestion, filtering, and routing logic
 - [ ] Fix missing or inconsistent request creation/linking across the four modules
 - [ ] Validate that module requests appear in Approval Center and retain source linkage
 

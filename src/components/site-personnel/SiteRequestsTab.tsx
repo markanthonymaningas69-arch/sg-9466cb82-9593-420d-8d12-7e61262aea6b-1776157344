@@ -16,7 +16,6 @@ import { FileText, Plus, CheckCircle, XCircle, Clock, Filter, Trash2 } from "luc
 import { siteService } from "@/services/siteService";
 import { approvalCenterService } from "@/services/approvalCenterService";
 import { CompactText } from "@/components/site-personnel/CompactText";
-import { useRouter } from "next/router";
 
 interface SiteRequest {
   id: string;
@@ -88,7 +87,6 @@ function isCashRequestType(requestType: string) {
 }
 
 export function SiteRequestsTab({ projectId }: { projectId: string }) {
-  const router = useRouter();
   const { toast } = useToast();
   const { currency } = useSettings();
   const [requests, setRequests] = useState<SiteRequest[]>([]);
@@ -947,11 +945,6 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
                           </TableCell>
                           <TableCell className="px-2 py-1.5 text-right align-middle">
                             <div className="flex justify-end gap-1.5">
-                              {request.status === "pending" ? (
-                                <Button variant="outline" size="sm" className="h-7 px-2 text-[11px]" onClick={() => void router.push("/approval-center")}>
-                                  Review
-                                </Button>
-                              ) : null}
                               <Button
                                 variant="outline"
                                 size="sm"

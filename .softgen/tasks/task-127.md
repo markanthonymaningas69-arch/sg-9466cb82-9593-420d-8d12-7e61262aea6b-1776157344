@@ -13,8 +13,8 @@ position: 127
 Remove the View button from the Site Personnel request list so the action area is simplified to the remaining request controls only. This is a UI-only change on the Site Personnel request list surface.
 
 ## Checklist
-- [ ] Inspect the Site Personnel request list action column and current button set
-- [ ] Remove the View button from the request list without affecting the remaining actions
+- [x] Inspect the Site Personnel request list action column and current button set
+- [x] Remove the View button from the request list without affecting the remaining actions
 - [ ] Validate the request list still renders and actions align correctly
 
 ## Acceptance
