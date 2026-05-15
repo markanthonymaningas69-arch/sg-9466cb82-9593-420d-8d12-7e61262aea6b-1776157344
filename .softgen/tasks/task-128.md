@@ -1,6 +1,6 @@
 ---
 title: Cross-module approval center workflow
-status: in_progress
+status: done
 priority: urgent
 type: bug
 tags: [approval-center, workflow, site-personnel, purchasing, accounting, human-resource]
@@ -19,7 +19,7 @@ Audit and fix the Approval Center workflow so requests originating from Site Per
 - [x] Inspect how Human Resource creates and links approval requests
 - [x] Inspect Approval Center request ingestion, filtering, and routing logic
 - [x] Fix missing or inconsistent request creation/linking across the four modules
-- [ ] Validate that module requests appear in Approval Center and retain source linkage
+- [x] Validate that module requests appear in Approval Center and retain source linkage
 
 ## Acceptance
 Requests from Site Personnel, Purchasing, Accounting, and Human Resource appear in Approval Center.

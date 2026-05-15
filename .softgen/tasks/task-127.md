@@ -1,6 +1,6 @@
 ---
 title: Site personnel request list actions
-status: in_progress
+status: done
 priority: medium
 type: bug
 tags: [site-personnel, requests, ui]
@@ -15,7 +15,7 @@ Remove the View button from the Site Personnel request list so the action area i
 ## Checklist
 - [x] Inspect the Site Personnel request list action column and current button set
 - [x] Remove the View button from the request list without affecting the remaining actions
-- [ ] Validate the request list still renders and actions align correctly
+- [x] Validate the request list still renders and actions align correctly
 
 ## Acceptance
 The Site Personnel request list no longer shows a View button.
