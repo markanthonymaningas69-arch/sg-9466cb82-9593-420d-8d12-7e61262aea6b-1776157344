@@ -716,4 +716,9 @@ export const approvalCenterService = {
 
     if (error) throw error;
   },
+
+  async permanentlyDeleteRequest(approvalRequestId: string) {
+    const { error } = await supabase.from("approval_requests").delete().eq("id", approvalRequestId);
+    if (error) throw error;
+  },
 };

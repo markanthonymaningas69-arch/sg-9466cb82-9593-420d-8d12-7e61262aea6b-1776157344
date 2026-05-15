@@ -104,11 +104,10 @@ export default function ApprovalCenterPage() {
   const [requests, setRequests] = useState<ApprovalRequest[]>([]);
   const [selectedRequestId, setSelectedRequestId] = useState("");
   const [loading, setLoading] = useState(true);
-  const [archivingId, setArchivingId] = useState("");
   const [deletingId, setDeletingId] = useState("");
   const [restoringId, setRestoringId] = useState("");
+  const [permanentlyDeletingId, setPermanentlyDeletingId] = useState("");
   const [deletedRequests, setDeletedRequests] = useState<ApprovalRequest[]>([]);
-  const [archiveOpen, setArchiveOpen] = useState(false);
   const [recycleBinOpen, setRecycleBinOpen] = useState(false);
 
   const filteredRequests = useMemo(() => {
@@ -247,6 +246,30 @@ export default function ApprovalCenterPage() {
     }
   }
 
+  async function handlePermanentDelete(request: ApprovalRequest) {
+    const confirmed = window.confirm("Permanently delete this approval request from the recycle bin?");
+    if (!confirmed) return;
+
+    try {
+      setPermanentlyDeletingId(request.id);
+      await approvalCenterService.permanentlyDeleteRequest(request.id);
+      await loadRequests();
+      toast({
+        title: "Request permanently deleted",
+        description: "The approval request was removed from the recycle bin.",
+      });
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to permanently delete request",
+        variant: "destructive",
+      });
+    } finally {
+      setPermanentlyDeletingId("");
+    }
+  }
+
   return (
     <Layout>
       <div className="space-y-4">
@@ -257,9 +280,6 @@ export default function ApprovalCenterPage() {
               Review centralized requests, open the full request details panel, and route approved work into the correct execution module.
             </p>
           </div>
-          <Button variant="outline" className="border-amber-200 text-amber-800 hover:bg-amber-50" onClick={() => setArchiveOpen(true)}>
-            Open GM Vault
-          </Button>
           <Button variant="outline" className="border-slate-200 text-slate-700 hover:bg-slate-50" onClick={() => setRecycleBinOpen(true)}>
             Recycle Bin
             {deletedRequests.length > 0 ? (
@@ -405,7 +425,7 @@ export default function ApprovalCenterPage() {
             <DialogHeader>
               <DialogTitle>Approval Center Recycle Bin</DialogTitle>
               <DialogDescription>
-                Deleted approval requests are removed from the live queue and can be restored here.
+                Deleted approval requests are removed from the live queue and can be restored or permanently deleted here.
               </DialogDescription>
             </DialogHeader>
 
@@ -424,6 +444,7 @@ export default function ApprovalCenterPage() {
                       <TableHead className="h-9 text-[11px] uppercase tracking-wide">Project</TableHead>
                       <TableHead className="h-9 text-[11px] uppercase tracking-wide">Deleted At</TableHead>
                       <TableHead className="h-9 text-right text-[11px] uppercase tracking-wide">Restore</TableHead>
+                      <TableHead className="h-9 text-right text-[11px] uppercase tracking-wide">Permanent Delete</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -450,6 +471,18 @@ export default function ApprovalCenterPage() {
                           >
                             <RotateCcw className="mr-1 h-3.5 w-3.5" />
                             {restoringId === request.id ? "Restoring..." : "Restore"}
+                          </Button>
+                        </TableCell>
+                        <TableCell className="py-2.5 text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 border-rose-200 px-2 text-xs text-rose-700 hover:bg-rose-50"
+                            disabled={permanentlyDeletingId === request.id}
+                            onClick={() => void handlePermanentDelete(request)}
+                          >
+                            <Trash2 className="mr-1 h-3.5 w-3.5" />
+                            {permanentlyDeletingId === request.id ? "Deleting..." : "Permanent Delete"}
                           </Button>
                         </TableCell>
                       </TableRow>
