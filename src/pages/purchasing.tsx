@@ -148,6 +148,22 @@ export default function Purchasing() {
     return `PO-${String(max + 1).padStart(5, '0')}`;
   };
 
+  const getApprovalRequesterName = async () => {
+    const { data: authData } = await supabase.auth.getUser();
+
+    if (!authData.user) {
+      return "Purchasing Team";
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name, email")
+      .eq("id", authData.user.id)
+      .maybeSingle();
+
+    return profile?.full_name || profile?.email || authData.user.email || "Purchasing Team";
+  };
+
   const [formData, setFormData] = useState({
     order_number: "",
     order_date: new Date().toISOString().split("T")[0],
@@ -305,8 +321,6 @@ export default function Purchasing() {
       return;
     }
     
-    console.log("Submitting PO with items:", poItems);
-    
     const payloadArray = poItems.map(item => ({
       order_number: poHeader.order_number,
       order_date: poHeader.order_date,
@@ -322,12 +336,10 @@ export default function Purchasing() {
       voucher_number: null
     }));
 
-    console.log("Inserting purchases:", payloadArray);
-
     const { data: createdPurchases, error: insertError } = await supabase
       .from("purchases")
       .insert(payloadArray)
-      .select("id, order_number, item_name, project_id");
+      .select("id, order_number, item_name, project_id, quantity, unit, supplier, unit_cost, destination_type");
 
     if (insertError) {
       console.error("Error saving PO items:", insertError);
@@ -335,32 +347,55 @@ export default function Purchasing() {
       return;
     }
 
-    console.log("Created purchases:", createdPurchases);
-
     try {
+      const requestedBy = await getApprovalRequesterName();
+
       await Promise.all(
-        (createdPurchases || []).map(async (purchase) => {
-          console.log("Creating approval request for purchase:", purchase.id);
-          return approvalCenterService.createRequest({
+        (createdPurchases || []).map((purchase) =>
+          approvalCenterService.createRequest({
             sourceModule: "Purchasing",
             sourceTable: "purchases",
             sourceRecordId: purchase.id,
             requestType: "Purchase Order",
-            requestedBy: "Purchasing Team",
+            requestedBy,
             projectId: purchase.project_id,
             summary: `${purchase.order_number}: ${purchase.item_name}`,
-          });
-        })
+            latestComment: `Supplier: ${purchase.supplier || "Pending Selection"}`,
+            payload: {
+              requestType: "Purchase Order",
+              orderNumber: purchase.order_number,
+              itemName: purchase.item_name,
+              quantity: Number(purchase.quantity || 0),
+              unit: purchase.unit || "unit",
+              supplier: purchase.supplier || "Pending Selection",
+              totalAmount: Number(purchase.quantity || 0) * Number(purchase.unit_cost || 0),
+              purchaseStatus: "pending_approval",
+              destinationType: purchase.destination_type || "main_warehouse",
+            },
+          })
+        )
       );
-      console.log("All approval requests created successfully");
-    } catch (approvalError) {
+    } catch (approvalError: any) {
+      const createdPurchaseIds = (createdPurchases || []).map((purchase) => purchase.id);
+
+      if (createdPurchaseIds.length > 0) {
+        await supabase
+          .from("approval_requests")
+          .delete()
+          .eq("source_table", "purchases")
+          .in("source_record_id", createdPurchaseIds);
+
+        await supabase.from("purchases").delete().in("id", createdPurchaseIds);
+      }
+
       console.error("Error creating approval requests:", approvalError);
-      alert("PO saved but failed to send to Approval Center: " + (approvalError as any).message);
+      alert("Failed to send PO to Approval Center: " + (approvalError?.message || "Unknown error"));
+      return;
     }
 
     setDialogOpen(false);
     setPoHeader({
-      order_number: generateNextPONumber([...purchases, ...createdPurchases]),
+      order_number: generateNextPONumber([...purchases, ...(createdPurchases || [])]),
       order_date: new Date().toISOString().split("T")[0],
       supplier: "",
       destination_type: "main_warehouse",
@@ -394,17 +429,22 @@ export default function Purchasing() {
     setDialogOpen(true);
   };
 
-  const handleDelete = async (id: string, approvalRequestId?: string) => {
+  const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this purchase order item?")) return;
 
     try {
+      const { error: approvalError } = await supabase
+        .from("approval_requests")
+        .delete()
+        .eq("source_table", "purchases")
+        .eq("source_record_id", id);
+
+      if (approvalError) {
+        throw approvalError;
+      }
+
       const { error: purchaseError } = await supabase.from("purchases").delete().eq("id", id);
       if (purchaseError) throw purchaseError;
-
-      if (approvalRequestId) {
-        const { error: approvalError } = await supabase.from("approval_requests").delete().eq("id", approvalRequestId);
-        if (approvalError) console.error("Failed to delete approval request:", approvalError);
-      }
 
       loadData();
     } catch (error) {
@@ -455,20 +495,23 @@ export default function Purchasing() {
     if (!confirm("Are you sure you want to delete all pending items in this group?")) return;
     
     const groupItems = filteredPurchases.filter((p) => getGroupKey(p) === groupKey);
-    const allPending = groupItems.every((p) => p.status === "pending");
+    const allPending = groupItems.every((p) => p.status === "pending" || p.status === "pending_approval");
 
     if (!allPending) {
-      alert("Can only delete items that are still pending (not yet approved/rejected).");
+      alert("Can only delete items that are still pending or pending approval.");
       return;
     }
 
     try {
       await Promise.all(
         groupItems.map(async (p) => {
+          await supabase
+            .from("approval_requests")
+            .delete()
+            .eq("source_table", "purchases")
+            .eq("source_record_id", p.id);
+
           await supabase.from("purchases").delete().eq("id", p.id);
-          if (p.approval_request_id) {
-            await supabase.from("approval_requests").delete().eq("id", p.approval_request_id);
-          }
         })
       );
       loadData();
@@ -602,22 +645,43 @@ export default function Purchasing() {
       status: 'pending_approval'
     }).eq('id', gmSubmitForm.id);
 
-    if (!error) {
+    if (error) {
+      alert("Failed to submit: " + error.message);
+      return;
+    }
+
+    try {
+      const requestedBy = await getApprovalRequesterName();
+
       await approvalCenterService.createRequest({
         sourceModule: "Purchasing",
         sourceTable: "purchases",
         sourceRecordId: gmSubmitForm.id,
         requestType: "Purchase Order",
-        requestedBy: "Purchasing Team",
+        requestedBy,
         projectId: gmSubmitForm.project_id || null,
         summary: `${gmSubmitForm.order_number}: ${gmSubmitForm.item_name}`,
+        latestComment: `Supplier: ${gmSubmitForm.supplier}`,
+        payload: {
+          requestType: "Purchase Order",
+          orderNumber: gmSubmitForm.order_number,
+          itemName: gmSubmitForm.item_name,
+          quantity: Number(gmSubmitForm.quantity || 0),
+          unit: gmSubmitForm.unit || "unit",
+          supplier: gmSubmitForm.supplier,
+          totalAmount: Number(gmSubmitForm.quantity || 0) * uc,
+          purchaseStatus: "pending_approval",
+          destinationType: gmSubmitForm.destination_type || "main_warehouse",
+        },
       });
 
       setGmSubmitDialogOpen(false);
       setGmSubmitForm(null);
       loadData();
-    } else {
-      alert("Failed to submit: " + error.message);
+    } catch (approvalError: any) {
+      await supabase.from("purchases").update({ status: "pending" }).eq("id", gmSubmitForm.id);
+      console.error("Error creating approval request:", approvalError);
+      alert("Failed to send purchase to Approval Center: " + (approvalError?.message || "Unknown error"));
     }
   };
 

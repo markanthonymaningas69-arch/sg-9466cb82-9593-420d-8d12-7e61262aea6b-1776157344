@@ -317,15 +317,31 @@ export default function Personnel() {
       throw error;
     }
 
-    await approvalCenterService.createRequest({
-      sourceModule: "HR",
-      sourceTable: "leave_requests",
-      sourceRecordId: leaveRequest.id,
-      requestType: "Leave Request",
-      requestedBy: requestedPerson?.name || "HR Personnel",
-      projectId: requestedPerson?.project_id || null,
-      summary: `${leaveForm.leave_type} leave: ${leaveForm.start_date} to ${leaveForm.end_date}`,
-    });
+    try {
+      await approvalCenterService.createRequest({
+        sourceModule: "HR",
+        sourceTable: "leave_requests",
+        sourceRecordId: leaveRequest.id,
+        requestType: "Leave Request",
+        requestedBy: requestedPerson?.name || "HR Personnel",
+        projectId: requestedPerson?.project_id || null,
+        summary: `${leaveForm.leave_type} leave: ${leaveForm.start_date} to ${leaveForm.end_date}`,
+        latestComment: leaveForm.reason || null,
+        payload: {
+          requestType: "Leave Request",
+          leaveType: leaveForm.leave_type,
+          startDate: leaveForm.start_date,
+          endDate: leaveForm.end_date,
+          daysRequested: days_requested,
+          personnelId: leaveForm.personnel_id,
+          personnelName: requestedPerson?.name || null,
+          reason: leaveForm.reason,
+        },
+      });
+    } catch (approvalError) {
+      await supabase.from("leave_requests").delete().eq("id", leaveRequest.id);
+      throw approvalError;
+    }
 
     setLeaveDialogOpen(false);
     resetLeaveForm();

@@ -15,10 +15,10 @@ Audit and fix the Approval Center workflow so requests originating from Site Per
 ## Checklist
 - [x] Inspect how Site Personnel creates and links approval requests
 - [x] Inspect how Purchasing creates and links approval requests
-- [ ] Inspect how Accounting creates and links approval requests
+- [x] Inspect how Accounting creates and links approval requests
 - [x] Inspect how Human Resource creates and links approval requests
 - [x] Inspect Approval Center request ingestion, filtering, and routing logic
-- [ ] Fix missing or inconsistent request creation/linking across the four modules
+- [x] Fix missing or inconsistent request creation/linking across the four modules
 - [ ] Validate that module requests appear in Approval Center and retain source linkage
 
 ## Acceptance
