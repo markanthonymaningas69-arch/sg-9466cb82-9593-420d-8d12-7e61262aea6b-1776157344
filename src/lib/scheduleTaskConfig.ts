@@ -14,7 +14,8 @@ export interface TeamMemberConfiguration {
   rate: number;
   unit: TeamRateUnit;
   manualRate: boolean;
-  description: string;
+  description?: string;
+  count: number;
 }
 
 export interface TaskTeamConfiguration {
@@ -76,15 +77,15 @@ export function createTeamRole(role = "Worker", quantity = 1, index = 0): TeamRo
   };
 }
 
-export function createTeamMember(positionName = "", index = 0): TeamMemberConfiguration {
+export function createTeamMember(positionName: string, index: number): TeamMemberConfiguration {
   return {
-    id: `member-${index + 1}`,
+    id: `member-${index}-${Date.now()}`,
+    positionName,
     catalogPositionId: "",
-    positionName: positionName.trim(),
     rate: 0,
     unit: "day",
     manualRate: false,
-    description: "",
+    count: 1,
   };
 }
 
