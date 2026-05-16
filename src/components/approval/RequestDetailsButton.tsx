@@ -59,11 +59,63 @@ function workflowBadgeClass(status: WorkflowStatus) {
 }
 
 function getLinkedRequestDetails(request: ApprovalRequest) {
-  if (request.sourceTable !== "site_requests" || !request.payload || Array.isArray(request.payload) || typeof request.payload !== "object") {
+  const payload = request.payload && typeof request.payload === "object" && !Array.isArray(request.payload) 
+    ? (request.payload as Record<string, unknown>) 
+    : {};
+
+  const details: Array<{ label: string; value: string }> = [];
+
+  if (request.requestType === "Purchase Order") {
+    if (typeof payload.orderNumber === "string") {
+      details.push({ label: "Order Number", value: payload.orderNumber });
+    }
+    if (typeof payload.itemName === "string") {
+      details.push({ label: "Item Name", value: payload.itemName });
+    }
+    if (typeof payload.quantity === "number" && typeof payload.unit === "string") {
+      details.push({ label: "Quantity", value: `${payload.quantity} ${payload.unit}` });
+    }
+    if (typeof payload.supplier === "string") {
+      details.push({ label: "Supplier", value: payload.supplier });
+    }
+    if (typeof payload.unitCost === "number") {
+      details.push({ label: "Unit Cost", value: `AED ${payload.unitCost.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` });
+    }
+    if (typeof payload.totalAmount === "number") {
+      details.push({ label: "Total Cost", value: `AED ${payload.totalAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` });
+    }
+    if (typeof payload.destinationType === "string") {
+      details.push({ 
+        label: "Destination", 
+        value: payload.destinationType === "main_warehouse" ? "Main Warehouse" : "Project Warehouse" 
+      });
+    }
+    return details;
+  }
+
+  if (request.requestType === "Voucher Request") {
+    if (typeof payload.orderNumber === "string") {
+      details.push({ label: "Order Number", value: payload.orderNumber });
+    }
+    if (typeof payload.itemName === "string") {
+      details.push({ label: "Item Name", value: payload.itemName });
+    }
+    if (typeof payload.supplier === "string") {
+      details.push({ label: "Supplier", value: payload.supplier });
+    }
+    if (typeof payload.totalAmount === "number") {
+      details.push({ label: "Voucher Amount", value: `AED ${payload.totalAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` });
+    }
+    if (typeof payload.description === "string") {
+      details.push({ label: "Description", value: payload.description });
+    }
+    return details;
+  }
+
+  if (request.sourceTable !== "site_requests") {
     return [];
   }
 
-  const payload = request.payload as Record<string, unknown>;
   const quantity = payload.quantity;
   const unit = payload.unit;
   const amount = payload.amount;
@@ -77,7 +129,7 @@ function getLinkedRequestDetails(request: ApprovalRequest) {
     { label: "Quantity / Amount", value: quantityLabel },
     { label: "Scope of Work", value: typeof payload.scopeName === "string" && payload.scopeName ? payload.scopeName : null },
     { label: "Request Date", value: typeof payload.requestDate === "string" ? new Date(payload.requestDate).toLocaleDateString() : null },
-    { label: "Recorded Amount", value: typeof amount === "number" ? amount.toLocaleString("en-US") : null },
+    { label: "Recorded Amount", value: typeof amount === "number" ? `AED ${amount.toLocaleString("en-US")}` : null },
   ].filter((detail): detail is { label: string; value: string } => Boolean(detail.value));
 }
 
@@ -290,6 +342,36 @@ export function RequestDetailsButton({
                   <h3 className="text-sm font-semibold text-foreground">Request Details</h3>
                   <p className="text-xs text-muted-foreground">Requested item and linked transaction context.</p>
                 </div>
+
+                {(request.requestType === "Purchase Order" || request.requestType === "Voucher Request") && 
+                 request.payload && typeof request.payload === "object" && !Array.isArray(request.payload) && 
+                 typeof (request.payload as Record<string, unknown>).totalAmount === "number" ? (
+                  <div className="rounded-lg border-2 border-primary/20 bg-primary/5 p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          {request.requestType === "Voucher Request" ? "Voucher Amount" : "Total Purchase Cost"}
+                        </p>
+                        <p className="mt-1 text-2xl font-bold text-foreground">
+                          AED {((request.payload as Record<string, unknown>).totalAmount as number).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      {request.requestType === "Purchase Order" && 
+                       typeof (request.payload as Record<string, unknown>).unitCost === "number" && 
+                       typeof (request.payload as Record<string, unknown>).quantity === "number" ? (
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">Unit Cost</p>
+                          <p className="text-lg font-semibold text-foreground">
+                            AED {((request.payload as Record<string, unknown>).unitCost as number).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            × {(request.payload as Record<string, unknown>).quantity} {(request.payload as Record<string, unknown>).unit || "units"}
+                          </p>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
 
                 {linkedDetails.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No additional request details recorded.</p>
