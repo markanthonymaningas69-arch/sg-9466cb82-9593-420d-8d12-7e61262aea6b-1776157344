@@ -15,7 +15,9 @@ import {
   type WorkflowStatus,
 } from "@/services/approvalCenterService";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { RotateCcw, Trash2 } from "lucide-react";
+import { RotateCcw, Trash2, Search, Loader2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
 
 type ApprovalTabKey = "all" | "Purchasing" | "Accounting" | "HR" | "Site Personnel" | "Project Manager";
 
@@ -108,6 +110,9 @@ export default function ApprovalCenterPage() {
   const [permanentlyDeletingId, setPermanentlyDeletingId] = useState("");
   const [deletedRequests, setDeletedRequests] = useState<ApprovalRequest[]>([]);
   const [recycleBinOpen, setRecycleBinOpen] = useState(false);
+  const [loadingDeleted, setLoadingDeleted] = useState(false);
+  const [emptyDialogOpen, setEmptyDialogOpen] = useState(false);
+  const [emptyingBin, setEmptyingBin] = useState(false);
 
   const filteredRequests = useMemo(() => {
     if (activeTab === "all") return requests;
@@ -175,6 +180,23 @@ export default function ApprovalCenterPage() {
     }
   }, [filteredRequests, selectedRequestId]);
 
+  async function loadDeletedRequests() {
+    setLoadingDeleted(true);
+    try {
+      const data = await approvalCenterService.listDeletedRequests();
+      setDeletedRequests(data);
+    } catch (error) {
+      console.error("Error loading deleted requests:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load deleted requests",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingDeleted(false);
+    }
+  }
+
   async function handleDelete(request: ApprovalRequest) {
     try {
       setDeletingId(request.id);
@@ -241,6 +263,75 @@ export default function ApprovalCenterPage() {
       });
     } finally {
       setPermanentlyDeletingId("");
+    }
+  }
+
+  async function handleRestoreRequest(id: string) {
+    try {
+      await approvalCenterService.restoreRequest(id);
+      toast({
+        title: "Request Restored",
+        description: "Request has been restored successfully",
+      });
+      await Promise.all([loadDeletedRequests(), loadRequests()]);
+    } catch (error) {
+      console.error("Error restoring request:", error);
+      toast({
+        title: "Error",
+        description: "Failed to restore request",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function handlePermanentDelete(id: string) {
+    if (!confirm("Permanently delete this request? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      await approvalCenterService.permanentlyDeleteRequest(id);
+      toast({
+        title: "Request Deleted",
+        description: "Request has been permanently deleted",
+      });
+      await loadDeletedRequests();
+    } catch (error) {
+      console.error("Error deleting request:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete request permanently",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function handleEmptyRecycleBin() {
+    try {
+      setEmptyingBin(true);
+      
+      const deletePromises = deletedRequests.map((request) =>
+        approvalCenterService.permanentlyDeleteRequest(request.id)
+      );
+      
+      await Promise.all(deletePromises);
+
+      toast({
+        title: "Recycle Bin Emptied",
+        description: `${deletedRequests.length} requests permanently deleted`,
+      });
+
+      setEmptyDialogOpen(false);
+      await loadDeletedRequests();
+    } catch (error) {
+      console.error("Error emptying recycle bin:", error);
+      toast({
+        title: "Error",
+        description: "Failed to empty recycle bin",
+        variant: "destructive",
+      });
+    } finally {
+      setEmptyingBin(false);
     }
   }
 
@@ -377,76 +468,124 @@ export default function ApprovalCenterPage() {
         <Dialog open={recycleBinOpen} onOpenChange={setRecycleBinOpen}>
           <DialogContent className="max-w-5xl">
             <DialogHeader>
-              <DialogTitle>Approval Center Recycle Bin</DialogTitle>
-              <DialogDescription>
-                Deleted approval requests are removed from the live queue and can be restored or permanently deleted here.
-              </DialogDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <DialogTitle>Approval Center Recycle Bin</DialogTitle>
+                  <DialogDescription>
+                    Restore or permanently delete approval requests
+                  </DialogDescription>
+                </div>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setEmptyDialogOpen(true)}
+                  disabled={deletedRequests.length === 0 || loadingDeleted}
+                  className="h-8"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Empty Recycle Bin
+                </Button>
+              </div>
             </DialogHeader>
 
-            {deletedRequests.length === 0 ? (
-              <div className="rounded-lg border border-dashed py-10 text-center text-sm text-muted-foreground">
-                No deleted approval requests.
+            {loadingDeleted ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : deletedRequests.length === 0 ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                Recycle bin is empty
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-y">
-                      <TableHead className="h-9 text-[11px] uppercase tracking-wide">Source</TableHead>
-                      <TableHead className="h-9 text-[11px] uppercase tracking-wide">Type</TableHead>
-                      <TableHead className="h-9 text-[11px] uppercase tracking-wide">Requested By</TableHead>
-                      <TableHead className="h-9 text-[11px] uppercase tracking-wide">Project</TableHead>
-                      <TableHead className="h-9 text-[11px] uppercase tracking-wide">Deleted At</TableHead>
-                      <TableHead className="h-9 text-right text-[11px] uppercase tracking-wide">Restore</TableHead>
-                      <TableHead className="h-9 text-right text-[11px] uppercase tracking-wide">Permanent Delete</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {deletedRequests.map((request) => (
-                      <TableRow key={request.id} className="text-xs">
-                        <TableCell className="py-2.5">
-                          <Badge variant="outline" className={`border text-[10px] ${getModuleTone(request.sourceModule)}`}>
-                            {request.sourceModule}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="py-2.5 font-medium">{request.requestType}</TableCell>
-                        <TableCell className="py-2.5">{request.requestedBy}</TableCell>
-                        <TableCell className="py-2.5">{request.projectName || "No project"}</TableCell>
-                        <TableCell className="py-2.5 text-muted-foreground">
-                          {request.deletedAt ? formatDateTime(request.deletedAt) : "—"}
-                        </TableCell>
-                        <TableCell className="py-2.5 text-right">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Request Type</TableHead>
+                    <TableHead>Requested By</TableHead>
+                    <TableHead>Module</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Summary</TableHead>
+                    <TableHead>Deleted</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {deletedRequests.map((request) => (
+                    <TableRow key={request.id}>
+                      <TableCell>
+                        <Badge variant="outline">{request.requestType}</Badge>
+                      </TableCell>
+                      <TableCell>{request.requestedBy}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{request.sourceModule}</Badge>
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {new Date(request.requestedAt).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="max-w-xs truncate">
+                        {request.summary}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {request.deletedAt ? new Date(request.deletedAt).toLocaleDateString() : "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
                           <Button
-                            size="sm"
                             variant="outline"
-                            className="h-7 border-emerald-200 px-2 text-xs text-emerald-700 hover:bg-emerald-50"
-                            disabled={restoringId === request.id}
-                            onClick={() => void handleRestore(request)}
+                            size="sm"
+                            onClick={() => void handleRestoreRequest(request.id)}
                           >
                             <RotateCcw className="mr-1 h-3.5 w-3.5" />
-                            {restoringId === request.id ? "Restoring..." : "Restore"}
+                            Restore
                           </Button>
-                        </TableCell>
-                        <TableCell className="py-2.5 text-right">
                           <Button
+                            variant="destructive"
                             size="sm"
-                            variant="outline"
-                            className="h-7 border-rose-200 px-2 text-xs text-rose-700 hover:bg-rose-50"
-                            disabled={permanentlyDeletingId === request.id}
-                            onClick={() => void handlePermanentDelete(request)}
+                            onClick={() => void handlePermanentDelete(request.id)}
                           >
                             <Trash2 className="mr-1 h-3.5 w-3.5" />
-                            {permanentlyDeletingId === request.id ? "Deleting..." : "Permanent Delete"}
+                            Delete
                           </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
           </DialogContent>
         </Dialog>
+
+        <AlertDialog open={emptyDialogOpen} onOpenChange={setEmptyDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Empty Recycle Bin?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action will permanently delete all {deletedRequests.length} approval requests in the recycle bin and cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={emptyingBin}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => void handleEmptyRecycleBin()}
+                disabled={emptyingBin}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {emptyingBin ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Confirm Delete
+                  </>
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );
