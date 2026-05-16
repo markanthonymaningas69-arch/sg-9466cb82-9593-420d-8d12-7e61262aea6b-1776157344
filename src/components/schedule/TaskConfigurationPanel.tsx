@@ -26,7 +26,7 @@ import {
   type TaskConfiguration,
 } from "@/lib/scheduleTaskConfig";
 import type { MasterTeamTemplate } from "@/services/masterCatalogService";
-import { AlignLeft, Clock, Settings2, Wrench } from "lucide-react";
+import { AlignLeft, Clock, Settings2, Wrench, ChevronDown, ChevronUp } from "lucide-react";
 import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { taskMaterialService, type TaskMaterialAssignment } from "@/services/taskMaterialService";
@@ -156,6 +156,15 @@ export function TaskConfigurationPanel({
   const [availableBomMaterials, setAvailableBomMaterials] = useState<BomMaterial[]>([]);
   const [taskMaterials, setTaskMaterials] = useState<TaskMaterialAssignment[]>([]);
   const [loadingMaterials, setLoadingMaterials] = useState(false);
+  
+  // Collapsible section states
+  const [showBasicInfo, setShowBasicInfo] = useState(true);
+  const [showProductivity, setShowProductivity] = useState(true);
+  const [showTeamComposition, setShowTeamComposition] = useState(true);
+  const [showTaskMaterials, setShowTaskMaterials] = useState(true);
+  const [showTeamAssignment, setShowTeamAssignment] = useState(true);
+  const [showMaterialDelivery, setShowMaterialDelivery] = useState(true);
+  const [showLaborCost, setShowLaborCost] = useState(true);
 
   useEffect(() => {
     if (task?.project_id) {
@@ -487,198 +496,246 @@ export function TaskConfigurationPanel({
           <div className="space-y-4 p-3">
             <TabsContent value="parameters" className="mt-0 space-y-4">
               <section className="space-y-3 rounded-md border p-3">
-                <div className="space-y-1">
-                  <h3 className="text-sm font-semibold text-foreground">Basic Info</h3>
-                  {task.bom_scope ? (
-                    <p className="text-[11px] text-muted-foreground">These values are synced from the linked BOM scope and can only be changed in the BOM module.</p>
-                  ) : (
-                    <p className="text-[11px] text-muted-foreground">Enter task details manually. These values will be synced if you later link this task to a BOM scope.</p>
-                  )}
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1 flex-1">
+                    <h3 className="text-sm font-semibold text-foreground">Basic Info</h3>
+                    {task.bom_scope ? (
+                      <p className="text-[11px] text-muted-foreground">These values are synced from the linked BOM scope and can only be changed in the BOM module.</p>
+                    ) : (
+                      <p className="text-[11px] text-muted-foreground">Enter task details manually. These values will be synced if you later link this task to a BOM scope.</p>
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setShowBasicInfo(!showBasicInfo)}
+                    className="h-7 w-7 p-0"
+                  >
+                    {showBasicInfo ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </Button>
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-xs">Task Name</Label>
-                  <Input 
-                    value={task.bom_scope?.name || task.name || ""} 
-                    onChange={(event) => {
-                      if (!task.bom_scope) {
-                        onTaskChange({ ...task, name: event.target.value });
-                      }
-                    }}
-                    readOnly={Boolean(task.bom_scope)} 
-                    className={`h-8 text-sm ${task.bom_scope ? 'bg-muted/50' : ''}`}
-                    placeholder="Enter task name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs">Scope Quantity</Label>
-                  <div className="grid grid-cols-[1fr_140px] gap-2">
-                    <Input 
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      value={String(task.bom_scope?.quantity ?? taskConfig.scopeQuantity)} 
-                      onChange={(event) => {
-                        if (!task.bom_scope) {
-                          handleTaskConfigChange({
-                            scopeQuantity: Number(event.target.value) || 0,
-                          });
-                        }
-                      }}
-                      readOnly={Boolean(task.bom_scope)} 
-                      className={`h-8 text-sm ${task.bom_scope ? 'bg-muted/50' : ''}`}
-                      placeholder="0"
-                    />
-                    <div className="space-y-1">
-                      <Select
-                        value={task.bom_scope?.unit || taskConfig.scopeUnit}
-                        onValueChange={(value) => {
+                {showBasicInfo && (
+                  <>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Task Name</Label>
+                      <Input 
+                        value={task.bom_scope?.name || task.name || ""} 
+                        onChange={(event) => {
                           if (!task.bom_scope) {
-                            handleTaskConfigChange({
-                              scopeUnit: value === "other" ? "" : value,
-                            });
+                            onTaskChange({ ...task, name: event.target.value });
                           }
                         }}
-                        disabled={Boolean(task.bom_scope)}
-                      >
-                        <SelectTrigger className={`h-8 text-sm ${task.bom_scope ? 'bg-muted/50' : ''}`}>
-                          <SelectValue placeholder="Unit" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Cu.m">Cu.m</SelectItem>
-                          <SelectItem value="Sq.m">Sq.m</SelectItem>
-                          <SelectItem value="Kg">Kg</SelectItem>
-                          <SelectItem value="Lot">Lot</SelectItem>
-                          <SelectItem value="other">Other (specify)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {!task.bom_scope && taskConfig.scopeUnit && !["Cu.m", "Sq.m", "Kg", "Lot"].includes(taskConfig.scopeUnit) && (
-                        <Input
-                          value={taskConfig.scopeUnit}
+                        readOnly={Boolean(task.bom_scope)} 
+                        className={`h-8 text-sm ${task.bom_scope ? 'bg-muted/50' : ''}`}
+                        placeholder="Enter task name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Scope Quantity</Label>
+                      <div className="grid grid-cols-[1fr_140px] gap-2">
+                        <Input 
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          value={String(task.bom_scope?.quantity ?? taskConfig.scopeQuantity)} 
                           onChange={(event) => {
-                            handleTaskConfigChange({
-                              scopeUnit: event.target.value,
-                            });
+                            if (!task.bom_scope) {
+                              handleTaskConfigChange({
+                                scopeQuantity: Number(event.target.value) || 0,
+                              });
+                            }
                           }}
-                          placeholder="Specify unit"
-                          className="h-7 text-xs"
+                          readOnly={Boolean(task.bom_scope)} 
+                          className={`h-8 text-sm ${task.bom_scope ? 'bg-muted/50' : ''}`}
+                          placeholder="0"
                         />
-                      )}
+                        <div className="space-y-1">
+                          <Select
+                            value={task.bom_scope?.unit || taskConfig.scopeUnit}
+                            onValueChange={(value) => {
+                              if (!task.bom_scope) {
+                                handleTaskConfigChange({
+                                  scopeUnit: value === "other" ? "" : value,
+                                });
+                              }
+                            }}
+                            disabled={Boolean(task.bom_scope)}
+                          >
+                            <SelectTrigger className={`h-8 text-sm ${task.bom_scope ? 'bg-muted/50' : ''}`}>
+                              <SelectValue placeholder="Unit" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Cu.m">Cu.m</SelectItem>
+                              <SelectItem value="Sq.m">Sq.m</SelectItem>
+                              <SelectItem value="Kg">Kg</SelectItem>
+                              <SelectItem value="Lot">Lot</SelectItem>
+                              <SelectItem value="other">Other (specify)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {!task.bom_scope && taskConfig.scopeUnit && !["Cu.m", "Sq.m", "Kg", "Lot"].includes(taskConfig.scopeUnit) && (
+                            <Input
+                              value={taskConfig.scopeUnit}
+                              onChange={(event) => {
+                                handleTaskConfigChange({
+                                  scopeUnit: event.target.value,
+                                });
+                              }}
+                              placeholder="Specify unit"
+                              className="h-7 text-xs"
+                            />
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  </>
+                )}
               </section>
 
               <section className="space-y-3 rounded-md border p-3">
-                <div className="space-y-1">
-                  <h3 className="text-sm font-semibold text-foreground">Productivity</h3>
-                  <p className="text-[11px] text-muted-foreground">
-                    Set the output of one team per working day or per working hour. Calculated duration uses scope quantity,
-                    productivity unit, work hours per day, and the configured number of teams.
-                  </p>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1 flex-1">
+                    <h3 className="text-sm font-semibold text-foreground">Productivity</h3>
+                    <p className="text-[11px] text-muted-foreground">
+                      Set the output of one team per working day or per working hour. Calculated duration uses scope quantity,
+                      productivity unit, work hours per day, and the configured number of teams.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setShowProductivity(!showProductivity)}
+                    className="h-7 w-7 p-0"
+                  >
+                    {showProductivity ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </Button>
                 </div>
-                <div className="grid grid-cols-[1fr_auto_auto] gap-2">
-                  <div className="space-y-2">
-                    <Label className="text-xs">
-                      Productivity of one team
-                    </Label>
-                    <Input
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      value={taskConfig.productivityOutput}
-                      onChange={(event) =>
-                        handleTaskConfigChange({
-                          productivityOutput: Number(event.target.value) || 0,
-                        })
-                      }
-                      className="h-8 text-sm"
+                {showProductivity && (
+                  <>
+                    <div className="grid grid-cols-[1fr_auto_auto] gap-2">
+                      <div className="space-y-2">
+                        <Label className="text-xs">
+                          Productivity of one team
+                        </Label>
+                        <Input
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          value={taskConfig.productivityOutput}
+                          onChange={(event) =>
+                            handleTaskConfigChange({
+                              productivityOutput: Number(event.target.value) || 0,
+                            })
+                          }
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Unit</Label>
+                        <div className="flex h-8 items-center rounded-md border bg-muted/50 px-3 text-sm text-foreground min-w-[80px]">
+                          {taskConfig.scopeUnit || "unit"}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Per</Label>
+                        <Select
+                          value={taskConfig.productivityUnit}
+                          onValueChange={(value) =>
+                            handleTaskConfigChange({
+                              productivityUnit: value as TaskConfiguration["productivityUnit"],
+                            })
+                          }
+                        >
+                          <SelectTrigger className="h-8 text-sm w-[100px]">
+                            <SelectValue placeholder="Period" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="day">Per day</SelectItem>
+                            <SelectItem value="hour">Per hour</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      {taskConfig.productivityUnit === "hour"
+                        ? `Total daily output = productivity × ${taskConfig.workHoursPerDay} work hour(s) × ${Math.max(1, taskConfig.numberOfTeams)} team(s).`
+                        : `Total daily output = productivity × ${Math.max(1, taskConfig.numberOfTeams)} team(s).`}
+                    </p>
+                    {!validation.productivityValid && <p className="text-[11px] text-destructive">Productivity must be greater than 0.</p>}
+                  </>
+                )}
+              </section>
+
+              <section className="space-y-3 rounded-md border p-3">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex-1">
+                    <h3 className="text-sm font-semibold text-foreground">Team Composition</h3>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setShowTeamComposition(!showTeamComposition)}
+                    className="h-7 w-7 p-0"
+                  >
+                    {showTeamComposition ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </Button>
+                </div>
+                {showTeamComposition && (
+                  <>
+                    <TeamCompositionEditor
+                      teams={taskConfig.teams}
+                      catalogItems={manpowerCatalogItems}
+                      workHoursPerDay={taskConfig.workHoursPerDay}
+                      onChange={(teams) => {
+                        const nextConfig = normalizeTaskConfiguration(
+                          {
+                            ...taskConfig,
+                            teams,
+                          },
+                          {
+                            quantity: task.bom_scope?.quantity,
+                            unit: task.bom_scope?.unit,
+                            assignedTeamName: teams[0]?.teamName || task.assigned_team,
+                          }
+                        );
+
+                        onTaskChange({
+                          ...task,
+                          assigned_team: nextConfig.assignedTeamName || null,
+                          number_of_teams: nextConfig.numberOfTeams,
+                          task_config: nextConfig,
+                        });
+                      }}
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs">Unit</Label>
-                    <div className="flex h-8 items-center rounded-md border bg-muted/50 px-3 text-sm text-foreground min-w-[80px]">
-                      {taskConfig.scopeUnit || "unit"}
+
+                    {!validation.teamStructureValid ? (
+                      <p className="text-[11px] text-destructive">Each team needs at least one member.</p>
+                    ) : null}
+                    {!validation.positionsValid ? (
+                      <p className="text-[11px] text-destructive">Each member must use a position from this project&apos;s Manpower Catalog.</p>
+                    ) : null}
+                    {!validation.memberRatesValid ? (
+                      <p className="text-[11px] text-destructive">Each member rate must be greater than 0.</p>
+                    ) : null}
+                    {!validation.numberOfTeamsValid ? (
+                      <p className="text-[11px] text-destructive">Number of Teams must be at least 1 for every team setup.</p>
+                    ) : null}
+
+                    <div className="rounded-md border bg-primary/5 p-3 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-semibold text-foreground">Estimated Duration</span>
+                        <Badge>{estimatedDuration} days</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{productivitySummary.teamLabel || "No teams configured yet"}</p>
+                      <p className="text-xs text-muted-foreground">Output per team: {productivitySummary.perTeamOutputLabel}</p>
+                      <p className="text-xs text-muted-foreground">Total output with configured teams: {totalDailyOutput} {taskConfig.scopeUnit} per day</p>
+                      <p className="text-xs text-muted-foreground">Total manpower: {totalTeamMembers} personnel</p>
+                      <p className="text-xs text-muted-foreground">Total daily labor cost: AED {totalDailyLaborCost.toFixed(2)}</p>
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs">Per</Label>
-                    <Select
-                      value={taskConfig.productivityUnit}
-                      onValueChange={(value) =>
-                        handleTaskConfigChange({
-                          productivityUnit: value as TaskConfiguration["productivityUnit"],
-                        })
-                      }
-                    >
-                      <SelectTrigger className="h-8 text-sm w-[100px]">
-                        <SelectValue placeholder="Period" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="day">Per day</SelectItem>
-                        <SelectItem value="hour">Per hour</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <p className="text-[11px] text-muted-foreground">
-                  {taskConfig.productivityUnit === "hour"
-                    ? `Total daily output = productivity × ${taskConfig.workHoursPerDay} work hour(s) × ${Math.max(1, taskConfig.numberOfTeams)} team(s).`
-                    : `Total daily output = productivity × ${Math.max(1, taskConfig.numberOfTeams)} team(s).`}
-                </p>
-                {!validation.productivityValid && <p className="text-[11px] text-destructive">Productivity must be greater than 0.</p>}
-              </section>
-
-              <section className="space-y-3 rounded-md border p-3">
-                <TeamCompositionEditor
-                  teams={taskConfig.teams}
-                  catalogItems={manpowerCatalogItems}
-                  workHoursPerDay={taskConfig.workHoursPerDay}
-                  onChange={(teams) => {
-                    const nextConfig = normalizeTaskConfiguration(
-                      {
-                        ...taskConfig,
-                        teams,
-                      },
-                      {
-                        quantity: task.bom_scope?.quantity,
-                        unit: task.bom_scope?.unit,
-                        assignedTeamName: teams[0]?.teamName || task.assigned_team,
-                      }
-                    );
-
-                    onTaskChange({
-                      ...task,
-                      assigned_team: nextConfig.assignedTeamName || null,
-                      number_of_teams: nextConfig.numberOfTeams,
-                      task_config: nextConfig,
-                    });
-                  }}
-                />
-
-                {!validation.teamStructureValid ? (
-                  <p className="text-[11px] text-destructive">Each team needs at least one member.</p>
-                ) : null}
-                {!validation.positionsValid ? (
-                  <p className="text-[11px] text-destructive">Each member must use a position from this project&apos;s Manpower Catalog.</p>
-                ) : null}
-                {!validation.memberRatesValid ? (
-                  <p className="text-[11px] text-destructive">Each member rate must be greater than 0.</p>
-                ) : null}
-                {!validation.numberOfTeamsValid ? (
-                  <p className="text-[11px] text-destructive">Number of Teams must be at least 1 for every team setup.</p>
-                ) : null}
-
-                <div className="rounded-md border bg-primary/5 p-3 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-foreground">Estimated Duration</span>
-                    <Badge>{estimatedDuration} days</Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{productivitySummary.teamLabel || "No teams configured yet"}</p>
-                  <p className="text-xs text-muted-foreground">Output per team: {productivitySummary.perTeamOutputLabel}</p>
-                  <p className="text-xs text-muted-foreground">Total output with configured teams: {totalDailyOutput} {taskConfig.scopeUnit} per day</p>
-                  <p className="text-xs text-muted-foreground">Total manpower: {totalTeamMembers} personnel</p>
-                  <p className="text-xs text-muted-foreground">Total daily labor cost: AED {totalDailyLaborCost.toFixed(2)}</p>
-                </div>
+                  </>
+                )}
               </section>
             </TabsContent>
 
@@ -784,600 +841,660 @@ export function TaskConfigurationPanel({
             <TabsContent value="resources" className="space-y-4 mt-0">
               <section className="space-y-3 rounded-md border p-3">
                 <div className="flex items-center justify-between">
-                  <div>
+                  <div className="flex-1">
                     <h3 className="text-sm font-semibold text-foreground">Task Materials</h3>
                     <p className="text-[11px] text-muted-foreground">
                       Manually assign materials from BOM database for cost tracking and forecasting.
                     </p>
                   </div>
-                  <Button type="button" size="sm" variant="outline" onClick={handleAddMaterial} disabled={loadingMaterials}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Material
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button type="button" size="sm" variant="outline" onClick={handleAddMaterial} disabled={loadingMaterials}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Material
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setShowTaskMaterials(!showTaskMaterials)}
+                      className="h-7 w-7 p-0"
+                    >
+                      {showTaskMaterials ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </Button>
+                  </div>
                 </div>
 
-                {taskMaterials.length > 0 ? (
-                  <div className="space-y-2">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs border-collapse">
-                        <thead>
-                          <tr className="border-b bg-muted/50">
-                            <th className="p-2 text-left font-medium">Material</th>
-                            <th className="p-2 text-left font-medium w-20">Unit</th>
-                            <th className="p-2 text-right font-medium w-24">Quantity</th>
-                            <th className="p-2 text-right font-medium w-28">Unit Cost</th>
-                            <th className="p-2 text-right font-medium w-28">Total</th>
-                            <th className="p-2 w-10"></th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {taskMaterials.map((material) => (
-                            <tr key={material.id} className="border-b hover:bg-muted/20">
-                              <td className="p-2">
-                                <Select
-                                  value={material.materialId}
-                                  onValueChange={(value) => handleMaterialChange(material.id, "materialId", value)}
-                                >
-                                  <SelectTrigger className="h-7 text-xs">
-                                    <SelectValue placeholder="Select material" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="other">Other (custom)</SelectItem>
-                                    {availableBomMaterials.map((bomMat) => (
-                                      <SelectItem key={bomMat.id} value={bomMat.id}>
-                                        {bomMat.material_name}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                {material.materialId === "other" && (
-                                  <Input
-                                    value={material.materialName}
-                                    onChange={(e) => handleMaterialChange(material.id, "materialName", e.target.value)}
-                                    placeholder="Enter material name"
-                                    className="h-7 text-xs mt-1"
-                                  />
-                                )}
-                              </td>
-                              <td className="p-2">
-                                <Input
-                                  value={material.unit}
-                                  onChange={(e) => handleMaterialChange(material.id, "unit", e.target.value)}
-                                  placeholder="Unit"
-                                  className="h-7 text-xs"
-                                  disabled={material.materialId !== "other" && material.materialId !== ""}
-                                />
-                              </td>
-                              <td className="p-2">
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={material.quantity}
-                                  onChange={(e) => handleMaterialChange(material.id, "quantity", Number(e.target.value))}
-                                  className="h-7 text-xs text-right"
-                                />
-                              </td>
-                              <td className="p-2">
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={material.unitCost}
-                                  onChange={(e) => handleMaterialChange(material.id, "unitCost", Number(e.target.value))}
-                                  className="h-7 text-xs text-right"
-                                />
-                              </td>
-                              <td className="p-2 text-right font-medium">
-                                AED {material.totalCost.toFixed(2)}
-                              </td>
-                              <td className="p-2 text-center">
-                                <Button
-                                  type="button"
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-6 w-6"
-                                  onClick={() => handleRemoveMaterial(material.id)}
-                                >
-                                  <Trash2 className="h-3 w-3 text-destructive" />
-                                </Button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                        <tfoot>
-                          <tr className="border-t bg-primary/5">
-                            <td colSpan={4} className="p-2 text-right font-semibold text-xs">
-                              Total Material Cost:
-                            </td>
-                            <td className="p-2 text-right font-bold text-sm">
-                              AED {totalMaterialCost.toFixed(2)}
-                            </td>
-                            <td></td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    No materials assigned yet. Click &quot;Add Material&quot; to manually assign materials from the BOM database.
-                  </p>
+                {showTaskMaterials && (
+                  <>
+                    {taskMaterials.length > 0 ? (
+                      <div className="space-y-2">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs border-collapse">
+                            <thead>
+                              <tr className="border-b bg-muted/50">
+                                <th className="p-2 text-left font-medium">Material</th>
+                                <th className="p-2 text-left font-medium w-20">Unit</th>
+                                <th className="p-2 text-right font-medium w-24">Quantity</th>
+                                <th className="p-2 text-right font-medium w-28">Unit Cost</th>
+                                <th className="p-2 text-right font-medium w-28">Total</th>
+                                <th className="p-2 w-10"></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {taskMaterials.map((material) => (
+                                <tr key={material.id} className="border-b hover:bg-muted/20">
+                                  <td className="p-2">
+                                    <Select
+                                      value={material.materialId}
+                                      onValueChange={(value) => handleMaterialChange(material.id, "materialId", value)}
+                                    >
+                                      <SelectTrigger className="h-7 text-xs">
+                                        <SelectValue placeholder="Select material" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="other">Other (custom)</SelectItem>
+                                        {availableBomMaterials.map((bomMat) => (
+                                          <SelectItem key={bomMat.id} value={bomMat.id}>
+                                            {bomMat.material_name}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    {material.materialId === "other" && (
+                                      <Input
+                                        value={material.materialName}
+                                        onChange={(e) => handleMaterialChange(material.id, "materialName", e.target.value)}
+                                        placeholder="Enter material name"
+                                        className="h-7 text-xs mt-1"
+                                      />
+                                    )}
+                                  </td>
+                                  <td className="p-2">
+                                    <Input
+                                      value={material.unit}
+                                      onChange={(e) => handleMaterialChange(material.id, "unit", e.target.value)}
+                                      placeholder="Unit"
+                                      className="h-7 text-xs"
+                                      disabled={material.materialId !== "other" && material.materialId !== ""}
+                                    />
+                                  </td>
+                                  <td className="p-2">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={material.quantity}
+                                      onChange={(e) => handleMaterialChange(material.id, "quantity", Number(e.target.value))}
+                                      className="h-7 text-xs text-right"
+                                    />
+                                  </td>
+                                  <td className="p-2">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={material.unitCost}
+                                      onChange={(e) => handleMaterialChange(material.id, "unitCost", Number(e.target.value))}
+                                      className="h-7 text-xs text-right"
+                                    />
+                                  </td>
+                                  <td className="p-2 text-right font-medium">
+                                    AED {material.totalCost.toFixed(2)}
+                                  </td>
+                                  <td className="p-2 text-center">
+                                    <Button
+                                      type="button"
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-6 w-6"
+                                      onClick={() => handleRemoveMaterial(material.id)}
+                                    >
+                                      <Trash2 className="h-3 w-3 text-destructive" />
+                                    </Button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            <tfoot>
+                              <tr className="border-t bg-primary/5">
+                                <td colSpan={4} className="p-2 text-right font-semibold text-xs">
+                                  Total Material Cost:
+                                </td>
+                                <td className="p-2 text-right font-bold text-sm">
+                                  AED {totalMaterialCost.toFixed(2)}
+                                </td>
+                                <td></td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        No materials assigned yet. Click &quot;Add Material&quot; to manually assign materials from the BOM database.
+                      </p>
+                    )}
+                  </>
                 )}
               </section>
 
               <section className="space-y-3 rounded-md border p-3">
                 <div className="flex items-center justify-between">
-                  <div>
+                  <div className="flex-1">
                     <h3 className="text-sm font-semibold text-foreground">Team Assignment</h3>
                     <p className="text-[11px] text-muted-foreground">
                       Member positions and default rates come from the project Manpower Catalog only.
                     </p>
                   </div>
-                  <Badge variant="outline">{taskConfig.teams.length} team setup(s)</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">{taskConfig.teams.length} team setup(s)</Badge>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setShowTeamAssignment(!showTeamAssignment)}
+                      className="h-7 w-7 p-0"
+                    >
+                      {showTeamAssignment ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </Button>
+                  </div>
                 </div>
 
-                {taskConfig.teams.length > 0 ? (
-                  <div className="space-y-3">
-                    {taskConfig.teams.map((team) => (
-                      <div key={team.id} className="rounded-md border bg-muted/20 p-3 text-xs">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="font-semibold text-foreground">{team.teamName}</p>
-                            <p className="text-muted-foreground">
-                              {team.members.length} member(s) per team × {team.numberOfTeams} team(s)
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium text-foreground">
-                              {team.members.length * team.numberOfTeams} total personnel
-                            </p>
-                            <p className="text-muted-foreground">
-                              Daily subtotal AED {calculateTotalTeamDailyCost({ ...taskConfig, teams: [team] }).toFixed(2)}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="mt-3 space-y-2">
-                          {team.members.map((member) => (
-                            <div key={member.id} className="flex items-center justify-between rounded-md border bg-background px-3 py-2">
+                {showTeamAssignment && (
+                  <>
+                    {taskConfig.teams.length > 0 ? (
+                      <div className="space-y-3">
+                        {taskConfig.teams.map((team) => (
+                          <div key={team.id} className="rounded-md border bg-muted/20 p-3 text-xs">
+                            <div className="flex items-center justify-between gap-3">
                               <div>
-                                <p className="font-medium text-foreground">{member.positionName || "Unassigned"}</p>
+                                <p className="font-semibold text-foreground">{team.teamName}</p>
                                 <p className="text-muted-foreground">
-                                  Rate can be overridden per member while keeping the catalog default available.
+                                  {team.members.length} member(s) per team × {team.numberOfTeams} team(s)
                                 </p>
                               </div>
                               <div className="text-right">
-                                <p className="text-foreground">
-                                  AED {Number(member.rate || 0).toFixed(2)}/{member.unit === "hour" ? "hr" : "day"}
+                                <p className="font-medium text-foreground">
+                                  {team.members.reduce((sum, m) => sum + (m.count || 1), 0) * team.numberOfTeams} total personnel
                                 </p>
                                 <p className="text-muted-foreground">
-                                  Daily equivalent AED {getMemberDailyRate(member, taskConfig.workHoursPerDay).toFixed(2)}
+                                  Daily subtotal AED {calculateTotalTeamDailyCost({ ...taskConfig, teams: [team] }).toFixed(2)}
                                 </p>
                               </div>
                             </div>
-                          ))}
-                        </div>
+
+                            <div className="mt-3 space-y-2">
+                              {team.members.map((member) => (
+                                <div key={member.id} className="flex items-center justify-between rounded-md border bg-background px-3 py-2">
+                                  <div>
+                                    <p className="font-medium text-foreground">{member.positionName || "Unassigned"}</p>
+                                    <p className="text-muted-foreground">
+                                      {member.count || 1} × Rate can be overridden per member while keeping the catalog default available.
+                                    </p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-foreground">
+                                      AED {Number(member.rate || 0).toFixed(2)}/{member.unit === "hour" ? "hr" : "day"}
+                                    </p>
+                                    <p className="text-muted-foreground">
+                                      Daily equivalent AED {getMemberDailyRate(member, taskConfig.workHoursPerDay).toFixed(2)}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground">Add at least one team in Parameters to populate this manpower plan.</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Add at least one team in Parameters to populate this manpower plan.</p>
+                    )}
+                  </>
                 )}
               </section>
 
               <section className="space-y-3 rounded-md border p-3">
                 <div className="flex items-center justify-between">
-                  <div>
+                  <div className="flex-1">
                     <h3 className="text-sm font-semibold text-foreground">Material Delivery Planning</h3>
                     <p className="text-[11px] text-muted-foreground">
                       Plan material deliveries aligned with task timeline. Supports procurement forecasting and cash flow planning.
                     </p>
                   </div>
-                  <Badge variant="outline">{resourceMaterialPlans.length} material(s)</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">{resourceMaterialPlans.length} material(s)</Badge>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setShowMaterialDelivery(!showMaterialDelivery)}
+                      className="h-7 w-7 p-0"
+                    >
+                      {showMaterialDelivery ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </Button>
+                  </div>
                 </div>
 
-                {resourceMaterialPlans.length === 0 ? (
-                  <div className="rounded-md border border-dashed bg-muted/20 p-6 text-center">
-                    <p className="text-sm text-muted-foreground">
-                      No materials assigned yet. Add materials in the Task Materials section above to enable delivery planning.
-                    </p>
-                  </div>
-                ) : null}
+                {showMaterialDelivery && (
+                  <>
+                    {resourceMaterialPlans.length === 0 ? (
+                      <div className="rounded-md border border-dashed bg-muted/20 p-6 text-center">
+                        <p className="text-sm text-muted-foreground">
+                          No materials assigned yet. Add materials in the Task Materials section above to enable delivery planning.
+                        </p>
+                      </div>
+                    ) : null}
 
-                {resourceMaterialPlans.map((plan) => {
-                  const distributionRows = buildEvenDistributionRows(
-                    Number(plan.totalQuantity || 0),
-                    plan.deliveryDates
-                  );
-                  const averageQuantityPerDelivery =
-                    distributionRows.length > 0
-                      ? Number((Number(plan.totalQuantity || 0) / distributionRows.length).toFixed(2))
-                      : 0;
+                    {resourceMaterialPlans.map((plan) => {
+                      const distributionRows = buildEvenDistributionRows(
+                        Number(plan.totalQuantity || 0),
+                        plan.deliveryDates
+                      );
+                      const averageQuantityPerDelivery =
+                        distributionRows.length > 0
+                          ? Number((Number(plan.totalQuantity || 0) / distributionRows.length).toFixed(2))
+                          : 0;
 
-                  // Find material cost from task materials
-                  const linkedMaterial = taskMaterials.find(m => m.materialId === plan.materialId);
-                  const unitCost = linkedMaterial?.unitCost || 0;
-                  const totalCost = Number(plan.totalQuantity || 0) * unitCost;
-                  const costPerDelivery = distributionRows.length > 0 ? totalCost / distributionRows.length : 0;
+                      // Find material cost from task materials
+                      const linkedMaterial = taskMaterials.find(m => m.materialId === plan.materialId);
+                      const unitCost = linkedMaterial?.unitCost || 0;
+                      const totalCost = Number(plan.totalQuantity || 0) * unitCost;
+                      const costPerDelivery = distributionRows.length > 0 ? totalCost / distributionRows.length : 0;
 
-                  // Validation warnings
-                  const warnings: string[] = [];
-                  if (!plan.deliveryStartDate) {
-                    warnings.push("Delivery start date is required");
-                  }
-                  if (plan.deliveryStartDate && task.start_date && plan.deliveryStartDate < task.start_date) {
-                    warnings.push("Delivery starts before task start date");
-                  }
-                  if (plan.deliveryDates.length > 0 && task.end_date) {
-                    const lastDeliveryDate = plan.deliveryDates[plan.deliveryDates.length - 1];
-                    if (lastDeliveryDate > task.end_date) {
-                      warnings.push("Deliveries extend beyond task end date");
-                    }
-                  }
-                  if (Number(plan.totalQuantity || 0) <= 0) {
-                    warnings.push("Total quantity must be greater than 0");
-                  }
+                      // Validation warnings
+                      const warnings: string[] = [];
+                      if (!plan.deliveryStartDate) {
+                        warnings.push("Delivery start date is required");
+                      }
+                      if (plan.deliveryStartDate && task.start_date && plan.deliveryStartDate < task.start_date) {
+                        warnings.push("Delivery starts before task start date");
+                      }
+                      if (plan.deliveryDates.length > 0 && task.end_date) {
+                        const lastDeliveryDate = plan.deliveryDates[plan.deliveryDates.length - 1];
+                        if (lastDeliveryDate > task.end_date) {
+                          warnings.push("Deliveries extend beyond task end date");
+                        }
+                      }
+                      if (Number(plan.totalQuantity || 0) <= 0) {
+                        warnings.push("Total quantity must be greater than 0");
+                      }
 
-                  return (
-                    <div key={plan.materialId} className="rounded-md border bg-muted/20 p-3 space-y-4">
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-semibold text-foreground">{plan.materialName}</p>
-                            {warnings.length > 0 && (
-                              <Badge variant="destructive" className="h-5 text-[10px]">
-                                {warnings.length} {warnings.length === 1 ? "warning" : "warnings"}
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-[11px] text-muted-foreground">
-                            Task timeline: {task.start_date || "Not set"} → {task.end_date || "Not set"}
-                          </p>
-                          {warnings.length > 0 && (
-                            <div className="mt-2 space-y-1">
-                              {warnings.map((warning, idx) => (
-                                <p key={idx} className="text-[11px] text-destructive flex items-center gap-1">
-                                  <span className="h-1 w-1 rounded-full bg-destructive"></span>
-                                  {warning}
-                                </p>
-                              ))}
+                      return (
+                        <div key={plan.materialId} className="rounded-md border bg-muted/20 p-3 space-y-4">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-semibold text-foreground">{plan.materialName}</p>
+                                {warnings.length > 0 && (
+                                  <Badge variant="destructive" className="h-5 text-[10px]">
+                                    {warnings.length} {warnings.length === 1 ? "warning" : "warnings"}
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-muted-foreground">
+                                Task timeline: {task.start_date || "Not set"} → {task.end_date || "Not set"}
+                              </p>
+                              {warnings.length > 0 && (
+                                <div className="mt-2 space-y-1">
+                                  {warnings.map((warning, idx) => (
+                                    <p key={idx} className="text-[11px] text-destructive flex items-center gap-1">
+                                      <span className="h-1 w-1 rounded-full bg-destructive"></span>
+                                      {warning}
+                                    </p>
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">{plan.unit}</Badge>
-                          {unitCost > 0 && (
-                            <Badge variant="secondary" className="text-[10px]">
-                              AED {unitCost.toFixed(2)}/{plan.unit}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline">{plan.unit}</Badge>
+                              {unitCost > 0 && (
+                                <Badge variant="secondary" className="text-[10px]">
+                                  AED {unitCost.toFixed(2)}/{plan.unit}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
 
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label className="text-[11px]">Delivery Type</Label>
-                          <Select
-                            value={plan.deliveryScheduleType}
-                            onValueChange={(value) =>
-                              updateMaterialPlan(plan.materialId, {
-                                deliveryScheduleType: value as "one_time" | "staggered",
-                              })
-                            }
-                          >
-                            <SelectTrigger className="h-8 text-xs">
-                              <SelectValue placeholder="Select delivery type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="one_time">One-time delivery</SelectItem>
-                              <SelectItem value="staggered">Staggered delivery</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-[11px]">Delivery Start Date</Label>
-                          <Input
-                            type="date"
-                            value={plan.deliveryStartDate || ""}
-                            onChange={(event) =>
-                              updateMaterialPlan(plan.materialId, {
-                                deliveryStartDate: event.target.value || null,
-                              })
-                            }
-                            className="h-8 text-xs"
-                          />
-                        </div>
-                      </div>
-
-                      {plan.deliveryScheduleType === "staggered" && (
-                        <div className="space-y-3">
-                          <div className="grid gap-3 md:grid-cols-3">
+                          <div className="grid gap-3 md:grid-cols-2">
                             <div className="space-y-2">
-                              <Label className="text-[11px]">Frequency</Label>
+                              <Label className="text-[11px]">Delivery Type</Label>
                               <Select
-                                value={plan.deliveryFrequency}
+                                value={plan.deliveryScheduleType}
                                 onValueChange={(value) =>
                                   updateMaterialPlan(plan.materialId, {
-                                    deliveryFrequency: value as "daily" | "weekly" | "custom",
+                                    deliveryScheduleType: value as "one_time" | "staggered",
                                   })
                                 }
                               >
                                 <SelectTrigger className="h-8 text-xs">
-                                  <SelectValue placeholder="Select frequency" />
+                                  <SelectValue placeholder="Select delivery type" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="daily">Daily</SelectItem>
-                                  <SelectItem value="weekly">Weekly</SelectItem>
-                                  <SelectItem value="custom">Custom interval</SelectItem>
+                                  <SelectItem value="one_time">One-time delivery</SelectItem>
+                                  <SelectItem value="staggered">Staggered delivery</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
 
                             <div className="space-y-2">
-                              <Label className="text-[11px]">Duration (days)</Label>
+                              <Label className="text-[11px]">Delivery Start Date</Label>
                               <Input
-                                type="number"
-                                min="1"
-                                step="1"
-                                value={plan.deliveryDurationDays}
+                                type="date"
+                                value={plan.deliveryStartDate || ""}
                                 onChange={(event) =>
                                   updateMaterialPlan(plan.materialId, {
-                                    deliveryDurationDays: Math.max(
-                                      1,
-                                      Math.round(Number(event.target.value) || 1)
-                                    ),
+                                    deliveryStartDate: event.target.value || null,
                                   })
                                 }
                                 className="h-8 text-xs"
                               />
                             </div>
+                          </div>
 
-                            {plan.deliveryFrequency === "custom" && (
-                              <div className="space-y-2">
-                                <Label className="text-[11px]">Interval (days)</Label>
-                                <Input
-                                  type="number"
-                                  min="1"
-                                  step="1"
-                                  value={plan.customIntervalDays || 1}
-                                  onChange={(event) =>
+                          {plan.deliveryScheduleType === "staggered" && (
+                            <div className="space-y-3">
+                              <div className="grid gap-3 md:grid-cols-3">
+                                <div className="space-y-2">
+                                  <Label className="text-[11px]">Frequency</Label>
+                                  <Select
+                                    value={plan.deliveryFrequency}
+                                    onValueChange={(value) =>
+                                      updateMaterialPlan(plan.materialId, {
+                                        deliveryFrequency: value as "daily" | "weekly" | "custom",
+                                      })
+                                    }
+                                  >
+                                    <SelectTrigger className="h-8 text-xs">
+                                      <SelectValue placeholder="Select frequency" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="daily">Daily</SelectItem>
+                                      <SelectItem value="weekly">Weekly</SelectItem>
+                                      <SelectItem value="custom">Custom interval</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <Label className="text-[11px]">Duration (days)</Label>
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    step="1"
+                                    value={plan.deliveryDurationDays}
+                                    onChange={(event) =>
+                                      updateMaterialPlan(plan.materialId, {
+                                        deliveryDurationDays: Math.max(
+                                          1,
+                                          Math.round(Number(event.target.value) || 1)
+                                        ),
+                                      })
+                                    }
+                                    className="h-8 text-xs"
+                                  />
+                                </div>
+
+                                {plan.deliveryFrequency === "custom" && (
+                                  <div className="space-y-2">
+                                    <Label className="text-[11px]">Interval (days)</Label>
+                                    <Input
+                                      type="number"
+                                      min="1"
+                                      step="1"
+                                      value={plan.customIntervalDays || 1}
+                                      onChange={(event) =>
+                                        updateMaterialPlan(plan.materialId, {
+                                          customIntervalDays: Math.max(
+                                            1,
+                                            Math.round(Number(event.target.value) || 1)
+                                          ),
+                                        })
+                                      }
+                                      className="h-8 text-xs"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    const taskDuration = task.duration_days || estimatedDuration || 7;
                                     updateMaterialPlan(plan.materialId, {
-                                      customIntervalDays: Math.max(
-                                        1,
-                                        Math.round(Number(event.target.value) || 1)
-                                      ),
-                                    })
-                                  }
-                                  className="h-8 text-xs"
-                                />
+                                      deliveryScheduleType: "staggered",
+                                      deliveryFrequency: "weekly",
+                                      deliveryDurationDays: taskDuration,
+                                      deliveryStartDate: task.start_date,
+                                    });
+                                  }}
+                                  className="h-7 text-[11px]"
+                                >
+                                  Weekly Pattern
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    const taskDuration = task.duration_days || estimatedDuration || 7;
+                                    updateMaterialPlan(plan.materialId, {
+                                      deliveryScheduleType: "staggered",
+                                      deliveryFrequency: "daily",
+                                      deliveryDurationDays: taskDuration,
+                                      deliveryStartDate: task.start_date,
+                                    });
+                                  }}
+                                  className="h-7 text-[11px]"
+                                >
+                                  Daily Pattern
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    updateMaterialPlan(plan.materialId, {
+                                      deliveryScheduleType: "one_time",
+                                      deliveryStartDate: task.start_date,
+                                    });
+                                  }}
+                                  className="h-7 text-[11px]"
+                                >
+                                  Single Delivery
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="space-y-2">
+                            <Label className="text-[11px]">Total Quantity ({plan.unit})</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={plan.totalQuantity}
+                              onChange={(event) =>
+                                updateMaterialPlan(plan.materialId, {
+                                  totalQuantity: Math.max(0, Number(event.target.value) || 0),
+                                })
+                              }
+                              className="h-8 text-xs"
+                            />
+                          </div>
+
+                          <div className="grid gap-3 rounded-md border bg-background/70 p-3 md:grid-cols-4">
+                            <div>
+                              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Deliveries</p>
+                              <p className="mt-1 text-sm font-semibold text-foreground">{plan.deliveryDates.length}</p>
+                            </div>
+                            <div>
+                              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Qty / Delivery</p>
+                              <p className="mt-1 text-sm font-semibold text-foreground">
+                                {distributionRows.length > 0
+                                  ? `${formatDistributionQuantity(averageQuantityPerDelivery)} ${plan.unit}`
+                                  : "-"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Total Planned</p>
+                              <p className="mt-1 text-sm font-semibold text-foreground">
+                                {formatDistributionQuantity(Number(plan.totalQuantity || 0))} {plan.unit}
+                              </p>
+                            </div>
+                            {unitCost > 0 && (
+                              <div>
+                                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Total Cost</p>
+                                <p className="mt-1 text-sm font-semibold text-primary">
+                                  AED {totalCost.toFixed(2)}
+                                </p>
                               </div>
                             )}
                           </div>
 
-                          <div className="flex flex-wrap gap-2">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                const taskDuration = task.duration_days || estimatedDuration || 7;
-                                updateMaterialPlan(plan.materialId, {
-                                  deliveryScheduleType: "staggered",
-                                  deliveryFrequency: "weekly",
-                                  deliveryDurationDays: taskDuration,
-                                  deliveryStartDate: task.start_date,
-                                });
-                              }}
-                              className="h-7 text-[11px]"
-                            >
-                              Weekly Pattern
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                const taskDuration = task.duration_days || estimatedDuration || 7;
-                                updateMaterialPlan(plan.materialId, {
-                                  deliveryScheduleType: "staggered",
-                                  deliveryFrequency: "daily",
-                                  deliveryDurationDays: taskDuration,
-                                  deliveryStartDate: task.start_date,
-                                });
-                              }}
-                              className="h-7 text-[11px]"
-                            >
-                              Daily Pattern
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                updateMaterialPlan(plan.materialId, {
-                                  deliveryScheduleType: "one_time",
-                                  deliveryStartDate: task.start_date,
-                                });
-                              }}
-                              className="h-7 text-[11px]"
-                            >
-                              Single Delivery
-                            </Button>
-                          </div>
-                        </div>
-                      )}
+                          {plan.deliveryDates.length > 0 ? (
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-[11px]">Delivery Schedule</Label>
+                                <Badge variant="secondary" className="text-[10px]">
+                                  Even distribution
+                                </Badge>
+                              </div>
+                              
+                              <div className="space-y-2 max-h-64 overflow-y-auto rounded-md border bg-background p-2">
+                                {distributionRows.map((row, index) => {
+                                  const deliveryCost = unitCost > 0 ? row.quantity * unitCost : 0;
+                                  return (
+                                    <div
+                                      key={`${plan.materialId}-${row.date}-${index}`}
+                                      className="flex items-center justify-between rounded-md border bg-muted/20 px-3 py-2 text-xs hover:bg-muted/40"
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <Badge variant="outline" className="text-[10px] min-w-[90px]">
+                                          {row.date}
+                                        </Badge>
+                                        <span className="font-medium text-foreground">
+                                          {formatDistributionQuantity(row.quantity)} {plan.unit}
+                                        </span>
+                                      </div>
+                                      {unitCost > 0 && (
+                                        <span className="text-primary font-medium">
+                                          AED {deliveryCost.toFixed(2)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
 
-                      <div className="space-y-2">
-                        <Label className="text-[11px]">Total Quantity ({plan.unit})</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={plan.totalQuantity}
-                          onChange={(event) =>
-                            updateMaterialPlan(plan.materialId, {
-                              totalQuantity: Math.max(0, Number(event.target.value) || 0),
-                            })
-                          }
-                          className="h-8 text-xs"
-                        />
-                      </div>
-
-                      <div className="grid gap-3 rounded-md border bg-background/70 p-3 md:grid-cols-4">
-                        <div>
-                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Deliveries</p>
-                          <p className="mt-1 text-sm font-semibold text-foreground">{plan.deliveryDates.length}</p>
-                        </div>
-                        <div>
-                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Qty / Delivery</p>
-                          <p className="mt-1 text-sm font-semibold text-foreground">
-                            {distributionRows.length > 0
-                              ? `${formatDistributionQuantity(averageQuantityPerDelivery)} ${plan.unit}`
-                              : "-"}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Total Planned</p>
-                          <p className="mt-1 text-sm font-semibold text-foreground">
-                            {formatDistributionQuantity(Number(plan.totalQuantity || 0))} {plan.unit}
-                          </p>
-                        </div>
-                        {unitCost > 0 && (
-                          <div>
-                            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Total Cost</p>
-                            <p className="mt-1 text-sm font-semibold text-primary">
-                              AED {totalCost.toFixed(2)}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-
-                      {plan.deliveryDates.length > 0 ? (
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <Label className="text-[11px]">Delivery Schedule</Label>
-                            <Badge variant="secondary" className="text-[10px]">
-                              Even distribution
-                            </Badge>
-                          </div>
-                          
-                          <div className="space-y-2 max-h-64 overflow-y-auto rounded-md border bg-background p-2">
-                            {distributionRows.map((row, index) => {
-                              const deliveryCost = unitCost > 0 ? row.quantity * unitCost : 0;
-                              return (
-                                <div
-                                  key={`${plan.materialId}-${row.date}-${index}`}
-                                  className="flex items-center justify-between rounded-md border bg-muted/20 px-3 py-2 text-xs hover:bg-muted/40"
-                                >
-                                  <div className="flex items-center gap-3">
-                                    <Badge variant="outline" className="text-[10px] min-w-[90px]">
-                                      {row.date}
-                                    </Badge>
-                                    <span className="font-medium text-foreground">
-                                      {formatDistributionQuantity(row.quantity)} {plan.unit}
+                              {unitCost > 0 && distributionRows.length > 0 && (
+                                <div className="rounded-md border bg-primary/5 p-3">
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span className="text-muted-foreground">Cost per delivery:</span>
+                                    <span className="font-semibold text-foreground">
+                                      AED {costPerDelivery.toFixed(2)}
                                     </span>
                                   </div>
-                                  {unitCost > 0 && (
-                                    <span className="text-primary font-medium">
-                                      AED {deliveryCost.toFixed(2)}
-                                    </span>
-                                  )}
                                 </div>
-                              );
-                            })}
-                          </div>
-
-                          {unitCost > 0 && distributionRows.length > 0 && (
-                            <div className="rounded-md border bg-primary/5 p-3">
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="text-muted-foreground">Cost per delivery:</span>
-                                <span className="font-semibold text-foreground">
-                                  AED {costPerDelivery.toFixed(2)}
-                                </span>
-                              </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="rounded-md border border-dashed bg-muted/20 p-4 text-center">
+                              <p className="text-[11px] text-muted-foreground">
+                                Set delivery start date and quantity to generate the delivery schedule
+                              </p>
                             </div>
                           )}
                         </div>
-                      ) : (
-                        <div className="rounded-md border border-dashed bg-muted/20 p-4 text-center">
-                          <p className="text-[11px] text-muted-foreground">
-                            Set delivery start date and quantity to generate the delivery schedule
+                      );
+                    })}
+
+                    {resourceMaterialPlans.length > 0 && taskMaterials.some(m => m.unitCost > 0) && (
+                      <div className="rounded-md border bg-primary/5 p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">Total Material Delivery Cost</p>
+                            <p className="text-[11px] text-muted-foreground">
+                              Based on planned quantities and current unit costs
+                            </p>
+                          </div>
+                          <p className="text-lg font-bold text-primary">
+                            AED {resourceMaterialPlans.reduce((sum, plan) => {
+                              const material = taskMaterials.find(m => m.materialId === plan.materialId);
+                              return sum + (Number(plan.totalQuantity || 0) * (material?.unitCost || 0));
+                            }, 0).toFixed(2)}
                           </p>
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-
-                {resourceMaterialPlans.length > 0 && taskMaterials.some(m => m.unitCost > 0) && (
-                  <div className="rounded-md border bg-primary/5 p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">Total Material Delivery Cost</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          Based on planned quantities and current unit costs
-                        </p>
                       </div>
-                      <p className="text-lg font-bold text-primary">
-                        AED {resourceMaterialPlans.reduce((sum, plan) => {
-                          const material = taskMaterials.find(m => m.materialId === plan.materialId);
-                          return sum + (Number(plan.totalQuantity || 0) * (material?.unitCost || 0));
-                        }, 0).toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
+                    )}
+                  </>
                 )}
               </section>
 
               <section className="space-y-3 rounded-md border p-3">
                 <div className="flex items-center justify-between">
-                  <div>
+                  <div className="flex-1">
                     <h3 className="text-sm font-semibold text-foreground">Labor Cost Summary</h3>
                     <p className="text-[11px] text-muted-foreground">
                       Costs update automatically whenever team composition, duration, or HR rates change.
                     </p>
                   </div>
-                  <Badge variant="outline">{laborCostSummary?.durationDays || estimatedDuration} days</Badge>
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="rounded-md border bg-primary/5 p-3">
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Daily Labor Cost</p>
-                    <p className="mt-1 text-lg font-semibold text-foreground">
-                      AED {Number(laborCostSummary?.dailyCost || 0).toFixed(2)}
-                    </p>
-                  </div>
-                  <div className="rounded-md border bg-primary/5 p-3">
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Total Labor Cost</p>
-                    <p className="mt-1 text-lg font-semibold text-foreground">
-                      AED {Number(laborCostSummary?.totalCost || 0).toFixed(2)}
-                    </p>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">{laborCostSummary?.durationDays || estimatedDuration} days</Badge>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setShowLaborCost(!showLaborCost)}
+                      className="h-7 w-7 p-0"
+                    >
+                      {showLaborCost ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </Button>
                   </div>
                 </div>
 
-                {laborCostSummary?.rateSnapshot?.length ? (
-                  <div className="space-y-2">
-                    {laborCostSummary.rateSnapshot.map((rate) => (
-                      <div key={`${rate.role}-${rate.count}`} className="rounded-md border bg-muted/20 p-3 text-xs">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-semibold text-foreground">{rate.role}</p>
-                            <p className="text-muted-foreground">{rate.count} personnel assigned</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-foreground">AED {Number(rate.dailyRate || 0).toFixed(2)}/day</p>
-                            <p className="text-muted-foreground">OT AED {Number(rate.overtimeRate || 0).toFixed(2)}</p>
-                          </div>
-                        </div>
+                {showLaborCost && (
+                  <>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="rounded-md border bg-primary/5 p-3">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Daily Labor Cost</p>
+                        <p className="mt-1 text-lg font-semibold text-foreground">
+                          AED {Number(laborCostSummary?.dailyCost || 0).toFixed(2)}
+                        </p>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    No labor rate snapshot available yet. Add manpower rates in HR to populate this summary.
-                  </p>
+                      <div className="rounded-md border bg-primary/5 p-3">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Total Labor Cost</p>
+                        <p className="mt-1 text-lg font-semibold text-foreground">
+                          AED {Number(laborCostSummary?.totalCost || 0).toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {laborCostSummary?.rateSnapshot?.length ? (
+                      <div className="space-y-2">
+                        {laborCostSummary.rateSnapshot.map((rate) => (
+                          <div key={`${rate.role}-${rate.count}`} className="rounded-md border bg-muted/20 p-3 text-xs">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="font-semibold text-foreground">{rate.role}</p>
+                                <p className="text-muted-foreground">{rate.count} personnel assigned</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-foreground">AED {Number(rate.dailyRate || 0).toFixed(2)}/day</p>
+                                <p className="text-muted-foreground">OT AED {Number(rate.overtimeRate || 0).toFixed(2)}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        No labor rate snapshot available yet. Add manpower rates in HR to populate this summary.
+                      </p>
+                    )}
+                  </>
                 )}
               </section>
 
