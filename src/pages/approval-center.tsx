@@ -266,46 +266,6 @@ export default function ApprovalCenterPage() {
     }
   }
 
-  async function handleRestoreRequest(id: string) {
-    try {
-      await approvalCenterService.restoreRequest(id);
-      toast({
-        title: "Request Restored",
-        description: "Request has been restored successfully",
-      });
-      await Promise.all([loadDeletedRequests(), loadRequests()]);
-    } catch (error) {
-      console.error("Error restoring request:", error);
-      toast({
-        title: "Error",
-        description: "Failed to restore request",
-        variant: "destructive",
-      });
-    }
-  }
-
-  async function handlePermanentDelete(id: string) {
-    if (!confirm("Permanently delete this request? This action cannot be undone.")) {
-      return;
-    }
-
-    try {
-      await approvalCenterService.permanentlyDeleteRequest(id);
-      toast({
-        title: "Request Deleted",
-        description: "Request has been permanently deleted",
-      });
-      await loadDeletedRequests();
-    } catch (error) {
-      console.error("Error deleting request:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete request permanently",
-        variant: "destructive",
-      });
-    }
-  }
-
   async function handleEmptyRecycleBin() {
     try {
       setEmptyingBin(true);
@@ -533,7 +493,7 @@ export default function ApprovalCenterPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => void handleRestoreRequest(request.id)}
+                            onClick={() => void handleRestore(request)}
                           >
                             <RotateCcw className="mr-1 h-3.5 w-3.5" />
                             Restore
@@ -541,7 +501,7 @@ export default function ApprovalCenterPage() {
                           <Button
                             variant="destructive"
                             size="sm"
-                            onClick={() => void handlePermanentDelete(request.id)}
+                            onClick={() => void handlePermanentDelete(request)}
                           >
                             <Trash2 className="mr-1 h-3.5 w-3.5" />
                             Delete
