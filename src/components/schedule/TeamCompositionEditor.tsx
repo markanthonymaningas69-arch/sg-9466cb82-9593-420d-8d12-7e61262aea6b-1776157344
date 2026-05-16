@@ -36,12 +36,13 @@ function getSelectedCatalogId(
 }
 
 function calculateTeamMemberCount(team: TaskTeamConfiguration) {
-  return team.members.length * Math.max(1, Number(team.numberOfTeams || 1));
+  const membersPerTeam = team.members.reduce((sum, member) => sum + (member.count || 1), 0);
+  return membersPerTeam * Math.max(1, Number(team.numberOfTeams || 1));
 }
 
 function calculateTeamDailyCost(team: TaskTeamConfiguration, workHoursPerDay: number) {
   const perTeamCost = team.members.reduce(
-    (total, member) => total + getMemberDailyRate(member, workHoursPerDay),
+    (total, member) => total + getMemberDailyRate(member, workHoursPerDay) * (member.count || 1),
     0
   );
 
@@ -83,7 +84,7 @@ export function TeamCompositionEditor({
   const addMember = (teamId: string) => {
     updateTeam(teamId, (team) => ({
       ...team,
-      members: [...team.members, createTeamMember("", team.members.length)],
+      members: [...team.members, { ...createTeamMember("", team.members.length), count: 1 }],
     }));
   };
 
@@ -111,8 +112,7 @@ export function TeamCompositionEditor({
         <div className="min-w-0 space-y-1">
           <h3 className="text-sm font-semibold text-foreground">Team Composition</h3>
           <p className="text-[11px] text-muted-foreground">
-            Build task crews from this project&apos;s Manpower Catalog only. Each team setup can be repeated using
-            the Number of Teams field.
+            Build task crews from this project&apos;s Manpower Catalog. Specify how many people of each position. Each team setup can be repeated using the Number of Teams field.
           </p>
         </div>
         <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
@@ -192,90 +192,104 @@ export function TeamCompositionEditor({
 
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <Label className="text-xs">Members</Label>
+                <Label className="text-xs">Position - Nos - Rate</Label>
                 <Button type="button" variant="outline" size="sm" onClick={() => addMember(team.id)}>
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Member
+                  Add Position
                 </Button>
               </div>
 
               {team.members.length === 0 ? (
                 <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-                  Add at least one member to this team.
+                  Add at least one position to this team.
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {team.members.map((member) => {
                     const matchedCatalog =
                       catalogItems.find((item) => item.id === getSelectedCatalogId(member, catalogItems)) || null;
 
                     return (
-                      <div key={member.id} className="rounded-md border bg-muted/20 p-2.5">
-                        <div className="flex items-start gap-2">
-                          <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-[minmax(0,1fr)_128px]">
-                            <div className="min-w-0 space-y-1.5">
-                              <Label className="text-[11px]">Position</Label>
-                              <Select
-                                value={getSelectedCatalogId(member, catalogItems)}
-                                onValueChange={(value) => {
-                                  const selectedItem = catalogItems.find((item) => item.id === value);
-                                  if (!selectedItem) {
-                                    return;
-                                  }
+                      <div key={member.id} className="rounded-md border bg-muted/20 p-2">
+                        <div className="grid gap-2 sm:grid-cols-[1fr_80px_110px_auto]">
+                          <div className="space-y-1">
+                            <Label className="text-[11px]">Position</Label>
+                            <Select
+                              value={getSelectedCatalogId(member, catalogItems)}
+                              onValueChange={(value) => {
+                                const selectedItem = catalogItems.find((item) => item.id === value);
+                                if (!selectedItem) {
+                                  return;
+                                }
 
-                                  updateMember(team.id, member.id, (current) => ({
-                                    ...current,
-                                    catalogPositionId: selectedItem.id,
-                                    positionName: selectedItem.positionName,
-                                    rate: selectedItem.standardRate,
-                                    unit: selectedItem.unit,
-                                    manualRate: false,
-                                    description: selectedItem.description,
-                                  }));
-                                }}
-                              >
-                                <SelectTrigger className="h-9 w-full text-xs">
-                                  <SelectValue placeholder="Select position" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {catalogItems.map((item) => (
-                                    <SelectItem key={item.id} value={item.id}>
-                                      {item.positionName}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-
-                            <div className="space-y-1.5 sm:max-w-[128px]">
-                              <Label className="text-[11px]">
-                                Rate / {member.unit === "hour" ? "Hour" : "Day"}
-                              </Label>
-                              <Input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={member.rate}
-                                onChange={(event) => {
-                                  const newRate = Math.max(0, Number(event.target.value) || 0);
-                                  updateMember(team.id, member.id, (current) => ({
-                                    ...current,
-                                    rate: newRate,
-                                    manualRate: true,
-                                  }));
-                                }}
-                                className="h-9"
-                              />
-                            </div>
+                                updateMember(team.id, member.id, (current) => ({
+                                  ...current,
+                                  catalogPositionId: selectedItem.id,
+                                  positionName: selectedItem.positionName,
+                                  rate: selectedItem.standardRate,
+                                  unit: selectedItem.unit,
+                                  manualRate: false,
+                                  description: selectedItem.description,
+                                }));
+                              }}
+                            >
+                              <SelectTrigger className="h-8 w-full text-xs">
+                                <SelectValue placeholder="Select position" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {catalogItems.map((item) => (
+                                  <SelectItem key={item.id} value={item.id}>
+                                    {item.positionName}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
 
-                          <div className="mt-5 flex shrink-0 items-center gap-1">
+                          <div className="space-y-1">
+                            <Label className="text-[11px]">Nos</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              step="1"
+                              value={member.count || 1}
+                              onChange={(event) => {
+                                const newCount = Math.max(1, Math.round(Number(event.target.value) || 1));
+                                updateMember(team.id, member.id, (current) => ({
+                                  ...current,
+                                  count: newCount,
+                                }));
+                              }}
+                              className="h-8"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <Label className="text-[11px]">Rate/{member.unit === "hour" ? "Hr" : "Day"}</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={member.rate}
+                              onChange={(event) => {
+                                const newRate = Math.max(0, Number(event.target.value) || 0);
+                                updateMember(team.id, member.id, (current) => ({
+                                  ...current,
+                                  rate: newRate,
+                                  manualRate: true,
+                                }));
+                              }}
+                              className="h-8"
+                            />
+                          </div>
+
+                          <div className="flex items-end gap-1">
                             {matchedCatalog && member.manualRate ? (
                               <Button
                                 type="button"
                                 variant="ghost"
                                 size="sm"
-                                className="h-8 px-2.5 text-xs"
+                                className="h-8 px-2"
                                 onClick={() =>
                                   updateMember(team.id, member.id, (current) => ({
                                     ...current,
@@ -285,8 +299,7 @@ export function TeamCompositionEditor({
                                   }))
                                 }
                               >
-                                <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-                                Default
+                                <RotateCcw className="h-3.5 w-3.5" />
                               </Button>
                             ) : null}
                             <Button
@@ -297,15 +310,19 @@ export function TeamCompositionEditor({
                               onClick={() => removeMember(team.id, member.id)}
                               disabled={team.members.length === 1}
                             >
-                              <Trash2 className="h-4 w-4 text-destructive" />
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
                             </Button>
                           </div>
                         </div>
 
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                          <Badge variant="outline">{member.unit === "hour" ? "Hourly" : "Daily"} rate</Badge>
-                          <span>Daily equivalent AED {getMemberDailyRate(member, workHoursPerDay).toFixed(2)}</span>
-                          {member.manualRate ? <span>Manual override active</span> : <span>Catalog default</span>}
+                        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                          <Badge variant="outline" className="h-4 px-1 text-[10px]">
+                            {member.unit === "hour" ? "Hourly" : "Daily"}
+                          </Badge>
+                          <span>
+                            {member.count || 1} × AED {getMemberDailyRate(member, workHoursPerDay).toFixed(2)}/day = AED {(getMemberDailyRate(member, workHoursPerDay) * (member.count || 1)).toFixed(2)}/day
+                          </span>
+                          {member.manualRate && <Badge variant="secondary" className="h-4 px-1 text-[10px]">Manual</Badge>}
                         </div>
                       </div>
                     );
