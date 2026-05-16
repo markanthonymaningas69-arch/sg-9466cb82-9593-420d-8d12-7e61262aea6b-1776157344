@@ -85,6 +85,10 @@ export function Layout({ children }: LayoutProps) {
     sitePersonnel: 0,
     purchasing: 0,
     accounting: 0,
+    dashboard: 0,
+    projectManager: 0,
+    humanResources: 0,
+    warehouse: 0,
   });
   
   const [notificationOpen, setNotificationOpen] = useState(false);
@@ -155,48 +159,31 @@ export function Layout({ children }: LayoutProps) {
       return;
     }
 
+    const markModuleRead = async (surface: string) => {
+      try {
+        await notificationService.markSurfaceAsRead(surface, modules);
+        await loadNotificationSummary(modules);
+      } catch (error) {
+        console.error(`Error marking ${surface} notifications read:`, error);
+      }
+    };
+
     if (router.pathname === "/approval-center") {
-      void (async () => {
-        try {
-          await notificationService.markSurfaceAsRead("Approval Center", modules);
-          await loadNotificationSummary(modules);
-        } catch (error) {
-          console.error("Error marking approval center notifications read:", error);
-        }
-      })();
-    }
-
-    if (router.pathname === "/site-personnel") {
-      void (async () => {
-        try {
-          await notificationService.markSurfaceAsRead("Site Personnel", modules);
-          await loadNotificationSummary(modules);
-        } catch (error) {
-          console.error("Error marking site personnel notifications read:", error);
-        }
-      })();
-    }
-
-    if (router.pathname === "/purchasing") {
-      void (async () => {
-        try {
-          await notificationService.markSurfaceAsRead("Purchasing", modules);
-          await loadNotificationSummary(modules);
-        } catch (error) {
-          console.error("Error marking purchasing notifications read:", error);
-        }
-      })();
-    }
-
-    if (router.pathname === "/accounting") {
-      void (async () => {
-        try {
-          await notificationService.markSurfaceAsRead("Accounting", modules);
-          await loadNotificationSummary(modules);
-        } catch (error) {
-          console.error("Error marking accounting notifications read:", error);
-        }
-      })();
+      void markModuleRead("Approval Center");
+    } else if (router.pathname === "/site-personnel") {
+      void markModuleRead("Site Personnel");
+    } else if (router.pathname === "/purchasing") {
+      void markModuleRead("Purchasing");
+    } else if (router.pathname === "/accounting") {
+      void markModuleRead("Accounting");
+    } else if (router.pathname === "/dashboard") {
+      void markModuleRead("Dashboard");
+    } else if (router.pathname === "/schedule") {
+      void markModuleRead("Project Manager");
+    } else if (router.pathname === "/personnel") {
+      void markModuleRead("Human Resources");
+    } else if (router.pathname === "/warehouse") {
+      void markModuleRead("Warehouse");
     }
   }, [assignedModule, assignedModules, router.pathname]);
 
@@ -222,6 +209,25 @@ export function Layout({ children }: LayoutProps) {
       setUnreadNotificationSummary(summary);
     } catch (error) {
       console.error("Error loading approval notifications:", error);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      const modules = getNotificationModules();
+      await notificationService.markAllAsRead(modules);
+      await loadNotificationSummary(modules);
+      toast({
+        title: "All Notifications Marked as Read",
+        description: "All notifications have been marked as read successfully.",
+      });
+    } catch (error) {
+      console.error("Error marking all as read:", error);
+      toast({
+        title: "Error",
+        description: "Failed to mark all notifications as read",
+        variant: "destructive",
+      });
     }
   };
 
@@ -601,28 +607,16 @@ export function Layout({ children }: LayoutProps) {
     ...siteResolvedRequests.map((request) => `req-${request.id}-${request.status || "pending"}`),
   ]);
 
-  const acctCount = unreadNotificationSummary.accounting || (
-    hasUnseenModuleNotifications("accounting", accountingSignature)
-      ? pendingCashAdvances.length + accountingPendingRequests.length + approvedVouchers.length
-      : 0
-  );
-  const whseCount = hasUnseenModuleNotifications("warehouse", warehouseSignature)
-    ? warehousePendingRequests.length
-    : 0;
-  const hrCount = hasUnseenModuleNotifications("personnel", hrSignature)
-    ? pendingLeaves.length + expiringDocuments.length
-    : 0;
-  const purchCount = unreadNotificationSummary.purchasing || (
-    hasUnseenModuleNotifications("purchasing", purchasingSignature)
-      ? pendingPurchases.length
-      : 0
-  );
-  const approvalCount = unreadNotificationSummary.approvalCenter || (
-    hasUnseenModuleNotifications("approval-center", approvalCenterSignature)
-      ? pendingApprovalRequests.length
-      : 0
-  );
-  const sitePersonnelNotificationCount = unreadNotificationSummary.sitePersonnel;
+  const acctCount = unreadNotificationSummary.accounting;
+  const whseCount = unreadNotificationSummary.warehouse;
+  const hrCount = unreadNotificationSummary.humanResources;
+  const purchCount = unreadNotificationSummary.purchasing;
+  const approvalCount = unreadNotificationSummary.approvalCenter;
+  const sitePersonnelCount = unreadNotificationSummary.sitePersonnel;
+  const dashboardCount = unreadNotificationSummary.dashboard;
+  const projectManagerCount = unreadNotificationSummary.projectManager;
+
+  const totalUnreadCount = acctCount + whseCount + hrCount + purchCount + approvalCount + sitePersonnelCount + dashboardCount + projectManagerCount;
 
   return (
     <div className="min-h-screen bg-background">
@@ -690,6 +684,16 @@ export function Layout({ children }: LayoutProps) {
                 const Icon = item.icon;
                 const isActive = router.pathname === item.href;
 
+                let badgeCount = 0;
+                if (item.name === "Accounting") badgeCount = acctCount;
+                else if (item.name === "Warehouse") badgeCount = whseCount;
+                else if (item.name === "Human Resources") badgeCount = hrCount;
+                else if (item.name === "Purchasing") badgeCount = purchCount;
+                else if (item.name === "Approval Center") badgeCount = approvalCount;
+                else if (item.name === "Site Personnel") badgeCount = sitePersonnelCount;
+                else if (item.name === "Dashboard") badgeCount = dashboardCount;
+                else if (item.name === "Project Manager") badgeCount = projectManagerCount;
+
                 return (
                   <li key={item.name}>
                     <Link
@@ -706,38 +710,13 @@ export function Layout({ children }: LayoutProps) {
                       
                       <Icon className="h-4.5 w-4.5 shrink-0" />
                       {!sidebarCollapsed && <span className="truncate">{item.name}</span>}
-                      {!sidebarCollapsed && item.name === "Accounting" && acctCount > 0 &&
-                      <Badge variant="destructive" className="ml-auto h-4.5 min-w-[18px] px-1 flex items-center justify-center text-[9px] shrink-0">
-                          {acctCount}
+                      {!sidebarCollapsed && badgeCount > 0 && (
+                        <Badge variant="destructive" className="ml-auto h-4.5 min-w-[18px] px-1 flex items-center justify-center text-[9px] shrink-0">
+                          {badgeCount}
                         </Badge>
-                      }
-                      {!sidebarCollapsed && item.name === "Warehouse" && whseCount > 0 &&
-                      <Badge variant="destructive" className="ml-auto h-4.5 min-w-[18px] px-1 flex items-center justify-center text-[9px] shrink-0">
-                          {whseCount}
-                        </Badge>
-                      }
-                      {!sidebarCollapsed && item.name === "Human Resources" && hrCount > 0 &&
-                      <Badge variant="destructive" className="ml-auto h-4.5 min-w-[18px] px-1 flex items-center justify-center text-[9px] shrink-0">
-                          {hrCount}
-                        </Badge>
-                      }
-                      {!sidebarCollapsed && item.name === "Purchasing" && purchCount > 0 &&
-                      <Badge variant="destructive" className="ml-auto h-4.5 min-w-[18px] px-1 flex items-center justify-center text-[9px] shrink-0">
-                          {purchCount}
-                        </Badge>
-                      }
-                      {!sidebarCollapsed && item.name === "Approval Center" && approvalCount > 0 &&
-                      <Badge variant="destructive" className="ml-auto h-4.5 min-w-[18px] px-1 flex items-center justify-center text-[9px] shrink-0">
-                          {approvalCount}
-                        </Badge>
-                      }
-                      {!sidebarCollapsed && item.name === "Site Personnel" && sitePersonnelNotificationCount > 0 &&
-                      <Badge variant="destructive" className="ml-auto h-4.5 min-w-[18px] px-1 flex items-center justify-center text-[9px] shrink-0">
-                          {sitePersonnelNotificationCount}
-                        </Badge>
-                      }
-                      {sidebarCollapsed && (sitePersonnelNotificationCount > 0 || acctCount > 0 || whseCount > 0 || hrCount > 0 || purchCount > 0 || approvalCount > 0) && ['Site Personnel', 'Accounting', 'Warehouse', 'Human Resources', 'Purchasing', 'Approval Center'].includes(item.name) && (
-                        <div className="absolute right-2 top-2 h-2 w-2 rounded-full bg-destructive border-2 border-card"></div>
+                      )}
+                      {sidebarCollapsed && badgeCount > 0 && (
+                        <div className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive border-2 border-card shadow-sm"></div>
                       )}
                     </Link>
                   </li>);
@@ -866,6 +845,15 @@ export function Layout({ children }: LayoutProps) {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                {totalUnreadCount > 0 && (
+                  <>
+                    <DropdownMenuItem onClick={handleMarkAllAsRead}>
+                      <Check className="mr-2 h-4 w-4" />
+                      Mark All as Read ({totalUnreadCount})
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
                 <DropdownMenuItem onClick={() => router.push('/settings')}>
                   <Settings className="mr-2 h-4 w-4" />
                   {assignedModules.includes("GM") ? "Company Settings" : "Settings"}

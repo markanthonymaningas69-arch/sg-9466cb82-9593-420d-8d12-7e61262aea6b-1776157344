@@ -19,6 +19,10 @@ export interface UnreadNotificationSummary {
   sitePersonnel: number;
   purchasing: number;
   accounting: number;
+  dashboard: number;
+  projectManager: number;
+  humanResources: number;
+  warehouse: number;
 }
 
 function getUniqueModules(modules: string[]) {
@@ -64,13 +68,31 @@ export const notificationService = {
     const normalizedModules = getUniqueModules(modules);
 
     if (normalizedModules.length === 0) {
-      return { approvalCenter: 0, sitePersonnel: 0, purchasing: 0, accounting: 0 };
+      return {
+        approvalCenter: 0,
+        sitePersonnel: 0,
+        purchasing: 0,
+        accounting: 0,
+        dashboard: 0,
+        projectManager: 0,
+        humanResources: 0,
+        warehouse: 0,
+      };
     }
 
     const userId = await getCurrentUserId();
 
     if (!userId) {
-      return { approvalCenter: 0, sitePersonnel: 0, purchasing: 0, accounting: 0 };
+      return {
+        approvalCenter: 0,
+        sitePersonnel: 0,
+        purchasing: 0,
+        accounting: 0,
+        dashboard: 0,
+        projectManager: 0,
+        humanResources: 0,
+        warehouse: 0,
+      };
     }
 
     const { data: notifications, error } = await supabase
@@ -85,7 +107,16 @@ export const notificationService = {
     const notificationIds = (notifications || []).map((notification) => notification.id);
 
     if (notificationIds.length === 0) {
-      return { approvalCenter: 0, sitePersonnel: 0, purchasing: 0, accounting: 0 };
+      return {
+        approvalCenter: 0,
+        sitePersonnel: 0,
+        purchasing: 0,
+        accounting: 0,
+        dashboard: 0,
+        projectManager: 0,
+        humanResources: 0,
+        warehouse: 0,
+      };
     }
 
     const { data: reads, error: readsError } = await supabase
@@ -108,23 +139,34 @@ export const notificationService = {
 
         if (notification.target_surface === "Approval Center") {
           summary.approvalCenter += 1;
-        }
-
-        if (notification.target_surface === "Site Personnel") {
+        } else if (notification.target_surface === "Site Personnel") {
           summary.sitePersonnel += 1;
-        }
-
-        if (notification.target_surface === "Purchasing") {
+        } else if (notification.target_surface === "Purchasing") {
           summary.purchasing += 1;
-        }
-
-        if (notification.target_surface === "Accounting") {
+        } else if (notification.target_surface === "Accounting") {
           summary.accounting += 1;
+        } else if (notification.target_surface === "Dashboard") {
+          summary.dashboard += 1;
+        } else if (notification.target_surface === "Project Manager") {
+          summary.projectManager += 1;
+        } else if (notification.target_surface === "Human Resources") {
+          summary.humanResources += 1;
+        } else if (notification.target_surface === "Warehouse") {
+          summary.warehouse += 1;
         }
 
         return summary;
       },
-      { approvalCenter: 0, sitePersonnel: 0, purchasing: 0, accounting: 0 }
+      {
+        approvalCenter: 0,
+        sitePersonnel: 0,
+        purchasing: 0,
+        accounting: 0,
+        dashboard: 0,
+        projectManager: 0,
+        humanResources: 0,
+        warehouse: 0,
+      }
     );
   },
 
@@ -145,6 +187,65 @@ export const notificationService = {
       .from("approval_notifications")
       .select("id")
       .eq("target_surface", targetSurface)
+      .in("audience_module", normalizedModules);
+
+    if (error) {
+      throw error;
+    }
+
+    const notificationIds = (notifications || []).map((notification) => notification.id);
+
+    if (notificationIds.length === 0) {
+      return;
+    }
+
+    const { data: existingReads, error: existingReadsError } = await supabase
+      .from("approval_notification_reads")
+      .select("notification_id")
+      .eq("user_id", userId)
+      .in("notification_id", notificationIds);
+
+    if (existingReadsError) {
+      throw existingReadsError;
+    }
+
+    const existingReadIds = new Set((existingReads || []).map((read) => read.notification_id));
+    const unreadInserts: ApprovalNotificationReadInsert[] = notificationIds
+      .filter((notificationId) => !existingReadIds.has(notificationId))
+      .map((notificationId) => ({
+        notification_id: notificationId,
+        user_id: userId,
+      }));
+
+    if (unreadInserts.length === 0) {
+      return;
+    }
+
+    const { error: insertError } = await supabase
+      .from("approval_notification_reads")
+      .upsert(unreadInserts, { onConflict: "notification_id,user_id" });
+
+    if (insertError) {
+      throw insertError;
+    }
+  },
+
+  async markAllAsRead(modules: string[]) {
+    const normalizedModules = getUniqueModules(modules);
+
+    if (normalizedModules.length === 0) {
+      return;
+    }
+
+    const userId = await getCurrentUserId();
+
+    if (!userId) {
+      return;
+    }
+
+    const { data: notifications, error } = await supabase
+      .from("approval_notifications")
+      .select("id")
       .in("audience_module", normalizedModules);
 
     if (error) {
