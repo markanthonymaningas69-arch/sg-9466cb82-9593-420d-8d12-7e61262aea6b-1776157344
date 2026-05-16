@@ -1238,13 +1238,14 @@ export default function Purchasing() {
           )}
 
           <div className="overflow-auto rounded-md border h-full relative -mx-3 sm:mx-0">
-            <Table className="min-w-[1200px] table-fixed text-xs">
+            <Table className="min-w-[1400px] table-fixed text-xs">
               <TableHeader className="sticky top-0 bg-background z-10">
                 <TableRow className="border-b">
                   <TableHead className="h-8 min-w-[120px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Group ID</TableHead>
                   <TableHead className="hidden md:table-cell h-8 min-w-[96px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Date</TableHead>
                   <TableHead className="hidden sm:table-cell h-8 min-w-[140px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Supplier</TableHead>
                   <TableHead className="h-8 min-w-[200px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Items</TableHead>
+                  <TableHead className="text-right h-8 min-w-[100px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Unit Cost</TableHead>
                   <TableHead className="text-right h-8 min-w-[110px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Total Cost</TableHead>
                   <TableHead className="hidden lg:table-cell h-8 min-w-[140px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Destination</TableHead>
                   <TableHead className="h-8 min-w-[100px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Status</TableHead>
@@ -1254,15 +1255,16 @@ export default function Purchasing() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-xs text-muted-foreground">Loading purchases...</TableCell>
+                    <TableCell colSpan={9} className="text-center py-8 text-xs text-muted-foreground">Loading purchases...</TableCell>
                   </TableRow>
                 ) : groupedPurchases.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-xs text-muted-foreground">No purchase orders found.</TableCell>
+                    <TableCell colSpan={9} className="text-center py-8 text-xs text-muted-foreground">No purchase orders found.</TableCell>
                   </TableRow>
                 ) : (
                   groupedPurchases.map((group) => {
                     const p = group.firstItem;
+                    const avgUnitCost = group.items.reduce((sum, item) => sum + (item.unit_cost || 0), 0) / group.items.length;
                     return (
                       <TableRow key={group.key} className="border-b last:border-b-0">
                         <TableCell className="px-2 py-1.5 align-middle font-medium text-primary whitespace-nowrap">{group.displayKey}</TableCell>
@@ -1277,6 +1279,13 @@ export default function Purchasing() {
                               <TruncatedText value={group.items.map((item: any) => item.item_name).join(", ")} className="max-w-[180px] text-[11px] text-muted-foreground" />
                             ) : null}
                           </div>
+                        </TableCell>
+                        <TableCell className="text-right px-2 py-1.5 align-middle whitespace-nowrap">
+                          {group.itemCount === 1 ? (
+                            <span className="font-medium">{formatCurrency(p.unit_cost || 0)}</span>
+                          ) : (
+                            <span className="text-muted-foreground text-[11px]">Avg: {formatCurrency(avgUnitCost)}</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-right px-2 py-1.5 align-middle font-semibold whitespace-nowrap">{formatCurrency(group.totalCost)}</TableCell>
                         <TableCell className="hidden lg:table-cell px-2 py-1.5 align-middle">
