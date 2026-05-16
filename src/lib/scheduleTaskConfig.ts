@@ -36,6 +36,7 @@ export interface TaskConfiguration {
   teamTemplateId: string;
   numberOfTeams: number;
   teams: TaskTeamConfiguration[];
+  taskMaterials?: any[];
 }
 
 interface ScopeDefaults {
@@ -257,6 +258,7 @@ export function normalizeTaskConfiguration(rawValue: unknown, scopeDefaults?: Sc
       : createLegacyTeams(typedValue, scopeDefaults);
 
   const teamRoles = aggregateTeamRoles(teams);
+  const taskMaterials = Array.isArray(typedValue.taskMaterials) ? typedValue.taskMaterials : [];
 
   return {
     scopeQuantity: toPositiveNumber(scopeDefaults?.quantity ?? typedValue.scopeQuantity, fallback.scopeQuantity),
@@ -277,6 +279,7 @@ export function normalizeTaskConfiguration(rawValue: unknown, scopeDefaults?: Sc
     teamTemplateId: "",
     numberOfTeams: teams.reduce((total, team) => total + Math.max(1, Number(team.numberOfTeams || 1)), 0),
     teams,
+    taskMaterials,
   };
 }
 
