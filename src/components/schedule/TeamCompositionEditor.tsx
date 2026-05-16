@@ -147,12 +147,13 @@ export function TeamCompositionEditor({
                   <Label className="text-xs">Team Name</Label>
                   <Input
                     value={team.teamName}
-                    onChange={(event) =>
+                    onChange={(event) => {
+                      const newName = event.target.value;
                       updateTeam(team.id, (current) => ({
                         ...current,
-                        teamName: event.target.value,
-                      }))
-                    }
+                        teamName: newName,
+                      }));
+                    }}
                     placeholder={`Team ${teamIndex + 1}`}
                     className="h-9"
                   />
@@ -165,12 +166,13 @@ export function TeamCompositionEditor({
                     min="1"
                     step="1"
                     value={team.numberOfTeams}
-                    onChange={(event) =>
+                    onChange={(event) => {
+                      const newCount = Math.max(1, Math.round(Number(event.target.value) || 1));
                       updateTeam(team.id, (current) => ({
                         ...current,
-                        numberOfTeams: Math.max(1, Math.round(Number(event.target.value) || 1)),
-                      }))
-                    }
+                        numberOfTeams: newCount,
+                      }));
+                    }}
                     className="h-9"
                   />
                 </div>
@@ -254,13 +256,14 @@ export function TeamCompositionEditor({
                                 min="0"
                                 step="0.01"
                                 value={member.rate}
-                                onChange={(event) =>
+                                onChange={(event) => {
+                                  const newRate = Math.max(0, Number(event.target.value) || 0);
                                   updateMember(team.id, member.id, (current) => ({
                                     ...current,
-                                    rate: Number(event.target.value) || 0,
+                                    rate: newRate,
                                     manualRate: true,
-                                  }))
-                                }
+                                  }));
+                                }}
                                 className="h-9"
                               />
                             </div>
