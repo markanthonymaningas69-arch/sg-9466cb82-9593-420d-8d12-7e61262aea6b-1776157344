@@ -893,9 +893,6 @@ export default function SchedulePage() {
                     </SelectContent>
                   </Select>
 
-                  <Button type="button" size="sm" variant="outline" onClick={() => void handleGenerateFromBOM()} disabled={!selectedProject || loading}>
-                    Sync BOM
-                  </Button>
                   <Button type="button" size="sm" onClick={handleCreateTask} disabled={!selectedProject}>
                     <Plus className="mr-2 h-4 w-4" />
                     Add Task
