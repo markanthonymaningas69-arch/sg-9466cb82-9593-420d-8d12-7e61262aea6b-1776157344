@@ -177,7 +177,7 @@ export function SitePersonnelRecycleBin({ projectId, onChange }: SitePersonnelRe
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
           <DialogHeader>
             <div className="flex items-center justify-between">
               <div>
@@ -208,55 +208,57 @@ export function SitePersonnelRecycleBin({ projectId, onChange }: SitePersonnelRe
               Recycle bin is empty
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Details</TableHead>
-                  <TableHead>Deleted</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((item) => (
-                  <TableRow key={`${item.sourceTable}-${item.id}`}>
-                    <TableCell>
-                      <Badge variant="outline">{getSourceLabel(item.sourceTable)}</Badge>
-                    </TableCell>
-                    <TableCell>{formatDate(item.createdAt)}</TableCell>
-                    <TableCell className="max-w-xs truncate">
-                      <span className="font-medium">{item.title}</span> &bull; {item.description}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {formatDate(item.deletedAt)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => void handleRestore(item)}
-                          disabled={loading}
-                        >
-                          <RotateCcw className="mr-1 h-3.5 w-3.5" />
-                          Restore
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => void handlePermanentDelete(item)}
-                          disabled={loading}
-                        >
-                          <Trash2 className="mr-1 h-3.5 w-3.5" />
-                          Delete
-                        </Button>
-                      </div>
-                    </TableCell>
+            <div className="overflow-auto flex-1 rounded-md border">
+              <Table>
+                <TableHeader className="sticky top-0 bg-background z-10">
+                  <TableRow>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Details</TableHead>
+                    <TableHead>Deleted</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {items.map((item) => (
+                    <TableRow key={`${item.sourceTable}-${item.id}`}>
+                      <TableCell>
+                        <Badge variant="outline">{getSourceLabel(item.sourceTable)}</Badge>
+                      </TableCell>
+                      <TableCell>{formatDate(item.createdAt)}</TableCell>
+                      <TableCell className="max-w-xs truncate">
+                        <span className="font-medium">{item.title}</span> &bull; {item.description}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {formatDate(item.deletedAt)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => void handleRestore(item)}
+                            disabled={loading}
+                          >
+                            <RotateCcw className="mr-1 h-3.5 w-3.5" />
+                            Restore
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => void handlePermanentDelete(item)}
+                            disabled={loading}
+                          >
+                            <Trash2 className="mr-1 h-3.5 w-3.5" />
+                            Delete
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </DialogContent>
       </Dialog>
