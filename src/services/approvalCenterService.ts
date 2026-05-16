@@ -133,6 +133,7 @@ async function listArchivedSourceIds() {
 function mapSourceStatus(sourceTable: string, status: ApprovalStatus) {
   if (status === "approved") return "approved";
   if (status === "rejected") return "rejected";
+  if (status === "returned_for_revision") return "returned_for_revision";
   if (sourceTable === "purchases" || sourceTable === "vouchers") return "pending";
   return "pending";
 }
@@ -786,5 +787,83 @@ export const approvalCenterService = {
   async permanentlyDeleteRequest(approvalRequestId: string) {
     const { error } = await supabase.from("approval_requests").delete().eq("id", approvalRequestId);
     if (error) throw error;
+  },
+
+  async resubmitRequest(approvalRequestId: string, updatedSummary?: string, updatedPayload?: JsonValue) {
+    const { data: authData } = await supabase.auth.getUser();
+    if (!authData.user) throw new Error("Unauthorized");
+
+    const { data: request, error: requestError } = await supabase
+      .from("approval_requests")
+      .select("id, source_module, source_table, source_record_id, request_type, requested_by, project_id, summary, target_module")
+      .eq("id", approvalRequestId)
+      .single();
+
+    if (requestError || !request) throw requestError || new Error("Approval request not found");
+
+    const timestamp = new Date().toISOString();
+    const updateData: Record<string, unknown> = {
+      status: "pending",
+      workflow_status: "pending_approval",
+      latest_comment: null,
+      reviewed_by: null,
+      reviewed_at: null,
+      updated_at: timestamp,
+    };
+
+    if (updatedSummary) {
+      updateData.summary = updatedSummary;
+    }
+
+    if (updatedPayload) {
+      updateData.payload = updatedPayload;
+    }
+
+    const { error: updateError } = await supabase
+      .from("approval_requests")
+      .update(updateData)
+      .eq("id", approvalRequestId);
+
+    if (updateError) throw updateError;
+
+    await syncSourceRecord(request.source_table, request.source_record_id, "pending" as ApprovalStatus);
+
+    if (request.source_table === "site_requests") {
+      await requestWorkflowService.updateLifecycleBySiteRequest(request.source_record_id, {
+        lifecycle_status: "pending_approval",
+      });
+    }
+
+    await notificationService.createNotification({
+      approvalRequestId,
+      audienceModule: "GM",
+      targetSurface: "Approval Center",
+      eventType: "request_resubmitted",
+      title: `${request.request_type} resubmitted`,
+      message: updatedSummary 
+        ? `${request.requested_by} resubmitted • ${updatedSummary}` 
+        : `${request.requested_by} resubmitted this request`,
+      payload: {
+        sourceTable: request.source_table,
+        sourceRecordId: request.source_record_id,
+        requestType: request.request_type,
+        requestedBy: request.requested_by,
+        projectId: request.project_id,
+        targetModule: request.target_module,
+      },
+    });
+
+    await notificationService.createNotification({
+      approvalRequestId,
+      audienceModule: request.source_module,
+      targetSurface: request.source_module,
+      eventType: "request_resubmitted",
+      title: `${request.request_type} resubmitted for approval`,
+      message: "Your revised request has been resubmitted for approval",
+      payload: {
+        sourceTable: request.source_table,
+        sourceRecordId: request.source_record_id,
+      },
+    });
   },
 };

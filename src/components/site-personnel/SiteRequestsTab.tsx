@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useSettings } from "@/contexts/SettingsProvider";
-import { FileText, Plus, CheckCircle, XCircle, Clock, Filter, Trash2 } from "lucide-react";
+import { FileText, Plus, CheckCircle, XCircle, Clock, Filter, Trash2, AlertCircle, Edit2, Send } from "lucide-react";
 import { siteService } from "@/services/siteService";
 import { approvalCenterService } from "@/services/approvalCenterService";
 import { CompactText } from "@/components/site-personnel/CompactText";
@@ -66,6 +66,7 @@ const STATUS_CONFIG = {
   pending: { label: "Pending", icon: Clock, variant: "secondary" as const },
   approved: { label: "Approved", icon: CheckCircle, variant: "default" as const },
   rejected: { label: "Rejected", icon: XCircle, variant: "destructive" as const },
+  returned_for_revision: { label: "Returned for Revision", icon: AlertCircle, variant: "outline" as const },
 };
 
 function getDefaultFormData() {
@@ -97,6 +98,10 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [isOtherMaterial, setIsOtherMaterial] = useState(false);
+  const [revisionComments, setRevisionComments] = useState<Record<string, string>>({});
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingRequest, setEditingRequest] = useState<SiteRequest | null>(null);
+  const [editFormData, setEditFormData] = useState(getDefaultFormData);
   const [filters, setFilters] = useState({
     requestType: "all",
     status: "all",
@@ -140,6 +145,7 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
       pendingCount: filteredRequests.filter((request) => request.status === "pending").length,
       approvedCount: filteredRequests.filter((request) => request.status === "approved").length,
       rejectedCount: filteredRequests.filter((request) => request.status === "rejected").length,
+      returnedCount: filteredRequests.filter((request) => request.status === "returned_for_revision").length,
     };
   }, [filteredRequests]);
 
@@ -228,6 +234,23 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
 
       if (error) throw error;
       setRequests(data || []);
+
+      const requestIds = (data || []).map(r => r.id);
+      if (requestIds.length > 0) {
+        const { data: approvalData } = await supabase
+          .from("approval_requests")
+          .select("source_record_id, latest_comment")
+          .in("source_record_id", requestIds)
+          .eq("source_table", "site_requests");
+
+        const commentsMap: Record<string, string> = {};
+        (approvalData || []).forEach(item => {
+          if (item.latest_comment) {
+            commentsMap[item.source_record_id] = item.latest_comment;
+          }
+        });
+        setRevisionComments(commentsMap);
+      }
     } catch (error) {
       console.error("Error loading requests:", error);
       toast({
@@ -484,6 +507,79 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
       toast({
         title: "Error",
         description: "Failed to delete request",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function handleEditRequest(request: SiteRequest) {
+    setEditingRequest(request);
+    setEditFormData({
+      request_type: request.request_type,
+      bom_scope_id: request.bom_scope_id || "",
+      item_name: request.item_name,
+      custom_item_name: "",
+      quantity: String(request.quantity),
+      unit: request.unit,
+      worker_id: "",
+      request_date: request.request_date,
+      notes: request.notes || "",
+    });
+    setEditDialogOpen(true);
+  }
+
+  async function handleUpdateRequest(event: React.FormEvent) {
+    event.preventDefault();
+    if (!editingRequest) return;
+
+    try {
+      const { error } = await supabase
+        .from("site_requests")
+        .update({
+          item_name: editFormData.item_name,
+          quantity: Number(editFormData.quantity),
+          unit: editFormData.unit,
+          notes: editFormData.notes || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", editingRequest.id);
+
+      if (error) throw error;
+
+      const { data: approvalRequest } = await supabase
+        .from("approval_requests")
+        .select("id")
+        .eq("source_table", "site_requests")
+        .eq("source_record_id", editingRequest.id)
+        .maybeSingle();
+
+      if (approvalRequest?.id) {
+        await approvalCenterService.resubmitRequest(
+          approvalRequest.id,
+          `${editFormData.item_name} • ${editFormData.quantity} ${editFormData.unit}`,
+          {
+            requestType: editFormData.request_type,
+            itemName: editFormData.item_name,
+            quantity: Number(editFormData.quantity),
+            unit: editFormData.unit,
+            notes: editFormData.notes || null,
+          }
+        );
+      }
+
+      toast({
+        title: "Request Updated",
+        description: "Request has been revised and resubmitted for approval",
+      });
+
+      setEditDialogOpen(false);
+      setEditingRequest(null);
+      void loadRequests();
+    } catch (error) {
+      console.error("Error updating request:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update request",
         variant: "destructive",
       });
     }
@@ -887,6 +983,7 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
                 <span>{historySummary.pendingCount} pending</span>
                 <span>{historySummary.approvedCount} approved</span>
                 <span>{historySummary.rejectedCount} rejected</span>
+                <span>{historySummary.returnedCount} returned</span>
               </div>
             </div>
 
@@ -934,17 +1031,32 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
                           </TableCell>
                           <TableCell className="px-2 py-1.5 text-center align-middle">
                             <div className="flex justify-center">
-                              <Badge variant={statusConfig.variant} className="h-5 gap-1 whitespace-nowrap px-1.5 text-[10px]">
+                              <Badge variant={statusConfig.variant} className={`h-5 gap-1 whitespace-nowrap px-1.5 text-[10px] ${statusKey === "returned_for_revision" ? "border-amber-500 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-950/30" : ""}`}>
                                 <StatusIcon className="h-3 w-3" />
                                 {statusConfig.label}
                               </Badge>
                             </div>
                           </TableCell>
                           <TableCell className="px-2 py-1.5 align-middle text-muted-foreground">
-                            <CompactText value={request.notes || "—"} className="max-w-[194px]" />
+                            {request.status === "returned_for_revision" && revisionComments[request.id] ? (
+                              <CompactText value={revisionComments[request.id]} className="max-w-[194px] text-amber-700 font-medium" />
+                            ) : (
+                              <CompactText value={request.notes || "—"} className="max-w-[194px]" />
+                            )}
                           </TableCell>
                           <TableCell className="px-2 py-1.5 text-right align-middle">
                             <div className="flex justify-end gap-1.5">
+                              {request.status === "returned_for_revision" ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 px-2 text-[11px] border-amber-500 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                                  onClick={() => void handleEditRequest(request)}
+                                >
+                                  <Edit2 className="mr-1.5 h-3.5 w-3.5" />
+                                  Revise & Resubmit
+                                </Button>
+                              ) : null}
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -966,6 +1078,83 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
           </div>
         )}
       </CardContent>
+
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Revise & Resubmit Request</DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={handleUpdateRequest} className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="edit_item_name" className="text-[11px]">
+                {isCashRequestType(editFormData.request_type) ? "Purpose / Description" : "Item / Description"}
+              </Label>
+              <Input
+                id="edit_item_name"
+                className="h-8 text-xs"
+                value={editFormData.item_name}
+                onChange={(event) => setEditFormData((current) => ({ ...current, item_name: event.target.value }))}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="edit_quantity" className="text-[11px]">
+                  {isCashRequestType(editFormData.request_type) ? "Amount" : "Quantity"}
+                </Label>
+                <Input
+                  id="edit_quantity"
+                  type="number"
+                  step="0.01"
+                  className="h-8 text-xs"
+                  value={editFormData.quantity}
+                  onChange={(event) => setEditFormData((current) => ({ ...current, quantity: event.target.value }))}
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="edit_unit" className="text-[11px]">
+                  {isCashRequestType(editFormData.request_type) ? "Currency / Ref." : "Unit"}
+                </Label>
+                <Input
+                  id="edit_unit"
+                  className="h-8 text-xs"
+                  value={editFormData.unit}
+                  onChange={(event) => setEditFormData((current) => ({ ...current, unit: event.target.value }))}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="edit_notes" className="text-[11px]">
+                Notes
+              </Label>
+              <Textarea
+                id="edit_notes"
+                rows={3}
+                className="min-h-[84px] text-xs"
+                value={editFormData.notes}
+                onChange={(event) => setEditFormData((current) => ({ ...current, notes: event.target.value }))}
+                placeholder="Add updated details for this request"
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)} className="h-8 flex-1 text-xs">
+                Cancel
+              </Button>
+              <Button type="submit" className="h-8 flex-1 text-xs">
+                <Send className="mr-1.5 h-3.5 w-3.5" />
+                Resubmit
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
