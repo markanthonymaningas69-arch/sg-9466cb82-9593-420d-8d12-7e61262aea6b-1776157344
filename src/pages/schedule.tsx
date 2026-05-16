@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 import { Layout } from "@/components/Layout";
 import { CalendarView } from "@/components/schedule/CalendarView";
 import { GanttView } from "@/components/schedule/GanttView";
@@ -9,6 +9,7 @@ import { TaskConfigurationPanel, type EditableProjectTask } from "@/components/s
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -35,7 +36,6 @@ import {
 import { scheduleService } from "@/services/scheduleService";
 import { scurveService } from "@/services/scurveService";
 import { taskPlanningService, type SaveTaskMaterialDeliveryPlanInput } from "@/services/taskPlanningService";
-import { PlanningWorkspaceShell } from "@/components/schedule/PlanningWorkspaceShell";
 
 type ScheduleTaskRecord = TaskFormData & { task_config?: unknown; bom_scope?: EditableProjectTask["bom_scope"] };
 
@@ -827,226 +827,228 @@ export default function SchedulePage() {
   return (
     <Layout>
       <div className="-m-6 h-[calc(100vh-4rem)] overflow-hidden p-3 lg:p-4">
-        <PlanningWorkspaceShell
-          className="h-full"
-          workspaceHeightClassName="h-full"
-          panelOpen={panelOpen}
-          onPanelOpenChange={setPanelOpen}
-          panelTitle={selectedTask ? selectedTask.name || "Task Configuration" : "Task Configuration"}
-          panelDescription={undefined}
-          sidePanel={
-            <TaskConfigurationPanel
-              task={selectedTask}
-              tasks={sortedTasks}
-              materialDeliveryPlans={currentMaterialDeliveryPlans}
-              manpowerCatalogItems={manpowerCatalogItems}
-              laborCostSummary={selectedTask?.id ? laborCostSummaries[selectedTask.id] || currentLaborCostSummary : currentLaborCostSummary}
-              saving={saving}
-              embedded
-              onTaskChange={handleTaskChange}
-              onMaterialDeliveryPlansChange={(plans) => selectedTask?.id ? setMaterialDeliveryPlansByTask((current) => ({ ...current, [selectedTask.id]: plans })) : undefined}
-            />
-          }
-          toolbar={
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h1 className="text-base font-semibold text-foreground">Project Manager</h1>
-                  </div>
-                  {selectedProject ? (
-                    <p className="truncate text-xs text-muted-foreground">
-                      {selectedProjectName}
-                    </p>
-                  ) : null}
-                </div>
-
-                <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
-                  <div className="flex rounded-lg border bg-card p-1">
-                    <Button type="button" variant={viewMode === "list" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("list")}>
-                      Task List
-                    </Button>
-                    <Button type="button" variant={viewMode === "gantt" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("gantt")}>
-                      Gantt
-                    </Button>
-                    <Button type="button" variant={viewMode === "calendar" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("calendar")}>
-                      Calendar
-                    </Button>
-                    <Button type="button" variant={viewMode === "scurve" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("scurve")}>
-                      S-Curve
-                    </Button>
-                    <Button type="button" variant={viewMode === "catalog" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("catalog")}>
-                      Manpower Catalog
-                    </Button>
-                  </div>
-
-                  <Select value={selectedProject} onValueChange={setSelectedProject}>
-                    <SelectTrigger className="h-9 w-full sm:w-[240px]">
-                      <SelectValue placeholder="Select project" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {projects.map((project) => (
-                        <SelectItem key={project.id} value={project.id}>
-                          {project.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <Button type="button" size="sm" onClick={handleCreateTask} disabled={!selectedProject}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Task
-                  </Button>
-                </div>
-              </div>
-
-              <div className="hidden flex-wrap items-center gap-2 xl:flex">
-                <Badge variant="outline">Tasks {sortedTasks.length}</Badge>
-                <Badge variant="outline">Dependencies {dependentTaskCount}</Badge>
-                <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-700">
-                  Critical Path {criticalPathTaskIds.length}
-                </Badge>
-                <Badge variant="outline">Daily Labor AED {Number(currentLaborCostSummary?.dailyCost || 0).toFixed(0)}</Badge>
-              </div>
-            </div>
-          }
-          mainContent={
-            <div className="flex h-full min-h-0 flex-col">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2">
-                <div className="min-w-0">
-                  <p className="truncate text-xs text-muted-foreground">
-                    {selectedTask ? `Selected task: ${selectedTask.name}` : "Select a task to open the configuration panel."}
-                  </p>
-                </div>
+        <div className="flex h-full flex-col gap-3">
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
+              <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="hidden xl:inline-flex">
-                    {saving ? "Auto-saving" : "Auto-save enabled"}
-                  </Badge>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-8"
-                    onClick={() => setPanelOpen((current) => !current)}
-                  >
-                    {panelOpen ? "Hide Panel" : "Show Panel"}
+                  <h1 className="text-base font-semibold text-foreground">Project Manager</h1>
+                </div>
+                {selectedProject ? (
+                  <p className="truncate text-xs text-muted-foreground">
+                    {selectedProjectName}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+                <div className="flex rounded-lg border bg-card p-1">
+                  <Button type="button" variant={viewMode === "list" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("list")}>
+                    Task List
+                  </Button>
+                  <Button type="button" variant={viewMode === "gantt" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("gantt")}>
+                    Gantt
+                  </Button>
+                  <Button type="button" variant={viewMode === "calendar" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("calendar")}>
+                    Calendar
+                  </Button>
+                  <Button type="button" variant={viewMode === "scurve" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("scurve")}>
+                    S-Curve
+                  </Button>
+                  <Button type="button" variant={viewMode === "catalog" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("catalog")}>
+                    Manpower Catalog
                   </Button>
                 </div>
-              </div>
 
-              <div className="min-h-0 flex-1 overflow-hidden">
-                {!selectedProject ? (
-                  <div className="flex h-full items-center justify-center px-6 text-center">
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium text-foreground">Select a project</p>
-                      <p className="text-xs text-muted-foreground">
-                        Open a project to manage tasks, resources, and performance curves in one workspace.
-                      </p>
-                    </div>
-                  </div>
-                ) : loading ? (
-                  <div className="flex h-full items-center justify-center px-6">
-                    <p className="text-sm text-muted-foreground">Loading schedule...</p>
-                  </div>
-                ) : tasks.length === 0 && viewMode !== "scurve" ? (
-                  <div className="flex h-full items-center justify-center px-6 text-center">
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium text-foreground">No tasks yet</p>
-                      <p className="text-xs text-muted-foreground">
-                        Sync the BOM or add a task manually to start planning this project.
-                      </p>
-                    </div>
-                  </div>
-                ) : viewMode === "list" ? (
-                  <div className="h-full overflow-auto">
-                    <table className="w-full text-sm">
-                      <thead className="sticky top-0 z-10 bg-background">
-                        <tr className="border-b text-left text-muted-foreground">
-                          <th className="px-3 py-2 font-medium">Task</th>
-                          <th className="px-3 py-2 font-medium">Start</th>
-                          <th className="px-3 py-2 font-medium">Duration</th>
-                          <th className="px-3 py-2 font-medium">Dependencies</th>
-                          <th className="px-3 py-2 text-right font-medium">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {sortedTasks.map((task) => {
-                          const isCritical = task.id ? criticalPathTaskIdSet.has(task.id) : false;
+                <Select value={selectedProject} onValueChange={setSelectedProject}>
+                  <SelectTrigger className="h-9 w-full sm:w-[240px]">
+                    <SelectValue placeholder="Select project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-                          return (
-                            <tr
-                              key={task.id || task.name}
-                              className={`cursor-pointer border-b ${
-                                selectedTask?.id === task.id
-                                  ? "bg-primary/5"
-                                  : isCritical
-                                    ? "bg-amber-500/5 hover:bg-amber-500/10"
-                                    : "hover:bg-muted/30"
-                              }`}
-                              onClick={() => handleTaskSelect(task)}
-                            >
-                              <td className="px-3 py-3 font-medium">
-                                {task.name}
-                                <div className="mt-1 flex flex-wrap gap-1.5">
-                                  <Badge variant="outline">{task.dependencies.length} predecessor(s)</Badge>
-                                  {isCritical ? (
-                                    <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-700">
-                                      Critical path
-                                    </Badge>
-                                  ) : null}
-                                </div>
-                              </td>
-                              <td className="px-3 py-3">{task.start_date || "-"}</td>
-                              <td className="px-3 py-3">{task.duration_days || 0} day(s)</td>
-                              <td className="px-3 py-3">
-                                {task.dependencies.map((dependency) => `${dependency.type}${dependency.lagDays ? ` +${dependency.lagDays}` : ""}`).join(", ") || "-"}
-                              </td>
-                              <td className="px-3 py-3 text-right">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    if (task.id) void handleDeleteTask(task.id);
-                                  }}
-                                  disabled={!task.id || saving}
-                                >
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="h-full overflow-auto p-3">
-                    {viewMode === "gantt" ? (
-                      <GanttView
-                        tasks={sortedTasks}
-                        criticalTaskIds={criticalPathTaskIds}
-                        selectedTaskId={selectedTask?.id || null}
-                        onTaskSelect={handleGanttTaskSelect}
-                        onTaskReorder={handleGanttTaskReorder}
-                      />
-                    ) : viewMode === "calendar" ? (
-                      <CalendarView tasks={sortedTasks} projectName={selectedProjectName} />
-                    ) : viewMode === "catalog" ? (
-                      <ProjectManpowerCatalogTab
-                        projectId={selectedProject}
-                        onCatalogChanged={setManpowerCatalogItems}
-                      />
-                    ) : (
-                      <SCurveView projectId={selectedProject} projectName={selectedProjectName} />
-                    )}
-                  </div>
-                )}
+                <Button type="button" size="sm" onClick={handleCreateTask} disabled={!selectedProject}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Task
+                </Button>
               </div>
             </div>
-          }
-        />
+
+            <div className="hidden flex-wrap items-center gap-2 xl:flex">
+              <Badge variant="outline">Tasks {sortedTasks.length}</Badge>
+              <Badge variant="outline">Dependencies {dependentTaskCount}</Badge>
+              <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-700">
+                Critical Path {criticalPathTaskIds.length}
+              </Badge>
+              <Badge variant="outline">Daily Labor AED {Number(currentLaborCostSummary?.dailyCost || 0).toFixed(0)}</Badge>
+            </div>
+          </div>
+
+          <div className="flex h-full min-h-0 flex-col rounded-lg border bg-card">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2">
+              <div className="min-w-0">
+                <p className="truncate text-xs text-muted-foreground">
+                  {selectedTask ? `Selected task: ${selectedTask.name}` : "Select a task to open the configuration panel."}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="hidden xl:inline-flex">
+                  {saving ? "Auto-saving" : "Auto-save enabled"}
+                </Badge>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8"
+                  onClick={() => setPanelOpen((current) => !current)}
+                  disabled={!selectedTask}
+                >
+                  {panelOpen ? "Hide Panel" : "Show Panel"}
+                </Button>
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-hidden">
+              {!selectedProject ? (
+                <div className="flex h-full items-center justify-center px-6 text-center">
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-foreground">Select a project</p>
+                    <p className="text-xs text-muted-foreground">
+                      Open a project to manage tasks, resources, and performance curves in one workspace.
+                    </p>
+                  </div>
+                </div>
+              ) : loading ? (
+                <div className="flex h-full items-center justify-center px-6">
+                  <p className="text-sm text-muted-foreground">Loading schedule...</p>
+                </div>
+              ) : tasks.length === 0 && viewMode !== "scurve" ? (
+                <div className="flex h-full items-center justify-center px-6 text-center">
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-foreground">No tasks yet</p>
+                    <p className="text-xs text-muted-foreground">
+                      Sync the BOM or add a task manually to start planning this project.
+                    </p>
+                  </div>
+                </div>
+              ) : viewMode === "list" ? (
+                <div className="h-full overflow-auto">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 z-10 bg-background">
+                      <tr className="border-b text-left text-muted-foreground">
+                        <th className="px-3 py-2 font-medium">Task</th>
+                        <th className="px-3 py-2 font-medium">Start</th>
+                        <th className="px-3 py-2 font-medium">Duration</th>
+                        <th className="px-3 py-2 font-medium">Dependencies</th>
+                        <th className="px-3 py-2 text-right font-medium">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedTasks.map((task) => {
+                        const isCritical = task.id ? criticalPathTaskIdSet.has(task.id) : false;
+
+                        return (
+                          <tr
+                            key={task.id || task.name}
+                            className={`cursor-pointer border-b ${
+                              selectedTask?.id === task.id
+                                ? "bg-primary/5"
+                                : isCritical
+                                  ? "bg-amber-500/5 hover:bg-amber-500/10"
+                                  : "hover:bg-muted/30"
+                            }`}
+                            onClick={() => handleTaskSelect(task)}
+                          >
+                            <td className="px-3 py-3 font-medium">
+                              {task.name}
+                              <div className="mt-1 flex flex-wrap gap-1.5">
+                                <Badge variant="outline">{task.dependencies.length} predecessor(s)</Badge>
+                                {isCritical ? (
+                                  <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-700">
+                                    Critical path
+                                  </Badge>
+                                ) : null}
+                              </div>
+                            </td>
+                            <td className="px-3 py-3">{task.start_date || "-"}</td>
+                            <td className="px-3 py-3">{task.duration_days || 0} day(s)</td>
+                            <td className="px-3 py-3">
+                              {task.dependencies.map((dependency) => `${dependency.type}${dependency.lagDays ? ` +${dependency.lagDays}` : ""}`).join(", ") || "-"}
+                            </td>
+                            <td className="px-3 py-3 text-right">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  if (task.id) void handleDeleteTask(task.id);
+                                }}
+                                disabled={!task.id || saving}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="h-full overflow-auto p-3">
+                  {viewMode === "gantt" ? (
+                    <GanttView
+                      tasks={sortedTasks}
+                      criticalTaskIds={criticalPathTaskIds}
+                      selectedTaskId={selectedTask?.id || null}
+                      onTaskSelect={handleGanttTaskSelect}
+                      onTaskReorder={handleGanttTaskReorder}
+                    />
+                  ) : viewMode === "calendar" ? (
+                    <CalendarView tasks={sortedTasks} projectName={selectedProjectName} />
+                  ) : viewMode === "catalog" ? (
+                    <ProjectManpowerCatalogTab
+                      projectId={selectedProject}
+                      onCatalogChanged={setManpowerCatalogItems}
+                    />
+                  ) : (
+                    <SCurveView projectId={selectedProject} projectName={selectedProjectName} />
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <Dialog open={panelOpen} onOpenChange={setPanelOpen}>
+          <DialogContent className="max-w-[90vw] h-[90vh] flex flex-col p-0">
+            <DialogHeader className="px-6 py-4 border-b shrink-0">
+              <DialogTitle className="text-lg font-semibold">
+                {selectedTask ? selectedTask.name || "Task Configuration" : "Task Configuration"}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 overflow-hidden">
+              <TaskConfigurationPanel
+                task={selectedTask}
+                tasks={sortedTasks}
+                materialDeliveryPlans={currentMaterialDeliveryPlans}
+                manpowerCatalogItems={manpowerCatalogItems}
+                laborCostSummary={selectedTask?.id ? laborCostSummaries[selectedTask.id] || currentLaborCostSummary : currentLaborCostSummary}
+                saving={saving}
+                embedded
+                onTaskChange={handleTaskChange}
+                onMaterialDeliveryPlansChange={(plans) => selectedTask?.id ? setMaterialDeliveryPlansByTask((current) => ({ ...current, [selectedTask.id]: plans })) : undefined}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );

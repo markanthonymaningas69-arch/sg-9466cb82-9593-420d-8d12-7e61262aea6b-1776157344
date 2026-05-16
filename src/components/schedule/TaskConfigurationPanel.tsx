@@ -170,6 +170,42 @@ export function TaskConfigurationPanel({
     }
   }, [task?.task_config]);
 
+  useEffect(() => {
+    if (!onMaterialDeliveryPlansChange || !task) return;
+    
+    const validTaskMaterials = taskMaterials.filter(m => m.materialId && m.materialId !== "" && m.materialName);
+    
+    if (validTaskMaterials.length === 0) return;
+    
+    const existingPlanIds = new Set(materialDeliveryPlans.map(p => p.materialId));
+    const taskMaterialIds = new Set(validTaskMaterials.map(m => m.materialId));
+    
+    const plansToKeep = materialDeliveryPlans.filter(p => taskMaterialIds.has(p.materialId));
+    
+    const newPlans: SaveTaskMaterialDeliveryPlanInput[] = validTaskMaterials
+      .filter(m => !existingPlanIds.has(m.materialId))
+      .map(material => ({
+        materialId: material.materialId,
+        materialName: material.materialName,
+        deliveryScheduleType: "one_time" as const,
+        deliveryStartDate: task.start_date || null,
+        deliveryFrequency: "daily" as const,
+        deliveryDurationDays: Math.max(1, Number(task.duration_days || 1)),
+        customIntervalDays: null,
+        quantityMode: "even" as const,
+        deliveryDates: task.start_date ? [task.start_date] : [],
+        plannedUsagePeriod: task.start_date
+          ? { startDate: task.start_date, endDate: task.end_date || task.start_date }
+          : null,
+        totalQuantity: material.quantity || 0,
+        unit: material.unit || "unit",
+      }));
+    
+    if (newPlans.length > 0 || plansToKeep.length !== materialDeliveryPlans.length) {
+      onMaterialDeliveryPlansChange([...plansToKeep, ...newPlans]);
+    }
+  }, [taskMaterials, task?.id, task?.start_date, task?.end_date, task?.duration_days]);
+
   async function loadBomMaterials(projectId: string) {
     try {
       setLoadingMaterials(true);
