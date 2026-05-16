@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Package, TrendingDown, FileText, TrendingUp, Users, Warehouse as WarehouseIcon, Trash2 } from "lucide-react";
+import { Package, TrendingDown, FileText, TrendingUp, Users, Warehouse as WarehouseIcon } from "lucide-react";
 
 // Import modular tab components
 import { SiteWarehouseTab } from "@/components/site-personnel/SiteWarehouseTab";
@@ -150,19 +150,25 @@ export default function SitePersonnelPage() {
             </p>
           </div>
 
-          <div className="w-full sm:w-[280px]">
-            <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="Select project" />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((project) => (
-                  <SelectItem key={project.id} value={project.id}>
-                    {project.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex items-center gap-2">
+            <SitePersonnelRecycleBin
+              projectId={selectedProjectId}
+              onChange={() => setRecycleBinVersion((current) => current + 1)}
+            />
+            <div className="w-full sm:w-[280px]">
+              <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="Select project" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
@@ -214,13 +220,6 @@ export default function SitePersonnelPage() {
                     <Users className="h-3.5 w-3.5" />
                     <span>Attendance</span>
                   </TabsTrigger>
-                  <TabsTrigger
-                    value="recycle-bin"
-                    className="h-7 shrink-0 gap-1.5 whitespace-nowrap rounded-md px-2 text-[11px] font-semibold leading-none text-slate-700 data-[state=active]:bg-slate-200 data-[state=active]:text-slate-950"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    <span>Recycle Bin</span>
-                  </TabsTrigger>
                 </TabsList>
 
                 <CardContent className="px-4 pb-4 pt-0">
@@ -246,13 +245,6 @@ export default function SitePersonnelPage() {
 
                   <TabsContent value="attendance" className="mt-0">
                     <AttendanceTab key={`attendance-${selectedProjectId}-${recycleBinVersion}`} projectId={selectedProjectId} />
-                  </TabsContent>
-
-                  <TabsContent value="recycle-bin" className="mt-0">
-                    <SitePersonnelRecycleBin
-                      projectId={selectedProjectId}
-                      onChange={() => setRecycleBinVersion((current) => current + 1)}
-                    />
                   </TabsContent>
                 </CardContent>
               </Tabs>
