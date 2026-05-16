@@ -604,14 +604,19 @@ export default function Purchasing() {
       return;
     }
 
+    const totalCost = uc * (Number(gmSubmitForm.quantity) || 0);
+
     const { error } = await supabase.from('purchases').update({
       supplier: gmSubmitForm.supplier,
       unit_cost: uc,
-      status: 'pending_approval'
+      total_cost: totalCost,
+      status: 'pending_approval',
+      updated_at: new Date().toISOString(),
     }).eq('id', gmSubmitForm.id);
 
     if (error) {
-      alert("Failed to submit: " + error.message);
+      console.error("Error updating purchase:", error);
+      alert("Failed to update purchase: " + error.message);
       return;
     }
 
@@ -626,7 +631,7 @@ export default function Purchasing() {
         requestedBy,
         projectId: gmSubmitForm.project_id || null,
         summary: `${gmSubmitForm.order_number}: ${gmSubmitForm.item_name}`,
-        latestComment: `Supplier: ${gmSubmitForm.supplier}`,
+        latestComment: `Supplier: ${gmSubmitForm.supplier} • Total: ${formatCurrency(totalCost)}`,
         payload: {
           requestType: "Purchase Order",
           orderNumber: gmSubmitForm.order_number,
@@ -634,19 +639,33 @@ export default function Purchasing() {
           quantity: Number(gmSubmitForm.quantity || 0),
           unit: gmSubmitForm.unit || "unit",
           supplier: gmSubmitForm.supplier,
-          totalAmount: Number(gmSubmitForm.quantity || 0) * uc,
+          unitCost: uc,
+          totalAmount: totalCost,
           purchaseStatus: "pending_approval",
           destinationType: gmSubmitForm.destination_type || "main_warehouse",
         },
       });
 
+      toast({
+        title: "Sent to Approval Center",
+        description: `${gmSubmitForm.order_number} submitted for approval`,
+      });
+
       setGmSubmitDialogOpen(false);
       setGmSubmitForm(null);
-      loadData();
+      await loadData();
     } catch (approvalError: any) {
-      await supabase.from("purchases").update({ status: "pending" }).eq("id", gmSubmitForm.id);
+      await supabase.from("purchases").update({ 
+        status: "pending",
+        updated_at: new Date().toISOString(),
+      }).eq("id", gmSubmitForm.id);
+      
       console.error("Error creating approval request:", approvalError);
-      alert("Failed to send purchase to Approval Center: " + (approvalError?.message || "Unknown error"));
+      toast({
+        title: "Error",
+        description: "Failed to send purchase to Approval Center: " + (approvalError?.message || "Unknown error"),
+        variant: "destructive",
+      });
     }
   };
 
