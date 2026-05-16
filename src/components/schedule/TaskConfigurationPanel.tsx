@@ -511,7 +511,7 @@ export function TaskConfigurationPanel({
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs">Scope Quantity</Label>
-                  <div className="grid grid-cols-[1fr_110px] gap-2">
+                  <div className="grid grid-cols-[1fr_140px] gap-2">
                     <Input 
                       type="number"
                       min="0.01"
@@ -528,19 +528,42 @@ export function TaskConfigurationPanel({
                       className={`h-8 text-sm ${task.bom_scope ? 'bg-muted/50' : ''}`}
                       placeholder="0"
                     />
-                    <Input 
-                      value={task.bom_scope?.unit || taskConfig.scopeUnit} 
-                      onChange={(event) => {
-                        if (!task.bom_scope) {
-                          handleTaskConfigChange({
-                            scopeUnit: event.target.value,
-                          });
-                        }
-                      }}
-                      readOnly={Boolean(task.bom_scope)} 
-                      className={`h-8 text-sm ${task.bom_scope ? 'bg-muted/50' : ''}`}
-                      placeholder="unit"
-                    />
+                    <div className="space-y-1">
+                      <Select
+                        value={task.bom_scope?.unit || taskConfig.scopeUnit}
+                        onValueChange={(value) => {
+                          if (!task.bom_scope) {
+                            handleTaskConfigChange({
+                              scopeUnit: value === "other" ? "" : value,
+                            });
+                          }
+                        }}
+                        disabled={Boolean(task.bom_scope)}
+                      >
+                        <SelectTrigger className={`h-8 text-sm ${task.bom_scope ? 'bg-muted/50' : ''}`}>
+                          <SelectValue placeholder="Unit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Cu.m">Cu.m</SelectItem>
+                          <SelectItem value="Sq.m">Sq.m</SelectItem>
+                          <SelectItem value="Kg">Kg</SelectItem>
+                          <SelectItem value="Lot">Lot</SelectItem>
+                          <SelectItem value="other">Other (specify)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {!task.bom_scope && taskConfig.scopeUnit && !["Cu.m", "Sq.m", "Kg", "Lot"].includes(taskConfig.scopeUnit) && (
+                        <Input
+                          value={taskConfig.scopeUnit}
+                          onChange={(event) => {
+                            handleTaskConfigChange({
+                              scopeUnit: event.target.value,
+                            });
+                          }}
+                          placeholder="Specify unit"
+                          className="h-7 text-xs"
+                        />
+                      )}
+                    </div>
                   </div>
                 </div>
               </section>
@@ -553,7 +576,7 @@ export function TaskConfigurationPanel({
                     productivity unit, work hours per day, and the configured number of teams.
                   </p>
                 </div>
-                <div className="grid grid-cols-[1fr_120px] gap-2">
+                <div className="grid grid-cols-[1fr_auto_auto] gap-2">
                   <div className="space-y-2">
                     <Label className="text-xs">
                       Productivity of one team
@@ -573,6 +596,12 @@ export function TaskConfigurationPanel({
                   </div>
                   <div className="space-y-2">
                     <Label className="text-xs">Unit</Label>
+                    <div className="flex h-8 items-center rounded-md border bg-muted/50 px-3 text-sm text-foreground min-w-[80px]">
+                      {taskConfig.scopeUnit || "unit"}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Per</Label>
                     <Select
                       value={taskConfig.productivityUnit}
                       onValueChange={(value) =>
@@ -581,8 +610,8 @@ export function TaskConfigurationPanel({
                         })
                       }
                     >
-                      <SelectTrigger className="h-8 text-sm">
-                        <SelectValue placeholder="Unit" />
+                      <SelectTrigger className="h-8 text-sm w-[100px]">
+                        <SelectValue placeholder="Period" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="day">Per day</SelectItem>
