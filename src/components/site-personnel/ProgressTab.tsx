@@ -198,19 +198,67 @@ export function ProgressTab({ projectId }: { projectId: string }) {
       return;
     }
 
+    // Validate against existing progress for this scope
+    const existingProgressForScope = progressUpdates.filter(
+      (update) => update.bom_scope_id === formData.bom_scope_id
+    );
+    
+    const latestProgressForScope = existingProgressForScope.length > 0
+      ? Math.max(...existingProgressForScope.map((u) => u.percentage_completed))
+      : 0;
+
+    if (percentage < latestProgressForScope) {
+      const confirmed = confirm(
+        `Warning: This progress (${percentage}%) is less than the latest recorded progress (${latestProgressForScope}%) for this scope. Continue?`
+      );
+      if (!confirmed) return;
+    }
+
     try {
+      const { data: authData } = await supabase.auth.getUser();
+      const updatedBy = authData.user?.email || "Unknown user";
+
       const { error } = await supabase.from("bom_progress_updates").insert({
         bom_scope_id: formData.bom_scope_id,
         update_date: formData.update_date,
         percentage_completed: percentage,
         notes: formData.notes || null,
+        updated_by: updatedBy,
       });
 
       if (error) throw error;
 
+      // Trigger S-Curve recalculation for the project
+      try {
+        const { data: scopeData } = await supabase
+          .from("bom_scope_of_work")
+          .select("bom_id")
+          .eq("id", formData.bom_scope_id)
+          .single();
+
+        if (scopeData) {
+          const { data: bomData } = await supabase
+            .from("bill_of_materials")
+            .select("project_id")
+            .eq("id", scopeData.bom_id)
+            .single();
+
+          if (bomData?.project_id) {
+            // Import scurveService dynamically to avoid circular dependencies
+            const { scurveService } = await import("@/services/scurveService");
+            await scurveService.recalculateProject(bomData.project_id);
+            
+            console.log(`S-Curve auto-updated for project ${bomData.project_id} from Site Personnel accomplishment`);
+          }
+        }
+      } catch (scurveError) {
+        console.error("S-Curve auto-recalculation failed:", scurveError);
+        // Don't block the accomplishment submission if S-Curve update fails
+      }
+
       toast({
         title: "Success",
-        description: "Progress update recorded",
+        description: "Progress update recorded and S-Curve updated",
       });
 
       setDialogOpen(false);

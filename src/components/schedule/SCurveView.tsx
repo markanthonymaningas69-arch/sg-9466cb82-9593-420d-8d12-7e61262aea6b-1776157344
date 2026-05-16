@@ -11,12 +11,15 @@ import {
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { scurveService } from "@/services/scurveService";
+import { supabase } from "@/integrations/supabase/client";
 import {
   deriveSCurvePerformanceIndicators,
   type SCurveDailyValue,
   type SCurvePerformanceIndicators,
 } from "@/lib/scurve";
+import { RefreshCw } from "lucide-react";
 
 interface SCurveViewProps {
   projectId: string;
@@ -73,12 +76,35 @@ function buildStatusTone(value: number) {
   return "text-muted-foreground";
 }
 
+function formatTimestamp(timestamp: string | null) {
+  if (!timestamp) return "Never";
+  
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins} min ago`;
+  if (diffMins < 1440) return `${Math.floor(diffMins / 60)} hours ago`;
+  
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 export function SCurveView({ projectId, projectName }: SCurveViewProps) {
   const [series, setSeries] = useState<SCurveDailyValue[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [zoom, setZoom] = useState<ZoomLevel>("daily");
   const [errorMessage, setErrorMessage] = useState("");
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [autoRefreshing, setAutoRefreshing] = useState(false);
 
   async function loadSeries(forceRecalculate = false) {
     try {
@@ -87,14 +113,27 @@ export function SCurveView({ projectId, projectName }: SCurveViewProps) {
         setRefreshing(true);
         const recalculatedSeries = await scurveService.recalculateProject(projectId);
         setSeries(recalculatedSeries);
+        setLastUpdated(new Date().toISOString());
       } else {
         setLoading(true);
         const storedSeries = await scurveService.getProjectDailyAggregates(projectId);
         if (storedSeries.length > 0) {
           setSeries(storedSeries);
+          
+          // Get last updated timestamp
+          const { data: lastUpdateData } = await supabase
+            .from("project_scurve_daily")
+            .select("updated_at")
+            .eq("project_id", projectId)
+            .order("updated_at", { ascending: false })
+            .limit(1)
+            .single();
+          
+          setLastUpdated(lastUpdateData?.updated_at || null);
         } else {
           const recalculatedSeries = await scurveService.recalculateProject(projectId);
           setSeries(recalculatedSeries);
+          setLastUpdated(new Date().toISOString());
         }
       }
     } catch (error) {
@@ -103,11 +142,62 @@ export function SCurveView({ projectId, projectName }: SCurveViewProps) {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setAutoRefreshing(false);
     }
   }
 
   useEffect(() => {
     void loadSeries();
+
+    // Real-time subscription to progress updates and related tables
+    const progressChannel = supabase
+      .channel(`scurve_updates_${projectId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "bom_progress_updates",
+        },
+        async (payload) => {
+          console.log("Progress update detected, auto-refreshing S-Curve...", payload);
+          setAutoRefreshing(true);
+          await loadSeries(true);
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "site_attendance",
+          filter: `project_id=eq.${projectId}`,
+        },
+        async () => {
+          console.log("Attendance update detected, auto-refreshing S-Curve...");
+          setAutoRefreshing(true);
+          await loadSeries(true);
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "material_consumption",
+          filter: `project_id=eq.${projectId}`,
+        },
+        async () => {
+          console.log("Material consumption detected, auto-refreshing S-Curve...");
+          setAutoRefreshing(true);
+          await loadSeries(true);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(progressChannel);
+    };
   }, [projectId]);
 
   const indicators: SCurvePerformanceIndicators = useMemo(
@@ -122,10 +212,25 @@ export function SCurveView({ projectId, projectName }: SCurveViewProps) {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-foreground">S-Curve (Planned vs Actual)</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-foreground">S-Curve (Planned vs Actual)</h3>
+            {autoRefreshing && (
+              <Badge variant="outline" className="h-5 animate-pulse border-emerald-500 bg-emerald-50 text-emerald-700">
+                <RefreshCw className="mr-1 h-3 w-3 animate-spin" />
+                Auto-updating
+              </Badge>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground">
             Cumulative PV, AV, and EV for {projectName}.
           </p>
+          <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+            <span>Last updated: {formatTimestamp(lastUpdated)}</span>
+            <span>•</span>
+            <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
+              Updated from Site Personnel
+            </Badge>
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <div className="flex rounded-lg border bg-background p-1">
@@ -294,7 +399,7 @@ export function SCurveView({ projectId, projectName }: SCurveViewProps) {
 
               <div className="rounded-lg border bg-background px-4 py-3 text-sm text-muted-foreground">
                 Deviations are visible as the gap between PV, AV, and EV. A widening AV above EV indicates cost overrun,
-                while EV below PV indicates schedule slippage.
+                while EV below PV indicates schedule slippage. Data updates automatically when Site Personnel records accomplishments.
               </div>
             </div>
           )}
