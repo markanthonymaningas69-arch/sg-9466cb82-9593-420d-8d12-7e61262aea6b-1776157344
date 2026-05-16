@@ -609,7 +609,6 @@ export default function Purchasing() {
     const { error } = await supabase.from('purchases').update({
       supplier: gmSubmitForm.supplier,
       unit_cost: uc,
-      total_cost: totalCost,
       status: 'pending_approval',
       updated_at: new Date().toISOString(),
     }).eq('id', gmSubmitForm.id);
