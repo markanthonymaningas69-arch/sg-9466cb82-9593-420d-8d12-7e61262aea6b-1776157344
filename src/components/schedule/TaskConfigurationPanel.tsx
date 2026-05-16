@@ -26,7 +26,12 @@ import {
 } from "@/lib/scheduleTaskConfig";
 import type { MasterTeamTemplate } from "@/services/masterCatalogService";
 import { AlignLeft, Clock, Settings2, Wrench } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { taskMaterialService, type TaskMaterialAssignment } from "@/services/taskMaterialService";
+import type { Database } from "@/integrations/supabase/types";
 
+type BomMaterial = Database["public"]["Tables"]["bom_materials"]["Row"];
 type EditableTaskScope = NonNullable<TaskFormData["bom_scope"]>;
 
 export interface EditableProjectTask extends Omit<TaskFormData, "bom_scope" | "task_config" | "dependencies"> {
@@ -147,6 +152,109 @@ export function TaskConfigurationPanel({
   onMaterialDeliveryPlansChange,
   embedded = false,
 }: TaskConfigurationPanelProps) {
+  const [availableBomMaterials, setAvailableBomMaterials] = useState<BomMaterial[]>([]);
+  const [taskMaterials, setTaskMaterials] = useState<TaskMaterialAssignment[]>([]);
+  const [loadingMaterials, setLoadingMaterials] = useState(false);
+
+  useEffect(() => {
+    if (task?.project_id) {
+      void loadBomMaterials(task.project_id);
+    }
+  }, [task?.project_id]);
+
+  useEffect(() => {
+    if (task?.task_config && typeof task.task_config === "object") {
+      const config = task.task_config as { taskMaterials?: TaskMaterialAssignment[] };
+      setTaskMaterials(config.taskMaterials || []);
+    }
+  }, [task?.task_config]);
+
+  async function loadBomMaterials(projectId: string) {
+    try {
+      setLoadingMaterials(true);
+      const materials = await taskMaterialService.getBomMaterialsByProject(projectId);
+      setAvailableBomMaterials(materials);
+    } catch (error) {
+      console.error("Error loading BOM materials:", error);
+    } finally {
+      setLoadingMaterials(false);
+    }
+  }
+
+  const handleAddMaterial = () => {
+    const newMaterial: TaskMaterialAssignment = {
+      id: `temp-${Date.now()}`,
+      taskId: task?.id || "",
+      materialId: "",
+      materialName: "",
+      unit: "",
+      quantity: 0,
+      unitCost: 0,
+      totalCost: 0,
+    };
+    const nextMaterials = [...taskMaterials, newMaterial];
+    setTaskMaterials(nextMaterials);
+    updateTaskMaterials(nextMaterials);
+  };
+
+  const handleRemoveMaterial = (materialId: string) => {
+    const nextMaterials = taskMaterials.filter((m) => m.id !== materialId);
+    setTaskMaterials(nextMaterials);
+    updateTaskMaterials(nextMaterials);
+  };
+
+  const handleMaterialChange = (
+    materialId: string,
+    field: keyof TaskMaterialAssignment,
+    value: string | number
+  ) => {
+    const nextMaterials = taskMaterials.map((material) => {
+      if (material.id !== materialId) {
+        return material;
+      }
+
+      let updated = { ...material, [field]: value };
+
+      if (field === "materialId") {
+        const bomMaterial = availableBomMaterials.find((m) => m.id === value);
+        if (bomMaterial) {
+          updated = {
+            ...updated,
+            materialId: bomMaterial.id,
+            materialName: bomMaterial.material_name,
+            unit: bomMaterial.unit,
+            unitCost: bomMaterial.unit_cost,
+          };
+        }
+      }
+
+      if (field === "quantity" || field === "unitCost") {
+        updated.totalCost = taskMaterialService.calculateMaterialTotal(
+          Number(updated.quantity),
+          Number(updated.unitCost)
+        );
+      }
+
+      return updated;
+    });
+
+    setTaskMaterials(nextMaterials);
+    updateTaskMaterials(nextMaterials);
+  };
+
+  const updateTaskMaterials = (materials: TaskMaterialAssignment[]) => {
+    if (!task) return;
+    onTaskChange({
+      ...task,
+      task_config: {
+        ...taskConfig,
+        taskMaterials: materials,
+      },
+    });
+  };
+
+  const totalMaterialCost = taskMaterialService.calculateTotalMaterialCost(taskMaterials);
+
   const containerClassName = embedded
     ? "flex h-full min-h-0 flex-col overflow-hidden rounded-none border-0 shadow-none"
     : "lg:col-span-1 flex h-[560px] flex-col overflow-hidden";
@@ -567,6 +675,130 @@ export function TaskConfigurationPanel({
             </TabsContent>
 
             <TabsContent value="resources" className="space-y-4 mt-0">
+              <section className="space-y-3 rounded-md border p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground">Task Materials</h3>
+                    <p className="text-[11px] text-muted-foreground">
+                      Manually assign materials from BOM database for cost tracking and forecasting.
+                    </p>
+                  </div>
+                  <Button type="button" size="sm" variant="outline" onClick={handleAddMaterial} disabled={loadingMaterials}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Material
+                  </Button>
+                </div>
+
+                {taskMaterials.length > 0 ? (
+                  <div className="space-y-2">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b bg-muted/50">
+                            <th className="p-2 text-left font-medium">Material</th>
+                            <th className="p-2 text-left font-medium w-20">Unit</th>
+                            <th className="p-2 text-right font-medium w-24">Quantity</th>
+                            <th className="p-2 text-right font-medium w-28">Unit Cost</th>
+                            <th className="p-2 text-right font-medium w-28">Total</th>
+                            <th className="p-2 w-10"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {taskMaterials.map((material) => (
+                            <tr key={material.id} className="border-b hover:bg-muted/20">
+                              <td className="p-2">
+                                <Select
+                                  value={material.materialId}
+                                  onValueChange={(value) => handleMaterialChange(material.id, "materialId", value)}
+                                >
+                                  <SelectTrigger className="h-7 text-xs">
+                                    <SelectValue placeholder="Select material" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="other">Other (custom)</SelectItem>
+                                    {availableBomMaterials.map((bomMat) => (
+                                      <SelectItem key={bomMat.id} value={bomMat.id}>
+                                        {bomMat.material_name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                {material.materialId === "other" && (
+                                  <Input
+                                    value={material.materialName}
+                                    onChange={(e) => handleMaterialChange(material.id, "materialName", e.target.value)}
+                                    placeholder="Enter material name"
+                                    className="h-7 text-xs mt-1"
+                                  />
+                                )}
+                              </td>
+                              <td className="p-2">
+                                <Input
+                                  value={material.unit}
+                                  onChange={(e) => handleMaterialChange(material.id, "unit", e.target.value)}
+                                  placeholder="Unit"
+                                  className="h-7 text-xs"
+                                  disabled={material.materialId !== "other" && material.materialId !== ""}
+                                />
+                              </td>
+                              <td className="p-2">
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={material.quantity}
+                                  onChange={(e) => handleMaterialChange(material.id, "quantity", Number(e.target.value))}
+                                  className="h-7 text-xs text-right"
+                                />
+                              </td>
+                              <td className="p-2">
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={material.unitCost}
+                                  onChange={(e) => handleMaterialChange(material.id, "unitCost", Number(e.target.value))}
+                                  className="h-7 text-xs text-right"
+                                />
+                              </td>
+                              <td className="p-2 text-right font-medium">
+                                AED {material.totalCost.toFixed(2)}
+                              </td>
+                              <td className="p-2 text-center">
+                                <Button
+                                  type="button"
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-6 w-6"
+                                  onClick={() => handleRemoveMaterial(material.id)}
+                                >
+                                  <Trash2 className="h-3 w-3 text-destructive" />
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="border-t bg-primary/5">
+                            <td colSpan={4} className="p-2 text-right font-semibold text-xs">
+                              Total Material Cost:
+                            </td>
+                            <td className="p-2 text-right font-bold text-sm">
+                              AED {totalMaterialCost.toFixed(2)}
+                            </td>
+                            <td></td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    No materials assigned yet. Click &quot;Add Material&quot; to manually assign materials from the BOM database.
+                  </p>
+                )}
+              </section>
+
               <section className="space-y-3 rounded-md border p-3">
                 <div className="flex items-center justify-between">
                   <div>
