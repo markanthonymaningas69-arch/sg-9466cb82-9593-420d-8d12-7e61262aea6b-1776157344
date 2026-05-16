@@ -118,6 +118,7 @@ function normalizeTeamMember(rawValue: unknown, index: number): TeamMemberConfig
     unit: typedValue.unit === "hour" ? "hour" : "day",
     manualRate: Boolean(typedValue.manualRate),
     description: typeof typedValue.description === "string" ? typedValue.description.trim() : "",
+    count: toWholeNumber(typedValue.count, 1),
   };
 }
 
@@ -182,16 +183,18 @@ function aggregateTeamRoles(teams: TaskTeamConfiguration[]) {
 
       const key = normalizedRole.toLowerCase();
       const existing = totals.get(key);
+      const memberCount = member.count || 1;
+      const quantity = teamMultiplier * memberCount;
 
       if (existing) {
-        existing.quantity += teamMultiplier;
+        existing.quantity += quantity;
         return;
       }
 
       totals.set(key, {
         id: `${slugify(normalizedRole) || "role"}-${totals.size + 1}`,
         role: normalizedRole,
-        quantity: teamMultiplier,
+        quantity: quantity,
       });
     });
   });
@@ -212,7 +215,10 @@ export function calculateTotalTeamMembers(config: TaskConfiguration) {
   const normalizedConfig = normalizeTaskConfiguration(config);
 
   return normalizedConfig.teams.reduce(
-    (total, team) => total + team.members.length * Math.max(1, Number(team.numberOfTeams || 1)),
+    (total, team) => {
+      const membersInTeam = team.members.reduce((sum, m) => sum + (m.count || 1), 0);
+      return total + membersInTeam * Math.max(1, Number(team.numberOfTeams || 1));
+    },
     0
   );
 }
@@ -222,7 +228,7 @@ export function calculateTotalTeamDailyCost(config: TaskConfiguration) {
 
   return normalizedConfig.teams.reduce((total, team) => {
     const teamDailyCost = team.members.reduce(
-      (memberTotal, member) => memberTotal + getMemberDailyRate(member, normalizedConfig.workHoursPerDay),
+      (memberTotal, member) => memberTotal + getMemberDailyRate(member, normalizedConfig.workHoursPerDay) * (member.count || 1),
       0
     );
 
