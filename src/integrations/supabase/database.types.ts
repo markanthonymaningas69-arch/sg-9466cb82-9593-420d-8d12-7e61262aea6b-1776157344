@@ -2039,6 +2039,7 @@ export type Database = {
           total_cost: number | null
           unit: string
           unit_cost: number
+          updated_at: string | null
           voucher_number: string | null
         }
         Insert: {
@@ -2061,6 +2062,7 @@ export type Database = {
           total_cost?: number | null
           unit: string
           unit_cost: number
+          updated_at?: string | null
           voucher_number?: string | null
         }
         Update: {
@@ -2083,6 +2085,7 @@ export type Database = {
           total_cost?: number | null
           unit?: string
           unit_cost?: number
+          updated_at?: string | null
           voucher_number?: string | null
         }
         Relationships: [
