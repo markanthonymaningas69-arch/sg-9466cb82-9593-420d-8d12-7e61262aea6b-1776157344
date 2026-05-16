@@ -151,7 +151,31 @@ async function syncSourceRecord(sourceTable: string, sourceRecordId: string, sta
       : null;
 
   if (!tableName) return;
-  await supabase.from(tableName).update({ status: mappedStatus }).eq("id", sourceRecordId);
+  
+  const updateData: Record<string, unknown> = { status: mappedStatus, updated_at: new Date().toISOString() };
+  
+  if (status === "approved") {
+    updateData.approved_at = new Date().toISOString();
+  } else if (status === "rejected") {
+    updateData.rejected_at = new Date().toISOString();
+  }
+  
+  await supabase.from(tableName).update(updateData).eq("id", sourceRecordId);
+}
+
+async function syncPurchaseLifecycle(purchaseId: string, voucherNumber?: string | null, accountingStatus?: string) {
+  const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  
+  if (voucherNumber) {
+    updateData.voucher_number = voucherNumber;
+    updateData.status = "approved";
+  }
+  
+  if (accountingStatus) {
+    updateData.accounting_status = accountingStatus;
+  }
+  
+  await supabase.from("purchases").update(updateData).eq("id", purchaseId);
 }
 
 async function processApprovedRequest(request: {
@@ -227,6 +251,8 @@ async function processApprovedRequest(request: {
               totalAmount: Number(purchase.data.total_cost || 0),
               purchaseStatus: purchase.data.status || "pending",
             },
+            workflow_status: "in_purchasing",
+            processed_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
           .eq("id", request.approvalRequestId);
@@ -239,6 +265,15 @@ async function processApprovedRequest(request: {
       lifecycle_status: "in_accounting",
       total_amount: Number(source.amount || 0),
     });
+    
+    await supabase
+      .from("approval_requests")
+      .update({
+        workflow_status: "in_accounting",
+        processed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", request.approvalRequestId);
     return;
   }
 
@@ -300,11 +335,13 @@ async function processApprovedRequest(request: {
           voucherStatus: "approved",
           accountingStatus: "ready_for_delivery",
         },
+        workflow_status: "in_accounting",
+        processed_at: approvedAt,
         updated_at: approvedAt,
       })
       .eq("id", request.approvalRequestId);
 
-    await supabase.from("purchases").update({ voucher_number: voucherNumber, status: "approved" }).eq("id", voucherRequest.purchase_id);
+    await syncPurchaseLifecycle(voucherRequest.purchase_id, voucherNumber, "ready_for_delivery");
 
     if (voucher.data?.id) {
       await requestWorkflowService.markVoucherApproved({
@@ -313,6 +350,28 @@ async function processApprovedRequest(request: {
         voucherNumber,
       });
     }
+  }
+  
+  if (request.sourceTable === "purchases") {
+    await supabase
+      .from("approval_requests")
+      .update({
+        workflow_status: "in_purchasing",
+        processed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", request.approvalRequestId);
+  }
+  
+  if (request.sourceTable === "leave_requests" || request.sourceTable === "cash_advance_requests") {
+    await supabase
+      .from("approval_requests")
+      .update({
+        workflow_status: "approved",
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", request.approvalRequestId);
   }
 }
 
@@ -491,20 +550,27 @@ export const approvalCenterService = {
     const targetModule = request.target_module || resolveTargetModule(request.source_table, request.request_type, request.payload as JsonValue | null);
     const workflowStatus = resolveWorkflowStatus(status, targetModule);
 
+    const updateData: Record<string, unknown> = {
+      status,
+      target_module: targetModule,
+      workflow_status: workflowStatus,
+      latest_comment: comments || null,
+      reviewed_by: authData.user.id,
+      reviewed_at: timestamp,
+      updated_at: timestamp,
+    };
+    
+    if (status === "approved" && targetModule) {
+      updateData.routed_at = timestamp;
+    }
+    
+    if (status === "rejected") {
+      updateData.completed_at = timestamp;
+    }
+
     const { error: updateError } = await supabase
       .from("approval_requests")
-      .update({
-        status,
-        target_module: targetModule,
-        workflow_status: workflowStatus,
-        latest_comment: comments || null,
-        reviewed_by: authData.user.id,
-        reviewed_at: timestamp,
-        routed_at: status === "approved" && targetModule ? timestamp : null,
-        processed_at: null,
-        completed_at: null,
-        updated_at: timestamp,
-      })
+      .update(updateData)
       .eq("id", approvalRequestId);
 
     if (updateError) throw updateError;
