@@ -15,7 +15,7 @@ import {
   type WorkflowStatus,
 } from "@/services/approvalCenterService";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { RotateCcw, Trash2, Search, Loader2 } from "lucide-react";
+import { RotateCcw, Trash2, Search, Loader2, List } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 
@@ -26,6 +26,14 @@ interface ApprovalTab {
   label: string;
   tone: string;
   activeTone: string;
+}
+
+interface RequestGroup {
+  groupKey: string;
+  orderNumber: string | null;
+  requests: ApprovalRequest[];
+  firstRequest: ApprovalRequest;
+  itemCount: number;
 }
 
 const approvalTabs: ApprovalTab[] = [
@@ -72,31 +80,40 @@ function getModuleTone(sourceModule: string) {
   return approvalTabs.find((tab) => tab.key === sourceModule)?.tone || approvalTabs[0].tone;
 }
 
-function canArchiveRequest(request: ApprovalRequest) {
-  return request.status === "approved" && ["purchases", "site_requests", "cash_advance_requests", "leave_requests"].includes(request.sourceTable);
+function getOrderNumber(request: ApprovalRequest): string | null {
+  if (!request.payload || typeof request.payload !== "object" || Array.isArray(request.payload)) {
+    return null;
+  }
+  const payload = request.payload as Record<string, unknown>;
+  return typeof payload.orderNumber === "string" ? payload.orderNumber : null;
 }
 
-function getLinkedRequestDetails(request: ApprovalRequest) {
-  if (request.sourceTable !== "site_requests" || !request.payload || Array.isArray(request.payload) || typeof request.payload !== "object") {
-    return [];
-  }
+function groupRequests(requests: ApprovalRequest[]): RequestGroup[] {
+  const grouped = new Map<string, ApprovalRequest[]>();
+  
+  requests.forEach((request) => {
+    const orderNumber = getOrderNumber(request);
+    const groupKey = orderNumber || request.id;
+    
+    if (!grouped.has(groupKey)) {
+      grouped.set(groupKey, []);
+    }
+    grouped.get(groupKey)!.push(request);
+  });
 
-  const payload = request.payload as Record<string, unknown>;
-  const quantity = payload.quantity;
-  const unit = payload.unit;
-  const amount = payload.amount;
-  const quantityLabel =
-    typeof quantity === "number" || typeof quantity === "string"
-      ? `${quantity}${typeof unit === "string" && unit ? ` ${unit}` : ""}`
-      : null;
-
-  return [
-    { label: "Requested Item", value: typeof payload.itemName === "string" ? payload.itemName : null },
-    { label: "Quantity / Amount", value: quantityLabel },
-    { label: "Request Date", value: typeof payload.requestDate === "string" ? new Date(payload.requestDate).toLocaleDateString() : null },
-    { label: "Scope of Work", value: typeof payload.scopeName === "string" && payload.scopeName ? payload.scopeName : null },
-    { label: "Recorded Amount", value: typeof amount === "number" ? amount.toLocaleString("en-US") : null },
-  ].filter((detail): detail is { label: string; value: string } => Boolean(detail.value));
+  return Array.from(grouped.entries()).map(([groupKey, groupRequests]) => {
+    const sortedRequests = groupRequests.sort((a, b) => 
+      new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime()
+    );
+    
+    return {
+      groupKey,
+      orderNumber: getOrderNumber(sortedRequests[0]),
+      requests: sortedRequests,
+      firstRequest: sortedRequests[0],
+      itemCount: sortedRequests.length,
+    };
+  });
 }
 
 export default function ApprovalCenterPage() {
@@ -113,20 +130,21 @@ export default function ApprovalCenterPage() {
   const [loadingDeleted, setLoadingDeleted] = useState(false);
   const [emptyDialogOpen, setEmptyDialogOpen] = useState(false);
   const [emptyingBin, setEmptyingBin] = useState(false);
+  const [groupItemsDialogOpen, setGroupItemsDialogOpen] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState<RequestGroup | null>(null);
 
   const filteredRequests = useMemo(() => {
     if (activeTab === "all") return requests;
     return requests.filter((request) => request.sourceModule === activeTab);
   }, [activeTab, requests]);
 
+  const groupedRequests = useMemo(() => {
+    return groupRequests(filteredRequests);
+  }, [filteredRequests]);
+
   const selectedRequest = useMemo(
     () => requests.find((request) => request.id === selectedRequestId) || filteredRequests[0] || null,
     [filteredRequests, requests, selectedRequestId]
-  );
-
-  const selectedRequestDetails = useMemo(
-    () => (selectedRequest ? getLinkedRequestDetails(selectedRequest) : []),
-    [selectedRequest]
   );
 
   const pendingCounts = useMemo(() => {
@@ -295,6 +313,11 @@ export default function ApprovalCenterPage() {
     }
   }
 
+  function openGroupItemsDialog(group: RequestGroup) {
+    setSelectedGroup(group);
+    setGroupItemsDialogOpen(true);
+  }
+
   return (
     <Layout>
       <div className="space-y-4">
@@ -341,13 +364,13 @@ export default function ApprovalCenterPage() {
                 <CardHeader className="space-y-1 p-4">
                   <CardTitle className="text-base">{approvalTabs.find((tab) => tab.key === activeTab)?.label}</CardTitle>
                   <CardDescription className="text-xs">
-                    Structured request review list with direct access to the full Request Details panel.
+                    Grouped requests with direct access to the full Request Details panel.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
                   {loading ? (
                     <div className="py-10 text-center text-sm text-muted-foreground">Loading approval requests...</div>
-                  ) : filteredRequests.length === 0 ? (
+                  ) : groupedRequests.length === 0 ? (
                     <div className="rounded-b-lg border-t border-dashed py-10 text-center text-sm text-muted-foreground">
                       No approval requests in this category.
                     </div>
@@ -356,6 +379,7 @@ export default function ApprovalCenterPage() {
                       <Table>
                         <TableHeader>
                           <TableRow className="border-y">
+                            <TableHead className="h-9 text-[11px] uppercase tracking-wide">Group ID</TableHead>
                             <TableHead className="h-9 text-[11px] uppercase tracking-wide">Source</TableHead>
                             <TableHead className="h-9 text-[11px] uppercase tracking-wide">Type</TableHead>
                             <TableHead className="h-9 text-[11px] uppercase tracking-wide">Requested By</TableHead>
@@ -363,58 +387,82 @@ export default function ApprovalCenterPage() {
                             <TableHead className="h-9 text-[11px] uppercase tracking-wide">Project</TableHead>
                             <TableHead className="h-9 text-[11px] uppercase tracking-wide">Status</TableHead>
                             <TableHead className="h-9 text-[11px] uppercase tracking-wide">Lifecycle</TableHead>
-                            <TableHead className="h-9 text-right text-[11px] uppercase tracking-wide">Delete</TableHead>
-                            <TableHead className="h-9 text-right text-[11px] uppercase tracking-wide">View Details</TableHead>
+                            <TableHead className="h-9 text-right text-[11px] uppercase tracking-wide">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {filteredRequests.map((request) => (
-                            <TableRow
-                              key={request.id}
-                              className={`cursor-pointer text-xs ${selectedRequest?.id === request.id ? "bg-primary/5" : ""}`}
-                              onClick={() => setSelectedRequestId(request.id)}
-                            >
-                              <TableCell className="py-2.5">
-                                <Badge variant="outline" className={`border text-[10px] ${getModuleTone(request.sourceModule)}`}>
-                                  {request.sourceModule}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="py-2.5 font-medium">{request.requestType}</TableCell>
-                              <TableCell className="py-2.5">{request.requestedBy}</TableCell>
-                              <TableCell className="py-2.5 text-muted-foreground">{formatDateTime(request.requestedAt)}</TableCell>
-                              <TableCell className="py-2.5">{request.projectName || "No project"}</TableCell>
-                              <TableCell className="py-2.5">
-                                <Badge className={`text-[10px] ${statusBadgeClass(request.status)}`}>
-                                  {request.status.replaceAll("_", " ")}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="py-2.5">
-                                <div className="space-y-1">
-                                  <Badge className={`text-[10px] ${workflowBadgeClass(request.workflowStatus)}`}>
-                                    {formatWorkflowStatus(request.workflowStatus)}
+                          {groupedRequests.map((group) => {
+                            const request = group.firstRequest;
+                            return (
+                              <TableRow
+                                key={group.groupKey}
+                                className="cursor-pointer text-xs hover:bg-muted/50"
+                                onClick={() => setSelectedRequestId(request.id)}
+                              >
+                                <TableCell className="py-2.5 font-medium text-primary">
+                                  {group.orderNumber || `REQ-${request.id.slice(0, 8)}`}
+                                  {group.itemCount > 1 && (
+                                    <Badge variant="secondary" className="ml-2 h-4 px-1 text-[10px]">
+                                      {group.itemCount} items
+                                    </Badge>
+                                  )}
+                                </TableCell>
+                                <TableCell className="py-2.5">
+                                  <Badge variant="outline" className={`border text-[10px] ${getModuleTone(request.sourceModule)}`}>
+                                    {request.sourceModule}
                                   </Badge>
-                                  <p className="text-[11px] text-muted-foreground">{request.targetModule || "Unassigned"}</p>
-                                </div>
-                              </TableCell>
-                              <TableCell className="py-2.5 text-right">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 border-rose-200 px-2 text-xs text-rose-700 hover:bg-rose-50"
-                                  disabled={deletingId === request.id}
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    void handleDelete(request);
-                                  }}
-                                >
-                                  {deletingId === request.id ? "Deleting..." : "Delete"}
-                                </Button>
-                              </TableCell>
-                              <TableCell className="py-2.5 text-right">
-                                <RequestDetailsButton request={request} allowActions onStatusUpdated={loadRequests} />
-                              </TableCell>
-                            </TableRow>
-                          ))}
+                                </TableCell>
+                                <TableCell className="py-2.5 font-medium">{request.requestType}</TableCell>
+                                <TableCell className="py-2.5">{request.requestedBy}</TableCell>
+                                <TableCell className="py-2.5 text-muted-foreground">{formatDateTime(request.requestedAt)}</TableCell>
+                                <TableCell className="py-2.5">{request.projectName || "No project"}</TableCell>
+                                <TableCell className="py-2.5">
+                                  <Badge className={`text-[10px] ${statusBadgeClass(request.status)}`}>
+                                    {request.status.replaceAll("_", " ")}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="py-2.5">
+                                  <div className="space-y-1">
+                                    <Badge className={`text-[10px] ${workflowBadgeClass(request.workflowStatus)}`}>
+                                      {formatWorkflowStatus(request.workflowStatus)}
+                                    </Badge>
+                                    <p className="text-[11px] text-muted-foreground">{request.targetModule || "Unassigned"}</p>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="py-2.5 text-right">
+                                  <div className="flex justify-end gap-2">
+                                    {group.itemCount > 1 && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-7 px-2 text-xs"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          openGroupItemsDialog(group);
+                                        }}
+                                      >
+                                        <List className="mr-1 h-3.5 w-3.5" />
+                                        View Group
+                                      </Button>
+                                    )}
+                                    <RequestDetailsButton request={request} allowActions onStatusUpdated={loadRequests} />
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 border-rose-200 px-2 text-xs text-rose-700 hover:bg-rose-50"
+                                      disabled={deletingId === request.id}
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        void handleDelete(request);
+                                      }}
+                                    >
+                                      Delete
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
                         </TableBody>
                       </Table>
                     </div>
@@ -424,6 +472,54 @@ export default function ApprovalCenterPage() {
             </div>
           </TabsContent>
         </Tabs>
+
+        <Dialog open={groupItemsDialogOpen} onOpenChange={setGroupItemsDialogOpen}>
+          <DialogContent className="max-w-5xl">
+            <DialogHeader>
+              <DialogTitle>Group Items: {selectedGroup?.orderNumber || "Request Group"}</DialogTitle>
+              <DialogDescription>
+                All requests in this group ({selectedGroup?.itemCount || 0} items)
+              </DialogDescription>
+            </DialogHeader>
+
+            {selectedGroup ? (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Requested By</TableHead>
+                      <TableHead>Date & Time</TableHead>
+                      <TableHead>Summary</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedGroup.requests.map((request) => (
+                      <TableRow key={request.id}>
+                        <TableCell className="font-medium">{request.requestType}</TableCell>
+                        <TableCell>{request.requestedBy}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {formatDateTime(request.requestedAt)}
+                        </TableCell>
+                        <TableCell className="max-w-xs truncate">{request.summary}</TableCell>
+                        <TableCell>
+                          <Badge className={`text-[10px] ${statusBadgeClass(request.status)}`}>
+                            {request.status.replaceAll("_", " ")}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <RequestDetailsButton request={request} allowActions onStatusUpdated={loadRequests} />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : null}
+          </DialogContent>
+        </Dialog>
 
         <Dialog open={recycleBinOpen} onOpenChange={setRecycleBinOpen}>
           <DialogContent className="max-w-5xl">
