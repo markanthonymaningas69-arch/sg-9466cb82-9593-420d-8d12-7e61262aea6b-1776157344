@@ -224,9 +224,9 @@ export function SitePersonnelRecycleBin({ projectId, onChange }: SitePersonnelRe
                     <TableCell>
                       <Badge variant="outline">{getSourceLabel(item.sourceTable)}</Badge>
                     </TableCell>
-                    <TableCell>{formatDate(item.date)}</TableCell>
+                    <TableCell>{formatDate(item.createdAt)}</TableCell>
                     <TableCell className="max-w-xs truncate">
-                      {item.details}
+                      <span className="font-medium">{item.title}</span> &bull; {item.description}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {formatDate(item.deletedAt)}
