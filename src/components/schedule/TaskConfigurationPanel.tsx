@@ -489,17 +489,58 @@ export function TaskConfigurationPanel({
               <section className="space-y-3 rounded-md border p-3">
                 <div className="space-y-1">
                   <h3 className="text-sm font-semibold text-foreground">Basic Info</h3>
-                  <p className="text-[11px] text-muted-foreground">These values are synced from the linked BOM scope and can only be changed in the BOM module.</p>
+                  {task.bom_scope ? (
+                    <p className="text-[11px] text-muted-foreground">These values are synced from the linked BOM scope and can only be changed in the BOM module.</p>
+                  ) : (
+                    <p className="text-[11px] text-muted-foreground">Enter task details manually. These values will be synced if you later link this task to a BOM scope.</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs">Task Name</Label>
-                  <Input value={task.bom_scope?.name || task.name || ""} readOnly className="h-8 text-sm bg-muted/50" />
+                  <Input 
+                    value={task.bom_scope?.name || task.name || ""} 
+                    onChange={(event) => {
+                      if (!task.bom_scope) {
+                        onTaskChange({ ...task, name: event.target.value });
+                      }
+                    }}
+                    readOnly={Boolean(task.bom_scope)} 
+                    className={`h-8 text-sm ${task.bom_scope ? 'bg-muted/50' : ''}`}
+                    placeholder="Enter task name"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs">Scope Quantity</Label>
                   <div className="grid grid-cols-[1fr_110px] gap-2">
-                    <Input value={String(task.bom_scope?.quantity ?? taskConfig.scopeQuantity)} readOnly className="h-8 text-sm bg-muted/50" />
-                    <Input value={task.bom_scope?.unit || taskConfig.scopeUnit} readOnly className="h-8 text-sm bg-muted/50" />
+                    <Input 
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={String(task.bom_scope?.quantity ?? taskConfig.scopeQuantity)} 
+                      onChange={(event) => {
+                        if (!task.bom_scope) {
+                          handleTaskConfigChange({
+                            scopeQuantity: Number(event.target.value) || 0,
+                          });
+                        }
+                      }}
+                      readOnly={Boolean(task.bom_scope)} 
+                      className={`h-8 text-sm ${task.bom_scope ? 'bg-muted/50' : ''}`}
+                      placeholder="0"
+                    />
+                    <Input 
+                      value={task.bom_scope?.unit || taskConfig.scopeUnit} 
+                      onChange={(event) => {
+                        if (!task.bom_scope) {
+                          handleTaskConfigChange({
+                            scopeUnit: event.target.value,
+                          });
+                        }
+                      }}
+                      readOnly={Boolean(task.bom_scope)} 
+                      className={`h-8 text-sm ${task.bom_scope ? 'bg-muted/50' : ''}`}
+                      placeholder="unit"
+                    />
                   </div>
                 </div>
               </section>
