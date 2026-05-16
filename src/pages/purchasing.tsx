@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ShoppingCart, Plus, Search, Building2, Warehouse as WarehouseIcon, FilterX, List, Edit2, Archive, Printer, ChevronsUpDown, Check, Filter, Receipt, Eye, Trash2 } from "lucide-react";
+import { ShoppingCart, Plus, Search, Building2, Warehouse as WarehouseIcon, FilterX, List, Edit2, Printer, ChevronsUpDown, Check, Filter, Receipt, Eye, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { projectService } from "@/services/projectService";
 import { useSettings } from "@/contexts/SettingsProvider";
@@ -21,6 +21,7 @@ import { requestWorkflowService } from "@/services/requestWorkflowService";
 import { RequestDetailsButton } from "@/components/approval/RequestDetailsButton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PurchasingRecycleBin } from "@/components/purchasing/PurchasingRecycleBin";
 
 const STANDARD_CATEGORIES = [
   "Construction Materials",
@@ -205,7 +206,7 @@ export default function Purchasing() {
   const loadData = async () => {
     setLoading(true);
     const [{ data: pData }, { data: projData }, { data: supData }, { data: vouchData }, { data: voucherReqData }, { data: masterData }, incomingData] = await Promise.all([
-      supabase.from("purchases").select(`*, projects(name)`).eq('is_archived', false).order('created_at', { ascending: false }),
+      supabase.from("purchases").select(`*, projects(name)`).eq('is_deleted', false).order('created_at', { ascending: false }),
       projectService.getAll(),
       supabase.from("suppliers").select("*").order("name"),
       supabase.from("vouchers").select("*").order("created_at", { ascending: false }),
@@ -430,33 +431,29 @@ export default function Purchasing() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this purchase order item?")) return;
+    if (!confirm("Move this purchase order to recycle bin?")) return;
 
     try {
-      const { error: approvalError } = await supabase
-        .from("approval_requests")
-        .delete()
-        .eq("source_table", "purchases")
-        .eq("source_record_id", id);
+      const { error } = await supabase
+        .from("purchases")
+        .update({ is_deleted: true, deleted_at: new Date().toISOString() })
+        .eq("id", id);
 
-      if (approvalError) {
-        throw approvalError;
-      }
-
-      const { error: purchaseError } = await supabase.from("purchases").delete().eq("id", id);
-      if (purchaseError) throw purchaseError;
+      if (error) throw error;
 
       loadData();
+      toast({
+        title: "Purchase Deleted",
+        description: "Purchase order moved to recycle bin",
+      });
     } catch (error) {
       console.error("Error deleting purchase:", error);
-      alert("Failed to delete purchase order item");
+      toast({
+        title: "Error",
+        description: "Failed to delete purchase order",
+        variant: "destructive",
+      });
     }
-  };
-
-  const handleArchive = async (id: string) => {
-    if (!confirm("Are you sure you want to archive this purchase order item?")) return;
-    const { error } = await supabase.from("purchases").update({ is_archived: true }).eq("id", id);
-    if (!error) loadData();
   };
 
   const uniqueSuppliers = Array.from(new Set(purchases.map(p => p.supplier))).filter(Boolean);
@@ -469,55 +466,33 @@ export default function Purchasing() {
     return matchSupplier && matchDate && matchItem && matchStatus;
   });
 
-  const handleArchiveGroup = async (groupKey: string) => {
-    if (!confirm("Are you sure you want to archive all items in this group?")) return;
-    
-    const groupItems = filteredPurchases.filter((p) => getGroupKey(p) === groupKey);
-    const hasApprovalResults = groupItems.some((p) => p.status === "approved" || p.status === "rejected");
-
-    if (!hasApprovalResults) {
-      alert("Can only archive items that have been approved or rejected in Approval Center.");
-      return;
-    }
-
-    try {
-      await Promise.all(
-        groupItems.map((p) => supabase.from("purchases").update({ is_archived: true }).eq("id", p.id))
-      );
-      loadData();
-    } catch (error) {
-      console.error("Error archiving group:", error);
-      alert("Failed to archive group");
-    }
-  };
-
   const handleDeleteGroup = async (groupKey: string) => {
-    if (!confirm("Are you sure you want to delete all pending items in this group?")) return;
+    if (!confirm("Move all items in this group to recycle bin?")) return;
     
     const groupItems = filteredPurchases.filter((p) => getGroupKey(p) === groupKey);
-    const allPending = groupItems.every((p) => p.status === "pending" || p.status === "pending_approval");
-
-    if (!allPending) {
-      alert("Can only delete items that are still pending or pending approval.");
-      return;
-    }
 
     try {
+      const timestamp = new Date().toISOString();
       await Promise.all(
-        groupItems.map(async (p) => {
-          await supabase
-            .from("approval_requests")
-            .delete()
-            .eq("source_table", "purchases")
-            .eq("source_record_id", p.id);
-
-          await supabase.from("purchases").delete().eq("id", p.id);
-        })
+        groupItems.map((p) => 
+          supabase
+            .from("purchases")
+            .update({ is_deleted: true, deleted_at: timestamp })
+            .eq("id", p.id)
+        )
       );
       loadData();
+      toast({
+        title: "Group Deleted",
+        description: "Purchase group moved to recycle bin",
+      });
     } catch (error) {
       console.error("Error deleting group:", error);
-      alert("Failed to delete group");
+      toast({
+        title: "Error",
+        description: "Failed to delete group",
+        variant: "destructive",
+      });
     }
   };
 
@@ -553,20 +528,8 @@ export default function Purchasing() {
     setViewGroupDialogOpen(true);
   };
 
-  const canArchiveGroup = (group: any) => {
-    const hasApprovalResult = group.items.some((item: any) => 
-      item.status === "approved" || item.status === "rejected"
-    );
-    console.log("Can archive group?", group.key, "hasApprovalResult:", hasApprovalResult);
-    return hasApprovalResult;
-  };
-
   const canDeleteGroup = (group: any) => {
-    const allPendingOrPendingApproval = group.items.every((item: any) => 
-      item.status === "pending" || item.status === "pending_approval"
-    );
-    console.log("Can delete group?", group.key, "allPending:", allPendingOrPendingApproval, "statuses:", group.items.map((i: any) => i.status));
-    return allPendingOrPendingApproval;
+    return true;
   };
 
   const canPriceAndSubmit = (group: any) => {
@@ -1172,7 +1135,8 @@ export default function Purchasing() {
         </div>
 
         <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none">
-          <div className="flex justify-end mb-3 shrink-0">
+          <div className="flex justify-between mb-3 shrink-0 gap-2">
+            <PurchasingRecycleBin onChange={loadData} />
             <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="h-8 px-2 text-xs">
               <Filter className="h-3.5 w-3.5 mr-1.5" />
               {showFilters ? "Hide Filters" : "Filters"}
@@ -1352,18 +1316,6 @@ export default function Purchasing() {
                                 disabled={isLocked}
                               >
                                 Price & Submit
-                              </Button>
-                            )}
-                            {canArchiveGroup(group) && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                                onClick={() => void handleArchiveGroup(group.key)}
-                                title="Archive"
-                                disabled={isLocked}
-                              >
-                                <Archive className="h-3.5 w-3.5" />
                               </Button>
                             )}
                             {canDeleteGroup(group) && (

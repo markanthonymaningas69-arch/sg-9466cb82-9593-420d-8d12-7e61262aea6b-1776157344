@@ -2023,9 +2023,11 @@ export type Database = {
           category: string
           company_id: string | null
           created_at: string | null
+          deleted_at: string | null
           destination_type: string
           id: string
           is_archived: boolean | null
+          is_deleted: boolean | null
           item_name: string
           notes: string | null
           order_date: string
@@ -2043,9 +2045,11 @@ export type Database = {
           category: string
           company_id?: string | null
           created_at?: string | null
+          deleted_at?: string | null
           destination_type: string
           id?: string
           is_archived?: boolean | null
+          is_deleted?: boolean | null
           item_name: string
           notes?: string | null
           order_date?: string
@@ -2063,9 +2067,11 @@ export type Database = {
           category?: string
           company_id?: string | null
           created_at?: string | null
+          deleted_at?: string | null
           destination_type?: string
           id?: string
           is_archived?: boolean | null
+          is_deleted?: boolean | null
           item_name?: string
           notes?: string | null
           order_date?: string
