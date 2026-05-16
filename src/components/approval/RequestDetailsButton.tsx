@@ -365,7 +365,7 @@ export function RequestDetailsButton({
                             AED {((request.payload as Record<string, unknown>).unitCost as number).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </p>
                           <p className="mt-1 text-xs text-muted-foreground">
-                            × {(request.payload as Record<string, unknown>).quantity} {(request.payload as Record<string, unknown>).unit || "units"}
+                            × {Number((request.payload as Record<string, unknown>).quantity)} {String((request.payload as Record<string, unknown>).unit || "units")}
                           </p>
                         </div>
                       ) : null}
