@@ -1008,7 +1008,7 @@ export function SiteRequestsTab({ projectId }: { projectId: string }) {
                   </TableHeader>
                   <TableBody>
                     {filteredRequests.map((request) => {
-                      const statusKey = request.status as "pending" | "approved" | "rejected";
+                      const statusKey = request.status as "pending" | "approved" | "rejected" | "returned_for_revision";
                       const statusConfig = STATUS_CONFIG[statusKey] || STATUS_CONFIG.pending;
                       const StatusIcon = statusConfig.icon;
 
