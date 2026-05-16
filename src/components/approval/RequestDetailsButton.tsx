@@ -360,7 +360,17 @@ export function RequestDetailsButton({
                         {auditEntries.map((entry, index) => (
                           <div key={entry.id} className="relative">
                             <div className={`absolute -left-6 top-2 h-4 w-4 rounded-full border-2 border-background ${entry.tone.includes("emerald") ? "bg-emerald-500" : entry.tone.includes("rose") ? "bg-rose-500" : entry.tone.includes("amber") ? "bg-amber-500" : entry.tone.includes("violet") ? "bg-violet-500" : "bg-sky-500"}`}></div>
-                            <div className={`rounded-lg border-2 p-4 shadow-sm ${entry.tone}`}>
+                            <div className={`rounded-lg border-2 p-4 shadow-sm ${
+                              entry.tone.includes("emerald") 
+                                ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900/50 dark:bg-emerald-950/30" 
+                                : entry.tone.includes("rose") 
+                                  ? "border-rose-200 bg-rose-50 dark:border-rose-900/50 dark:bg-rose-950/30" 
+                                  : entry.tone.includes("amber") 
+                                    ? "border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/30" 
+                                    : entry.tone.includes("violet") 
+                                      ? "border-violet-200 bg-violet-50 dark:border-violet-900/50 dark:bg-violet-950/30" 
+                                      : "border-sky-200 bg-sky-50 dark:border-sky-900/50 dark:bg-sky-950/30"
+                            }`}>
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0 flex-1">
                                   <p className="text-sm font-semibold text-foreground">{entry.label}</p>
@@ -371,7 +381,7 @@ export function RequestDetailsButton({
                                 <p className="shrink-0 text-xs font-medium text-muted-foreground">{formatDateTime(entry.createdAt)}</p>
                               </div>
                               {entry.comments ? (
-                                <div className="mt-3 rounded-md bg-background/60 p-3">
+                                <div className="mt-3 rounded-md bg-background/60 p-3 dark:bg-background/40">
                                   <p className="text-sm leading-relaxed text-foreground">{entry.comments}</p>
                                 </div>
                               ) : null}
