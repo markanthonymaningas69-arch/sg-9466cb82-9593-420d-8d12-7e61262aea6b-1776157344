@@ -22,6 +22,7 @@ import { RequestDetailsButton } from "@/components/approval/RequestDetailsButton
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PurchasingRecycleBin } from "@/components/purchasing/PurchasingRecycleBin";
+import { useToast } from "@/hooks/use-toast";
 
 const STANDARD_CATEGORIES = [
   "Construction Materials",
@@ -89,6 +90,7 @@ function formatCompactDateTime(value: string | null) {
 
 export default function Purchasing() {
   const { formatCurrency, company, currency, isLocked } = useSettings();
+  const { toast } = useToast();
   const [purchases, setPurchases] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
