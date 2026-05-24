@@ -57,6 +57,7 @@ const navigation = [
 { name: "Purchasing", href: "/purchasing", icon: ShoppingCart },
 { name: "Accounting", href: "/accounting", icon: Calculator },
 { name: "Human Resources", href: "/personnel", icon: Users },
+{ name: "Team Access", href: "/team-access", icon: Users },
 { name: "Warehouse", href: "/warehouse", icon: Warehouse },
 { name: "Analytics", href: "/analytics", icon: BarChart3 }];
 
