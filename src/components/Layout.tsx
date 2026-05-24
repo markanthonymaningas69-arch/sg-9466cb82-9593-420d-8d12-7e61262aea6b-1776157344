@@ -21,7 +21,8 @@ import {
   Activity,
   CalendarDays,
   ChevronLeft,
-  ChevronRight } from
+  ChevronRight,
+  UserPlus } from
 "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -57,7 +58,7 @@ const navigation = [
 { name: "Purchasing", href: "/purchasing", icon: ShoppingCart },
 { name: "Accounting", href: "/accounting", icon: Calculator },
 { name: "Human Resources", href: "/personnel", icon: Users },
-{ name: "Team Access", href: "/team-access", icon: Users },
+{ name: "Team Access", href: "/team-access", icon: UserPlus },
 { name: "Warehouse", href: "/warehouse", icon: Warehouse },
 { name: "Analytics", href: "/analytics", icon: BarChart3 }];
 
