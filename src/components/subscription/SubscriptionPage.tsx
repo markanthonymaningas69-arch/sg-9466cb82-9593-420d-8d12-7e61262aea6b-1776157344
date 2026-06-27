@@ -303,7 +303,18 @@ export function SubscriptionPage({ country, currency, pricing, addons, available
         })
       });
 
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        console.error("Non-JSON response received:", await response.text());
+        throw new Error("Server error. Please contact support if this persists.");
+      }
+
       const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to create checkout session");
+      }
 
       if (data.url) {
         if (window.self !== window.top) {

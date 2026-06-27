@@ -25,22 +25,6 @@ interface PlanSnapshotInput {
   billingCycle: "monthly" | "annual";
 }
 
-// Validate service role key is present
-if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error("SUPABASE_SERVICE_ROLE_KEY environment variable is required for checkout");
-}
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  }
-);
-
 function parseFeatures(value: unknown): Record<string, number> {
   if (!value) {
     return {};
@@ -110,6 +94,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
+
+  // Validate service role key is present
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error("SUPABASE_SERVICE_ROLE_KEY is not configured");
+    return res.status(500).json({ error: "Server configuration error. Please contact support." });
+  }
+
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    }
+  );
 
   let snapshotId: string | null = null;
 
@@ -247,13 +248,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ sessionId: session.id, url: session.url });
   } catch (error: unknown) {
     if (snapshotId) {
-      await supabaseAdmin
-        .from("subscription_billing_snapshots")
-        .update({
-          status: "failed",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", snapshotId);
+      try {
+        const supabaseAdmin = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!,
+          {
+            auth: {
+              autoRefreshToken: false,
+              persistSession: false
+            }
+          }
+        );
+        
+        await supabaseAdmin
+          .from("subscription_billing_snapshots")
+          .update({
+            status: "failed",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", snapshotId);
+      } catch (cleanupError) {
+        console.error("Failed to mark snapshot as failed:", cleanupError);
+      }
     }
 
     const message = error instanceof Error ? error.message : "Unexpected Stripe checkout error";
