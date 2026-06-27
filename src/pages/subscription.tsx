@@ -53,25 +53,25 @@ async function getSubscriptionRouteFromUser(): Promise<string | null> {
       return null;
     }
 
-    // Get company country
+    // Get company country from company_settings
     const { data: company } = await supabase
-      .from("companies")
-      .select("country")
+      .from("company_settings")
+      .select("name")
       .eq("id", profile.company_id)
       .single();
 
-    if (!company?.country) {
+    if (!company?.name) {
       return null;
     }
 
-    const country = company.country.toLowerCase();
+    const companyName = company.name.toLowerCase();
 
-    // Route based on registered country
-    if (country.includes("philippines") || country === "ph") {
+    // Route based on company name containing country indicator
+    if (companyName.includes("philippines") || companyName.includes("manila") || companyName.includes("ph")) {
       return "/subscription/ph";
     }
 
-    if (country.includes("uae") || country.includes("emirates") || country === "ae") {
+    if (companyName.includes("uae") || companyName.includes("dubai") || companyName.includes("emirates")) {
       return "/subscription/uae";
     }
 
