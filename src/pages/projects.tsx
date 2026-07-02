@@ -123,17 +123,44 @@ export default function Projects() {
       spent: editingProject ? editingProject.spent : 0
     };
 
-    if (editingProject) {
-      await projectService.update(editingProject.id, projectData);
-      toast({ title: "Success", description: "Project updated successfully." });
-    } else {
-      await projectService.create(projectData);
-      toast({ title: "Success", description: "Project created successfully." });
-    }
+    try {
+      if (editingProject) {
+        const { error } = await projectService.update(editingProject.id, projectData);
+        if (error) {
+          console.error("Update error:", error);
+          toast({ 
+            title: "Error", 
+            description: error.message || "Failed to update project. Please try again.", 
+            variant: "destructive" 
+          });
+          return;
+        }
+        toast({ title: "Success", description: "Project updated successfully." });
+      } else {
+        const { error } = await projectService.create(projectData);
+        if (error) {
+          console.error("Create error:", error);
+          toast({ 
+            title: "Error", 
+            description: error.message || "Failed to create project. Please try again.", 
+            variant: "destructive" 
+          });
+          return;
+        }
+        toast({ title: "Success", description: "Project created successfully." });
+      }
 
-    setDialogOpen(false);
-    resetForm();
-    loadProjects();
+      setDialogOpen(false);
+      resetForm();
+      loadProjects();
+    } catch (err: any) {
+      console.error("Unexpected error:", err);
+      toast({ 
+        title: "Error", 
+        description: err.message || "An unexpected error occurred. Please try again.", 
+        variant: "destructive" 
+      });
+    }
   };
 
   const handleMasterItemSubmit = async (e: React.FormEvent) => {
