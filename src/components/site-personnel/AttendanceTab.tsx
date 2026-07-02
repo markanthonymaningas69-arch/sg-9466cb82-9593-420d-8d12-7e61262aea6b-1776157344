@@ -22,10 +22,14 @@ interface AttendanceRecord {
   overtime_hours?: number;
   status: "present" | "absent" | "late" | "half_day";
   notes?: string;
+  bom_scope_id?: string;
   created_at: string;
   personnel?: {
     name: string;
     role: string;
+  };
+  bom_scope_of_work?: {
+    name: string;
   };
 }
 
@@ -33,6 +37,11 @@ interface Personnel {
   id: string;
   name: string;
   role: string;
+}
+
+interface ScopeOfWork {
+  id: string;
+  name: string;
 }
 
 const ATTENDANCE_STATUS = [
@@ -46,8 +55,10 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
   const { toast } = useToast();
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [personnelList, setPersonnelList] = useState<Personnel[]>([]);
+  const [scopesList, setScopesList] = useState<ScopeOfWork[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [bulkAddDialogOpen, setBulkAddDialogOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filters, setFilters] = useState({
     personnelId: "all",
@@ -136,6 +147,17 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
     hours_worked: "8",
     overtime_hours: "0",
     status: "present" as AttendanceRecord["status"],
+    bom_scope_id: "",
+    notes: "",
+  });
+
+  // Bulk add form state
+  const [bulkFormData, setBulkFormData] = useState({
+    date: new Date().toISOString().split("T")[0],
+    hours_worked: "8",
+    overtime_hours: "0",
+    status: "present" as AttendanceRecord["status"],
+    bom_scope_id: "",
     notes: "",
   });
 
@@ -157,12 +179,18 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
       if (personnelError) throw personnelError;
       setPersonnelList(personnelData || []);
 
+      // Load scopes of work for this project
+      const { data: scopesData, error: scopesError } = await siteService.getScopeOfWorks(projectId);
+      if (scopesError) throw scopesError;
+      setScopesList(scopesData || []);
+
       // Load attendance
       const { data, error } = await supabase
         .from("site_attendance")
         .select(`
           *,
-          personnel (name, role)
+          personnel (name, role),
+          bom_scope_of_work (name)
         `)
         .eq("project_id", projectId)
         .eq("is_archived", false)
@@ -199,6 +227,7 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
         hours_worked: Number(formData.hours_worked),
         overtime_hours: Number(formData.overtime_hours),
         status: formData.status,
+        bom_scope_id: formData.bom_scope_id || null,
         notes: formData.notes || null,
       });
 
@@ -217,6 +246,7 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
         hours_worked: "8",
         overtime_hours: "0",
         status: "present",
+        bom_scope_id: "",
         notes: "",
       });
       void loadData();
@@ -225,6 +255,55 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
       toast({
         title: "Error",
         description: error.message?.includes("duplicate") ? "Attendance already recorded for this worker on this date" : "Failed to record attendance",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function handleBulkAdd(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (personnelList.length === 0) {
+      toast({ title: "No Workers", description: "No active workers found for this project", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const attendanceRecords = personnelList.map(person => ({
+        project_id: projectId,
+        personnel_id: person.id,
+        date: bulkFormData.date,
+        hours_worked: Number(bulkFormData.hours_worked),
+        overtime_hours: Number(bulkFormData.overtime_hours),
+        status: bulkFormData.status,
+        bom_scope_id: bulkFormData.bom_scope_id || null,
+        notes: bulkFormData.notes || null,
+      }));
+
+      const { error } = await supabase.from("site_attendance").insert(attendanceRecords);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `Attendance recorded for ${personnelList.length} workers`,
+      });
+
+      setBulkAddDialogOpen(false);
+      setBulkFormData({
+        date: new Date().toISOString().split("T")[0],
+        hours_worked: "8",
+        overtime_hours: "0",
+        status: "present",
+        bom_scope_id: "",
+        notes: "",
+      });
+      void loadData();
+    } catch (error: any) {
+      console.error("Error recording bulk attendance:", error);
+      toast({
+        title: "Error",
+        description: error.message?.includes("duplicate") ? "Some workers already have attendance for this date" : "Failed to record attendance",
         variant: "destructive",
       });
     }
@@ -296,101 +375,220 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
             <Users className="h-5 w-5" />
             Attendance Records
           </CardTitle>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm">
-                <Plus className="mr-2 h-4 w-4" />
-                Mark Attendance
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Mark Attendance</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="personnel_id">Worker</Label>
-                  <Select value={formData.personnel_id} onValueChange={(value) => setFormData((prev) => ({ ...prev, personnel_id: value }))}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select worker" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {personnelList.map((person) => (
-                        <SelectItem key={person.id} value={person.id}>
-                          {person.name} ({person.role})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="date">Date</Label>
-                  <Input
-                    id="date"
-                    type="date"
-                    value={formData.date}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, date: e.target.value }))}
-                    required
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
+          <div className="flex gap-2">
+            <Dialog open={bulkAddDialogOpen} onOpenChange={setBulkAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline">
+                  <Users className="mr-2 h-4 w-4" />
+                  Add All Workers
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Mark Attendance for All Workers</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleBulkAdd} className="space-y-4">
                   <div>
-                    <Label htmlFor="hours_worked">Hours Worked</Label>
+                    <Label htmlFor="bulk_date">Date</Label>
                     <Input
-                      id="hours_worked"
-                      type="number"
-                      step="0.5"
-                      value={formData.hours_worked}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, hours_worked: e.target.value }))}
+                      id="bulk_date"
+                      type="date"
+                      value={bulkFormData.date}
+                      onChange={(e) => setBulkFormData((prev) => ({ ...prev, date: e.target.value }))}
                       required
                     />
                   </div>
+
                   <div>
-                    <Label htmlFor="overtime_hours">Overtime Hours</Label>
+                    <Label htmlFor="bulk_scope">Scope of Work (Optional)</Label>
+                    <Select value={bulkFormData.bom_scope_id} onValueChange={(value) => setBulkFormData((prev) => ({ ...prev, bom_scope_id: value }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select scope of work" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">None</SelectItem>
+                        {scopesList.map((scope) => (
+                          <SelectItem key={scope.id} value={scope.id}>
+                            {scope.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="bulk_hours_worked">Hours Worked</Label>
+                      <Input
+                        id="bulk_hours_worked"
+                        type="number"
+                        step="0.5"
+                        value={bulkFormData.hours_worked}
+                        onChange={(e) => setBulkFormData((prev) => ({ ...prev, hours_worked: e.target.value }))}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="bulk_overtime_hours">Overtime Hours</Label>
+                      <Input
+                        id="bulk_overtime_hours"
+                        type="number"
+                        step="0.5"
+                        value={bulkFormData.overtime_hours}
+                        onChange={(e) => setBulkFormData((prev) => ({ ...prev, overtime_hours: e.target.value }))}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="bulk_status">Status</Label>
+                    <Select value={bulkFormData.status} onValueChange={(value: AttendanceRecord["status"]) => setBulkFormData((prev) => ({ ...prev, status: value }))}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ATTENDANCE_STATUS.map((status) => (
+                          <SelectItem key={status.value} value={status.value}>
+                            {status.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="bulk_notes">Notes (Optional)</Label>
                     <Input
-                      id="overtime_hours"
-                      type="number"
-                      step="0.5"
-                      value={formData.overtime_hours}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, overtime_hours: e.target.value }))}
-                      required
+                      id="bulk_notes"
+                      value={bulkFormData.notes}
+                      onChange={(e) => setBulkFormData((prev) => ({ ...prev, notes: e.target.value }))}
                     />
                   </div>
-                </div>
 
-                <div>
-                  <Label htmlFor="status">Status</Label>
-                  <Select value={formData.status} onValueChange={(value: AttendanceRecord["status"]) => setFormData((prev) => ({ ...prev, status: value }))}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ATTENDANCE_STATUS.map((status) => (
-                        <SelectItem key={status.value} value={status.value}>
-                          {status.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                  <div className="bg-muted p-3 rounded-md text-sm">
+                    <p className="font-medium">This will mark attendance for {personnelList.length} active workers</p>
+                  </div>
 
-                <div>
-                  <Label htmlFor="notes">Notes (Optional)</Label>
-                  <Input
-                    id="notes"
-                    value={formData.notes}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
-                  />
-                </div>
-
-                <Button type="submit" className="w-full">
+                  <Button type="submit" className="w-full">
+                    Mark Attendance for All
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm">
+                  <Plus className="mr-2 h-4 w-4" />
                   Mark Attendance
                 </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Mark Attendance</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <Label htmlFor="personnel_id">Worker</Label>
+                    <Select value={formData.personnel_id} onValueChange={(value) => setFormData((prev) => ({ ...prev, personnel_id: value }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select worker" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {personnelList.map((person) => (
+                          <SelectItem key={person.id} value={person.id}>
+                            {person.name} ({person.role})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="date">Date</Label>
+                    <Input
+                      id="date"
+                      type="date"
+                      value={formData.date}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, date: e.target.value }))}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="scope">Scope of Work (Optional)</Label>
+                    <Select value={formData.bom_scope_id} onValueChange={(value) => setFormData((prev) => ({ ...prev, bom_scope_id: value }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select scope of work" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">None</SelectItem>
+                        {scopesList.map((scope) => (
+                          <SelectItem key={scope.id} value={scope.id}>
+                            {scope.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="hours_worked">Hours Worked</Label>
+                      <Input
+                        id="hours_worked"
+                        type="number"
+                        step="0.5"
+                        value={formData.hours_worked}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, hours_worked: e.target.value }))}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="overtime_hours">Overtime Hours</Label>
+                      <Input
+                        id="overtime_hours"
+                        type="number"
+                        step="0.5"
+                        value={formData.overtime_hours}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, overtime_hours: e.target.value }))}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="status">Status</Label>
+                    <Select value={formData.status} onValueChange={(value: AttendanceRecord["status"]) => setFormData((prev) => ({ ...prev, status: value }))}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ATTENDANCE_STATUS.map((status) => (
+                          <SelectItem key={status.value} value={status.value}>
+                            {status.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="notes">Notes (Optional)</Label>
+                    <Input
+                      id="notes"
+                      value={formData.notes}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
+                    />
+                  </div>
+
+                  <Button type="submit" className="w-full">
+                    Mark Attendance
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -538,6 +736,7 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
                       <TableHead>Date</TableHead>
                       <TableHead>Worker Name</TableHead>
                       <TableHead>Position</TableHead>
+                      <TableHead>Scope of Work</TableHead>
                       <TableHead>Hours</TableHead>
                       <TableHead>Overtime</TableHead>
                       <TableHead>Status</TableHead>
@@ -555,6 +754,15 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
                           <TableCell>{new Date(record.date).toLocaleDateString()}</TableCell>
                           <TableCell className="font-medium">{record.personnel?.name || "Unknown"}</TableCell>
                           <TableCell>{record.personnel?.role || "-"}</TableCell>
+                          <TableCell>
+                            {record.bom_scope_of_work?.name ? (
+                              <Badge variant="outline" className="text-xs">
+                                {record.bom_scope_of_work.name}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
                           <TableCell>{record.hours_worked || 0}</TableCell>
                           <TableCell>{record.overtime_hours || 0}</TableCell>
                           <TableCell>
