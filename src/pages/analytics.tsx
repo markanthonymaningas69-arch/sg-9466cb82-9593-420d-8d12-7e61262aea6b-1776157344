@@ -225,8 +225,7 @@ export default function Analytics() {
       return {
         rows: [],
         totals: { cost: 0, wtPercentage: 0, accomplishment: 0, amountOfCompletion: 0 },
-        appliedAsOfDate: swaAsOfDate || null,
-        hasWorkerData: false
+        appliedAsOfDate: swaAsOfDate || null
       };
     }
 
@@ -249,16 +248,6 @@ export default function Analytics() {
       progressByScope.get(update.bom_scope_id)?.push(update);
     });
 
-    // Filter attendance based on as-of-date
-    const applicableAttendance = (attendance || []).filter((a: any) => {
-      if (!a.date) return false;
-      if (swaAsOfDate && a.date > swaAsOfDate) return false;
-      return true;
-    });
-
-    // Check if we have worker data
-    const hasWorkerData = applicableAttendance.some((a: any) => a.bom_scope_id);
-
     let grandTotalCost = 0;
 
     const scopeRows = scopes.map((scope: any) => {
@@ -271,29 +260,9 @@ export default function Analytics() {
 
       const linkedUpdates = progressByScope.get(scope.id) || [];
       const latestLinkedUpdate = linkedUpdates.length > 0 ? linkedUpdates[linkedUpdates.length - 1] : null;
-      const manualCompletion = latestLinkedUpdate
+      const completion = latestLinkedUpdate
         ? Number(latestLinkedUpdate.percentage_completed || 0)
         : Number(scope.completion_percentage || 0);
-
-      // Calculate labor-based accomplishment from SWA data
-      const scopeAttendance = applicableAttendance.filter((a: any) => a.bom_scope_id === scope.id);
-      const totalHours = scopeAttendance.reduce((sum: number, a: any) => 
-        sum + (Number(a.hours_worked || 0) + Number(a.overtime_hours || 0)), 0
-      );
-
-      // Estimated labor hours from BOM
-      const estimatedLaborHours = Array.isArray(scope.bom_labor)
-        ? scope.bom_labor.reduce((sum: number, l: any) => sum + Number(l.hours || 0), 0)
-        : 0;
-
-      const laborProgress = estimatedLaborHours > 0 
-        ? Math.min(100, (totalHours / estimatedLaborHours) * 100)
-        : (totalHours > 0 ? Math.min(100, (totalHours / 100) * 100) : 0);
-
-      // Blend labor (40%) + manual (60%) when worker data exists
-      const completion = scopeAttendance.length > 0
-        ? (laborProgress * 0.4) + (manualCompletion * 0.6)
-        : manualCompletion;
 
       const cost = matCost + labCost;
       grandTotalCost += cost;
@@ -304,9 +273,6 @@ export default function Analytics() {
         type: "scope",
         cost,
         completion,
-        manualCompletion,
-        laborCompletion: laborProgress,
-        hasWorkerActivity: scopeAttendance.length > 0,
         order_number: scope.order_number || 0,
       };
     });
@@ -324,10 +290,7 @@ export default function Analytics() {
         name: "Indirect Cost",
         type: "indirect",
         cost,
-        completion: avgCompletion,
-        manualCompletion: avgCompletion,
-        laborCompletion: 0,
-        hasWorkerActivity: false
+        completion: avgCompletion
       };
     });
 
@@ -354,10 +317,9 @@ export default function Analytics() {
     return {
       rows: allRows,
       totals,
-      appliedAsOfDate: swaAsOfDate || null,
-      hasWorkerData
+      appliedAsOfDate: swaAsOfDate || null
     };
-  }, [bom, progressUpdates, attendance, swaAsOfDate, latestProgressUpdateDate]);
+  }, [bom, progressUpdates, swaAsOfDate, latestProgressUpdateDate]);
 
   // 2. Material Usage vs Allocated
   const materialUsageData = useMemo(() => {
@@ -679,21 +641,9 @@ export default function Analytics() {
                     <div className="border-b border-border/60 bg-muted/20 px-4 py-3 sm:px-0 sm:pb-4 sm:pt-0">
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                         <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="secondary" className="text-[11px]">
-                              {swaData.appliedAsOfDate ? `As of ${new Date(swaData.appliedAsOfDate).toLocaleDateString()}` : "Latest"}
-                            </Badge>
-                            {swaData.hasWorkerData && (
-                              <Badge variant="default" className="text-[11px]">
-                                SWA Integrated
-                              </Badge>
-                            )}
-                          </div>
-                          {swaData.hasWorkerData && (
-                            <p className="text-xs text-muted-foreground">
-                              Accomplishment blends worker hours (40%) with manual progress (60%)
-                            </p>
-                          )}
+                          <Badge variant="secondary" className="text-[11px]">
+                            {swaData.appliedAsOfDate ? `As of ${new Date(swaData.appliedAsOfDate).toLocaleDateString()}` : "Latest"}
+                          </Badge>
                         </div>
 
                         <div className="grid gap-2 sm:grid-cols-2">
@@ -754,21 +704,11 @@ export default function Analytics() {
                                     <div className="flex flex-wrap items-center gap-2">
                                       <span>{row.name}</span>
                                       {row.type === "indirect" && <Badge variant="outline" className="text-[10px] h-5">Indirect Cost</Badge>}
-                                      {row.hasWorkerActivity && <Badge variant="secondary" className="text-[10px] h-5">SWA</Badge>}
                                     </div>
                                   </TableCell>
                                   <TableCell className="text-right">{formatCurrency(row.cost)}</TableCell>
                                   <TableCell className="text-right">{row.wtPercentage.toFixed(2)}%</TableCell>
-                                  <TableCell className="text-right">
-                                    <div className="flex flex-col items-end gap-0.5">
-                                      <span className="font-semibold">{row.completion.toFixed(2)}%</span>
-                                      {row.hasWorkerActivity && (
-                                        <span className="text-[10px] text-muted-foreground">
-                                          L:{row.laborCompletion.toFixed(0)}% M:{row.manualCompletion.toFixed(0)}%
-                                        </span>
-                                      )}
-                                    </div>
-                                  </TableCell>
+                                  <TableCell className="text-right font-semibold">{row.completion.toFixed(2)}%</TableCell>
                                   <TableCell className="text-right font-bold text-primary">{row.accomplishment.toFixed(2)}%</TableCell>
                                   <TableCell className="text-right font-bold text-primary">{formatCurrency(row.amountOfCompletion)}</TableCell>
                                 </TableRow>

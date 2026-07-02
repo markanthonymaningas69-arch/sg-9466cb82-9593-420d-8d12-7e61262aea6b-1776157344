@@ -84,7 +84,7 @@ export default function Dashboard() {
       supabase.from('projects').select('*').order('created_at', { ascending: false }),
       supabase.from('bill_of_materials').select('project_id, bom_scope_of_work(*, bom_materials(*), bom_labor(*)), bom_indirect_costs(*)'),
       supabase.from('material_consumption').select('*'),
-      supabase.from('site_attendance').select('*, personnel(*), bom_scope_of_work(id)')
+      supabase.from('site_attendance').select('*, personnel(*)').order('date', { ascending: true })
     ]);
 
     const projects = projectsData || [];
@@ -102,65 +102,11 @@ export default function Dashboard() {
       let grandTotalCost = 0;
       let accomplishmentAmount = 0;
       let accomplishmentPct = 0;
-      let laborBasedAccomplishment = 0;
-      let hasWorkerData = false;
 
       if (projectBom) {
         const scopes = projectBom.bom_scope_of_work || [];
         const indirects = projectBom.bom_indirect_costs || [];
 
-        // Calculate labor-based accomplishment from SWA data
-        const projectAttendance = attendances.filter((a: any) => a.project_id === p.id && a.bom_scope_id);
-        
-        if (projectAttendance.length > 0) {
-          hasWorkerData = true;
-          
-          // Group attendance by scope and calculate labor progress
-          const scopeLaborData = scopes.map((scope: any) => {
-            const scopeAttendance = projectAttendance.filter((a: any) => a.bom_scope_id === scope.id);
-            const totalHours = scopeAttendance.reduce((sum: number, a: any) => 
-              sum + (Number(a.hours_worked) || 0) + (Number(a.overtime_hours) || 0), 0
-            );
-            
-            // Calculate material and labor costs for weighting
-            const matCost = (scope.bom_materials || []).reduce((sum: number, m: any) => 
-              sum + (Number(m.quantity || 0) * Number(m.unit_cost || 0)), 0
-            );
-            const labCost = (scope.bom_labor || []).reduce((sum: number, l: any) => 
-              sum + Number(l.total_cost || (Number(l.hours || 0) * Number(l.hourly_rate || 0))), 0
-            );
-            const scopeCost = matCost + labCost;
-            
-            // Labor progress indicator: hours worked vs estimated hours (assuming 8 hours per labor unit)
-            const estimatedLaborHours = (scope.bom_labor || []).reduce((sum: number, l: any) => 
-              sum + Number(l.hours || 0), 0
-            );
-            
-            const laborProgress = estimatedLaborHours > 0 
-              ? Math.min(100, (totalHours / estimatedLaborHours) * 100)
-              : (totalHours > 0 ? Math.min(100, (totalHours / 100) * 100) : 0); // Fallback to hours/100 if no estimate
-            
-            return {
-              scopeId: scope.id,
-              scopeCost,
-              laborProgress,
-              manualProgress: Number(scope.completion_percentage || 0),
-              totalHours
-            };
-          });
-          
-          // Calculate weighted labor-based accomplishment
-          const totalScopeCost = scopeLaborData.reduce((sum, s) => sum + s.scopeCost, 0);
-          
-          if (totalScopeCost > 0) {
-            laborBasedAccomplishment = scopeLaborData.reduce((sum, s) => {
-              const weight = s.scopeCost / totalScopeCost;
-              return sum + (weight * s.laborProgress);
-            }, 0);
-          }
-        }
-
-        // Calculate manual progress-based accomplishment (existing logic)
         const scopeRows = scopes.map((scope: any) => {
           const matCost = (scope.bom_materials || []).reduce((sum: number, m: any) => sum + (Number(m.quantity || 0) * Number(m.unit_cost || 0)), 0);
           const labCost = (scope.bom_labor || []).reduce((sum: number, l: any) => sum + Number(l.total_cost || (Number(l.hours || 0) * Number(l.hourly_rate || 0))), 0);
@@ -227,22 +173,13 @@ export default function Dashboard() {
       totalVal += activeBudget;
       totalCst += totalActualCost;
 
-      // Blend SWA-based accomplishment with manual progress when worker data exists
-      // If no worker data, fall back to manual progress only
-      const finalAccomplishment = hasWorkerData 
-        ? (laborBasedAccomplishment * 0.4) + (accomplishmentPct * 0.6) // 40% labor, 60% manual
-        : accomplishmentPct;
-
       return {
         ...p,
         contractAmount: activeBudget,
         projectCost: activeBudget,
         costToDate: totalActualCost,
         margin: margin,
-        completion: finalAccomplishment || 0,
-        manualCompletion: accomplishmentPct || 0,
-        laborCompletion: laborBasedAccomplishment || 0,
-        hasWorkerData,
+        completion: accomplishmentPct || 0,
         amountOfCompletion: accomplishmentAmount,
         weightPercent: 0,
         weightedContribution: 0,
@@ -338,55 +275,6 @@ export default function Dashboard() {
         const { data: updates } = await supabase.from('bom_progress_updates').select('*, bom_scope_of_work(name)').in('bom_scope_id', scopeIds).order('update_date', { ascending: true });
         if (updates) {
           setRawProgressUpdates(updates);
-        }
-        
-        // Load attendance linked to scopes - THIS IS THE SWA LINK
-        const { data: attendance } = await supabase
-          .from('site_attendance')
-          .select('*, personnel(name, role), bom_scope_of_work(id, name)')
-          .eq('project_id', project.id)
-          .not('bom_scope_id', 'is', null)
-          .order('date', { ascending: false });
-        
-        if (attendance) {
-          // Group attendance by scope and date for accomplishment tracking
-          const scopeAttendance = scopes.map(scope => {
-            const scopeRecords = attendance.filter((a: any) => a.bom_scope_id === scope.id);
-            const uniqueWorkers = Array.from(new Set(scopeRecords.map((a: any) => a.personnel?.name))).filter(Boolean);
-            const totalHours = scopeRecords.reduce((sum: number, a: any) => sum + (Number(a.hours_worked) || 0) + (Number(a.overtime_hours) || 0), 0);
-            const totalWorkerDays = scopeRecords.length;
-            
-            // Calculate labor progress contribution
-            // This links SWA (worker hours) to accomplishment
-            // Using 100 as estimated base since column doesn't exist - can be enhanced later
-            const laborProgressIndicator = totalHours > 0 ? 
-              Math.min(100, (totalHours / (100 * 8)) * 100) : 0;
-            
-            return {
-              scopeId: scope.id,
-              scopeName: scope.name,
-              completion: scope.completion_percentage || 0,
-              workers: uniqueWorkers,
-              totalHours,
-              recordCount: scopeRecords.length,
-              totalWorkerDays,
-              laborProgressIndicator: laborProgressIndicator.toFixed(1)
-            };
-          });
-          
-          // Store enhanced scope data with SWA metrics
-          setProjectScopes((scopes as any).map((s: any) => {
-            const attendance = scopeAttendance.find(sa => sa.scopeId === s.id);
-            return {
-              ...s,
-              workers: attendance?.workers || [],
-              totalHours: attendance?.totalHours || 0,
-              recordCount: attendance?.recordCount || 0,
-              totalWorkerDays: attendance?.totalWorkerDays || 0,
-              laborProgressIndicator: attendance?.laborProgressIndicator || '0.0',
-              hasWorkerActivity: (attendance?.totalHours || 0) > 0
-            };
-          }));
         }
       }
     }
@@ -540,18 +428,8 @@ export default function Dashboard() {
                         </TableCell>
                         <TableCell className="px-2 py-2 text-right">
                           <div className="flex flex-col items-end gap-1">
-                            <div className="flex items-center gap-1">
-                              <span className="text-[10px] font-semibold sm:text-xs">{project.completion.toFixed(2)}%</span>
-                              {project.hasWorkerData && (
-                                <Badge variant="secondary" className="text-[8px] px-1 py-0 h-4">SWA</Badge>
-                              )}
-                            </div>
+                            <span className="text-[10px] font-semibold sm:text-xs">{project.completion.toFixed(2)}%</span>
                             <Progress value={project.completion} className="h-1.5 w-full bg-muted" />
-                            {project.hasWorkerData && (
-                              <div className="text-[8px] text-muted-foreground">
-                                Labor: {project.laborCompletion.toFixed(1)}% | Manual: {project.manualCompletion.toFixed(1)}%
-                              </div>
-                            )}
                           </div>
                         </TableCell>
                         <TableCell className="px-2 py-2 text-right">
@@ -729,61 +607,6 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {projectScopes.length > 0 && (
-                    <div className="shrink-0 border rounded-lg p-4 bg-card">
-                      <h4 className="font-semibold text-sm text-muted-foreground mb-3">Scope of Work Assignments (SWA) ↔ Accomplishment</h4>
-                      <div className="space-y-2">
-                        {projectScopes.map((scope: any) => (
-                          <div key={scope.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-md border-l-4" style={{ borderLeftColor: scope.hasWorkerActivity ? 'hsl(var(--primary))' : 'hsl(var(--muted))' }}>
-                            <div className="flex-1">
-                              <div className="font-medium text-sm flex items-center gap-2">
-                                {scope.name}
-                                {scope.hasWorkerActivity && (
-                                  <Badge variant="secondary" className="text-xs">Active</Badge>
-                                )}
-                              </div>
-                              <div className="text-xs text-muted-foreground mt-1">
-                                {scope.workers && scope.workers.length > 0 ? (
-                                  <>
-                                    <strong>{scope.workers.length}</strong> worker{scope.workers.length !== 1 ? 's' : ''} • 
-                                    <strong> {scope.totalHours || 0}</strong> total hours • 
-                                    <strong> {scope.totalWorkerDays || 0}</strong> worker-day{scope.totalWorkerDays !== 1 ? 's' : ''} recorded
-                                  </>
-                                ) : (
-                                  'No workers assigned yet - no SWA data'
-                                )}
-                              </div>
-                              {scope.workers && scope.workers.length > 0 && (
-                                <div className="text-xs text-muted-foreground mt-1">
-                                  <strong>Workers:</strong> {scope.workers.join(', ')}
-                                </div>
-                              )}
-                              {scope.hasWorkerActivity && (
-                                <div className="text-xs mt-2 pt-2 border-t border-muted flex items-center gap-4">
-                                  <span>
-                                    <strong className="text-primary">Labor Progress:</strong> {scope.laborProgressIndicator}%
-                                  </span>
-                                  <span>
-                                    <strong className="text-primary">Reported Completion:</strong> {scope.completion || 0}%
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                            <Badge variant={scope.completion >= 100 ? "default" : scope.hasWorkerActivity ? "secondary" : "outline"} className="ml-4">
-                              {scope.completion || 0}%
-                            </Badge>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="mt-3 p-3 bg-primary/5 rounded-md border border-primary/20">
-                        <p className="text-xs text-muted-foreground">
-                          <strong>SWA ↔ Accomplishment Link:</strong> Worker attendance with scope assignments directly contributes to labor progress tracking. 
-                          The accomplishment curve below reflects progress updates, enhanced by actual worker hours recorded per scope.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
                   <div className="flex-1 min-h-[250px] border rounded-lg p-4 bg-card shrink-0 flex flex-col">
                     <div className="flex justify-between items-center mb-4">
                       <h4 className="font-semibold text-sm text-muted-foreground">Project Accomplishment Curve</h4>
@@ -835,44 +658,6 @@ export default function Dashboard() {
                         </div>
                       )}
                     </div>
-                  </div>
-
-                  <div className="flex-1 border rounded-lg overflow-hidden flex flex-col min-h-[200px]">
-                    <div className="bg-muted/50 px-4 py-2 border-b font-semibold text-sm">Scope Updates History</div>
-                    <ScrollArea className="flex-1">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Date</TableHead>
-                            <TableHead>Scope of Work</TableHead>
-                            <TableHead>Completion</TableHead>
-                            <TableHead>Notes</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredHistory.length > 0 ? (
-                            filteredHistory.map((update) => (
-                              <TableRow key={update.id}>
-                                <TableCell className="whitespace-nowrap">{update.update_date}</TableCell>
-                                <TableCell className="font-medium">{update.bom_scope_of_work?.name || "Unknown Scope"}</TableCell>
-                                <TableCell>
-                                  <Badge variant="outline" className={update.percentage_completed === 100 ? "bg-green-50 text-green-700" : ""}>
-                                    {update.percentage_completed}%
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate" title={update.notes}>{update.notes || "-"}</TableCell>
-                              </TableRow>
-                            ))
-                          ) : (
-                            <TableRow>
-                              <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
-                                No updates found.
-                              </TableCell>
-                            </TableRow>
-                          )}
-                        </TableBody>
-                      </Table>
-                    </ScrollArea>
                   </div>
                 </div>
               );
