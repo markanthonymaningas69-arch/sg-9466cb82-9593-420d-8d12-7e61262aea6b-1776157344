@@ -331,6 +331,30 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
     }
   }
 
+  async function handleScopeChange(recordId: string, newScopeId: string) {
+    try {
+      const { error } = await supabase
+        .from("site_attendance")
+        .update({ bom_scope_id: newScopeId === "none" ? null : newScopeId })
+        .eq("id", recordId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Scope of work updated",
+      });
+      void loadData();
+    } catch (error) {
+      console.error("Error updating scope:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update scope of work",
+        variant: "destructive",
+      });
+    }
+  }
+
   // Calculate attendance summary
   const today = new Date().toISOString().split("T")[0];
   const todayAttendance = attendance.filter((a) => a.date === today);
@@ -754,13 +778,22 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
                           <TableCell className="font-medium">{record.personnel?.name || "Unknown"}</TableCell>
                           <TableCell>{record.personnel?.role || "-"}</TableCell>
                           <TableCell>
-                            {record.bom_scope_of_work?.name ? (
-                              <Badge variant="outline" className="text-xs">
-                                {record.bom_scope_of_work.name}
-                              </Badge>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
+                            <Select
+                              value={record.bom_scope_id || "none"}
+                              onValueChange={(value) => void handleScopeChange(record.id, value)}
+                            >
+                              <SelectTrigger className="h-8 w-[180px]">
+                                <SelectValue placeholder="Select scope" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">No scope assigned</SelectItem>
+                                {scopesList.map((scope) => (
+                                  <SelectItem key={scope.id} value={scope.id}>
+                                    {scope.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </TableCell>
                           <TableCell>{record.hours_worked || 0}</TableCell>
                           <TableCell>{record.overtime_hours || 0}</TableCell>
