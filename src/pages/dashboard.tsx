@@ -169,6 +169,7 @@ export default function Dashboard() {
 
       const activeBudget = grandTotalCost > 0 ? grandTotalCost : budget;
       const margin = activeBudget > 0 ? ((activeBudget - totalActualCost) / activeBudget) * 100 : 0;
+      const profitAmount = activeBudget - totalActualCost;
 
       totalVal += activeBudget;
       totalCst += totalActualCost;
@@ -179,6 +180,7 @@ export default function Dashboard() {
         projectCost: activeBudget,
         costToDate: totalActualCost,
         margin: margin,
+        profitAmount: profitAmount,
         completion: accomplishmentPct || 0,
         amountOfCompletion: accomplishmentAmount,
         weightPercent: 0,
@@ -433,6 +435,14 @@ export default function Dashboard() {
                           </div>
                         </TableCell>
                         <TableCell className="px-2 py-2 text-right">
+                          <span className="text-[10px] font-semibold text-primary sm:text-xs">{formatCurrency(project.amountOfCompletion)}</span>
+                        </TableCell>
+                        <TableCell className="px-2 py-2 text-right">
+                          <span className={`text-[10px] font-semibold sm:text-xs ${project.profitAmount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {formatCurrency(project.profitAmount)}
+                          </span>
+                        </TableCell>
+                        <TableCell className="px-2 py-2">
                           <div className="flex flex-col items-stretch justify-end gap-1.5 sm:flex-row sm:items-center">
                             <Button size="sm" variant="outline" className="h-7 w-full px-2 text-[10px] sm:w-auto" onClick={() => openProjectDetails(project)}>
                               <Eye className="h-3 w-3 sm:mr-1" /> <span className="hidden sm:inline">View</span>
