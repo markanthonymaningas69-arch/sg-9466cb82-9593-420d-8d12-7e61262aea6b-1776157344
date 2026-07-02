@@ -437,7 +437,7 @@ export default function Dashboard() {
                           </div>
                         </TableCell>
                         <TableCell className="px-2 py-2 text-right">
-                          <span className="text-[10px] font-semibold sm:text-xs">{project.completion.toFixed(2)}%</span>
+                          <span className="text-[10px] font-semibold text-primary sm:text-xs">{formatCurrency(project.amountOfCompletion)}</span>
                         </TableCell>
                         <TableCell className="px-2 py-2 text-right">
                           <span className={`text-[10px] font-semibold sm:text-xs ${project.profitAmount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
