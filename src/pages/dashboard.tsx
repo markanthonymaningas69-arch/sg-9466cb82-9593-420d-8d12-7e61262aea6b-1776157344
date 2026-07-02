@@ -266,14 +266,53 @@ export default function Dashboard() {
     
     const { data: bom } = await supabase.from('bill_of_materials').select('id').eq('project_id', project.id).maybeSingle();
     if (bom) {
-      const { data: scopes } = await supabase.from('bom_scope_of_work').select('id, name').eq('bom_id', bom.id);
+      const { data: scopes } = await supabase.from('bom_scope_of_work').select('id, name, completion_percentage').eq('bom_id', bom.id);
       if (scopes && scopes.length > 0) {
         setProjectScopes(scopes);
         const scopeIds = scopes.map(s => s.id);
-        const { data: updates } = await supabase.from('bom_progress_updates').select('*, bom_scope_of_work(name)').in('bom_scope_id', scopeIds).order('update_date', { ascending: true });
         
+        // Load progress updates
+        const { data: updates } = await supabase.from('bom_progress_updates').select('*, bom_scope_of_work(name)').in('bom_scope_id', scopeIds).order('update_date', { ascending: true });
         if (updates) {
           setRawProgressUpdates(updates);
+        }
+        
+        // Load attendance linked to scopes
+        const { data: attendance } = await supabase
+          .from('site_attendance')
+          .select('*, personnel(name, role), bom_scope_of_work(id, name)')
+          .eq('project_id', project.id)
+          .in('bom_scope_id', scopeIds)
+          .not('bom_scope_id', 'is', null)
+          .order('date', { ascending: false });
+        
+        if (attendance) {
+          // Group attendance by scope
+          const scopeAttendance = scopes.map(scope => {
+            const scopeRecords = attendance.filter((a: any) => a.bom_scope_id === scope.id);
+            const uniqueWorkers = Array.from(new Set(scopeRecords.map((a: any) => a.personnel?.name))).filter(Boolean);
+            const totalHours = scopeRecords.reduce((sum: number, a: any) => sum + (Number(a.hours_worked) || 0) + (Number(a.overtime_hours) || 0), 0);
+            
+            return {
+              scopeId: scope.id,
+              scopeName: scope.name,
+              completion: scope.completion_percentage || 0,
+              workers: uniqueWorkers,
+              totalHours,
+              recordCount: scopeRecords.length
+            };
+          });
+          
+          // Store for display
+          setProjectScopes((scopes as any).map((s: any) => {
+            const attendance = scopeAttendance.find(sa => sa.scopeId === s.id);
+            return {
+              ...s,
+              workers: attendance?.workers || [],
+              totalHours: attendance?.totalHours || 0,
+              recordCount: attendance?.recordCount || 0
+            };
+          }));
         }
       }
     }
@@ -606,6 +645,38 @@ export default function Dashboard() {
                     </div>
                   </div>
 
+                  {projectScopes.length > 0 && (
+                    <div className="shrink-0 border rounded-lg p-4 bg-card">
+                      <h4 className="font-semibold text-sm text-muted-foreground mb-3">Scope of Work Assignments</h4>
+                      <div className="space-y-2">
+                        {projectScopes.map((scope: any) => (
+                          <div key={scope.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-md">
+                            <div className="flex-1">
+                              <div className="font-medium text-sm">{scope.name}</div>
+                              <div className="text-xs text-muted-foreground mt-1">
+                                {scope.workers && scope.workers.length > 0 ? (
+                                  <>
+                                    {scope.workers.length} worker{scope.workers.length !== 1 ? 's' : ''} • {scope.totalHours || 0} total hours • {scope.recordCount || 0} attendance record{scope.recordCount !== 1 ? 's' : ''}
+                                  </>
+                                ) : (
+                                  'No workers assigned yet'
+                                )}
+                              </div>
+                              {scope.workers && scope.workers.length > 0 && (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  Workers: {scope.workers.join(', ')}
+                                </div>
+                              )}
+                            </div>
+                            <Badge variant={scope.completion >= 100 ? "default" : "outline"} className="ml-4">
+                              {scope.completion || 0}%
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex-1 min-h-[250px] border rounded-lg p-4 bg-card shrink-0 flex flex-col">
                     <div className="flex justify-between items-center mb-4">
                       <h4 className="font-semibold text-sm text-muted-foreground">Project Accomplishment Curve</h4>
@@ -617,7 +688,7 @@ export default function Dashboard() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="all">All Scopes</SelectItem>
-                            {projectScopes.map(s => (
+                            {projectScopes.map((s: any) => (
                               <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                             ))}
                           </SelectContent>
