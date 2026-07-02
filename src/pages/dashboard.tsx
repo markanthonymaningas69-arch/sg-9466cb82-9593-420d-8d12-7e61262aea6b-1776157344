@@ -369,7 +369,7 @@ export default function Dashboard() {
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <div>
                 <CardTitle className="text-sm font-medium text-primary">Overall Accomplishment</CardTitle>
-                <p className="mt-1 text-xs text-primary/80">Click to view weighted breakdown</p>
+                <p className="mt-1 text-xs text-primary/80">From SWA • Click to view breakdown</p>
               </div>
               <Activity className="h-4 w-4 text-primary" />
             </CardHeader>
@@ -432,12 +432,18 @@ export default function Dashboard() {
                         </TableCell>
                         <TableCell className="px-2 py-2 text-right">
                           <div className="flex flex-col items-end gap-1">
-                            <span className="text-[10px] font-semibold sm:text-xs">{project.completion.toFixed(2)}%</span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] font-semibold sm:text-xs">{project.completion.toFixed(2)}%</span>
+                              <Badge variant="secondary" className="text-[8px] px-1 py-0 h-4">SWA</Badge>
+                            </div>
                             <Progress value={project.completion} className="h-1.5 w-full bg-muted" />
                           </div>
                         </TableCell>
                         <TableCell className="px-2 py-2 text-right">
-                          <span className="text-[10px] font-semibold text-primary sm:text-xs">{formatCurrency(project.amountOfCompletion)}</span>
+                          <div className="flex flex-col items-end gap-0.5">
+                            <span className="text-[10px] font-semibold text-primary sm:text-xs">{formatCurrency(project.amountOfCompletion)}</span>
+                            <span className="text-[8px] text-muted-foreground">from SWA</span>
+                          </div>
                         </TableCell>
                         <TableCell className="px-2 py-2 text-right">
                           <span className={`text-[10px] font-semibold sm:text-xs ${project.profitAmount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
@@ -614,7 +620,10 @@ export default function Dashboard() {
                       <div className="text-xl font-bold">{selectedProjectDetails ? formatCurrency(selectedProjectDetails.costToDate) : '-'}</div>
                     </div>
                     <div className="bg-muted/50 p-4 rounded-lg border">
-                      <div className="text-sm text-muted-foreground">Overall Completion</div>
+                      <div className="text-sm text-muted-foreground flex items-center gap-2">
+                        Overall Completion
+                        <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4">from SWA</Badge>
+                      </div>
                       <div className="text-xl font-bold text-primary">{selectedProjectDetails?.completion?.toFixed(2)}%</div>
                     </div>
                   </div>
