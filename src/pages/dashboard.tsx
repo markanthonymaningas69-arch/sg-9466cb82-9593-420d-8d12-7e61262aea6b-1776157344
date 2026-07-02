@@ -175,7 +175,10 @@ export default function Dashboard() {
       projAtt.forEach((a: any) => {
         const hrRate = Number(a.personnel?.hourly_rate || (a.personnel?.daily_rate ? a.personnel.daily_rate / 8 : 0));
         const hoursWorked = Number(a.hours_worked || 0);
-        const laborCost = hoursWorked * hrRate;
+        const overtimeHours = Number(a.overtime_hours || 0);
+        const regularCost = hoursWorked * hrRate;
+        const overtimeCost = overtimeHours * (hrRate * 1.5);
+        const laborCost = regularCost + overtimeCost;
 
         actualLabCost += laborCost;
 

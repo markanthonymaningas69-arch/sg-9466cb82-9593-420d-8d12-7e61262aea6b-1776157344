@@ -397,7 +397,11 @@ export default function Analytics() {
         .filter(a => a.bom_scope_id === scope.id)
         .reduce((sum: number, a: any) => {
           const hrRate = Number(a.personnel?.hourly_rate || (a.personnel?.daily_rate ? a.personnel.daily_rate / 8 : 0));
-          return sum + (Number(a.hours_worked || 0) * hrRate);
+          const hoursWorked = Number(a.hours_worked || 0);
+          const overtimeHours = Number(a.overtime_hours || 0);
+          const regularCost = hoursWorked * hrRate;
+          const overtimeCost = overtimeHours * (hrRate * 1.5);
+          return sum + regularCost + overtimeCost;
         }, 0);
 
       return {
@@ -420,7 +424,11 @@ export default function Analytics() {
       .filter(a => !a.bom_scope_id || !bom.bom_scope_of_work.find((s: any) => s.id === a.bom_scope_id))
       .reduce((sum: number, a: any) => {
         const hrRate = Number(a.personnel?.hourly_rate || (a.personnel?.daily_rate ? a.personnel.daily_rate / 8 : 0));
-        return sum + (Number(a.hours_worked || 0) * hrRate);
+        const hoursWorked = Number(a.hours_worked || 0);
+        const overtimeHours = Number(a.overtime_hours || 0);
+        const regularCost = hoursWorked * hrRate;
+        const overtimeCost = overtimeHours * (hrRate * 1.5);
+        return sum + regularCost + overtimeCost;
       }, 0);
 
     if (unassignedMatCost > 0 || unassignedLabCost > 0) {
@@ -486,10 +494,13 @@ export default function Analytics() {
       if (!laborByDate[date]) laborByDate[date] = { hours: 0, cost: 0 };
       
       const hrRate = Number(a.personnel?.hourly_rate || (a.personnel?.daily_rate ? a.personnel.daily_rate / 8 : 0));
-      const hours = Number(a.hours_worked || 0);
+      const hoursWorked = Number(a.hours_worked || 0);
+      const overtimeHours = Number(a.overtime_hours || 0);
+      const regularCost = hoursWorked * hrRate;
+      const overtimeCost = overtimeHours * (hrRate * 1.5);
       
-      laborByDate[date].hours += hours;
-      laborByDate[date].cost += hours * hrRate;
+      laborByDate[date].hours += hoursWorked + overtimeHours;
+      laborByDate[date].cost += regularCost + overtimeCost;
     });
 
     // Combine all dates
