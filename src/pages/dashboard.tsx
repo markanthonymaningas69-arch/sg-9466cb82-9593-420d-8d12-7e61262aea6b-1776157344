@@ -266,7 +266,7 @@ export default function Dashboard() {
     
     const { data: bom } = await supabase.from('bill_of_materials').select('id').eq('project_id', project.id).maybeSingle();
     if (bom) {
-      const { data: scopes } = await supabase.from('bom_scope_of_work').select('id, name, completion_percentage').eq('bom_id', bom.id);
+      const { data: scopes } = await supabase.from('bom_scope_of_work').select('id, name, completion_percentage, estimated_quantity, unit').eq('bom_id', bom.id);
       if (scopes && scopes.length > 0) {
         setProjectScopes(scopes);
         const scopeIds = scopes.map(s => s.id);
@@ -277,21 +277,26 @@ export default function Dashboard() {
           setRawProgressUpdates(updates);
         }
         
-        // Load attendance linked to scopes
+        // Load attendance linked to scopes - THIS IS THE SWA LINK
         const { data: attendance } = await supabase
           .from('site_attendance')
           .select('*, personnel(name, role), bom_scope_of_work(id, name)')
           .eq('project_id', project.id)
-          .in('bom_scope_id', scopeIds)
           .not('bom_scope_id', 'is', null)
           .order('date', { ascending: false });
         
         if (attendance) {
-          // Group attendance by scope
+          // Group attendance by scope and date for accomplishment tracking
           const scopeAttendance = scopes.map(scope => {
             const scopeRecords = attendance.filter((a: any) => a.bom_scope_id === scope.id);
             const uniqueWorkers = Array.from(new Set(scopeRecords.map((a: any) => a.personnel?.name))).filter(Boolean);
             const totalHours = scopeRecords.reduce((sum: number, a: any) => sum + (Number(a.hours_worked) || 0) + (Number(a.overtime_hours) || 0), 0);
+            const totalWorkerDays = scopeRecords.length;
+            
+            // Calculate labor progress contribution
+            // This links SWA (worker hours) to accomplishment
+            const laborProgressIndicator = totalHours > 0 ? 
+              Math.min(100, (totalHours / ((scope.estimated_quantity || 100) * 8)) * 100) : 0;
             
             return {
               scopeId: scope.id,
@@ -299,18 +304,24 @@ export default function Dashboard() {
               completion: scope.completion_percentage || 0,
               workers: uniqueWorkers,
               totalHours,
-              recordCount: scopeRecords.length
+              recordCount: scopeRecords.length,
+              totalWorkerDays,
+              laborProgressIndicator: laborProgressIndicator.toFixed(1),
+              unit: scope.unit || 'units'
             };
           });
           
-          // Store for display
+          // Store enhanced scope data with SWA metrics
           setProjectScopes((scopes as any).map((s: any) => {
             const attendance = scopeAttendance.find(sa => sa.scopeId === s.id);
             return {
               ...s,
               workers: attendance?.workers || [],
               totalHours: attendance?.totalHours || 0,
-              recordCount: attendance?.recordCount || 0
+              recordCount: attendance?.recordCount || 0,
+              totalWorkerDays: attendance?.totalWorkerDays || 0,
+              laborProgressIndicator: attendance?.laborProgressIndicator || '0.0',
+              hasWorkerActivity: (attendance?.totalHours || 0) > 0
             };
           }));
         }
@@ -647,32 +658,55 @@ export default function Dashboard() {
 
                   {projectScopes.length > 0 && (
                     <div className="shrink-0 border rounded-lg p-4 bg-card">
-                      <h4 className="font-semibold text-sm text-muted-foreground mb-3">Scope of Work Assignments</h4>
+                      <h4 className="font-semibold text-sm text-muted-foreground mb-3">Scope of Work Assignments (SWA) ↔ Accomplishment</h4>
                       <div className="space-y-2">
                         {projectScopes.map((scope: any) => (
-                          <div key={scope.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-md">
+                          <div key={scope.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-md border-l-4" style={{ borderLeftColor: scope.hasWorkerActivity ? 'hsl(var(--primary))' : 'hsl(var(--muted))' }}>
                             <div className="flex-1">
-                              <div className="font-medium text-sm">{scope.name}</div>
+                              <div className="font-medium text-sm flex items-center gap-2">
+                                {scope.name}
+                                {scope.hasWorkerActivity && (
+                                  <Badge variant="secondary" className="text-xs">Active</Badge>
+                                )}
+                              </div>
                               <div className="text-xs text-muted-foreground mt-1">
                                 {scope.workers && scope.workers.length > 0 ? (
                                   <>
-                                    {scope.workers.length} worker{scope.workers.length !== 1 ? 's' : ''} • {scope.totalHours || 0} total hours • {scope.recordCount || 0} attendance record{scope.recordCount !== 1 ? 's' : ''}
+                                    <strong>{scope.workers.length}</strong> worker{scope.workers.length !== 1 ? 's' : ''} • 
+                                    <strong> {scope.totalHours || 0}</strong> total hours • 
+                                    <strong> {scope.totalWorkerDays || 0}</strong> worker-day{scope.totalWorkerDays !== 1 ? 's' : ''} recorded
                                   </>
                                 ) : (
-                                  'No workers assigned yet'
+                                  'No workers assigned yet - no SWA data'
                                 )}
                               </div>
                               {scope.workers && scope.workers.length > 0 && (
                                 <div className="text-xs text-muted-foreground mt-1">
-                                  Workers: {scope.workers.join(', ')}
+                                  <strong>Workers:</strong> {scope.workers.join(', ')}
+                                </div>
+                              )}
+                              {scope.hasWorkerActivity && (
+                                <div className="text-xs mt-2 pt-2 border-t border-muted flex items-center gap-4">
+                                  <span>
+                                    <strong className="text-primary">Labor Progress:</strong> {scope.laborProgressIndicator}%
+                                  </span>
+                                  <span>
+                                    <strong className="text-primary">Reported Completion:</strong> {scope.completion || 0}%
+                                  </span>
                                 </div>
                               )}
                             </div>
-                            <Badge variant={scope.completion >= 100 ? "default" : "outline"} className="ml-4">
+                            <Badge variant={scope.completion >= 100 ? "default" : scope.hasWorkerActivity ? "secondary" : "outline"} className="ml-4">
                               {scope.completion || 0}%
                             </Badge>
                           </div>
                         ))}
+                      </div>
+                      <div className="mt-3 p-3 bg-primary/5 rounded-md border border-primary/20">
+                        <p className="text-xs text-muted-foreground">
+                          <strong>SWA ↔ Accomplishment Link:</strong> Worker attendance with scope assignments directly contributes to labor progress tracking. 
+                          The accomplishment curve below reflects progress updates, enhanced by actual worker hours recorded per scope.
+                        </p>
                       </div>
                     </div>
                   )}

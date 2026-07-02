@@ -401,12 +401,12 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
 
                   <div>
                     <Label htmlFor="bulk_scope">Scope of Work (Optional)</Label>
-                    <Select value={bulkFormData.bom_scope_id} onValueChange={(value) => setBulkFormData((prev) => ({ ...prev, bom_scope_id: value }))}>
+                    <Select value={bulkFormData.bom_scope_id || "none"} onValueChange={(value) => setBulkFormData((prev) => ({ ...prev, bom_scope_id: value === "none" ? "" : value }))}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select scope of work" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">None</SelectItem>
+                        <SelectItem value="none">No scope assigned</SelectItem>
                         {scopesList.map((scope) => (
                           <SelectItem key={scope.id} value={scope.id}>
                             {scope.name}
@@ -517,12 +517,12 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
 
                   <div>
                     <Label htmlFor="scope">Scope of Work (Optional)</Label>
-                    <Select value={formData.bom_scope_id} onValueChange={(value) => setFormData((prev) => ({ ...prev, bom_scope_id: value }))}>
+                    <Select value={formData.bom_scope_id || "none"} onValueChange={(value) => setFormData((prev) => ({ ...prev, bom_scope_id: value === "none" ? "" : value }))}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select scope of work" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">None</SelectItem>
+                        <SelectItem value="none">No scope assigned</SelectItem>
                         {scopesList.map((scope) => (
                           <SelectItem key={scope.id} value={scope.id}>
                             {scope.name}
