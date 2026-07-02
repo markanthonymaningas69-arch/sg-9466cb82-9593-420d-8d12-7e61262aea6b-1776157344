@@ -190,7 +190,7 @@ export default function Dashboard() {
 
       const activeBudget = grandTotalCost > 0 ? grandTotalCost : budget;
       const margin = activeBudget > 0 ? ((activeBudget - totalActualCost) / activeBudget) * 100 : 0;
-      const profitAmount = activeBudget - totalActualCost;
+      const profitAmount = accomplishmentAmount - totalActualCost;
 
       totalVal += activeBudget;
       totalCst += totalActualCost;
