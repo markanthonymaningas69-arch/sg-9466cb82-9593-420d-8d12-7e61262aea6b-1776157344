@@ -84,7 +84,7 @@ export default function Dashboard() {
       supabase.from('projects').select('*').order('created_at', { ascending: false }),
       supabase.from('bill_of_materials').select('project_id, bom_scope_of_work(*, bom_materials(*), bom_labor(*)), bom_indirect_costs(*)'),
       supabase.from('material_consumption').select('*'),
-      supabase.from('site_attendance').select('*, personnel(*)')
+      supabase.from('site_attendance').select('*, personnel(*), bom_scope_of_work(id)')
     ]);
 
     const projects = projectsData || [];
@@ -102,11 +102,65 @@ export default function Dashboard() {
       let grandTotalCost = 0;
       let accomplishmentAmount = 0;
       let accomplishmentPct = 0;
+      let laborBasedAccomplishment = 0;
+      let hasWorkerData = false;
 
       if (projectBom) {
         const scopes = projectBom.bom_scope_of_work || [];
         const indirects = projectBom.bom_indirect_costs || [];
 
+        // Calculate labor-based accomplishment from SWA data
+        const projectAttendance = attendances.filter((a: any) => a.project_id === p.id && a.bom_scope_id);
+        
+        if (projectAttendance.length > 0) {
+          hasWorkerData = true;
+          
+          // Group attendance by scope and calculate labor progress
+          const scopeLaborData = scopes.map((scope: any) => {
+            const scopeAttendance = projectAttendance.filter((a: any) => a.bom_scope_id === scope.id);
+            const totalHours = scopeAttendance.reduce((sum: number, a: any) => 
+              sum + (Number(a.hours_worked) || 0) + (Number(a.overtime_hours) || 0), 0
+            );
+            
+            // Calculate material and labor costs for weighting
+            const matCost = (scope.bom_materials || []).reduce((sum: number, m: any) => 
+              sum + (Number(m.quantity || 0) * Number(m.unit_cost || 0)), 0
+            );
+            const labCost = (scope.bom_labor || []).reduce((sum: number, l: any) => 
+              sum + Number(l.total_cost || (Number(l.hours || 0) * Number(l.hourly_rate || 0))), 0
+            );
+            const scopeCost = matCost + labCost;
+            
+            // Labor progress indicator: hours worked vs estimated hours (assuming 8 hours per labor unit)
+            const estimatedLaborHours = (scope.bom_labor || []).reduce((sum: number, l: any) => 
+              sum + Number(l.hours || 0), 0
+            );
+            
+            const laborProgress = estimatedLaborHours > 0 
+              ? Math.min(100, (totalHours / estimatedLaborHours) * 100)
+              : (totalHours > 0 ? Math.min(100, (totalHours / 100) * 100) : 0); // Fallback to hours/100 if no estimate
+            
+            return {
+              scopeId: scope.id,
+              scopeCost,
+              laborProgress,
+              manualProgress: Number(scope.completion_percentage || 0),
+              totalHours
+            };
+          });
+          
+          // Calculate weighted labor-based accomplishment
+          const totalScopeCost = scopeLaborData.reduce((sum, s) => sum + s.scopeCost, 0);
+          
+          if (totalScopeCost > 0) {
+            laborBasedAccomplishment = scopeLaborData.reduce((sum, s) => {
+              const weight = s.scopeCost / totalScopeCost;
+              return sum + (weight * s.laborProgress);
+            }, 0);
+          }
+        }
+
+        // Calculate manual progress-based accomplishment (existing logic)
         const scopeRows = scopes.map((scope: any) => {
           const matCost = (scope.bom_materials || []).reduce((sum: number, m: any) => sum + (Number(m.quantity || 0) * Number(m.unit_cost || 0)), 0);
           const labCost = (scope.bom_labor || []).reduce((sum: number, l: any) => sum + Number(l.total_cost || (Number(l.hours || 0) * Number(l.hourly_rate || 0))), 0);
@@ -173,13 +227,22 @@ export default function Dashboard() {
       totalVal += activeBudget;
       totalCst += totalActualCost;
 
+      // Blend SWA-based accomplishment with manual progress when worker data exists
+      // If no worker data, fall back to manual progress only
+      const finalAccomplishment = hasWorkerData 
+        ? (laborBasedAccomplishment * 0.4) + (accomplishmentPct * 0.6) // 40% labor, 60% manual
+        : accomplishmentPct;
+
       return {
         ...p,
         contractAmount: activeBudget,
         projectCost: activeBudget,
         costToDate: totalActualCost,
         margin: margin,
-        completion: accomplishmentPct || 0,
+        completion: finalAccomplishment || 0,
+        manualCompletion: accomplishmentPct || 0,
+        laborCompletion: laborBasedAccomplishment || 0,
+        hasWorkerData,
         amountOfCompletion: accomplishmentAmount,
         weightPercent: 0,
         weightedContribution: 0,
@@ -477,8 +540,18 @@ export default function Dashboard() {
                         </TableCell>
                         <TableCell className="px-2 py-2 text-right">
                           <div className="flex flex-col items-end gap-1">
-                            <span className="text-[10px] font-semibold sm:text-xs">{project.completion.toFixed(2)}%</span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] font-semibold sm:text-xs">{project.completion.toFixed(2)}%</span>
+                              {project.hasWorkerData && (
+                                <Badge variant="secondary" className="text-[8px] px-1 py-0 h-4">SWA</Badge>
+                              )}
+                            </div>
                             <Progress value={project.completion} className="h-1.5 w-full bg-muted" />
+                            {project.hasWorkerData && (
+                              <div className="text-[8px] text-muted-foreground">
+                                Labor: {project.laborCompletion.toFixed(1)}% | Manual: {project.manualCompletion.toFixed(1)}%
+                              </div>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell className="px-2 py-2 text-right">
