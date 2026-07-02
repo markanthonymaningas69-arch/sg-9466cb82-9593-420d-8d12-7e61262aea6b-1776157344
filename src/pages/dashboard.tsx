@@ -266,7 +266,7 @@ export default function Dashboard() {
     
     const { data: bom } = await supabase.from('bill_of_materials').select('id').eq('project_id', project.id).maybeSingle();
     if (bom) {
-      const { data: scopes } = await supabase.from('bom_scope_of_work').select('id, name, completion_percentage, estimated_quantity, unit').eq('bom_id', bom.id);
+      const { data: scopes } = await supabase.from('bom_scope_of_work').select('id, name, completion_percentage').eq('bom_id', bom.id);
       if (scopes && scopes.length > 0) {
         setProjectScopes(scopes);
         const scopeIds = scopes.map(s => s.id);
@@ -295,8 +295,9 @@ export default function Dashboard() {
             
             // Calculate labor progress contribution
             // This links SWA (worker hours) to accomplishment
+            // Using 100 as estimated base since column doesn't exist - can be enhanced later
             const laborProgressIndicator = totalHours > 0 ? 
-              Math.min(100, (totalHours / ((scope.estimated_quantity || 100) * 8)) * 100) : 0;
+              Math.min(100, (totalHours / (100 * 8)) * 100) : 0;
             
             return {
               scopeId: scope.id,
@@ -306,8 +307,7 @@ export default function Dashboard() {
               totalHours,
               recordCount: scopeRecords.length,
               totalWorkerDays,
-              laborProgressIndicator: laborProgressIndicator.toFixed(1),
-              unit: scope.unit || 'units'
+              laborProgressIndicator: laborProgressIndicator.toFixed(1)
             };
           });
           
