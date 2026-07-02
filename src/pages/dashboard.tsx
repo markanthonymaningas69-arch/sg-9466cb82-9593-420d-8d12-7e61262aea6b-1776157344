@@ -395,13 +395,15 @@ export default function Dashboard() {
                     <TableHead className="min-w-[96px] px-2 text-right text-[10px] sm:text-[11px]">Cost to Date</TableHead>
                     <TableHead className="min-w-[84px] px-2 text-right text-[10px] sm:text-[11px]">Profit Margin</TableHead>
                     <TableHead className="min-w-[112px] px-2 text-right text-[10px] sm:text-[11px]">Accomplishment</TableHead>
+                    <TableHead className="min-w-[120px] px-2 text-right text-[10px] sm:text-[11px]">Amount of Accomplishment</TableHead>
+                    <TableHead className="min-w-[100px] px-2 text-right text-[10px] sm:text-[11px]">Profit Amount</TableHead>
                     <TableHead className="min-w-[132px] px-2 text-right text-[10px] sm:text-[11px]">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {portfolio.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                         No projects found.
                       </TableCell>
                     </TableRow>
@@ -435,7 +437,7 @@ export default function Dashboard() {
                           </div>
                         </TableCell>
                         <TableCell className="px-2 py-2 text-right">
-                          <span className="text-[10px] font-semibold text-primary sm:text-xs">{formatCurrency(project.amountOfCompletion)}</span>
+                          <span className="text-[10px] font-semibold sm:text-xs">{project.completion.toFixed(2)}%</span>
                         </TableCell>
                         <TableCell className="px-2 py-2 text-right">
                           <span className={`text-[10px] font-semibold sm:text-xs ${project.profitAmount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
