@@ -189,8 +189,8 @@ export default function Dashboard() {
       const totalActualCost = actualMatCost + actualLabCost;
 
       const activeBudget = grandTotalCost > 0 ? grandTotalCost : budget;
-      const margin = activeBudget > 0 ? ((activeBudget - totalActualCost) / activeBudget) * 100 : 0;
       const profitAmount = accomplishmentAmount - totalActualCost;
+      const margin = activeBudget > 0 ? (profitAmount / activeBudget) * 100 : 0;
 
       totalVal += activeBudget;
       totalCst += totalActualCost;
