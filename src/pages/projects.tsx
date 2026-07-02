@@ -321,9 +321,14 @@ export default function Projects() {
               <Database className="h-4 w-4 mr-2" />
               Master Catalog Engine
             </Button>
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <Dialog open={dialogOpen} onOpenChange={(open) => {
+              setDialogOpen(open);
+              if (open) {
+                resetForm();
+              }
+            }}>
               <DialogTrigger asChild>
-                <Button onClick={resetForm} disabled={isLocked} className="w-full sm:w-auto">
+                <Button disabled={isLocked} className="w-full sm:w-auto">
                   <Plus className="h-4 w-4 mr-2" />
                   New Project
                 </Button>
