@@ -79,18 +79,21 @@ export default function Dashboard() {
       { data: projectsData },
       { data: bomsData },
       { data: consumptionsData },
-      { data: attendancesData }
+      { data: attendancesData },
+      { data: progressUpdatesData }
     ] = await Promise.all([
       supabase.from('projects').select('*').order('created_at', { ascending: false }),
       supabase.from('bill_of_materials').select('project_id, bom_scope_of_work(*, bom_materials(*), bom_labor(*)), bom_indirect_costs(*)'),
       supabase.from('material_consumption').select('*'),
-      supabase.from('site_attendance').select('*, personnel(*)').order('date', { ascending: true })
+      supabase.from('site_attendance').select('*, personnel(*)').order('date', { ascending: true }),
+      supabase.from('bom_progress_updates').select('bom_scope_id, percentage_completed, update_date').order('update_date', { ascending: true })
     ]);
 
     const projects = projectsData || [];
     const boms = bomsData || [];
     const consumptions = consumptionsData || [];
     const attendances = attendancesData || [];
+    const progressUpdates = progressUpdatesData || [];
     
     let totalVal = 0;
     let totalCst = 0;
@@ -107,12 +110,30 @@ export default function Dashboard() {
         const scopes = projectBom.bom_scope_of_work || [];
         const indirects = projectBom.bom_indirect_costs || [];
 
+        // Build progress map from bom_progress_updates (matching Analytics SWA logic)
+        const progressByScope = new Map<string, any[]>();
+        progressUpdates.forEach((update: any) => {
+          if (!update?.bom_scope_id) return;
+          if (!progressByScope.has(update.bom_scope_id)) {
+            progressByScope.set(update.bom_scope_id, []);
+          }
+          progressByScope.get(update.bom_scope_id)?.push(update);
+        });
+
         const scopeRows = scopes.map((scope: any) => {
           const matCost = (scope.bom_materials || []).reduce((sum: number, m: any) => sum + (Number(m.quantity || 0) * Number(m.unit_cost || 0)), 0);
           const labCost = (scope.bom_labor || []).reduce((sum: number, l: any) => sum + Number(l.total_cost || (Number(l.hours || 0) * Number(l.hourly_rate || 0))), 0);
           const cost = matCost + labCost;
           grandTotalCost += cost;
-          return { cost, completion: Number(scope.completion_percentage || 0) };
+
+          // Use bom_progress_updates if available, otherwise fall back to completion_percentage (matching Analytics SWA)
+          const linkedUpdates = progressByScope.get(scope.id) || [];
+          const latestLinkedUpdate = linkedUpdates.length > 0 ? linkedUpdates[linkedUpdates.length - 1] : null;
+          const completion = latestLinkedUpdate
+            ? Number(latestLinkedUpdate.percentage_completed || 0)
+            : Number(scope.completion_percentage || 0);
+
+          return { cost, completion };
         });
 
         const avgCompletion = scopeRows.length > 0 ? scopeRows.reduce((sum, r) => sum + r.completion, 0) / scopeRows.length : 0;
