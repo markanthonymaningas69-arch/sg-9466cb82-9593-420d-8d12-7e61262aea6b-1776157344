@@ -59,6 +59,8 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [bulkAddDialogOpen, setBulkAddDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filters, setFilters] = useState({
     personnelId: "all",
@@ -355,6 +357,70 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
     }
   }
 
+  function openEditDialog(record: AttendanceRecord) {
+    setEditingRecord(record);
+    setFormData({
+      personnel_id: record.personnel_id,
+      date: record.date,
+      time_in: record.time_in?.substring(0, 5) || "",
+      hours_worked: String(record.hours_worked || 0),
+      overtime_hours: String(record.overtime_hours || 0),
+      status: record.status,
+      bom_scope_id: record.bom_scope_id || "",
+      notes: record.notes || "",
+    });
+    setEditDialogOpen(true);
+  }
+
+  async function handleEdit(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (!editingRecord) return;
+
+    try {
+      const { error } = await supabase
+        .from("site_attendance")
+        .update({
+          date: formData.date,
+          time_in: formData.time_in ? `${formData.time_in}:00` : null,
+          hours_worked: Number(formData.hours_worked),
+          overtime_hours: Number(formData.overtime_hours),
+          status: formData.status,
+          bom_scope_id: formData.bom_scope_id || null,
+          notes: formData.notes || null,
+        })
+        .eq("id", editingRecord.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Attendance updated",
+      });
+
+      setEditDialogOpen(false);
+      setEditingRecord(null);
+      setFormData({
+        personnel_id: "",
+        date: new Date().toISOString().split("T")[0],
+        time_in: "",
+        hours_worked: "8",
+        overtime_hours: "0",
+        status: "present",
+        bom_scope_id: "",
+        notes: "",
+      });
+      void loadData();
+    } catch (error: any) {
+      console.error("Error updating attendance:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update attendance",
+        variant: "destructive",
+      });
+    }
+  }
+
   // Calculate attendance summary
   const today = new Date().toISOString().split("T")[0];
   const todayAttendance = attendance.filter((a) => a.date === today);
@@ -495,6 +561,106 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
 
                   <Button type="submit" className="w-full">
                     Mark Attendance for All
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+            <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Edit Attendance</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleEdit} className="space-y-4">
+                  <div>
+                    <Label htmlFor="edit_personnel">Worker</Label>
+                    <Input
+                      id="edit_personnel"
+                      value={editingRecord?.personnel?.name || ""}
+                      disabled
+                      className="bg-muted"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit_date">Date</Label>
+                    <Input
+                      id="edit_date"
+                      type="date"
+                      value={formData.date}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, date: e.target.value }))}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit_scope">Scope of Work (Optional)</Label>
+                    <Select value={formData.bom_scope_id || "none"} onValueChange={(value) => setFormData((prev) => ({ ...prev, bom_scope_id: value === "none" ? "" : value }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select scope of work" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No scope assigned</SelectItem>
+                        {scopesList.map((scope) => (
+                          <SelectItem key={scope.id} value={scope.id}>
+                            {scope.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit_hours_worked">Hours Worked</Label>
+                      <Input
+                        id="edit_hours_worked"
+                        type="number"
+                        step="0.5"
+                        value={formData.hours_worked}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, hours_worked: e.target.value }))}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit_overtime_hours">Overtime Hours</Label>
+                      <Input
+                        id="edit_overtime_hours"
+                        type="number"
+                        step="0.5"
+                        value={formData.overtime_hours}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, overtime_hours: e.target.value }))}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit_status">Status</Label>
+                    <Select value={formData.status} onValueChange={(value: AttendanceRecord["status"]) => setFormData((prev) => ({ ...prev, status: value }))}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ATTENDANCE_STATUS.map((status) => (
+                          <SelectItem key={status.value} value={status.value}>
+                            {status.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit_notes">Notes (Optional)</Label>
+                    <Input
+                      id="edit_notes"
+                      value={formData.notes}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
+                    />
+                  </div>
+
+                  <Button type="submit" className="w-full">
+                    Update Attendance
                   </Button>
                 </form>
               </DialogContent>
@@ -805,9 +971,17 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">{record.notes || "-"}</TableCell>
                           <TableCell>
-                            <Button variant="ghost" size="icon" onClick={() => void handleDelete(record.id)}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Button variant="ghost" size="icon" onClick={() => openEditDialog(record)}>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                                  <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                                  <path d="m15 5 4 4"/>
+                                </svg>
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => void handleDelete(record.id)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
