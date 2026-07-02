@@ -238,16 +238,15 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
         description: "Attendance recorded",
       });
 
-      setDialogOpen(false);
       setFormData({
         personnel_id: "",
-        date: new Date().toISOString().split("T")[0],
-        time_in: "",
-        hours_worked: "8",
-        overtime_hours: "0",
-        status: "present",
-        bom_scope_id: "",
-        notes: "",
+        date: formData.date,
+        time_in: formData.time_in,
+        hours_worked: formData.hours_worked,
+        overtime_hours: formData.overtime_hours,
+        status: formData.status,
+        bom_scope_id: formData.bom_scope_id,
+        notes: formData.notes,
       });
       void loadData();
     } catch (error: any) {
