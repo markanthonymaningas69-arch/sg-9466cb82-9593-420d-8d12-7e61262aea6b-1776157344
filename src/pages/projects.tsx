@@ -116,7 +116,7 @@ export default function Projects() {
       name: formData.name,
       location: formData.location,
       client: formData.client,
-      start_date: editingProject?.start_date || null,
+      start_date: editingProject?.start_date || new Date().toISOString().split('T')[0],
       end_date: editingProject?.end_date || null,
       status: editingProject?.status || "planning",
       budget: parseFloat(formData.budget) || 0,
