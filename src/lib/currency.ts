@@ -46,6 +46,10 @@ export function formatCountryCurrency(
   }).format(safeValue);
 }
 
+export interface CurrencyRates {
+  [currency: string]: number;
+}
+
 export function convertCurrency(amount: number, fromCurrency: string, toCurrency: string, rates: CurrencyRates): number {
   if (fromCurrency === toCurrency) return amount;
   
