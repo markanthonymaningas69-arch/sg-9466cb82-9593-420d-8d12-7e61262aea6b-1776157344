@@ -45,3 +45,22 @@ export function formatCountryCurrency(
     maximumFractionDigits: options.maximumFractionDigits ?? 2
   }).format(safeValue);
 }
+
+export function convertCurrency(amount: number, fromCurrency: string, toCurrency: string, rates: CurrencyRates): number {
+  if (fromCurrency === toCurrency) return amount;
+  
+  // Convert to PHP first (base currency)
+  const amountInPHP = amount / rates[fromCurrency as keyof CurrencyRates];
+  
+  // Then convert to target currency
+  return amountInPHP * rates[toCurrency as keyof CurrencyRates];
+}
+
+export function formatCurrency(amount: number, currency: string = "PHP"): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}

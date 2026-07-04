@@ -28,6 +28,8 @@ interface AttendanceRecord {
   personnel?: {
     name: string;
     role: string;
+    hourly_rate?: number;
+    daily_rate?: number;
   };
   bom_scope_of_work?: {
     name: string;
