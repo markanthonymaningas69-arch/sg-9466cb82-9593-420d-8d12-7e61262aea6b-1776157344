@@ -69,6 +69,8 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
     dateFrom: "",
     dateTo: "",
   });
+  const [usageScopeFilter, setUsageScopeFilter] = useState("all");
+  const [scopeFilter, setScopeFilter] = useState<string>("all");
 
   const workerOptions = useMemo(() => {
     return Array.from(
@@ -95,6 +97,35 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
       )
     ).sort((left, right) => left.localeCompare(right));
   }, [attendance]);
+
+  const attendances = useMemo(() => {
+    if (!allAttendances) return [];
+    return allAttendances.filter((a) => {
+      if (personnelFilter !== "all" && a.personnel_id !== personnelFilter) return false;
+      if (dateFilter && a.date !== dateFilter) return false;
+      return true;
+    });
+  }, [allAttendances, personnelFilter, dateFilter]);
+
+  const filteredAttendances = useMemo(() => {
+    if (!attendances) return [];
+    return attendances.filter((a) => {
+      if (scopeFilter === "all") return true;
+      if (scopeFilter === "unassigned") return !a.bom_scope_id;
+      return a.bom_scope_id === scopeFilter;
+    });
+  }, [attendances, scopeFilter]);
+
+  const totalLaborCost = useMemo(() => {
+    return filteredAttendances.reduce((sum, record) => {
+      const hrRate = Number(record.personnel?.hourly_rate || (record.personnel?.daily_rate ? record.personnel.daily_rate / 8 : 0));
+      const hoursWorked = Number(record.hours_worked || 0);
+      const overtimeHours = Number(record.overtime_hours || 0);
+      const regularCost = hoursWorked * hrRate;
+      const overtimeCost = overtimeHours * (hrRate * 1.5);
+      return sum + regularCost + overtimeCost;
+    }, 0);
+  }, [filteredAttendances]);
 
   const filteredAttendance = useMemo(() => {
     return attendance.filter((record) => {
@@ -914,81 +945,115 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
                 </div>
               </div>
 
-              {filteredAttendance.length === 0 ? (
-                <div className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
-                  No attendance records match the current filters.
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Worker Name</TableHead>
-                      <TableHead>Position</TableHead>
-                      <TableHead>Scope of Work</TableHead>
-                      <TableHead>Hours</TableHead>
-                      <TableHead>Overtime</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Notes</TableHead>
-                      <TableHead className="w-[80px]">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredAttendance.map((record) => {
-                      const statusConfig = ATTENDANCE_STATUS.find((s) => s.value === record.status);
-                      const StatusIcon = statusConfig?.icon || CheckCircle;
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-muted-foreground whitespace-nowrap">Scope:</Label>
+                <Select value={scopeFilter} onValueChange={setScopeFilter}>
+                  <SelectTrigger className="h-8 w-[180px]">
+                    <SelectValue placeholder="All Scopes" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Scopes</SelectItem>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {scopesList.map((scope) => (
+                      <SelectItem key={scope.id} value={scope.id}>
+                        {scope.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-                      return (
-                        <TableRow key={record.id}>
-                          <TableCell>{new Date(record.date).toLocaleDateString()}</TableCell>
-                          <TableCell className="font-medium">{record.personnel?.name || "Unknown"}</TableCell>
-                          <TableCell>{record.personnel?.role || "-"}</TableCell>
-                          <TableCell>
-                            <Select
-                              value={record.bom_scope_id || "none"}
-                              onValueChange={(value) => void handleScopeChange(record.id, value)}
-                            >
-                              <SelectTrigger className="h-8 w-[180px]">
-                                <SelectValue placeholder="Select scope" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">No scope assigned</SelectItem>
-                                {scopesList.map((scope) => (
-                                  <SelectItem key={scope.id} value={scope.id}>
-                                    {scope.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          <TableCell>{record.hours_worked || 0}</TableCell>
-                          <TableCell>{record.overtime_hours || 0}</TableCell>
-                          <TableCell>
-                            <Badge variant={statusConfig?.variant} className="gap-1">
-                              <StatusIcon className="h-3 w-3" />
-                              {statusConfig?.label}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{record.notes || "-"}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Button variant="ghost" size="icon" onClick={() => openEditDialog(record)}>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                                  <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
-                                  <path d="m15 5 4 4"/>
-                                </svg>
-                              </Button>
-                              <Button variant="ghost" size="icon" onClick={() => void handleDelete(record.id)}>
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </div>
+              <div className="border rounded-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Worker Name</TableHead>
+                        <TableHead>Position</TableHead>
+                        <TableHead>Scope of Work</TableHead>
+                        <TableHead className="text-center min-w-[80px]">Hours</TableHead>
+                        <TableHead className="text-center min-w-[80px]">OT Hrs</TableHead>
+                        <TableHead className="text-right min-w-[100px]">Labor Cost</TableHead>
+                        <TableHead className="min-w-[150px]">Notes</TableHead>
+                        <TableHead className="text-center min-w-[100px]">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredAttendances.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
+                            No attendance records yet
                           </TableCell>
                         </TableRow>
-                      );
-                    })}
+                      ) : null}
+                      <>
+                        {filteredAttendances.map((record) => {
+                          const hrRate = Number(record.personnel?.hourly_rate || (record.personnel?.daily_rate ? record.personnel.daily_rate / 8 : 0));
+                          const hoursWorked = Number(record.hours_worked || 0);
+                          const overtimeHours = Number(record.overtime_hours || 0);
+                          const regularCost = hoursWorked * hrRate;
+                          const overtimeCost = overtimeHours * (hrRate * 1.5);
+                          const laborCost = regularCost + overtimeCost;
+
+                          return (
+                            <TableRow key={record.id}>
+                              <TableCell>{new Date(record.date).toLocaleDateString()}</TableCell>
+                              <TableCell className="font-medium">{record.personnel?.name || "Unknown"}</TableCell>
+                              <TableCell>{record.personnel?.role || "-"}</TableCell>
+                              <TableCell>
+                                <Select
+                                  value={record.bom_scope_id || "none"}
+                                  onValueChange={(value) => void handleScopeChange(record.id, value)}
+                                >
+                                  <SelectTrigger className="h-8 w-[180px]">
+                                    <SelectValue placeholder="Select scope" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">No scope assigned</SelectItem>
+                                    {scopesList.map((scope) => (
+                                      <SelectItem key={scope.id} value={scope.id}>
+                                        {scope.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>{record.hours_worked || 0}</TableCell>
+                              <TableCell>{record.overtime_hours || 0}</TableCell>
+                              <TableCell className="text-right font-medium">
+                                {formatCurrency(laborCost)}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">{record.notes || "-"}</TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  <Button variant="ghost" size="icon" onClick={() => openEditDialog(record)}>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                                      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                                      <path d="m15 5 4 4"/>
+                                    </svg>
+                                  </Button>
+                                  <Button variant="ghost" size="icon" onClick={() => void handleDelete(record.id)}>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                        <TableRow className="bg-muted/50 font-bold hover:bg-muted/50">
+                          <TableCell colSpan={9} className="text-right">TOTAL</TableCell>
+                          <TableCell className="text-right text-primary">
+                            {formatCurrency(totalLaborCost)}
+                          </TableCell>
+                          <TableCell colSpan={2}></TableCell>
+                        </TableRow>
+                      </>
+                    )}
                   </TableBody>
-                </Table>
-              )}
+                  </Table>
+                </div>
+              </div>
             </div>
           )}
         </CardContent>
