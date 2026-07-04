@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Users, Plus, Trash2, CheckCircle, XCircle, Clock, Filter } from "lucide-react";
 import { siteService } from "@/services/siteService";
+import { formatCurrency } from "@/lib/currency";
 
 interface AttendanceRecord {
   id: string;
@@ -99,13 +100,14 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
   }, [attendance]);
 
   const attendances = useMemo(() => {
-    if (!allAttendances) return [];
-    return allAttendances.filter((a) => {
-      if (personnelFilter !== "all" && a.personnel_id !== personnelFilter) return false;
-      if (dateFilter && a.date !== dateFilter) return false;
+    if (!attendance) return [];
+    return attendance.filter((a) => {
+      if (filters.personnelId !== "all" && a.personnel_id !== filters.personnelId) return false;
+      if (filters.dateFrom && a.date < filters.dateFrom) return false;
+      if (filters.dateTo && a.date > filters.dateTo) return false;
       return true;
     });
-  }, [allAttendances, personnelFilter, dateFilter]);
+  }, [attendance, filters.personnelId, filters.dateFrom, filters.dateTo]);
 
   const filteredAttendances = useMemo(() => {
     if (!attendances) return [];
@@ -982,75 +984,75 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
                     <TableBody>
                       {filteredAttendances.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
-                            No attendance records yet
+                          <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                            No attendance records found
                           </TableCell>
                         </TableRow>
-                      ) : null}
-                      <>
-                        {filteredAttendances.map((record) => {
-                          const hrRate = Number(record.personnel?.hourly_rate || (record.personnel?.daily_rate ? record.personnel.daily_rate / 8 : 0));
-                          const hoursWorked = Number(record.hours_worked || 0);
-                          const overtimeHours = Number(record.overtime_hours || 0);
-                          const regularCost = hoursWorked * hrRate;
-                          const overtimeCost = overtimeHours * (hrRate * 1.5);
-                          const laborCost = regularCost + overtimeCost;
+                      ) : (
+                        <>
+                          {filteredAttendances.map((record) => {
+                            const hrRate = Number(record.personnel?.hourly_rate || (record.personnel?.daily_rate ? record.personnel.daily_rate / 8 : 0));
+                            const hoursWorked = Number(record.hours_worked || 0);
+                            const overtimeHours = Number(record.overtime_hours || 0);
+                            const regularCost = hoursWorked * hrRate;
+                            const overtimeCost = overtimeHours * (hrRate * 1.5);
+                            const laborCost = regularCost + overtimeCost;
 
-                          return (
-                            <TableRow key={record.id}>
-                              <TableCell>{new Date(record.date).toLocaleDateString()}</TableCell>
-                              <TableCell className="font-medium">{record.personnel?.name || "Unknown"}</TableCell>
-                              <TableCell>{record.personnel?.role || "-"}</TableCell>
-                              <TableCell>
-                                <Select
-                                  value={record.bom_scope_id || "none"}
-                                  onValueChange={(value) => void handleScopeChange(record.id, value)}
-                                >
-                                  <SelectTrigger className="h-8 w-[180px]">
-                                    <SelectValue placeholder="Select scope" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="none">No scope assigned</SelectItem>
-                                    {scopesList.map((scope) => (
-                                      <SelectItem key={scope.id} value={scope.id}>
-                                        {scope.name}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </TableCell>
-                              <TableCell>{record.hours_worked || 0}</TableCell>
-                              <TableCell>{record.overtime_hours || 0}</TableCell>
-                              <TableCell className="text-right font-medium">
-                                {formatCurrency(laborCost)}
-                              </TableCell>
-                              <TableCell className="text-sm text-muted-foreground">{record.notes || "-"}</TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-1">
-                                  <Button variant="ghost" size="icon" onClick={() => openEditDialog(record)}>
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                                      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
-                                      <path d="m15 5 4 4"/>
-                                    </svg>
-                                  </Button>
-                                  <Button variant="ghost" size="icon" onClick={() => void handleDelete(record.id)}>
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                        <TableRow className="bg-muted/50 font-bold hover:bg-muted/50">
-                          <TableCell colSpan={9} className="text-right">TOTAL</TableCell>
-                          <TableCell className="text-right text-primary">
-                            {formatCurrency(totalLaborCost)}
-                          </TableCell>
-                          <TableCell colSpan={2}></TableCell>
-                        </TableRow>
-                      </>
-                    )}
-                  </TableBody>
+                            return (
+                              <TableRow key={record.id}>
+                                <TableCell>{new Date(record.date).toLocaleDateString()}</TableCell>
+                                <TableCell className="font-medium">{record.personnel?.name || "Unknown"}</TableCell>
+                                <TableCell>{record.personnel?.role || "-"}</TableCell>
+                                <TableCell>
+                                  <Select
+                                    value={record.bom_scope_id || "none"}
+                                    onValueChange={(value) => void handleScopeChange(record.id, value)}
+                                  >
+                                    <SelectTrigger className="h-8 w-[180px]">
+                                      <SelectValue placeholder="Select scope" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="none">No scope assigned</SelectItem>
+                                      {scopesList.map((scope) => (
+                                        <SelectItem key={scope.id} value={scope.id}>
+                                          {scope.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </TableCell>
+                                <TableCell>{record.hours_worked || 0}</TableCell>
+                                <TableCell>{record.overtime_hours || 0}</TableCell>
+                                <TableCell className="text-right font-medium">
+                                  {formatCurrency(laborCost)}
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">{record.notes || "-"}</TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-1">
+                                    <Button variant="ghost" size="icon" onClick={() => openEditDialog(record)}>
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                                        <path d="m15 5 4 4"/>
+                                      </svg>
+                                    </Button>
+                                    <Button variant="ghost" size="icon" onClick={() => void handleDelete(record.id)}>
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                          <TableRow className="bg-muted/50 font-bold hover:bg-muted/50">
+                            <TableCell colSpan={6} className="text-right">TOTAL</TableCell>
+                            <TableCell className="text-right text-primary">
+                              {formatCurrency(totalLaborCost)}
+                            </TableCell>
+                            <TableCell colSpan={2}></TableCell>
+                          </TableRow>
+                        </>
+                      )}
+                    </TableBody>
                   </Table>
                 </div>
               </div>
