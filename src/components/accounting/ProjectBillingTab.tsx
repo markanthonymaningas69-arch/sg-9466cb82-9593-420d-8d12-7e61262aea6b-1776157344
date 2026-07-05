@@ -141,6 +141,7 @@ export function ProjectBillingTab({ projectId }: { projectId: string }) {
     }
 
     try {
+      const isPaid = formData.status === "paid";
       const { error } = await supabase.from("project_billing").insert({
         project_id: selectedProjectId,
         billing_number: formData.billing_number,
@@ -148,6 +149,8 @@ export function ProjectBillingTab({ projectId }: { projectId: string }) {
         description: formData.description || null,
         amount: Number(formData.amount),
         status: formData.status,
+        payment_received: isPaid ? Number(formData.amount) : 0,
+        payment_date: isPaid ? formData.billing_date : null,
         notes: formData.notes || null,
       });
 
@@ -184,6 +187,19 @@ export function ProjectBillingTab({ projectId }: { projectId: string }) {
     if (!editingRecord) return;
 
     try {
+      const isPaid = formData.status === "paid";
+      const wasPaid = editingRecord.status === "paid";
+      
+      // If changing to paid status, set payment_received to full amount
+      // If already paid and amount changes, update payment_received to match
+      const payment_received = isPaid 
+        ? Number(formData.amount)
+        : editingRecord.payment_received;
+      
+      const payment_date = isPaid && !wasPaid
+        ? formData.billing_date
+        : editingRecord.payment_date;
+
       const { error } = await supabase
         .from("project_billing")
         .update({
@@ -192,6 +208,8 @@ export function ProjectBillingTab({ projectId }: { projectId: string }) {
           description: formData.description || null,
           amount: Number(formData.amount),
           status: formData.status,
+          payment_received,
+          payment_date,
           notes: formData.notes || null,
         })
         .eq("id", editingRecord.id);
