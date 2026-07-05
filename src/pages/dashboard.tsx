@@ -197,7 +197,7 @@ export default function Dashboard() {
 
       const totalBilled = projBilling.reduce((sum, b) => sum + Number(b.amount || 0), 0);
       const totalPaid = projBilling.reduce((sum, b) => sum + Number(b.payment_received || 0), 0);
-      const outstanding = totalBilled - totalPaid;
+      const outstanding = activeBudget - totalPaid;
 
       const activeBudget = grandTotalCost > 0 ? grandTotalCost : budget;
       const profitAmount = accomplishmentAmount - totalActualCost;
