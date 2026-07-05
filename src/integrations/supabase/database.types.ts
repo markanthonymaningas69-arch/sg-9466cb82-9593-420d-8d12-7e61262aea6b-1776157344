@@ -1724,6 +1724,68 @@ export type Database = {
           },
         ]
       }
+      project_billing: {
+        Row: {
+          amount: number
+          balance: number | null
+          billing_date: string
+          billing_number: string
+          company_id: string
+          created_at: string
+          description: string | null
+          id: string
+          is_archived: boolean
+          notes: string | null
+          payment_date: string | null
+          payment_received: number
+          project_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          balance?: number | null
+          billing_date: string
+          billing_number: string
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_archived?: boolean
+          notes?: string | null
+          payment_date?: string | null
+          payment_received?: number
+          project_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          balance?: number | null
+          billing_date?: string
+          billing_number?: string
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_archived?: boolean
+          notes?: string | null
+          payment_date?: string | null
+          payment_received?: number
+          project_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_billing_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_manpower_catalog: {
         Row: {
           company_id: string

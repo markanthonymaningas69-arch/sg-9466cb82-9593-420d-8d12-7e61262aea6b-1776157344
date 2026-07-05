@@ -7,6 +7,7 @@ import { PayrollTab } from "@/components/accounting/PayrollTab";
 import { VouchersTab } from "@/components/accounting/VouchersTab";
 import { LiquidationsTab } from "@/components/accounting/LiquidationsTab";
 import { TaxReportTab } from "@/components/accounting/TaxReportTab";
+import { ProjectBillingTab } from "@/components/accounting/ProjectBillingTab";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Landmark, FileSpreadsheet, Users, Receipt, CircleDollarSign, FileText } from "lucide-react";
@@ -165,6 +166,9 @@ export default function Accounting() {
               <TabsTrigger value="liquidations" className="flex-1 min-w-[70px] h-9 text-xs data-[state=active]:bg-orange-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-orange-700 bg-orange-50 text-orange-700 hover:bg-orange-100">
                 <CircleDollarSign className="h-3 w-3 mr-1.5 hidden sm:inline" /> Liquidate
               </TabsTrigger>
+              <TabsTrigger value="billing" className="flex-1 min-w-[70px] h-9 text-xs data-[state=active]:bg-teal-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-teal-700 bg-teal-50 text-teal-700 hover:bg-teal-100">
+                <FileText className="h-3 w-3 mr-1.5 hidden sm:inline" /> Billing
+              </TabsTrigger>
               <TabsTrigger value="incoming" className="flex-1 min-w-[90px] h-9 text-xs data-[state=active]:bg-cyan-700 data-[state=active]:text-white border border-transparent data-[state=active]:border-cyan-800 bg-cyan-50 text-cyan-700 hover:bg-cyan-100 relative">
                 Incoming Requests
                 {incomingRequests.filter((request) => request.workflowStatus === "in_accounting").length > 0 && (
@@ -197,6 +201,10 @@ export default function Accounting() {
 
           <TabsContent value="liquidations" className="flex-1 mt-0">
             <LiquidationsTab />
+          </TabsContent>
+
+          <TabsContent value="billing" className="flex-1 mt-0">
+            <ProjectBillingTab projectId="" />
           </TabsContent>
 
           <TabsContent value="incoming" className="flex-1 mt-0">
