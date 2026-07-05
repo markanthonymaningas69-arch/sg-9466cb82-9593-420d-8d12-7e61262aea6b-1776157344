@@ -80,13 +80,15 @@ export default function Dashboard() {
       { data: bomsData },
       { data: consumptionsData },
       { data: attendancesData },
-      { data: progressUpdatesData }
+      { data: progressUpdatesData },
+      { data: billingData }
     ] = await Promise.all([
       supabase.from('projects').select('*').order('created_at', { ascending: false }),
       supabase.from('bill_of_materials').select('project_id, bom_scope_of_work(*, bom_materials(*), bom_labor(*)), bom_indirect_costs(*)'),
       supabase.from('material_consumption').select('*'),
       supabase.from('site_attendance').select('*, personnel(*)').order('date', { ascending: true }),
-      supabase.from('bom_progress_updates').select('bom_scope_id, percentage_completed, update_date').order('update_date', { ascending: true })
+      supabase.from('bom_progress_updates').select('bom_scope_id, percentage_completed, update_date').order('update_date', { ascending: true }),
+      supabase.from('project_billing').select('project_id, amount, payment_received, status').eq('is_archived', false)
     ]);
 
     const projects = projectsData || [];
@@ -94,6 +96,7 @@ export default function Dashboard() {
     const consumptions = consumptionsData || [];
     const attendances = attendancesData || [];
     const progressUpdates = progressUpdatesData || [];
+    const billings = billingData || [];
     
     let totalVal = 0;
     let totalCst = 0;
@@ -156,6 +159,7 @@ export default function Dashboard() {
 
       const projCons = consumptions.filter(c => c.project_id === p.id);
       const projAtt = attendances.filter(a => a.project_id === p.id);
+      const projBilling = billings.filter(b => b.project_id === p.id);
 
       let actualMatCost = 0;
       projCons.forEach((c: any) => {
@@ -191,6 +195,10 @@ export default function Dashboard() {
 
       const totalActualCost = actualMatCost + actualLabCost;
 
+      const totalBilled = projBilling.reduce((sum, b) => sum + Number(b.amount || 0), 0);
+      const totalPaid = projBilling.reduce((sum, b) => sum + Number(b.payment_received || 0), 0);
+      const outstanding = totalBilled - totalPaid;
+
       const activeBudget = grandTotalCost > 0 ? grandTotalCost : budget;
       const profitAmount = accomplishmentAmount - totalActualCost;
       const margin = activeBudget > 0 ? (profitAmount / activeBudget) * 100 : 0;
@@ -209,7 +217,10 @@ export default function Dashboard() {
         amountOfCompletion: accomplishmentAmount,
         weightPercent: 0,
         weightedContribution: 0,
-        dateStarted
+        dateStarted,
+        totalBilled,
+        totalPaid,
+        outstanding
       };
     });
 
@@ -421,13 +432,16 @@ export default function Dashboard() {
                     <TableHead className="min-w-[112px] px-2 text-right text-[10px] sm:text-[11px]">Accomplishment</TableHead>
                     <TableHead className="min-w-[120px] px-2 text-right text-[10px] sm:text-[11px]">Amount of Accomplishment</TableHead>
                     <TableHead className="min-w-[100px] px-2 text-right text-[10px] sm:text-[11px]">Profit Amount</TableHead>
+                    <TableHead className="min-w-[100px] px-2 text-right text-[10px] sm:text-[11px]">Total Billed</TableHead>
+                    <TableHead className="min-w-[100px] px-2 text-right text-[10px] sm:text-[11px]">Total Paid</TableHead>
+                    <TableHead className="min-w-[100px] px-2 text-right text-[10px] sm:text-[11px]">Outstanding</TableHead>
                     <TableHead className="min-w-[132px] px-2 text-right text-[10px] sm:text-[11px]">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {portfolio.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
                         No projects found.
                       </TableCell>
                     </TableRow>
@@ -472,6 +486,21 @@ export default function Dashboard() {
                         <TableCell className="px-2 py-2 text-right">
                           <span className={`text-[10px] font-semibold sm:text-xs ${project.profitAmount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                             {formatCurrency(project.profitAmount)}
+                          </span>
+                        </TableCell>
+                        <TableCell className="px-2 py-2 text-right">
+                          <span className="text-[10px] font-medium text-blue-600 sm:text-xs">
+                            {formatCurrency(project.totalBilled || 0)}
+                          </span>
+                        </TableCell>
+                        <TableCell className="px-2 py-2 text-right">
+                          <span className="text-[10px] font-medium text-green-600 sm:text-xs">
+                            {formatCurrency(project.totalPaid || 0)}
+                          </span>
+                        </TableCell>
+                        <TableCell className="px-2 py-2 text-right">
+                          <span className={`text-[10px] font-medium sm:text-xs ${(project.outstanding || 0) > 0 ? 'text-orange-600' : 'text-muted-foreground'}`}>
+                            {formatCurrency(project.outstanding || 0)}
                           </span>
                         </TableCell>
                         <TableCell className="px-2 py-2">
