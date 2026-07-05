@@ -195,11 +195,12 @@ export default function Dashboard() {
 
       const totalActualCost = actualMatCost + actualLabCost;
 
+      const activeBudget = grandTotalCost > 0 ? grandTotalCost : budget;
+
       const totalBilled = projBilling.reduce((sum, b) => sum + Number(b.amount || 0), 0);
       const totalPaid = projBilling.reduce((sum, b) => sum + Number(b.payment_received || 0), 0);
       const outstanding = activeBudget - totalPaid;
 
-      const activeBudget = grandTotalCost > 0 ? grandTotalCost : budget;
       const profitAmount = accomplishmentAmount - totalActualCost;
       const margin = activeBudget > 0 ? (profitAmount / activeBudget) * 100 : 0;
 
