@@ -226,7 +226,7 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
         .from("site_attendance")
         .select(`
           *,
-          personnel (name, role),
+          personnel (name, role, hourly_rate, daily_rate),
           bom_scope_of_work (name)
         `)
         .eq("project_id", projectId)
