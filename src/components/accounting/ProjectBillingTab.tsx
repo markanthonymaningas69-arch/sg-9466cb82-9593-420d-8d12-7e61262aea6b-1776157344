@@ -75,7 +75,7 @@ export function ProjectBillingTab({ projectId }: { projectId: string }) {
         .order("billing_date", { ascending: false });
 
       if (error) throw error;
-      setBillingRecords(data || []);
+      setBillingRecords((data || []) as BillingRecord[]);
     } catch (error) {
       console.error("Error loading billing records:", error);
       toast({
