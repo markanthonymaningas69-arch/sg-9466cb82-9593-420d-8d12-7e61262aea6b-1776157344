@@ -45,7 +45,7 @@ interface InventoryItem {
 export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryTabProps) {
   const { toast } = useToast();
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [deliveries, setDeliveries] = useState<Array<{ item_name: string; quantity: number; source?: string }>>([]);
+  const [deliveries, setDeliveries] = useState<Array<{ item_name: string; quantity: number; transaction_type?: string }>>([]);
   const [consumptions, setConsumptions] = useState<Array<{ item_name: string; quantity: number }>>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -81,7 +81,7 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
           .order("name"),
         supabase
           .from("deliveries")
-          .select("item_name, quantity, unit, source_location")
+          .select("item_name, quantity, unit, transaction_type")
           .eq("project_id", projectId)
           .eq("is_archived", false),
         supabase
@@ -704,7 +704,8 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                       <TableBody>
                         {filteredInventory.map((item) => {
                           const delivered = calculateDelivered(item.name);
-                          const deliverySource = deliveries.find(d => d.item_name === item.name)?.source || "Main Warehouse";
+                          const delivery = deliveries.find(d => d.item_name === item.name);
+                          const deliverySource = delivery?.transaction_type === "site_purchase" ? "Site Purchase" : "Main Warehouse";
                           
                           return (
                             <TableRow key={item.id}>
@@ -716,9 +717,9 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                               </TableCell>
                               <TableCell className="px-2 py-1.5">
                                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                                  deliverySource === "Main Warehouse" 
-                                    ? "bg-blue-100 text-blue-800" 
-                                    : "bg-purple-100 text-purple-800"
+                                  deliverySource === "Site Purchase" 
+                                    ? "bg-purple-100 text-purple-800" 
+                                    : "bg-blue-100 text-blue-800"
                                 }`}>
                                   {deliverySource}
                                 </span>
