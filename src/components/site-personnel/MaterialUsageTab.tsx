@@ -75,6 +75,8 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
   const [bomMaterials, setBomMaterials] = useState<BOMMaterial[]>([]);
   const [deliveredMaterials, setDeliveredMaterials] = useState<DeliveredMaterial[]>([]);
   const [loading, setLoading] = useState(true);
+  const [remainingQty, setRemainingQty] = useState<number | null>(null);
+  const [checkingStock, setCheckingStock] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState<MaterialUsageFormData>(getDefaultFormData);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -301,8 +303,9 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
 
       setDialogOpen(false);
       setFormData(getDefaultFormData());
-      await loadData();
-    } catch (error) {
+      setRemainingQty(null);
+      void loadData();
+    } catch (error: any) {
       console.error("Error recording usage:", error);
       toast({
         title: "Error",
@@ -353,6 +356,9 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
       item_name: selectedMaterial ? prev.item_name : "",
       unit: selectedMaterial ? selectedMaterial.unit || prev.unit : "",
     }));
+
+    // Reset remaining qty when scope changes
+    setRemainingQty(null);
   }
 
   function handleMaterialChange(value: string) {
@@ -363,6 +369,36 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
       item_name: value,
       unit: selectedMaterial?.unit || "",
     }));
+
+    // Check remaining quantity in warehouse
+    if (value && value !== "__custom__") {
+      void checkRemainingQuantity(value);
+    } else {
+      setRemainingQty(null);
+    }
+  }
+
+  async function checkRemainingQuantity(materialName: string) {
+    try {
+      setCheckingStock(true);
+
+      const { data, error } = await supabase
+        .from("site_warehouse")
+        .select("quantity")
+        .eq("project_id", projectId)
+        .eq("item_name", materialName)
+        .eq("is_archived", false)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      setRemainingQty(data ? Number(data.quantity || 0) : 0);
+    } catch (error) {
+      console.error("Error checking warehouse stock:", error);
+      setRemainingQty(null);
+    } finally {
+      setCheckingStock(false);
+    }
   }
 
   function clearFilters() {
@@ -441,6 +477,28 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
                     value={formData.item_name === "__custom__" ? "" : formData.item_name}
                     onChange={(e) => setFormData(prev => ({ ...prev, item_name: e.target.value }))}
                   />
+                )}
+                
+                {/* Remaining Quantity Display */}
+                {formData.item_name && formData.item_name !== "__custom__" && (
+                  <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-md border">
+                    {checkingStock ? (
+                      <span className="text-xs text-muted-foreground">Checking stock...</span>
+                    ) : remainingQty !== null ? (
+                      <>
+                        <span className="text-xs text-muted-foreground">Available in Warehouse:</span>
+                        <span className={`text-sm font-semibold ${
+                          remainingQty === 0 ? 'text-red-600' : 
+                          remainingQty < 10 ? 'text-orange-600' : 
+                          'text-green-600'
+                        }`}>
+                          {remainingQty} {formData.unit}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Not found in warehouse</span>
+                    )}
+                  </div>
                 )}
               </div>
 
