@@ -411,15 +411,16 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
       }
       
       // Filter by item type based on active tab
+      // Use explicit checks to avoid TypeScript control flow narrowing issues
+      const itemType = item.item_type;
+      
       if (activeTab === "material") {
         // Materials tab: show all except tool_equipment
-        if (item.item_type === "tool_equipment") return false;
-      } else {
-        // Tools tab: only show tool_equipment
-        if (item.item_type !== "tool_equipment") return false;
+        return itemType !== "tool_equipment";
       }
       
-      return true;
+      // Tools tab: only show tool_equipment
+      return itemType === "tool_equipment";
     });
     
     return filtered.sort((a, b) => a.name.localeCompare(b.name));
