@@ -38,6 +38,12 @@ interface BOMMaterial {
   scope_id: string;
 }
 
+interface DeliveredMaterial {
+  item_name: string;
+  unit: string;
+  bom_scope_id: string;
+}
+
 interface MaterialUsageFormData {
   bom_scope_id: string;
   item_name: string;
@@ -67,6 +73,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
   const [usageRecords, setUsageRecords] = useState<MaterialUsage[]>([]);
   const [bomScopes, setBomScopes] = useState<BOMScope[]>([]);
   const [bomMaterials, setBomMaterials] = useState<BOMMaterial[]>([]);
+  const [deliveredMaterials, setDeliveredMaterials] = useState<DeliveredMaterial[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState<MaterialUsageFormData>(getDefaultFormData);
@@ -81,11 +88,43 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
 
   const filteredMaterials = useMemo(() => {
     if (formData.bom_scope_id === "none") {
-      return bomMaterials;
+      // Show all materials (BOM + purchased) when no scope selected
+      const bomItems = bomMaterials.map(m => ({ name: m.material_name, unit: m.unit }));
+      const purchasedItems = deliveredMaterials.map(m => ({ name: m.item_name, unit: m.unit }));
+      const allItems = [...bomItems, ...purchasedItems];
+      
+      // Deduplicate by name, prefer BOM material unit if duplicate
+      const uniqueMap = new Map<string, { name: string; unit: string }>();
+      allItems.forEach(item => {
+        if (!uniqueMap.has(item.name)) {
+          uniqueMap.set(item.name, item);
+        }
+      });
+      
+      return Array.from(uniqueMap.values()).sort((a, b) => a.name.localeCompare(b.name));
     }
 
-    return bomMaterials.filter((material) => material.scope_id === formData.bom_scope_id);
-  }, [bomMaterials, formData.bom_scope_id]);
+    // Filter by selected scope
+    const bomItems = bomMaterials
+      .filter(m => m.scope_id === formData.bom_scope_id)
+      .map(m => ({ name: m.material_name, unit: m.unit }));
+    
+    const purchasedItems = deliveredMaterials
+      .filter(m => m.bom_scope_id === formData.bom_scope_id)
+      .map(m => ({ name: m.item_name, unit: m.unit }));
+    
+    const allItems = [...bomItems, ...purchasedItems];
+    
+    // Deduplicate by name
+    const uniqueMap = new Map<string, { name: string; unit: string }>();
+    allItems.forEach(item => {
+      if (!uniqueMap.has(item.name)) {
+        uniqueMap.set(item.name, item);
+      }
+    });
+    
+    return Array.from(uniqueMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [bomMaterials, deliveredMaterials, formData.bom_scope_id]);
 
   const unitOptions = useMemo(() => {
     return Array.from(new Set(usageRecords.map((record) => record.unit).filter(Boolean))).sort((left, right) =>
@@ -215,13 +254,22 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
       }
 
       setBomMaterials(materialsData || []);
+
+      // Load delivered materials (purchased materials assigned to scopes)
+      const { data: deliveriesData, error: deliveriesError } = await supabase
+        .from("deliveries")
+        .select("item_name, unit, bom_scope_id")
+        .eq("project_id", projectId)
+        .eq("is_archived", false)
+        .not("bom_scope_id", "is", null);
+
+      if (deliveriesError) {
+        console.error("Error loading delivered materials:", deliveriesError);
+      } else {
+        setDeliveredMaterials(deliveriesData || []);
+      }
     } catch (error) {
       console.error("Error loading usage data:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load material usage data",
-        variant: "destructive",
-      });
     } finally {
       setLoading(false);
     }
@@ -293,8 +341,11 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
   }
 
   function handleScopeChange(value: string) {
-    const nextMaterials = value === "none" ? bomMaterials : bomMaterials.filter((material) => material.scope_id === value);
-    const selectedMaterial = nextMaterials.find((material) => material.material_name === formData.item_name);
+    const nextMaterials = value === "none" 
+      ? filteredMaterials 
+      : filteredMaterials;
+    
+    const selectedMaterial = nextMaterials.find((material) => material.name === formData.item_name);
 
     setFormData((prev) => ({
       ...prev,
@@ -305,7 +356,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
   }
 
   function handleMaterialChange(value: string) {
-    const selectedMaterial = filteredMaterials.find((material) => material.material_name === value);
+    const selectedMaterial = filteredMaterials.find((material) => material.name === value);
 
     setFormData((prev) => ({
       ...prev,
@@ -375,13 +426,22 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
                     />
                   </SelectTrigger>
                   <SelectContent>
-                    {filteredMaterials.map((item) => (
-                      <SelectItem key={item.id} value={item.material_name}>
-                        {item.material_name}
+                    {filteredMaterials.map((item, index) => (
+                      <SelectItem key={`${item.name}-${index}`} value={item.name}>
+                        {item.name}
                       </SelectItem>
                     ))}
+                    <SelectItem value="__custom__">Other (custom input)</SelectItem>
                   </SelectContent>
                 </Select>
+                {formData.item_name === "__custom__" && (
+                  <Input
+                    className="mt-2"
+                    placeholder="Enter custom material name"
+                    value={formData.item_name === "__custom__" ? "" : formData.item_name}
+                    onChange={(e) => setFormData(prev => ({ ...prev, item_name: e.target.value }))}
+                  />
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
