@@ -436,6 +436,58 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
     }
   }
 
+  async function handleReceiveItem(itemId: string, itemName: string, unit: string, itemType: "material" | "tool_equipment") {
+    try {
+      const delivered = calculateDelivered(itemName);
+      
+      // Check if this is a virtual item (not yet in inventory)
+      if (itemId.startsWith("virtual_")) {
+        // Create new inventory record with delivered quantity as actual count
+        const { error } = await supabase
+          .from("inventory")
+          .insert({
+            project_id: projectId,
+            name: itemName,
+            item_type: itemType,
+            quantity: delivered,
+            unit: unit,
+            category: itemType === "material" ? "Construction Materials" : "Tools & Equipment",
+            unit_cost: 0,
+            reorder_level: 0,
+          });
+
+        if (error) throw error;
+
+        toast({
+          title: "Received",
+          description: `${itemName} has been received at site warehouse`,
+        });
+      } else {
+        // Update existing inventory record
+        const { error } = await supabase
+          .from("inventory")
+          .update({ quantity: delivered })
+          .eq("id", itemId);
+
+        if (error) throw error;
+
+        toast({
+          title: "Received",
+          description: `${itemName} quantity updated to ${delivered} ${unit}`,
+        });
+      }
+
+      void loadData();
+    } catch (error: any) {
+      console.error("Error receiving item:", error);
+      toast({
+        title: "Error",
+        description: "Failed to receive item",
+        variant: "destructive",
+      });
+    }
+  }
+
   const filteredInventory = useMemo(() => {
     if (!inventory) return [];
     
@@ -539,7 +591,8 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                           <TableHead className="h-8 px-2 text-right text-[11px]">Expected Remaining</TableHead>
                           <TableHead className="h-8 px-2 text-right text-[11px]">Actual Count</TableHead>
                           <TableHead className="h-8 px-2 text-right text-[11px]">Variance</TableHead>
-                          <TableHead className="h-8 px-2 text-center text-[11px]">Status</TableHead>
+                          <TableHead className="h-8 px-2 text-center text-[11px]">Stock Status</TableHead>
+                          <TableHead className="h-8 px-2 text-center text-[11px]">Receipt Status</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -549,6 +602,7 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                           const expectedRemaining = delivered - consumed;
                           const actualCount = item.quantity || 0;
                           const variance = expectedRemaining - actualCount;
+                          const isReceived = !item.id.startsWith("virtual_") && item.quantity !== null && item.quantity > 0;
                           
                           return (
                             <TableRow key={item.id}>
@@ -571,37 +625,67 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                                 </span>
                               </TableCell>
                               <TableCell className="px-2 py-1.5 text-right">
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  value={actualCount}
-                                  onChange={(e) => void handleActualCountUpdate(item.id, item.name, item.unit || "", Number(e.target.value))}
-                                  className="h-7 w-20 text-right text-xs"
-                                />
+                                {isReceived ? (
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={actualCount}
+                                    onChange={(e) => void handleActualCountUpdate(item.id, item.name, item.unit || "", Number(e.target.value))}
+                                    className="h-7 w-20 text-right text-xs"
+                                  />
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">-</span>
+                                )}
                               </TableCell>
                               <TableCell className="px-2 py-1.5 text-right whitespace-nowrap">
-                                <span className={`font-semibold ${
-                                  variance === 0 ? 'text-muted-foreground' : 
-                                  variance < 0 ? 'text-red-600' : 
-                                  'text-green-600'
-                                }`}>
-                                  {variance > 0 ? '+' : ''}{variance.toFixed(2)} {item.unit}
-                                </span>
-                              </TableCell>
-                              <TableCell className="px-2 py-1.5 text-center">
-                                {variance === 0 ? (
-                                  <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-800">
-                                    Match
-                                  </span>
-                                ) : variance < 0 ? (
-                                  <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-800">
-                                    Missing
+                                {isReceived ? (
+                                  <span className={`font-semibold ${
+                                    variance === 0 ? 'text-muted-foreground' : 
+                                    variance < 0 ? 'text-red-600' : 
+                                    'text-green-600'
+                                  }`}>
+                                    {variance > 0 ? '+' : ''}{variance.toFixed(2)} {item.unit}
                                   </span>
                                 ) : (
+                                  <span className="text-xs text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="px-2 py-1.5 text-center">
+                                {isReceived ? (
+                                  <>
+                                    {variance === 0 ? (
+                                      <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-800">
+                                        Match
+                                      </span>
+                                    ) : variance < 0 ? (
+                                      <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-800">
+                                        Missing
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-800">
+                                        Excess
+                                      </span>
+                                    )}
+                                  </>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="px-2 py-1.5 text-center">
+                                {isReceived ? (
                                   <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-800">
-                                    Excess
+                                    Received
                                   </span>
+                                ) : (
+                                  <Button
+                                    variant="default"
+                                    size="sm"
+                                    className="h-7 px-2 text-[10px]"
+                                    onClick={() => void handleReceiveItem(item.id, item.name, item.unit || "", "material")}
+                                  >
+                                    Receive
+                                  </Button>
                                 )}
                               </TableCell>
                             </TableRow>
@@ -670,6 +754,7 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                           <TableHead className="h-8 px-2 text-[11px]">Item Name</TableHead>
                           <TableHead className="h-8 px-2 text-right text-[11px]">Delivered</TableHead>
                           <TableHead className="h-8 px-2 text-[11px]">Source</TableHead>
+                          <TableHead className="h-8 px-2 text-center text-[11px]">Status</TableHead>
                           <TableHead className="h-8 px-2 text-right text-[11px]">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -678,11 +763,12 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                           const delivered = calculateDelivered(item.name);
                           const delivery = deliveries.find(d => d.item_name === item.name);
                           const deliverySource = delivery?.transaction_type === "site_purchase" ? "Site Purchase" : "Main Warehouse";
+                          const isReceived = !item.id.startsWith("virtual_") && item.quantity !== null && item.quantity > 0;
                           
                           return (
                             <TableRow key={item.id}>
                               <TableCell className="px-2 py-1.5 font-medium">
-                                <CompactText value={item.name} className="max-w-[200px]" />
+                                <CompactText value={item.name} className="max-w-[180px]" />
                               </TableCell>
                               <TableCell className="px-2 py-1.5 text-right whitespace-nowrap text-blue-600 font-medium">
                                 {delivered.toFixed(2)} {item.unit}
@@ -696,13 +782,36 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                                   {deliverySource}
                                 </span>
                               </TableCell>
+                              <TableCell className="px-2 py-1.5 text-center">
+                                {isReceived ? (
+                                  <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-800">
+                                    Received
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-medium text-yellow-800">
+                                    Pending Receipt
+                                  </span>
+                                )}
+                              </TableCell>
                               <TableCell className="px-2 py-1.5 text-right">
                                 <div className="flex justify-end gap-1">
+                                  {!isReceived && (
+                                    <Button
+                                      variant="default"
+                                      size="sm"
+                                      className="h-7 px-2 text-[10px]"
+                                      onClick={() => void handleReceiveItem(item.id, item.name, item.unit || "", "tool_equipment")}
+                                    >
+                                      Receive
+                                    </Button>
+                                  )}
                                   <Button
                                     variant="ghost"
                                     size="icon"
                                     className="h-7 w-7"
                                     onClick={() => openEditDialog(item)}
+                                    disabled={!isReceived}
+                                    title={!isReceived ? "Receive item first to edit" : "Edit item"}
                                   >
                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
                                       <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
@@ -714,6 +823,8 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                                     size="icon"
                                     className="h-7 w-7"
                                     onClick={() => void handleDelete(item.id)}
+                                    disabled={!isReceived}
+                                    title={!isReceived ? "Receive item first to delete" : "Delete item"}
                                   >
                                     <Trash2 className="h-3.5 w-3.5 text-destructive" />
                                   </Button>
