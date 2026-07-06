@@ -630,6 +630,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
       const linkedSiteRequest = getRelationItem(selectedReadyRecord.site_requests);
       const itemLabel = linkedSiteRequest?.item_name || "Request item";
 
+      // Mark as received in the workflow
       await requestWorkflowService.markReceived({
         siteRequestId: selectedReadyRecord.site_request_id,
         deliveryId: selectedReadyRecord.purchase_id,
@@ -637,6 +638,26 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
         actualQuantity: receivingForm.actualQuantity ? Number(receivingForm.actualQuantity) : null,
         remarks: receivingForm.remarks || null,
       });
+
+      // Create delivery record for inventory receiving workflow
+      const deliveryPayload = {
+        project_id: projectId,
+        transaction_type: "delivery" as const,
+        bom_scope_id: null,
+        item_name: linkedSiteRequest?.item_name || itemLabel,
+        quantity: receivingForm.actualQuantity ? Number(receivingForm.actualQuantity) : (linkedSiteRequest?.quantity || 0),
+        unit: linkedSiteRequest?.unit || "",
+        supplier: selectedReadyRecord.supplier || "Main Warehouse",
+        delivery_date: new Date().toISOString().split("T")[0],
+        received_by: receivingForm.receivedBy || "Site Personnel",
+        notes: receivingForm.remarks || `Received from voucher ${selectedReadyRecord.voucher_number}`,
+        status: "pending",
+        unit_cost: null,
+        amount: null,
+        receipt_number: selectedReadyRecord.voucher_number,
+      };
+
+      await siteService.createDelivery(deliveryPayload);
 
       if (selectedReadyRecord.initial_approval_request_id) {
         await notificationService.createNotification({
@@ -670,7 +691,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
 
       toast({
         title: "Received",
-        description: "The delivery was confirmed successfully.",
+        description: "The delivery was confirmed and is now ready for warehouse receiving.",
       });
 
       setReceivingDialogOpen(false);
