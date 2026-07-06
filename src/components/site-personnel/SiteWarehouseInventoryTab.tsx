@@ -134,7 +134,7 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
 
         // If inventory item exists, use it; otherwise create a virtual record
         if (inventoryItem) {
-          return inventoryItem;
+          return inventoryItem as InventoryItem;
         } else {
           // Create virtual inventory record for materials that exist in deliveries/consumption but not in inventory
           return {
@@ -158,8 +158,8 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
 
       // Add tools/equipment from inventory (they don't appear in deliveries/consumption)
       const toolsEquipment = (inventoryResult.data || []).filter(
-        (inv: InventoryItem) => inv.item_type === "tool_equipment"
-      );
+        (inv: any) => inv.item_type === "tool_equipment"
+      ) as InventoryItem[];
 
       setInventory([...unifiedInventory, ...toolsEquipment]);
       setDeliveries(deliveriesResult.data || []);
@@ -404,7 +404,10 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
     if (!inventory) return [];
     return inventory
       .filter((item) => {
-        if (item.item_type !== activeTab) return false;
+        const matchesType = activeTab === "material" 
+          ? item.item_type === "material" || item.item_type === null
+          : item.item_type === "tool_equipment";
+        if (!matchesType) return false;
         if (filters.itemName && !item.name.toLowerCase().includes(filters.itemName.toLowerCase())) return false;
         return true;
       })
