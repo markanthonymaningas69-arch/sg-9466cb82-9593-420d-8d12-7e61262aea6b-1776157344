@@ -46,6 +46,8 @@ interface InventoryItem {
 export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryTabProps) {
   const { toast } = useToast();
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [deliveries, setDeliveries] = useState<Array<{ item_name: string; quantity: number }>>([]);
+  const [consumptions, setConsumptions] = useState<Array<{ item_name: string; quantity: number }>>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -73,15 +75,32 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
     try {
       setLoading(true);
 
-      const { data, error } = await supabase
-        .from("inventory")
-        .select("*")
-        .eq("project_id", projectId)
-        .eq("is_archived", false)
-        .order("name");
+      const [inventoryResult, deliveriesResult, consumptionResult] = await Promise.all([
+        supabase
+          .from("inventory")
+          .select("*")
+          .eq("project_id", projectId)
+          .eq("is_archived", false)
+          .order("name"),
+        supabase
+          .from("deliveries")
+          .select("item_name, quantity")
+          .eq("project_id", projectId)
+          .eq("is_archived", false),
+        supabase
+          .from("material_consumption")
+          .select("item_name, quantity")
+          .eq("project_id", projectId)
+          .eq("is_archived", false)
+      ]);
 
-      if (error) throw error;
-      setInventory((data || []) as InventoryItem[]);
+      if (inventoryResult.error) throw inventoryResult.error;
+      if (deliveriesResult.error) throw deliveriesResult.error;
+      if (consumptionResult.error) throw consumptionResult.error;
+
+      setInventory((inventoryResult.data || []) as InventoryItem[]);
+      setDeliveries(deliveriesResult.data || []);
+      setConsumptions(consumptionResult.data || []);
     } catch (error) {
       console.error("Error loading inventory:", error);
       toast({
@@ -229,6 +248,18 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
       notes: "",
     });
     setEditDialogOpen(true);
+  }
+
+  function calculateExpectedRemaining(materialName: string): number {
+    const totalDelivered = deliveries
+      .filter(d => d.item_name === materialName)
+      .reduce((sum, d) => sum + Number(d.quantity || 0), 0);
+
+    const totalConsumed = consumptions
+      .filter(c => c.item_name === materialName)
+      .reduce((sum, c) => sum + Number(c.quantity || 0), 0);
+
+    return totalDelivered - totalConsumed;
   }
 
   const filteredInventory = useMemo(() => {
@@ -414,47 +445,61 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                         <TableRow>
                           <TableHead className="h-8 px-2 text-[11px]">Item Name</TableHead>
                           <TableHead className="h-8 px-2 text-right text-[11px]">Quantity</TableHead>
+                          <TableHead className="h-8 px-2 text-right text-[11px]">Expected Remaining</TableHead>
                           <TableHead className="h-8 px-2 text-[11px]">Location</TableHead>
                           <TableHead className="h-8 px-2 text-right text-[11px]">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredInventory.map((item) => (
-                          <TableRow key={item.id}>
-                            <TableCell className="px-2 py-1.5 font-medium">
-                              <CompactText value={item.name} className="max-w-[200px]" />
-                            </TableCell>
-                            <TableCell className="px-2 py-1.5 text-right whitespace-nowrap">
-                              {item.quantity} {item.unit}
-                            </TableCell>
-                            <TableCell className="px-2 py-1.5">
-                              <CompactText value={item.location || "—"} className="max-w-[150px]" />
-                            </TableCell>
-                            <TableCell className="px-2 py-1.5 text-right">
-                              <div className="flex justify-end gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7"
-                                  onClick={() => openEditDialog(item)}
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-                                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
-                                    <path d="m15 5 4 4"/>
-                                  </svg>
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7"
-                                  onClick={() => void handleDelete(item.id)}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {filteredInventory.map((item) => {
+                          const expectedRemaining = calculateExpectedRemaining(item.name);
+                          
+                          return (
+                            <TableRow key={item.id}>
+                              <TableCell className="px-2 py-1.5 font-medium">
+                                <CompactText value={item.name} className="max-w-[200px]" />
+                              </TableCell>
+                              <TableCell className="px-2 py-1.5 text-right whitespace-nowrap">
+                                {item.quantity} {item.unit}
+                              </TableCell>
+                              <TableCell className="px-2 py-1.5 text-right whitespace-nowrap">
+                                <span className={`font-semibold ${
+                                  expectedRemaining === 0 ? 'text-red-600' : 
+                                  expectedRemaining < 10 ? 'text-orange-600' : 
+                                  'text-green-600'
+                                }`}>
+                                  {expectedRemaining} {item.unit}
+                                </span>
+                              </TableCell>
+                              <TableCell className="px-2 py-1.5">
+                                <CompactText value={item.location || "—"} className="max-w-[150px]" />
+                              </TableCell>
+                              <TableCell className="px-2 py-1.5 text-right">
+                                <div className="flex justify-end gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => openEditDialog(item)}
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                                      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                                      <path d="m15 5 4 4"/>
+                                    </svg>
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => void handleDelete(item.id)}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </div>
