@@ -121,7 +121,7 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
         ...consumptionMaterials.keys()
       ]);
 
-      // Build unified inventory list
+      // Build unified inventory list for materials
       const unifiedInventory: InventoryItem[] = Array.from(allMaterialNames).map(materialName => {
         const delivery = deliveryMaterials.get(materialName);
         const consumption = consumptionMaterials.get(materialName);
@@ -156,12 +156,48 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
         }
       });
 
-      // Add tools/equipment from inventory (they don't appear in deliveries/consumption)
-      const toolsEquipment = (inventoryResult.data || []).filter(
-        (inv: any) => inv.item_type === "tool_equipment"
-      ) as InventoryItem[];
+      // Build tools/equipment list from deliveries (auto-populate like materials)
+      const toolsEquipmentFromDeliveries: InventoryItem[] = [];
+      (deliveriesResult.data || []).forEach(d => {
+        // Skip if already in materials list
+        if (allMaterialNames.has(d.item_name)) return;
+        
+        // Check if this item should be considered tool/equipment (not in consumption)
+        const isConsumed = consumptionMaterials.has(d.item_name);
+        if (isConsumed) return; // If consumed, it's a material, not a tool
+        
+        // Check if already in tools list
+        if (toolsEquipmentFromDeliveries.find(t => t.name === d.item_name)) return;
+        
+        // Find actual count from inventory table
+        const inventoryItem = (inventoryResult.data || []).find(
+          (inv: InventoryItem) => inv.name === d.item_name && inv.item_type === "tool_equipment"
+        );
 
-      setInventory([...unifiedInventory, ...toolsEquipment]);
+        if (inventoryItem) {
+          toolsEquipmentFromDeliveries.push(inventoryItem as InventoryItem);
+        } else {
+          // Create virtual record
+          toolsEquipmentFromDeliveries.push({
+            id: `virtual_tool_${d.item_name}`,
+            name: d.item_name,
+            item_type: "tool_equipment" as const,
+            quantity: 0,
+            unit: d.unit || "",
+            location: null,
+            category: "Tools & Equipment",
+            unit_cost: null,
+            reorder_level: null,
+            last_restocked: null,
+            company_id: "",
+            project_id: projectId,
+            is_archived: false,
+            created_at: new Date().toISOString(),
+          });
+        }
+      });
+
+      setInventory([...unifiedInventory, ...toolsEquipmentFromDeliveries]);
       setDeliveries(deliveriesResult.data || []);
       setConsumptions(consumptionResult.data || []);
     } catch (error) {
@@ -411,11 +447,14 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
         }
         
         // Filter by item type based on active tab
+        // Store item_type to avoid TypeScript control flow narrowing issues
+        const itemType = item.item_type;
+        const isMaterialTab = activeTab === "material";
+        const isToolType = itemType === "tool_equipment";
+        
         // Materials tab: show all except tool_equipment (includes material and null)
         // Tools tab: only show tool_equipment
-        return activeTab === "material" 
-          ? item.item_type !== "tool_equipment"
-          : item.item_type === "tool_equipment";
+        return isMaterialTab ? !isToolType : isToolType;
       })
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [inventory, activeTab, filters.itemName]);
@@ -440,68 +479,6 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                 Tools & Equipment
               </TabsTrigger>
             </TabsList>
-
-            {activeTab === "tool_equipment" && (
-              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button size="sm" className="h-8 px-2 text-xs">
-                    <Plus className="mr-1.5 h-3.5 w-3.5" />
-                    Add Tool/Equipment
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-lg">
-                  <DialogHeader>
-                    <DialogTitle>Add Tool/Equipment to Inventory</DialogTitle>
-                  </DialogHeader>
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="item_name">Item Name</Label>
-                      <Input
-                        id="item_name"
-                        value={formData.item_name}
-                        onChange={(e) => setFormData(prev => ({ ...prev, item_name: e.target.value }))}
-                        placeholder="Enter tool/equipment name"
-                        required
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="quantity">Actual Count</Label>
-                        <Input
-                          id="quantity"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={formData.quantity}
-                          onChange={(e) => setFormData(prev => ({ ...prev, quantity: e.target.value }))}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="unit">Unit</Label>
-                        <Input
-                          id="unit"
-                          value={formData.unit}
-                          onChange={(e) => setFormData(prev => ({ ...prev, unit: e.target.value }))}
-                          placeholder={activeTab === "material" ? "bags, pcs, cu.m" : "pcs, units"}
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <Button type="button" variant="outline" className="flex-1" onClick={() => setDialogOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button type="submit" className="flex-1">
-                        Add to Inventory
-                      </Button>
-                    </div>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            )}
           </div>
 
           <TabsContent value="material" className="mt-4 space-y-3">
@@ -648,7 +625,7 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                     <div className="space-y-0.5">
                       <p className="text-sm font-medium text-foreground">Tools & Equipment Inventory</p>
                       <p className="text-xs text-muted-foreground">
-                        Track tools and equipment stored on-site
+                        Auto-populated from Site Purchase & Deliveries (Ready for Receiving)
                       </p>
                     </div>
                     <Button
@@ -753,71 +730,6 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
             )}
           </TabsContent>
         </Tabs>
-
-        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Edit Inventory Item</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleEdit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit_item_type">Item Type</Label>
-                <Select value={formData.item_type} onValueChange={(value: "material" | "tool_equipment") => setFormData(prev => ({ ...prev, item_type: value }))}>
-                  <SelectTrigger id="edit_item_type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="material">Material</SelectItem>
-                    <SelectItem value="tool_equipment">Tool/Equipment</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit_item_name">Item Name</Label>
-                <Input
-                  id="edit_item_name"
-                  value={formData.item_name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, item_name: e.target.value }))}
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit_quantity">Actual Count</Label>
-                  <Input
-                    id="edit_quantity"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.quantity}
-                    onChange={(e) => setFormData(prev => ({ ...prev, quantity: e.target.value }))}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit_unit">Unit</Label>
-                  <Input
-                    id="edit_unit"
-                    value={formData.unit}
-                    onChange={(e) => setFormData(prev => ({ ...prev, unit: e.target.value }))}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" className="flex-1" onClick={() => setEditDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" className="flex-1">
-                  Update
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
       </CardContent>
     </Card>
   );
