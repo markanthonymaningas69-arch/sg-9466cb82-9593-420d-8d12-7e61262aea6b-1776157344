@@ -402,20 +402,26 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
 
   const filteredInventory = useMemo(() => {
     if (!inventory) return [];
-    return inventory
-      .filter((item) => {
-        // Filter by item type based on active tab
-        if (activeTab === "material") {
-          // Materials tab: show materials only (exclude tool_equipment)
-          return item.item_type !== "tool_equipment" && 
-                 (!filters.itemName || item.name.toLowerCase().includes(filters.itemName.toLowerCase()));
-        } else {
-          // Tools tab: show tool_equipment only
-          return item.item_type === "tool_equipment" && 
-                 (!filters.itemName || item.name.toLowerCase().includes(filters.itemName.toLowerCase()));
-        }
-      })
-      .sort((a, b) => a.name.localeCompare(b.name));
+    
+    // Filter by tab and search term
+    const filtered = inventory.filter((item) => {
+      // Filter by search term
+      if (filters.itemName && !item.name.toLowerCase().includes(filters.itemName.toLowerCase())) {
+        return false;
+      }
+      
+      // Filter by item type based on active tab
+      const itemType = item.item_type;
+      if (activeTab === "material") {
+        // Materials tab: show all except tool_equipment
+        return itemType !== "tool_equipment";
+      } else {
+        // Tools tab: only show tool_equipment
+        return itemType === "tool_equipment";
+      }
+    });
+    
+    return filtered.sort((a, b) => a.name.localeCompare(b.name));
   }, [inventory, activeTab, filters.itemName]);
 
   return (
