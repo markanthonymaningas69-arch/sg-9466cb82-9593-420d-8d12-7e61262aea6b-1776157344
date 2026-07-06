@@ -410,14 +410,10 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
         return false;
       }
       
-      // Filter by item type based on active tab
-      if (activeTab === "material") {
-        // Materials tab: exclude tool_equipment (show material and null)
-        return item.item_type !== "tool_equipment";
-      }
-      
-      // Tools tab: only show tool_equipment
-      return item.item_type === "tool_equipment";
+      // Filter by item type based on active tab - use ternary to avoid control flow narrowing
+      return (activeTab === "material") 
+        ? (item.item_type !== "tool_equipment") 
+        : (item.item_type === "tool_equipment");
     });
     
     return filtered.sort((a, b) => a.name.localeCompare(b.name));
