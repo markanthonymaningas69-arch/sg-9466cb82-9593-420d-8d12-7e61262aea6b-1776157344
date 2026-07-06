@@ -940,6 +940,7 @@ export type Database = {
           created_at: string | null
           id: string
           is_archived: boolean | null
+          item_type: string | null
           last_restocked: string | null
           location: string | null
           name: string
@@ -955,6 +956,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_archived?: boolean | null
+          item_type?: string | null
           last_restocked?: string | null
           location?: string | null
           name: string
@@ -970,6 +972,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_archived?: boolean | null
+          item_type?: string | null
           last_restocked?: string | null
           location?: string | null
           name?: string
