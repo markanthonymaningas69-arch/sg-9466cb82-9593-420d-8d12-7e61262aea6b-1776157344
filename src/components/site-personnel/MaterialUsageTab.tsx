@@ -382,19 +382,41 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
     try {
       setCheckingStock(true);
 
-      const { data, error } = await supabase
-        .from("inventory")
+      // Get total delivered to site
+      const { data: deliveriesData, error: deliveriesError } = await supabase
+        .from("deliveries")
+        .select("quantity_delivered")
+        .eq("project_id", projectId)
+        .eq("item_name", materialName)
+        .eq("is_archived", false);
+
+      if (deliveriesError) throw deliveriesError;
+
+      const totalDelivered = (deliveriesData || []).reduce(
+        (sum, delivery) => sum + Number(delivery.quantity_delivered || 0),
+        0
+      );
+
+      // Get total consumed
+      const { data: consumptionData, error: consumptionError } = await supabase
+        .from("material_consumption")
         .select("quantity")
         .eq("project_id", projectId)
-        .eq("name", materialName)
-        .eq("is_archived", false)
-        .maybeSingle();
+        .eq("item_name", materialName)
+        .eq("is_archived", false);
 
-      if (error) throw error;
+      if (consumptionError) throw consumptionError;
 
-      setRemainingQty(data ? Number(data.quantity || 0) : 0);
+      const totalConsumed = (consumptionData || []).reduce(
+        (sum, consumption) => sum + Number(consumption.quantity || 0),
+        0
+      );
+
+      // Calculate expected remaining
+      const expectedRemaining = totalDelivered - totalConsumed;
+      setRemainingQty(expectedRemaining);
     } catch (error) {
-      console.error("Error checking warehouse stock:", error);
+      console.error("Error checking site warehouse stock:", error);
       setRemainingQty(null);
     } finally {
       setCheckingStock(false);
@@ -486,7 +508,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
                       <span className="text-xs text-muted-foreground">Checking stock...</span>
                     ) : remainingQty !== null ? (
                       <>
-                        <span className="text-xs text-muted-foreground">Available in Warehouse:</span>
+                        <span className="text-xs text-muted-foreground">Expected Remaining in Site:</span>
                         <span className={`text-sm font-semibold ${
                           remainingQty === 0 ? 'text-red-600' : 
                           remainingQty < 10 ? 'text-orange-600' : 
@@ -496,7 +518,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
                         </span>
                       </>
                     ) : (
-                      <span className="text-xs text-muted-foreground">Not found in warehouse</span>
+                      <span className="text-xs text-muted-foreground">No deliveries to site yet</span>
                     )}
                   </div>
                 )}
