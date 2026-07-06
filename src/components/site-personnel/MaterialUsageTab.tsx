@@ -385,7 +385,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
       // Get total delivered to site
       const { data: deliveriesData, error: deliveriesError } = await supabase
         .from("deliveries")
-        .select("quantity_delivered")
+        .select("quantity")
         .eq("project_id", projectId)
         .eq("item_name", materialName)
         .eq("is_archived", false);
@@ -393,7 +393,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
       if (deliveriesError) throw deliveriesError;
 
       const totalDelivered = (deliveriesData || []).reduce(
-        (sum, delivery) => sum + Number(delivery.quantity_delivered || 0),
+        (sum, delivery) => sum + Number(delivery.quantity || 0),
         0
       );
 
