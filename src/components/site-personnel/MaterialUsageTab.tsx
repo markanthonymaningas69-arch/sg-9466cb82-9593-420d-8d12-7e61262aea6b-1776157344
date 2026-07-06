@@ -383,10 +383,10 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
       setCheckingStock(true);
 
       const { data, error } = await supabase
-        .from("site_warehouse")
+        .from("inventory")
         .select("quantity")
         .eq("project_id", projectId)
-        .eq("item_name", materialName)
+        .eq("name", materialName)
         .eq("is_archived", false)
         .maybeSingle();
 
