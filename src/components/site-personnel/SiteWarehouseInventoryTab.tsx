@@ -22,7 +22,6 @@ interface FormState {
   item_type: "material" | "tool_equipment";
   quantity: string;
   unit: string;
-  location: string;
   notes: string;
 }
 
@@ -56,14 +55,12 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filters, setFilters] = useState({
     itemName: "",
-    location: "",
   });
   const [formData, setFormData] = useState<FormState>({
     item_name: "",
     item_type: "material",
     quantity: "",
     unit: "",
-    location: "",
     notes: "",
   });
 
@@ -132,7 +129,6 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
         item_type: formData.item_type,
         quantity: Number(formData.quantity),
         unit: formData.unit,
-        location: formData.location || null,
         category: "Construction Materials",
         unit_cost: 0,
         reorder_level: 0,
@@ -151,7 +147,6 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
         item_type: "material",
         quantity: "",
         unit: "",
-        location: "",
         notes: "",
       });
       void loadData();
@@ -178,7 +173,6 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
           item_type: formData.item_type,
           quantity: Number(formData.quantity),
           unit: formData.unit,
-          location: formData.location || null,
         })
         .eq("id", editingItem.id);
 
@@ -196,7 +190,6 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
         item_type: "material",
         quantity: "",
         unit: "",
-        location: "",
         notes: "",
       });
       void loadData();
@@ -244,7 +237,6 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
       item_type: item.item_type || "material",
       quantity: String(item.quantity || 0),
       unit: item.unit || "",
-      location: item.location || "",
       notes: "",
     });
     setEditDialogOpen(true);
@@ -262,17 +254,56 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
     return totalDelivered - totalConsumed;
   }
 
+  function calculateDelivered(materialName: string): number {
+    return deliveries
+      .filter(d => d.item_name === materialName)
+      .reduce((sum, d) => sum + Number(d.quantity || 0), 0);
+  }
+
+  function calculateConsumed(materialName: string): number {
+    return consumptions
+      .filter(c => c.item_name === materialName)
+      .reduce((sum, c) => sum + Number(c.quantity || 0), 0);
+  }
+
+  async function handleActualCountUpdate(itemId: string, newActualCount: number) {
+    try {
+      const { error } = await supabase
+        .from("inventory")
+        .update({ quantity: newActualCount })
+        .eq("id", itemId);
+
+      if (error) throw error;
+
+      // Update local state
+      setInventory(prev => prev.map(item => 
+        item.id === itemId ? { ...item, quantity: newActualCount } : item
+      ));
+
+      toast({
+        title: "Updated",
+        description: "Actual count updated",
+      });
+    } catch (error: any) {
+      console.error("Error updating actual count:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update actual count",
+        variant: "destructive",
+      });
+    }
+  }
+
   const filteredInventory = useMemo(() => {
     if (!inventory) return [];
     return inventory
       .filter((item) => {
         if (item.item_type !== activeTab) return false;
         if (filters.itemName && !item.name.toLowerCase().includes(filters.itemName.toLowerCase())) return false;
-        if (filters.location && !item.location?.toLowerCase().includes(filters.location.toLowerCase())) return false;
         return true;
       })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [inventory, activeTab, filters.itemName, filters.location]);
+  }, [inventory, activeTab, filters.itemName]);
 
   return (
     <Card>
@@ -333,7 +364,7 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="quantity">Quantity</Label>
+                      <Label htmlFor="quantity">Actual Count</Label>
                       <Input
                         id="quantity"
                         type="number"
@@ -354,16 +385,6 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                         required
                       />
                     </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="location">Location</Label>
-                    <Input
-                      id="location"
-                      value={formData.location}
-                      onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
-                      placeholder="Storage location (optional)"
-                    />
                   </div>
 
                   <div className="flex gap-2">
@@ -405,7 +426,7 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                   </div>
 
                   {filtersOpen && (
-                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <div className="mt-3">
                       <div className="space-y-1">
                         <Label htmlFor="filter-item" className="text-[11px]">
                           Item Name
@@ -416,18 +437,6 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                           value={filters.itemName}
                           onChange={(e) => setFilters(prev => ({ ...prev, itemName: e.target.value }))}
                           placeholder="Search items"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="filter-location" className="text-[11px]">
-                          Location
-                        </Label>
-                        <Input
-                          id="filter-location"
-                          className="h-8 text-xs"
-                          value={filters.location}
-                          onChange={(e) => setFilters(prev => ({ ...prev, location: e.target.value }))}
-                          placeholder="Search location"
                         />
                       </div>
                     </div>
@@ -443,24 +452,34 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                     <Table className="text-xs">
                       <TableHeader className="sticky top-0 bg-background">
                         <TableRow>
-                          <TableHead className="h-8 px-2 text-[11px]">Item Name</TableHead>
-                          <TableHead className="h-8 px-2 text-right text-[11px]">Quantity</TableHead>
+                          <TableHead className="h-8 px-2 text-[11px]">Material Name</TableHead>
+                          <TableHead className="h-8 px-2 text-right text-[11px]">Delivered</TableHead>
+                          <TableHead className="h-8 px-2 text-right text-[11px]">Consumed</TableHead>
                           <TableHead className="h-8 px-2 text-right text-[11px]">Expected Remaining</TableHead>
-                          <TableHead className="h-8 px-2 text-[11px]">Location</TableHead>
+                          <TableHead className="h-8 px-2 text-right text-[11px]">Actual Count</TableHead>
+                          <TableHead className="h-8 px-2 text-right text-[11px]">Variance</TableHead>
+                          <TableHead className="h-8 px-2 text-center text-[11px]">Status</TableHead>
                           <TableHead className="h-8 px-2 text-right text-[11px]">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {filteredInventory.map((item) => {
-                          const expectedRemaining = calculateExpectedRemaining(item.name);
+                          const delivered = calculateDelivered(item.name);
+                          const consumed = calculateConsumed(item.name);
+                          const expectedRemaining = delivered - consumed;
+                          const actualCount = item.quantity || 0;
+                          const variance = expectedRemaining - actualCount;
                           
                           return (
                             <TableRow key={item.id}>
                               <TableCell className="px-2 py-1.5 font-medium">
-                                <CompactText value={item.name} className="max-w-[200px]" />
+                                <CompactText value={item.name} className="max-w-[180px]" />
                               </TableCell>
-                              <TableCell className="px-2 py-1.5 text-right whitespace-nowrap">
-                                {item.quantity} {item.unit}
+                              <TableCell className="px-2 py-1.5 text-right whitespace-nowrap text-blue-600 font-medium">
+                                {delivered.toFixed(2)} {item.unit}
+                              </TableCell>
+                              <TableCell className="px-2 py-1.5 text-right whitespace-nowrap text-orange-600 font-medium">
+                                {consumed.toFixed(2)} {item.unit}
                               </TableCell>
                               <TableCell className="px-2 py-1.5 text-right whitespace-nowrap">
                                 <span className={`font-semibold ${
@@ -468,11 +487,42 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                                   expectedRemaining < 10 ? 'text-orange-600' : 
                                   'text-green-600'
                                 }`}>
-                                  {expectedRemaining} {item.unit}
+                                  {expectedRemaining.toFixed(2)} {item.unit}
                                 </span>
                               </TableCell>
-                              <TableCell className="px-2 py-1.5">
-                                <CompactText value={item.location || "—"} className="max-w-[150px]" />
+                              <TableCell className="px-2 py-1.5 text-right">
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={actualCount}
+                                  onChange={(e) => void handleActualCountUpdate(item.id, Number(e.target.value))}
+                                  className="h-7 w-20 text-right text-xs"
+                                />
+                              </TableCell>
+                              <TableCell className="px-2 py-1.5 text-right whitespace-nowrap">
+                                <span className={`font-semibold ${
+                                  variance === 0 ? 'text-muted-foreground' : 
+                                  variance < 0 ? 'text-red-600' : 
+                                  'text-green-600'
+                                }`}>
+                                  {variance > 0 ? '+' : ''}{variance.toFixed(2)} {item.unit}
+                                </span>
+                              </TableCell>
+                              <TableCell className="px-2 py-1.5 text-center">
+                                {variance === 0 ? (
+                                  <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-800">
+                                    Match
+                                  </span>
+                                ) : variance < 0 ? (
+                                  <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-800">
+                                    Missing
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-800">
+                                    Excess
+                                  </span>
+                                )}
                               </TableCell>
                               <TableCell className="px-2 py-1.5 text-right">
                                 <div className="flex justify-end gap-1">
@@ -534,29 +584,17 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                   </div>
 
                   {filtersOpen && (
-                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <div className="mt-3">
                       <div className="space-y-1">
-                        <Label htmlFor="filter-item" className="text-[11px]">
+                        <Label htmlFor="filter-item-tools" className="text-[11px]">
                           Item Name
                         </Label>
                         <Input
-                          id="filter-item"
+                          id="filter-item-tools"
                           className="h-8 text-xs"
                           value={filters.itemName}
                           onChange={(e) => setFilters(prev => ({ ...prev, itemName: e.target.value }))}
                           placeholder="Search items"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="filter-location" className="text-[11px]">
-                          Location
-                        </Label>
-                        <Input
-                          id="filter-location"
-                          className="h-8 text-xs"
-                          value={filters.location}
-                          onChange={(e) => setFilters(prev => ({ ...prev, location: e.target.value }))}
-                          placeholder="Search location"
                         />
                       </div>
                     </div>
@@ -574,7 +612,6 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                         <TableRow>
                           <TableHead className="h-8 px-2 text-[11px]">Item Name</TableHead>
                           <TableHead className="h-8 px-2 text-right text-[11px]">Quantity</TableHead>
-                          <TableHead className="h-8 px-2 text-[11px]">Location</TableHead>
                           <TableHead className="h-8 px-2 text-right text-[11px]">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -586,9 +623,6 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                             </TableCell>
                             <TableCell className="px-2 py-1.5 text-right whitespace-nowrap">
                               {item.quantity} {item.unit}
-                            </TableCell>
-                            <TableCell className="px-2 py-1.5">
-                              <CompactText value={item.location || "—"} className="max-w-[150px]" />
                             </TableCell>
                             <TableCell className="px-2 py-1.5 text-right">
                               <div className="flex justify-end gap-1">
@@ -655,7 +689,7 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="edit_quantity">Quantity</Label>
+                  <Label htmlFor="edit_quantity">Actual Count</Label>
                   <Input
                     id="edit_quantity"
                     type="number"
@@ -675,15 +709,6 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                     required
                   />
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit_location">Location</Label>
-                <Input
-                  id="edit_location"
-                  value={formData.location}
-                  onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
-                />
               </div>
 
               <div className="flex gap-2">
