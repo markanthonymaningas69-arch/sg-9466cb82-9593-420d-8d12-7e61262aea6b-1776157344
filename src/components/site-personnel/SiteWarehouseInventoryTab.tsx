@@ -81,12 +81,12 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
           .order("name"),
         supabase
           .from("deliveries")
-          .select("item_name, quantity")
+          .select("item_name, quantity, unit")
           .eq("project_id", projectId)
           .eq("is_archived", false),
         supabase
           .from("material_consumption")
-          .select("item_name, quantity")
+          .select("item_name, quantity, unit")
           .eq("project_id", projectId)
           .eq("is_archived", false)
       ]);
@@ -95,7 +95,73 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
       if (deliveriesResult.error) throw deliveriesResult.error;
       if (consumptionResult.error) throw consumptionResult.error;
 
-      setInventory((inventoryResult.data || []) as InventoryItem[]);
+      // Get unique material names from both deliveries and consumption
+      const deliveryMaterials = new Map<string, { unit: string; totalDelivered: number }>();
+      const consumptionMaterials = new Map<string, { unit: string; totalConsumed: number }>();
+
+      // Process deliveries
+      (deliveriesResult.data || []).forEach(d => {
+        const existing = deliveryMaterials.get(d.item_name) || { unit: d.unit || "", totalDelivered: 0 };
+        existing.totalDelivered += Number(d.quantity || 0);
+        if (!existing.unit && d.unit) existing.unit = d.unit;
+        deliveryMaterials.set(d.item_name, existing);
+      });
+
+      // Process consumption
+      (consumptionResult.data || []).forEach(c => {
+        const existing = consumptionMaterials.get(c.item_name) || { unit: c.unit || "", totalConsumed: 0 };
+        existing.totalConsumed += Number(c.quantity || 0);
+        if (!existing.unit && c.unit) existing.unit = c.unit;
+        consumptionMaterials.set(c.item_name, existing);
+      });
+
+      // Get all unique material names
+      const allMaterialNames = new Set([
+        ...deliveryMaterials.keys(),
+        ...consumptionMaterials.keys()
+      ]);
+
+      // Build unified inventory list
+      const unifiedInventory: InventoryItem[] = Array.from(allMaterialNames).map(materialName => {
+        const delivery = deliveryMaterials.get(materialName);
+        const consumption = consumptionMaterials.get(materialName);
+        const unit = delivery?.unit || consumption?.unit || "";
+        
+        // Find actual count from inventory table (manual entry)
+        const inventoryItem = (inventoryResult.data || []).find(
+          (inv: InventoryItem) => inv.name === materialName && inv.item_type === "material"
+        );
+
+        // If inventory item exists, use it; otherwise create a virtual record
+        if (inventoryItem) {
+          return inventoryItem;
+        } else {
+          // Create virtual inventory record for materials that exist in deliveries/consumption but not in inventory
+          return {
+            id: `virtual_${materialName}`,
+            name: materialName,
+            item_type: "material" as const,
+            quantity: 0, // No actual count yet
+            unit: unit,
+            location: null,
+            category: "Construction Materials",
+            unit_cost: null,
+            reorder_level: null,
+            last_restocked: null,
+            company_id: "",
+            project_id: projectId,
+            is_archived: false,
+            created_at: new Date().toISOString(),
+          };
+        }
+      });
+
+      // Add tools/equipment from inventory (they don't appear in deliveries/consumption)
+      const toolsEquipment = (inventoryResult.data || []).filter(
+        (inv: InventoryItem) => inv.item_type === "tool_equipment"
+      );
+
+      setInventory([...unifiedInventory, ...toolsEquipment]);
       setDeliveries(deliveriesResult.data || []);
       setConsumptions(consumptionResult.data || []);
     } catch (error) {
@@ -122,6 +188,16 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
       return;
     }
 
+    // Only allow adding tools/equipment manually (materials auto-populate)
+    if (formData.item_type !== "tool_equipment") {
+      toast({
+        title: "Not Allowed",
+        description: "Materials are auto-populated from deliveries and usage logs",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const { error } = await supabase.from("inventory").insert({
         project_id: projectId,
@@ -138,13 +214,13 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
 
       toast({
         title: "Success",
-        description: `${formData.item_type === "material" ? "Material" : "Tool/Equipment"} added to inventory`,
+        description: "Tool/Equipment added to inventory",
       });
 
       setDialogOpen(false);
       setFormData({
         item_name: "",
-        item_type: "material",
+        item_type: "tool_equipment",
         quantity: "",
         unit: "",
         notes: "",
@@ -266,24 +342,54 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
       .reduce((sum, c) => sum + Number(c.quantity || 0), 0);
   }
 
-  async function handleActualCountUpdate(itemId: string, newActualCount: number) {
+  async function handleActualCountUpdate(itemId: string, materialName: string, unit: string, newActualCount: number) {
     try {
-      const { error } = await supabase
-        .from("inventory")
-        .update({ quantity: newActualCount })
-        .eq("id", itemId);
+      // Check if this is a virtual item (starts with "virtual_")
+      if (itemId.startsWith("virtual_")) {
+        // Create new inventory record
+        const { data, error } = await supabase
+          .from("inventory")
+          .insert({
+            project_id: projectId,
+            name: materialName,
+            item_type: "material",
+            quantity: newActualCount,
+            unit: unit,
+            category: "Construction Materials",
+            unit_cost: 0,
+            reorder_level: 0,
+          })
+          .select()
+          .single();
 
-      if (error) throw error;
+        if (error) throw error;
 
-      // Update local state
-      setInventory(prev => prev.map(item => 
-        item.id === itemId ? { ...item, quantity: newActualCount } : item
-      ));
+        toast({
+          title: "Created",
+          description: "Material added to inventory with actual count",
+        });
 
-      toast({
-        title: "Updated",
-        description: "Actual count updated",
-      });
+        // Reload to get the real database ID
+        void loadData();
+      } else {
+        // Update existing inventory record
+        const { error } = await supabase
+          .from("inventory")
+          .update({ quantity: newActualCount })
+          .eq("id", itemId);
+
+        if (error) throw error;
+
+        // Update local state
+        setInventory(prev => prev.map(item => 
+          item.id === itemId ? { ...item, quantity: newActualCount } : item
+        ));
+
+        toast({
+          title: "Updated",
+          description: "Actual count updated",
+        });
+      }
     } catch (error: any) {
       console.error("Error updating actual count:", error);
       toast({
@@ -326,78 +432,67 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
               </TabsTrigger>
             </TabsList>
 
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="h-8 px-2 text-xs">
-                  <Plus className="mr-1.5 h-3.5 w-3.5" />
-                  Add {activeTab === "material" ? "Material" : "Tool/Equipment"}
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-lg">
-                <DialogHeader>
-                  <DialogTitle>Add {activeTab === "material" ? "Material" : "Tool/Equipment"} to Inventory</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="item_type">Item Type</Label>
-                    <Select value={formData.item_type} onValueChange={(value: "material" | "tool_equipment") => setFormData(prev => ({ ...prev, item_type: value }))}>
-                      <SelectTrigger id="item_type">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="material">Material</SelectItem>
-                        <SelectItem value="tool_equipment">Tool/Equipment</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="item_name">Item Name</Label>
-                    <Input
-                      id="item_name"
-                      value={formData.item_name}
-                      onChange={(e) => setFormData(prev => ({ ...prev, item_name: e.target.value }))}
-                      placeholder={`Enter ${activeTab === "material" ? "material" : "tool/equipment"} name`}
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
+            {activeTab === "tool_equipment" && (
+              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" className="h-8 px-2 text-xs">
+                    <Plus className="mr-1.5 h-3.5 w-3.5" />
+                    Add Tool/Equipment
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Add Tool/Equipment to Inventory</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="quantity">Actual Count</Label>
+                      <Label htmlFor="item_name">Item Name</Label>
                       <Input
-                        id="quantity"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={formData.quantity}
-                        onChange={(e) => setFormData(prev => ({ ...prev, quantity: e.target.value }))}
+                        id="item_name"
+                        value={formData.item_name}
+                        onChange={(e) => setFormData(prev => ({ ...prev, item_name: e.target.value }))}
+                        placeholder="Enter tool/equipment name"
                         required
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="unit">Unit</Label>
-                      <Input
-                        id="unit"
-                        value={formData.unit}
-                        onChange={(e) => setFormData(prev => ({ ...prev, unit: e.target.value }))}
-                        placeholder={activeTab === "material" ? "bags, pcs, cu.m" : "pcs, units"}
-                        required
-                      />
-                    </div>
-                  </div>
 
-                  <div className="flex gap-2">
-                    <Button type="button" variant="outline" className="flex-1" onClick={() => setDialogOpen(false)}>
-                      Cancel
-                    </Button>
-                    <Button type="submit" className="flex-1">
-                      Add to Inventory
-                    </Button>
-                  </div>
-                </form>
-              </DialogContent>
-            </Dialog>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="quantity">Actual Count</Label>
+                        <Input
+                          id="quantity"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={formData.quantity}
+                          onChange={(e) => setFormData(prev => ({ ...prev, quantity: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="unit">Unit</Label>
+                        <Input
+                          id="unit"
+                          value={formData.unit}
+                          onChange={(e) => setFormData(prev => ({ ...prev, unit: e.target.value }))}
+                          placeholder={activeTab === "material" ? "bags, pcs, cu.m" : "pcs, units"}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button type="button" variant="outline" className="flex-1" onClick={() => setDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button type="submit" className="flex-1">
+                        Add to Inventory
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
 
           <TabsContent value="material" className="mt-4 space-y-3">
@@ -408,9 +503,9 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                 <div className="rounded-lg border bg-muted/20 p-2.5">
                   <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
                     <div className="space-y-0.5">
-                      <p className="text-sm font-medium text-foreground">Materials Inventory</p>
+                      <p className="text-sm font-medium text-foreground">Materials Inventory Tracking</p>
                       <p className="text-xs text-muted-foreground">
-                        Track construction materials stored on-site
+                        Auto-populated from Site Purchase & Deliveries and Usage Logs
                       </p>
                     </div>
                     <Button
@@ -496,7 +591,7 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                                   step="0.01"
                                   min="0"
                                   value={actualCount}
-                                  onChange={(e) => void handleActualCountUpdate(item.id, Number(e.target.value))}
+                                  onChange={(e) => void handleActualCountUpdate(item.id, item.name, item.unit || "", Number(e.target.value))}
                                   className="h-7 w-20 text-right text-xs"
                                 />
                               </TableCell>
@@ -531,6 +626,8 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                                     size="icon"
                                     className="h-7 w-7"
                                     onClick={() => openEditDialog(item)}
+                                    disabled={item.id.startsWith("virtual_")}
+                                    title={item.id.startsWith("virtual_") ? "Enter actual count to enable editing" : "Edit material"}
                                   >
                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
                                       <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
@@ -542,6 +639,8 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                                     size="icon"
                                     className="h-7 w-7"
                                     onClick={() => void handleDelete(item.id)}
+                                    disabled={item.id.startsWith("virtual_")}
+                                    title={item.id.startsWith("virtual_") ? "Cannot delete auto-populated materials" : "Delete material"}
                                   >
                                     <Trash2 className="h-3.5 w-3.5 text-destructive" />
                                   </Button>
