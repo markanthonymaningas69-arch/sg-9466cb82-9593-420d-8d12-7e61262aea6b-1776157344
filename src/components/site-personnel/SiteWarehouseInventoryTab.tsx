@@ -404,11 +404,16 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
     if (!inventory) return [];
     return inventory
       .filter((item) => {
-        const matchesType = activeTab === "material" 
-          ? item.item_type === "material" || item.item_type === null
-          : item.item_type === "tool_equipment";
-        if (!matchesType) return false;
+        // Filter by item type based on active tab
+        if (activeTab === "material") {
+          if (item.item_type !== "material" && item.item_type !== null) return false;
+        } else {
+          if (item.item_type !== "tool_equipment") return false;
+        }
+        
+        // Filter by item name if search term provided
         if (filters.itemName && !item.name.toLowerCase().includes(filters.itemName.toLowerCase())) return false;
+        
         return true;
       })
       .sort((a, b) => a.name.localeCompare(b.name));
