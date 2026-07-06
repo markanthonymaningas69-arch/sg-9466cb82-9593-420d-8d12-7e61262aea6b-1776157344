@@ -45,7 +45,7 @@ interface InventoryItem {
 export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryTabProps) {
   const { toast } = useToast();
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [deliveries, setDeliveries] = useState<Array<{ item_name: string; quantity: number }>>([]);
+  const [deliveries, setDeliveries] = useState<Array<{ item_name: string; quantity: number; source?: string }>>([]);
   const [consumptions, setConsumptions] = useState<Array<{ item_name: string; quantity: number }>>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -81,7 +81,7 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
           .order("name"),
         supabase
           .from("deliveries")
-          .select("item_name, quantity, unit")
+          .select("item_name, quantity, unit, source_location")
           .eq("project_id", projectId)
           .eq("is_archived", false),
         supabase
@@ -411,12 +411,15 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
       }
       
       // Filter by item type based on active tab
-      // Materials tab: show all except tool_equipment
-      // Tools tab: only show tool_equipment
-      const isMaterialsTab = activeTab === "material";
-      const isToolEquipment = item.item_type === "tool_equipment";
+      if (activeTab === "material") {
+        // Materials tab: show all except tool_equipment
+        if (item.item_type === "tool_equipment") return false;
+      } else {
+        // Tools tab: only show tool_equipment
+        if (item.item_type !== "tool_equipment") return false;
+      }
       
-      return isMaterialsTab ? !isToolEquipment : isToolEquipment;
+      return true;
     });
     
     return filtered.sort((a, b) => a.name.localeCompare(b.name));
@@ -694,29 +697,31 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                         <TableRow>
                           <TableHead className="h-8 px-2 text-[11px]">Item Name</TableHead>
                           <TableHead className="h-8 px-2 text-right text-[11px]">Delivered</TableHead>
-                          <TableHead className="h-8 px-2 text-right text-[11px]">Consumed</TableHead>
-                          <TableHead className="h-8 px-2 text-right text-[11px]">Expected Remaining</TableHead>
-                          <TableHead className="h-8 px-2 text-right text-[11px]">Actual Count</TableHead>
-                          <TableHead className="h-8 px-2 text-right text-[11px]">Variance</TableHead>
-                          <TableHead className="h-8 px-2 text-center text-[11px]">Status</TableHead>
+                          <TableHead className="h-8 px-2 text-[11px]">Source</TableHead>
                           <TableHead className="h-8 px-2 text-right text-[11px]">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {filteredInventory.map((item) => {
                           const delivered = calculateDelivered(item.name);
-                          const consumed = calculateConsumed(item.name);
-                          const expectedRemaining = delivered - consumed;
-                          const actualCount = item.quantity || 0;
-                          const variance = expectedRemaining - actualCount;
+                          const deliverySource = deliveries.find(d => d.item_name === item.name)?.source || "Main Warehouse";
                           
                           return (
                             <TableRow key={item.id}>
                               <TableCell className="px-2 py-1.5 font-medium">
                                 <CompactText value={item.name} className="max-w-[200px]" />
                               </TableCell>
-                              <TableCell className="px-2 py-1.5 text-right whitespace-nowrap">
-                                {item.quantity} {item.unit}
+                              <TableCell className="px-2 py-1.5 text-right whitespace-nowrap text-blue-600 font-medium">
+                                {delivered.toFixed(2)} {item.unit}
+                              </TableCell>
+                              <TableCell className="px-2 py-1.5">
+                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                                  deliverySource === "Main Warehouse" 
+                                    ? "bg-blue-100 text-blue-800" 
+                                    : "bg-purple-100 text-purple-800"
+                                }`}>
+                                  {deliverySource}
+                                </span>
                               </TableCell>
                               <TableCell className="px-2 py-1.5 text-right">
                                 <div className="flex justify-end gap-1">
