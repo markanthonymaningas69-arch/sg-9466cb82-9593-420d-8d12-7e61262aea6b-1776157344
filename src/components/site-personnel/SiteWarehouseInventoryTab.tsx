@@ -406,8 +406,10 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
       .filter((item) => {
         // Filter by item type based on active tab
         if (activeTab === "material") {
-          if (item.item_type !== "material" && item.item_type !== null) return false;
+          // Materials tab: exclude tool_equipment items
+          if (item.item_type === "tool_equipment") return false;
         } else {
+          // Tools tab: only show tool_equipment items
           if (item.item_type !== "tool_equipment") return false;
         }
         
