@@ -411,16 +411,14 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
       }
       
       // Filter by item type based on active tab
-      const itemType = item.item_type;
-      const isMaterialsTab = activeTab === "material";
-      
-      // Materials tab: show all except tool_equipment
-      // Tools tab: only show tool_equipment
-      if (isMaterialsTab) {
-        return itemType !== "tool_equipment";
-      } else {
-        return itemType === "tool_equipment";
+      // Use explicit checks to avoid TypeScript type narrowing issues
+      if (activeTab === "material") {
+        // Materials tab: exclude tool_equipment
+        return item.item_type !== "tool_equipment";
       }
+      
+      // Tools tab: only show tool_equipment
+      return item.item_type === "tool_equipment";
     });
     
     return filtered.sort((a, b) => a.name.localeCompare(b.name));
@@ -633,29 +631,6 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                                   </span>
                                 )}
                               </TableCell>
-                              <TableCell className="px-2 py-1.5 text-right">
-                                <div className="flex justify-end gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7"
-                                    onClick={() => openEditDialog(item)}
-                                  >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-                                      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
-                                      <path d="m15 5 4 4"/>
-                                    </svg>
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7"
-                                    onClick={() => void handleDelete(item.id)}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                                  </Button>
-                                </div>
-                              </TableCell>
                             </TableRow>
                           );
                         })}
@@ -730,39 +705,47 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredInventory.map((item) => (
-                          <TableRow key={item.id}>
-                            <TableCell className="px-2 py-1.5 font-medium">
-                              <CompactText value={item.name} className="max-w-[200px]" />
-                            </TableCell>
-                            <TableCell className="px-2 py-1.5 text-right whitespace-nowrap">
-                              {item.quantity} {item.unit}
-                            </TableCell>
-                            <TableCell className="px-2 py-1.5 text-right">
-                              <div className="flex justify-end gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7"
-                                  onClick={() => openEditDialog(item)}
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-                                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
-                                    <path d="m15 5 4 4"/>
-                                  </svg>
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7"
-                                  onClick={() => void handleDelete(item.id)}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {filteredInventory.map((item) => {
+                          const delivered = calculateDelivered(item.name);
+                          const consumed = calculateConsumed(item.name);
+                          const expectedRemaining = delivered - consumed;
+                          const actualCount = item.quantity || 0;
+                          const variance = expectedRemaining - actualCount;
+                          
+                          return (
+                            <TableRow key={item.id}>
+                              <TableCell className="px-2 py-1.5 font-medium">
+                                <CompactText value={item.name} className="max-w-[200px]" />
+                              </TableCell>
+                              <TableCell className="px-2 py-1.5 text-right whitespace-nowrap">
+                                {item.quantity} {item.unit}
+                              </TableCell>
+                              <TableCell className="px-2 py-1.5 text-right">
+                                <div className="flex justify-end gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => openEditDialog(item)}
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                                      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                                      <path d="m15 5 4 4"/>
+                                    </svg>
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => void handleDelete(item.id)}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </div>
