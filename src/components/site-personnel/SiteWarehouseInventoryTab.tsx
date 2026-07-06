@@ -405,13 +405,11 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
     return inventory
       .filter((item) => {
         // Filter by item type based on active tab
-        if (activeTab === "material") {
-          // Materials tab: exclude tool_equipment items
-          if (item.item_type === "tool_equipment") return false;
-        } else {
-          // Tools tab: only show tool_equipment items
-          if (item.item_type !== "tool_equipment") return false;
-        }
+        const matchesTab = activeTab === "material" 
+          ? (item.item_type === "material" || item.item_type === null)
+          : (item.item_type === "tool_equipment");
+        
+        if (!matchesTab) return false;
         
         // Filter by item name if search term provided
         if (filters.itemName && !item.name.toLowerCase().includes(filters.itemName.toLowerCase())) return false;
