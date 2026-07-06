@@ -33,7 +33,14 @@ interface InventoryItem {
   quantity: number | null;
   unit: string | null;
   location: string | null;
-  updated_at: string | null;
+  category: string | null;
+  unit_cost: number | null;
+  reorder_level: number | null;
+  last_restocked: string | null;
+  company_id: string;
+  project_id: string;
+  is_archived: boolean;
+  created_at: string;
 }
 
 export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryTabProps) {
