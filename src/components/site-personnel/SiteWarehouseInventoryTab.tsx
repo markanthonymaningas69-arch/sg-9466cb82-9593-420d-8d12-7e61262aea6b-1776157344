@@ -403,27 +403,22 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
   const filteredInventory = useMemo(() => {
     if (!inventory) return [];
     
-    // Filter by tab and search term
-    const filtered = inventory.filter((item) => {
-      // Filter by search term
-      if (filters.itemName && !item.name.toLowerCase().includes(filters.itemName.toLowerCase())) {
-        return false;
-      }
-      
-      // Filter by item type based on active tab
-      // Use explicit checks to avoid TypeScript control flow narrowing issues
-      const itemType = item.item_type;
-      
-      if (activeTab === "material") {
-        // Materials tab: show all except tool_equipment
-        return itemType !== "tool_equipment";
-      }
-      
-      // Tools tab: only show tool_equipment
-      return itemType === "tool_equipment";
-    });
-    
-    return filtered.sort((a, b) => a.name.localeCompare(b.name));
+    return inventory
+      .filter((item) => {
+        // Filter by search term
+        if (filters.itemName && !item.name.toLowerCase().includes(filters.itemName.toLowerCase())) {
+          return false;
+        }
+        
+        // Filter by item type based on active tab
+        // Materials tab: show all except tool_equipment (includes material and null)
+        // Tools tab: only show tool_equipment
+        const showInMaterialsTab = item.item_type !== "tool_equipment";
+        const showInToolsTab = item.item_type === "tool_equipment";
+        
+        return activeTab === "material" ? showInMaterialsTab : showInToolsTab;
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [inventory, activeTab, filters.itemName]);
 
   return (
