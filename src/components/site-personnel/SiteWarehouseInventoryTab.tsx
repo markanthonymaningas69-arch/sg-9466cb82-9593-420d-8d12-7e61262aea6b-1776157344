@@ -411,14 +411,13 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
       }
       
       // Filter by item type based on active tab
-      const itemType = item.item_type;
-      if (activeTab === "material") {
-        // Materials tab: show all except tool_equipment
-        return itemType !== "tool_equipment";
-      } else {
-        // Tools tab: only show tool_equipment
-        return itemType === "tool_equipment";
-      }
+      // Use explicit checks without if/else to avoid type narrowing issues
+      const isMaterialsTab = activeTab === "material";
+      const isToolEquipment = item.item_type === "tool_equipment";
+      
+      // Materials tab: show all except tool_equipment
+      // Tools tab: only show tool_equipment
+      return isMaterialsTab ? !isToolEquipment : isToolEquipment;
     });
     
     return filtered.sort((a, b) => a.name.localeCompare(b.name));
