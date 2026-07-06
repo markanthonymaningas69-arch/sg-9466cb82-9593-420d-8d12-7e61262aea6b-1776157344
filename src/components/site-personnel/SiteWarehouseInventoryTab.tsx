@@ -405,12 +405,14 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
     return inventory
       .filter((item) => {
         // Filter by item type based on active tab
+        const isToolEquipment = item.item_type === "tool_equipment";
+        
         if (activeTab === "material") {
-          // Materials tab: show material and null types, exclude tool_equipment
-          if (item.item_type === "tool_equipment") return false;
+          // Materials tab: exclude tool_equipment
+          if (isToolEquipment) return false;
         } else {
           // Tools tab: only show tool_equipment
-          if (item.item_type !== "tool_equipment") return false;
+          if (!isToolEquipment) return false;
         }
         
         // Filter by item name if search term provided
@@ -564,7 +566,6 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                           <TableHead className="h-8 px-2 text-right text-[11px]">Actual Count</TableHead>
                           <TableHead className="h-8 px-2 text-right text-[11px]">Variance</TableHead>
                           <TableHead className="h-8 px-2 text-center text-[11px]">Status</TableHead>
-                          <TableHead className="h-8 px-2 text-right text-[11px]">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -628,33 +629,6 @@ export function SiteWarehouseInventoryTab({ projectId }: SiteWarehouseInventoryT
                                     Excess
                                   </span>
                                 )}
-                              </TableCell>
-                              <TableCell className="px-2 py-1.5 text-right">
-                                <div className="flex justify-end gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7"
-                                    onClick={() => openEditDialog(item)}
-                                    disabled={item.id.startsWith("virtual_")}
-                                    title={item.id.startsWith("virtual_") ? "Enter actual count to enable editing" : "Edit material"}
-                                  >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-                                      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
-                                      <path d="m15 5 4 4"/>
-                                    </svg>
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7"
-                                    onClick={() => void handleDelete(item.id)}
-                                    disabled={item.id.startsWith("virtual_")}
-                                    title={item.id.startsWith("virtual_") ? "Cannot delete auto-populated materials" : "Delete material"}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                                  </Button>
-                                </div>
                               </TableCell>
                             </TableRow>
                           );
