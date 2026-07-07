@@ -165,6 +165,9 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
   const [selectedReceiptGroup, setSelectedReceiptGroup] = useState<ReceiptGroup | null>(null);
   const [selectedReadyRecord, setSelectedReadyRecord] = useState<ReadyForReceivingRecord | null>(null);
   const [receivingDialogOpen, setReceivingDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<ReceiptGroup | null>(null);
+  const [editFormData, setEditFormData] = useState<FormState>(defaultFormState);
   const [receivingForm, setReceivingForm] = useState({
     receivedBy: "Site Personnel",
     actualQuantity: "",
@@ -611,101 +614,68 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
     setReceivingDialogOpen(true);
   }
 
-  async function handleMarkReceived() {
-    if (!selectedReadyRecord) {
-      return;
-    }
+  function openEditDialog(group: ReceiptGroup) {
+    // Pre-fill form with data from the first item in the group
+    const firstItem = group.items[0];
+    setEditingGroup(group);
+    setEditFormData({
+      bom_scope_id: firstItem.bom_scope_id || "",
+      item_name: firstItem.item_name,
+      quantity: String(firstItem.quantity || ""),
+      unit: firstItem.unit || "",
+      unit_cost: String(firstItem.unit_cost || ""),
+      supplier: group.supplier || "",
+      delivery_date: group.deliveryDate || getTodayDate(),
+      receipt_number: group.receiptNumber || "",
+      notes: group.notes || "",
+      custom_item_name: "",
+    });
+    setEditDialogOpen(true);
+  }
 
-    if (!selectedReadyRecord.voucher_number || selectedReadyRecord.lifecycle_status !== "ready_for_delivery" || selectedReadyRecord.received_at) {
-      toast({
-        title: "Receiving locked",
-        description: "Only voucher-approved records that are ready for delivery can be marked as received.",
-        variant: "destructive",
-      });
+  async function handleEditSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!editingGroup || editingGroup.items.length === 0) {
       return;
     }
 
     try {
-      setSavingReceipt(true);
-      const linkedSiteRequest = getRelationItem(selectedReadyRecord.site_requests);
-      const itemLabel = linkedSiteRequest?.item_name || "Request item";
-
-      // Mark as received in the workflow
-      await requestWorkflowService.markReceived({
-        siteRequestId: selectedReadyRecord.site_request_id,
-        deliveryId: selectedReadyRecord.purchase_id,
-        receivedBy: receivingForm.receivedBy || "Site Personnel",
-        actualQuantity: receivingForm.actualQuantity ? Number(receivingForm.actualQuantity) : null,
-        remarks: receivingForm.remarks || null,
+      // Update the first item in the group
+      const itemToUpdate = editingGroup.items[0];
+      
+      const { error } = await siteService.updateDelivery(itemToUpdate.id, {
+        bom_scope_id: editFormData.bom_scope_id || null,
+        item_name: editFormData.item_name,
+        quantity: Number(editFormData.quantity),
+        unit: editFormData.unit,
+        unit_cost: Number(editFormData.unit_cost || 0),
+        amount: Number(editFormData.quantity || 0) * Number(editFormData.unit_cost || 0),
+        supplier: editFormData.supplier,
+        delivery_date: editFormData.delivery_date,
+        receipt_number: editFormData.receipt_number || null,
+        notes: editFormData.notes || null,
       });
 
-      // Create delivery record for inventory receiving workflow
-      const deliveryPayload = {
-        project_id: projectId,
-        transaction_type: "delivery" as const,
-        bom_scope_id: null,
-        item_name: linkedSiteRequest?.item_name || itemLabel,
-        quantity: receivingForm.actualQuantity ? Number(receivingForm.actualQuantity) : (linkedSiteRequest?.quantity || 0),
-        unit: linkedSiteRequest?.unit || "",
-        supplier: selectedReadyRecord.supplier || "Main Warehouse",
-        delivery_date: new Date().toISOString().split("T")[0],
-        received_by: receivingForm.receivedBy || "Site Personnel",
-        notes: receivingForm.remarks || `Received from voucher ${selectedReadyRecord.voucher_number}`,
-        status: "pending",
-        unit_cost: null,
-        amount: null,
-        receipt_number: selectedReadyRecord.voucher_number,
-      };
-
-      await siteService.createDelivery(deliveryPayload);
-
-      if (selectedReadyRecord.initial_approval_request_id) {
-        await notificationService.createNotification({
-          approvalRequestId: selectedReadyRecord.initial_approval_request_id,
-          audienceModule: "Purchasing",
-          targetSurface: "Purchasing",
-          eventType: "request_received",
-          title: "Delivery received on site",
-          message: `${itemLabel} has been marked as received`,
-          payload: {
-            siteRequestId: selectedReadyRecord.site_request_id,
-            purchaseId: selectedReadyRecord.purchase_id,
-            voucherNumber: selectedReadyRecord.voucher_number,
-          },
-        });
-
-        await notificationService.createNotification({
-          approvalRequestId: selectedReadyRecord.initial_approval_request_id,
-          audienceModule: "Accounting",
-          targetSurface: "Accounting",
-          eventType: "request_received",
-          title: "Delivery received on site",
-          message: `${itemLabel} has been marked as received`,
-          payload: {
-            siteRequestId: selectedReadyRecord.site_request_id,
-            purchaseId: selectedReadyRecord.purchase_id,
-            voucherNumber: selectedReadyRecord.voucher_number,
-          },
-        });
+      if (error) {
+        throw error;
       }
 
       toast({
-        title: "Received",
-        description: "The delivery was confirmed and is now ready for warehouse receiving.",
+        title: "Success",
+        description: "Purchase record updated successfully",
       });
 
-      setReceivingDialogOpen(false);
-      setSelectedReadyRecord(null);
+      setEditDialogOpen(false);
+      setEditingGroup(null);
       await loadData();
     } catch (error) {
-      console.error("Error marking request as received:", error);
+      console.error("Error updating purchase record:", error);
       toast({
         title: "Error",
-        description: "Failed to confirm receiving.",
+        description: "Failed to update the record",
         variant: "destructive",
       });
-    } finally {
-      setSavingReceipt(false);
     }
   }
 
@@ -1244,6 +1214,12 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                               <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSelectedReceiptGroup(group)}>
                                 <Eye className="h-3.5 w-3.5" />
                               </Button>
+                              <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditDialog(group)}>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                                  <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                                  <path d="m15 5 4 4"/>
+                                </svg>
+                              </Button>
                               <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => void handleDeleteGroup(group)}>
                                 <Trash2 className="h-3.5 w-3.5 text-destructive" />
                               </Button>
@@ -1384,6 +1360,171 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                         </div>
                       </div>
                     ) : null}
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+                  <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+                    <DialogHeader className="space-y-1">
+                      <DialogTitle className="text-base">Edit Purchase Record</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleEditSubmit} className="space-y-2.5 pb-1">
+                      <div className="space-y-1">
+                        <Label htmlFor="edit_scope" className="text-[11px]">
+                          Select Scope
+                        </Label>
+                        <Select value={editFormData.bom_scope_id} onValueChange={(value) => setEditFormData(prev => ({ ...prev, bom_scope_id: value }))}>
+                          <SelectTrigger id="edit_scope" className="h-8 text-xs">
+                            <SelectValue placeholder="Select scope" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {scopes.map((scope) => (
+                              <SelectItem key={scope.id} value={scope.id}>
+                                {scope.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label htmlFor="edit_item_name" className="text-[11px]">
+                          Material Name
+                        </Label>
+                        <Input
+                          id="edit_item_name"
+                          className="h-8 text-xs"
+                          value={editFormData.item_name}
+                          onChange={(e) => setEditFormData(prev => ({ ...prev, item_name: e.target.value }))}
+                          required
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label htmlFor="edit_quantity" className="text-[11px]">
+                            Quantity
+                          </Label>
+                          <Input
+                            id="edit_quantity"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            className="h-8 text-xs"
+                            value={editFormData.quantity}
+                            onChange={(e) => setEditFormData(prev => ({ ...prev, quantity: e.target.value }))}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="edit_unit" className="text-[11px]">
+                            Unit
+                          </Label>
+                          <Input
+                            id="edit_unit"
+                            className="h-8 text-xs"
+                            value={editFormData.unit}
+                            onChange={(e) => setEditFormData(prev => ({ ...prev, unit: e.target.value }))}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label htmlFor="edit_unit_cost" className="text-[11px]">
+                            Unit Cost
+                          </Label>
+                          <Input
+                            id="edit_unit_cost"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            className="h-8 text-xs"
+                            value={editFormData.unit_cost}
+                            onChange={(e) => setEditFormData(prev => ({ ...prev, unit_cost: e.target.value }))}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="edit_amount" className="text-[11px]">
+                            Amount
+                          </Label>
+                          <Input 
+                            id="edit_amount" 
+                            className="h-8 text-xs" 
+                            value={
+                              editFormData.quantity && editFormData.unit_cost
+                                ? formatCurrency(Number(editFormData.quantity) * Number(editFormData.unit_cost))
+                                : "0.00"
+                            } 
+                            readOnly 
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label htmlFor="edit_supplier" className="text-[11px]">
+                            Supplier
+                          </Label>
+                          <Input
+                            id="edit_supplier"
+                            className="h-8 text-xs"
+                            value={editFormData.supplier}
+                            onChange={(e) => setEditFormData(prev => ({ ...prev, supplier: e.target.value }))}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="edit_receipt_number" className="text-[11px]">
+                            Receipt Number
+                          </Label>
+                          <Input
+                            id="edit_receipt_number"
+                            className="h-8 text-xs"
+                            value={editFormData.receipt_number}
+                            onChange={(e) => setEditFormData(prev => ({ ...prev, receipt_number: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label htmlFor="edit_delivery_date" className="text-[11px]">
+                          Purchase Date
+                        </Label>
+                        <Input
+                          id="edit_delivery_date"
+                          type="date"
+                          className="h-8 text-xs"
+                          value={editFormData.delivery_date}
+                          onChange={(e) => setEditFormData(prev => ({ ...prev, delivery_date: e.target.value }))}
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label htmlFor="edit_notes" className="text-[11px]">
+                          Notes (Optional)
+                        </Label>
+                        <Textarea
+                          id="edit_notes"
+                          rows={2}
+                          className="min-h-[56px] text-xs"
+                          value={editFormData.notes}
+                          onChange={(e) => setEditFormData(prev => ({ ...prev, notes: e.target.value }))}
+                        />
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button type="button" variant="outline" className="h-8 flex-1 text-xs" onClick={() => setEditDialogOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button type="submit" className="h-8 flex-1 text-xs">
+                          Save Changes
+                        </Button>
+                      </div>
+                    </form>
                   </DialogContent>
                 </Dialog>
               </>
