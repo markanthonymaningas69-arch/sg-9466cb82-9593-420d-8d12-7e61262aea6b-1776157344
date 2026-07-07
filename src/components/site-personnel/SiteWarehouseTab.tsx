@@ -679,6 +679,104 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
     }
   }
 
+  async function handleMarkReceived() {
+    if (!selectedReadyRecord) {
+      return;
+    }
+
+    if (!selectedReadyRecord.voucher_number || selectedReadyRecord.lifecycle_status !== "ready_for_delivery" || selectedReadyRecord.received_at) {
+      toast({
+        title: "Receiving locked",
+        description: "Only voucher-approved records that are ready for delivery can be marked as received.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setSavingReceipt(true);
+      const linkedSiteRequest = getRelationItem(selectedReadyRecord.site_requests);
+      const itemLabel = linkedSiteRequest?.item_name || "Request item";
+
+      // Mark as received in the workflow
+      await requestWorkflowService.markReceived({
+        siteRequestId: selectedReadyRecord.site_request_id,
+        deliveryId: selectedReadyRecord.purchase_id,
+        receivedBy: receivingForm.receivedBy || "Site Personnel",
+        actualQuantity: receivingForm.actualQuantity ? Number(receivingForm.actualQuantity) : null,
+        remarks: receivingForm.remarks || null,
+      });
+
+      // Create delivery record for inventory receiving workflow
+      const deliveryPayload = {
+        project_id: projectId,
+        transaction_type: "delivery" as const,
+        bom_scope_id: null,
+        item_name: linkedSiteRequest?.item_name || itemLabel,
+        quantity: receivingForm.actualQuantity ? Number(receivingForm.actualQuantity) : (linkedSiteRequest?.quantity || 0),
+        unit: linkedSiteRequest?.unit || "",
+        supplier: selectedReadyRecord.supplier || "Main Warehouse",
+        delivery_date: new Date().toISOString().split("T")[0],
+        received_by: receivingForm.receivedBy || "Site Personnel",
+        notes: receivingForm.remarks || `Received from voucher ${selectedReadyRecord.voucher_number}`,
+        status: "pending",
+        unit_cost: null,
+        amount: null,
+        receipt_number: selectedReadyRecord.voucher_number,
+      };
+
+      await siteService.createDelivery(deliveryPayload);
+
+      if (selectedReadyRecord.initial_approval_request_id) {
+        await notificationService.createNotification({
+          approvalRequestId: selectedReadyRecord.initial_approval_request_id,
+          audienceModule: "Purchasing",
+          targetSurface: "Purchasing",
+          eventType: "request_received",
+          title: "Delivery received on site",
+          message: `${itemLabel} has been marked as received`,
+          payload: {
+            siteRequestId: selectedReadyRecord.site_request_id,
+            purchaseId: selectedReadyRecord.purchase_id,
+            voucherNumber: selectedReadyRecord.voucher_number,
+          },
+        });
+
+        await notificationService.createNotification({
+          approvalRequestId: selectedReadyRecord.initial_approval_request_id,
+          audienceModule: "Accounting",
+          targetSurface: "Accounting",
+          eventType: "request_received",
+          title: "Delivery received on site",
+          message: `${itemLabel} has been marked as received`,
+          payload: {
+            siteRequestId: selectedReadyRecord.site_request_id,
+            purchaseId: selectedReadyRecord.purchase_id,
+            voucherNumber: selectedReadyRecord.voucher_number,
+          },
+        });
+      }
+
+      toast({
+        title: "Received",
+        description: "The delivery was confirmed and is now ready for warehouse receiving.",
+      });
+
+      setReceivingDialogOpen(false);
+      setSelectedReadyRecord(null);
+      await loadData();
+    } catch (error) {
+      console.error("Error marking request as received:", error);
+      toast({
+        title: "Error",
+        description: "Failed to confirm receiving.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingReceipt(false);
+    }
+  }
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-3 px-4 py-3">
