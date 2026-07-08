@@ -265,7 +265,8 @@ export default function Analytics() {
       return {
         rows: [],
         totals: { cost: 0, wtPercentage: 0, accomplishment: 0, amountOfCompletion: 0 },
-        appliedAsOfDate: swaAsOfDate || null
+        appliedAsOfDate: swaAsOfDate || null,
+        ocmCost: 0
       };
     }
 
@@ -334,7 +335,7 @@ export default function Analytics() {
       };
     });
 
-    // Calculate OCM (Overhead & Contingency Materials) cost
+    // Calculate OCM (Overhead & Contingency Materials) cost for Cost to Date cards only
     let ocmTotalCost = 0;
     (consumption || []).forEach((cons: any) => {
       const scope = bom.bom_scope_of_work.find((s: any) => s.id === cons.bom_scope_id);
@@ -350,18 +351,8 @@ export default function Analytics() {
       }
     });
 
-    // Add OCM as a separate row if there's any OCM cost
-    const ocmRows = ocmTotalCost > 0 ? [{
-      id: "ocm",
-      name: "OCM (Overhead & Contingency Materials)",
-      type: "ocm",
-      cost: ocmTotalCost,
-      completion: avgCompletion
-    }] : [];
-
-    grandTotalCost += ocmTotalCost;
-
-    const allRows = [...scopeRows, ...indirectRows, ...ocmRows].map((row) => {
+    // Don't add OCM as a row in SWA - only use for Cost to Date calculation
+    const allRows = [...scopeRows, ...indirectRows].map((row) => {
       const wtPercentage = grandTotalCost > 0 ? (row.cost / grandTotalCost) * 100 : 0;
       const accomplishment = wtPercentage * (row.completion / 100);
       const amountOfCompletion = row.cost * (row.completion / 100);
@@ -384,7 +375,8 @@ export default function Analytics() {
     return {
       rows: allRows,
       totals,
-      appliedAsOfDate: swaAsOfDate || null
+      appliedAsOfDate: swaAsOfDate || null,
+      ocmCost: ocmTotalCost
     };
   }, [bom, progressUpdates, swaAsOfDate, latestProgressUpdateDate, consumption]);
 
@@ -782,7 +774,6 @@ export default function Analytics() {
                                     <div className="flex flex-wrap items-center gap-2">
                                       <span>{row.name}</span>
                                       {row.type === "indirect" && <Badge variant="outline" className="text-[10px] h-5">Indirect Cost</Badge>}
-                                      {row.type === "ocm" && <Badge variant="outline" className="text-[10px] h-5 bg-amber-50 text-amber-800 border-amber-300">OCM</Badge>}
                                     </div>
                                   </TableCell>
                                   <TableCell className="text-right">{formatCurrency(row.cost)}</TableCell>
@@ -872,9 +863,7 @@ export default function Analytics() {
                           <CardContent>
                             <div className="text-2xl font-bold text-amber-900">
                               {formatCurrency(
-                                swaData.rows
-                                  .filter((r: any) => r.type === "ocm")
-                                  .reduce((sum: number, r: any) => sum + r.amountOfCompletion, 0)
+                                swaData.ocmCost * (swaData.totals.accomplishment / (swaData.totals.wtPercentage || 100))
                               )}
                             </div>
                           </CardContent>
