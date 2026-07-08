@@ -805,6 +805,96 @@ export default function Analytics() {
                         </TableBody>
                       </Table>
                     </div>
+
+                    {swaData.rows.length > 0 && (
+                      <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4 border-t border-border/60 pt-6">
+                        <Card className="border-blue-200 bg-blue-50/50">
+                          <CardHeader className="pb-2">
+                            <CardDescription className="text-xs font-medium text-blue-700">BOM Materials Cost to Date</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold text-blue-900">
+                              {formatCurrency(
+                                swaData.rows
+                                  .filter((r: any) => r.type === "scope")
+                                  .reduce((sum: number, r: any) => {
+                                    const scope = bom?.bom_scope_of_work?.find((s: any) => s.id === r.id);
+                                    const matCost = Array.isArray(scope?.bom_materials)
+                                      ? scope.bom_materials.reduce((s: number, m: any) => s + (Number(m.quantity || 0) * Number(m.unit_cost || 0)), 0)
+                                      : 0;
+                                    return sum + (matCost * (r.completion / 100));
+                                  }, 0)
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        <Card className="border-indigo-200 bg-indigo-50/50">
+                          <CardHeader className="pb-2">
+                            <CardDescription className="text-xs font-medium text-indigo-700">BOM Labor Cost to Date</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold text-indigo-900">
+                              {formatCurrency(
+                                swaData.rows
+                                  .filter((r: any) => r.type === "scope")
+                                  .reduce((sum: number, r: any) => {
+                                    const scope = bom?.bom_scope_of_work?.find((s: any) => s.id === r.id);
+                                    const labCost = Array.isArray(scope?.bom_labor)
+                                      ? scope.bom_labor.reduce((s: number, l: any) => s + Number(l.total_cost || (Number(l.hours || 0) * Number(l.hourly_rate || 0))), 0)
+                                      : 0;
+                                    return sum + (labCost * (r.completion / 100));
+                                  }, 0)
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        <Card className="border-emerald-200 bg-emerald-50/50">
+                          <CardHeader className="pb-2">
+                            <CardDescription className="text-xs font-medium text-emerald-700">Indirect Cost to Date</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold text-emerald-900">
+                              {formatCurrency(
+                                swaData.rows
+                                  .filter((r: any) => r.type === "indirect")
+                                  .reduce((sum: number, r: any) => sum + r.amountOfCompletion, 0)
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        <Card className="border-amber-200 bg-amber-50/50">
+                          <CardHeader className="pb-2">
+                            <CardDescription className="text-xs font-medium text-amber-700">OCM Cost to Date</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold text-amber-900">
+                              {formatCurrency(
+                                swaData.rows
+                                  .filter((r: any) => r.type === "ocm")
+                                  .reduce((sum: number, r: any) => sum + r.amountOfCompletion, 0)
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        <Card className="md:col-span-2 lg:col-span-4 border-primary/50 bg-primary/5">
+                          <CardHeader className="pb-2">
+                            <CardDescription className="text-xs font-medium text-primary">TOTAL PROJECT COST TO DATE</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-3xl font-bold text-primary">
+                              {formatCurrency(swaData.totals.amountOfCompletion)}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {swaData.totals.accomplishment.toFixed(2)}% of {formatCurrency(swaData.totals.cost)} total budget
+                            </p>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
