@@ -81,14 +81,18 @@ export default function Dashboard() {
       { data: consumptionsData },
       { data: attendancesData },
       { data: progressUpdatesData },
-      { data: billingData }
+      { data: billingData },
+      { data: purchasesData },
+      { data: deliveriesData }
     ] = await Promise.all([
       supabase.from('projects').select('*').order('created_at', { ascending: false }),
       supabase.from('bill_of_materials').select('project_id, bom_scope_of_work(*, bom_materials(*), bom_labor(*)), bom_indirect_costs(*)'),
       supabase.from('material_consumption').select('*'),
       supabase.from('site_attendance').select('*, personnel(*)').order('date', { ascending: true }),
       supabase.from('bom_progress_updates').select('bom_scope_id, percentage_completed, update_date').order('update_date', { ascending: true }),
-      supabase.from('project_billing').select('project_id, amount, payment_received, status').eq('is_archived', false)
+      supabase.from('project_billing').select('project_id, amount, payment_received, status').eq('is_archived', false),
+      supabase.from('purchases').select('item_name, quantity, unit_cost, order_date, project_id').order('order_date', { ascending: true }),
+      supabase.from('deliveries').select('item_name, quantity, unit_cost, delivery_date, project_id').order('delivery_date', { ascending: true })
     ]);
 
     const projects = projectsData || [];
@@ -97,6 +101,8 @@ export default function Dashboard() {
     const attendances = attendancesData || [];
     const progressUpdates = progressUpdatesData || [];
     const billings = billingData || [];
+    const purchases = purchasesData || [];
+    const deliveries = deliveriesData || [];
     
     let totalVal = 0;
     let totalCst = 0;
@@ -160,18 +166,96 @@ export default function Dashboard() {
       const projCons = consumptions.filter(c => c.project_id === p.id);
       const projAtt = attendances.filter(a => a.project_id === p.id);
       const projBilling = billings.filter(b => b.project_id === p.id);
+      const projPurchases = purchases.filter(pur => pur.project_id === p.id);
+      const projDeliveries = deliveries.filter(del => del.project_id === p.id);
 
+      // Build FIFO lots for this project (combine purchases + deliveries)
+      const allLots: Array<{ name: string; qty: number; cost: number; date: string }> = [];
+      
+      projPurchases.forEach(pur => {
+        const name = (pur.item_name || '').toLowerCase().trim();
+        allLots.push({
+          name,
+          qty: Number(pur.quantity || 0),
+          cost: Number(pur.unit_cost || 0),
+          date: pur.order_date || ''
+        });
+      });
+      
+      projDeliveries.forEach(del => {
+        const name = (del.item_name || '').toLowerCase().trim();
+        allLots.push({
+          name,
+          qty: Number(del.quantity || 0),
+          cost: Number(del.unit_cost || 0),
+          date: del.delivery_date || ''
+        });
+      });
+      
+      allLots.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      
+      const lots: Record<string, { qty: number; cost: number }[]> = {};
+      allLots.forEach(lot => {
+        if (!lots[lot.name]) lots[lot.name] = [];
+        lots[lot.name].push({ qty: lot.qty, cost: lot.cost });
+      });
+
+      // Calculate actual material cost using FIFO
       let actualMatCost = 0;
+      let ocmCost = 0;
+      
       projCons.forEach((c: any) => {
-        let unitCost = 0;
-        if (projectBom) {
-          const scope = (projectBom.bom_scope_of_work || []).find((s:any) => s.id === c.bom_scope_id);
-          if (scope && scope.bom_materials) {
-            const bomMat = scope.bom_materials.find((m:any) => m.material_name === (c.item_name || c.material_name));
-            if (bomMat) unitCost = Number(bomMat.unit_cost || 0);
+        const name = (c.item_name || '').toLowerCase().trim();
+        let qtyToCost = Number(c.quantity || c.quantity_used || 0);
+        let totalCost = 0;
+
+        // Apply FIFO
+        if (lots[name] && lots[name].length > 0) {
+          for (let i = 0; i < lots[name].length && qtyToCost > 0; i++) {
+            const lot = lots[name][i];
+            if (lot.qty > 0 && lot.cost > 0) {
+              const consumedFromLot = Math.min(qtyToCost, lot.qty);
+              totalCost += consumedFromLot * lot.cost;
+              lot.qty -= consumedFromLot;
+              qtyToCost -= consumedFromLot;
+            }
           }
         }
-        actualMatCost += (Number(c.quantity || c.quantity_used || 0) * unitCost);
+
+        // Fallback costing
+        if (qtyToCost > 0) {
+          if (Number(c.estimated_cost) > 0) {
+            totalCost += qtyToCost * Number(c.estimated_cost);
+          } else if (projectBom) {
+            const scope = (projectBom.bom_scope_of_work || []).find((s: any) => s.id === c.bom_scope_id);
+            const bomMat = scope?.bom_materials?.find((m: any) => (m.material_name || '').toLowerCase().trim() === name);
+            
+            if (bomMat && Number(bomMat.unit_cost) > 0) {
+              totalCost += qtyToCost * Number(bomMat.unit_cost);
+            } else {
+              const matchingLot = allLots.find(lot => lot.name === name && lot.cost > 0);
+              if (matchingLot) {
+                totalCost += qtyToCost * matchingLot.cost;
+              }
+            }
+          }
+        }
+
+        actualMatCost += totalCost;
+
+        // Check if this is OCM (not in BOM)
+        if (projectBom) {
+          const scope = (projectBom.bom_scope_of_work || []).find((s: any) => s.id === c.bom_scope_id);
+          if (scope) {
+            const isInBom = (scope.bom_materials || []).some((m: any) => 
+              (m.material_name?.toLowerCase() || '') === name
+            );
+            
+            if (!isInBom) {
+              ocmCost += totalCost;
+            }
+          }
+        }
       });
 
       let actualLabCost = 0;
@@ -212,6 +296,7 @@ export default function Dashboard() {
         contractAmount: activeBudget,
         projectCost: activeBudget,
         costToDate: totalActualCost,
+        ocmCost: ocmCost,
         margin: margin,
         profitAmount: profitAmount,
         completion: accomplishmentPct || 0,
