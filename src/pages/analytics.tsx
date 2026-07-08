@@ -294,7 +294,34 @@ export default function Analytics() {
       };
     });
 
-    const allRows = [...scopeRows, ...indirectRows].map((row) => {
+    // Calculate OCM (Overhead & Contingency Materials) cost
+    let ocmTotalCost = 0;
+    (consumption || []).forEach((cons: any) => {
+      const scope = bom.bom_scope_of_work.find((s: any) => s.id === cons.bom_scope_id);
+      if (scope) {
+        const consName = (cons.item_name || "").toLowerCase();
+        const isInBom = Array.isArray(scope.bom_materials) && scope.bom_materials.some((m: any) => 
+          (m.material_name?.toLowerCase() || "") === consName
+        );
+        
+        if (!isInBom) {
+          ocmTotalCost += (cons.calculated_total_cost || 0);
+        }
+      }
+    });
+
+    // Add OCM as a separate row if there's any OCM cost
+    const ocmRows = ocmTotalCost > 0 ? [{
+      id: "ocm",
+      name: "OCM (Overhead & Contingency Materials)",
+      type: "ocm",
+      cost: ocmTotalCost,
+      completion: avgCompletion
+    }] : [];
+
+    grandTotalCost += ocmTotalCost;
+
+    const allRows = [...scopeRows, ...indirectRows, ...ocmRows].map((row) => {
       const wtPercentage = grandTotalCost > 0 ? (row.cost / grandTotalCost) * 100 : 0;
       const accomplishment = wtPercentage * (row.completion / 100);
       const amountOfCompletion = row.cost * (row.completion / 100);
@@ -319,7 +346,7 @@ export default function Analytics() {
       totals,
       appliedAsOfDate: swaAsOfDate || null
     };
-  }, [bom, progressUpdates, swaAsOfDate, latestProgressUpdateDate]);
+  }, [bom, progressUpdates, swaAsOfDate, latestProgressUpdateDate, consumption]);
 
   // 2. Material Usage vs Allocated
   const materialUsageData = useMemo(() => {
@@ -715,6 +742,7 @@ export default function Analytics() {
                                     <div className="flex flex-wrap items-center gap-2">
                                       <span>{row.name}</span>
                                       {row.type === "indirect" && <Badge variant="outline" className="text-[10px] h-5">Indirect Cost</Badge>}
+                                      {row.type === "ocm" && <Badge variant="outline" className="text-[10px] h-5 bg-amber-50 text-amber-800 border-amber-300">OCM</Badge>}
                                     </div>
                                   </TableCell>
                                   <TableCell className="text-right">{formatCurrency(row.cost)}</TableCell>
