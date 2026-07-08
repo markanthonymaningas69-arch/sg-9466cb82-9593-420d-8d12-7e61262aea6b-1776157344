@@ -914,16 +914,23 @@ export default function Analytics() {
                               </TableCell>
                             </TableRow>
                           ) : (
-                            ocmData.map((row: any, idx: number) => (
-                              <TableRow key={idx}>
-                                <TableCell>{new Date(row.date).toLocaleDateString()}</TableCell>
-                                <TableCell className="text-sm text-muted-foreground">{row.scopeName}</TableCell>
-                                <TableCell className="font-medium">{row.materialName}</TableCell>
-                                <TableCell className="text-right font-bold text-warning">{row.quantity} {row.unit}</TableCell>
-                                <TableCell className="text-right font-medium">{formatCurrency(row.cost)}</TableCell>
-                                <TableCell className="text-sm italic">{row.remarks || "-"}</TableCell>
+                            <>
+                              {ocmData.map((row: any, idx: number) => (
+                                <TableRow key={idx}>
+                                  <TableCell>{new Date(row.date).toLocaleDateString()}</TableCell>
+                                  <TableCell className="text-sm text-muted-foreground">{row.scopeName}</TableCell>
+                                  <TableCell className="font-medium">{row.materialName}</TableCell>
+                                  <TableCell className="text-right font-bold text-warning">{row.quantity} {row.unit}</TableCell>
+                                  <TableCell className="text-right font-medium">{formatCurrency(row.cost)}</TableCell>
+                                  <TableCell className="text-sm italic">{row.remarks || "-"}</TableCell>
+                                </TableRow>
+                              ))}
+                              <TableRow className="bg-amber-50/50 font-bold hover:bg-amber-50/50 border-t-2 border-amber-300">
+                                <TableCell colSpan={4} className="text-right text-amber-800">TOTAL OCM COST</TableCell>
+                                <TableCell className="text-right text-amber-800">{formatCurrency(ocmData.reduce((sum, row) => sum + row.cost, 0))}</TableCell>
+                                <TableCell></TableCell>
                               </TableRow>
-                            ))
+                            </>
                           )}
                         </TableBody>
                       </Table>
