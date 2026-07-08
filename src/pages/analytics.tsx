@@ -118,13 +118,43 @@ export default function Analytics() {
         supabase.from('purchases').select('item_name, quantity, unit_cost, order_date').order('order_date', { ascending: true })
       ]);
 
-      // 1. Build chronological purchase lots for True FIFO costing
+      // 1. Build chronological purchase/delivery lots for True FIFO costing
       const purchasesList = purchasesResponse.data || [];
-      const lots: Record<string, { qty: number; cost: number }[]> = {};
+      const deliveriesList = deliveriesData.data || [];
+      
+      // Combine purchases and deliveries, sort chronologically
+      const allLots: Array<{ name: string; qty: number; cost: number; date: string }> = [];
+      
+      // Add purchases
       purchasesList.forEach(p => {
         const name = (p.item_name || '').toLowerCase().trim();
-        if (!lots[name]) lots[name] = [];
-        lots[name].push({ qty: Number(p.quantity || 0), cost: Number(p.unit_cost || 0) });
+        allLots.push({
+          name,
+          qty: Number(p.quantity || 0),
+          cost: Number(p.unit_cost || 0),
+          date: p.order_date || ''
+        });
+      });
+      
+      // Add deliveries
+      deliveriesList.forEach(d => {
+        const name = (d.item_name || '').toLowerCase().trim();
+        allLots.push({
+          name,
+          qty: Number(d.quantity || 0),
+          cost: Number(d.unit_cost || 0),
+          date: d.delivery_date || ''
+        });
+      });
+      
+      // Sort by date
+      allLots.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      
+      // Group by material name
+      const lots: Record<string, { qty: number; cost: number }[]> = {};
+      allLots.forEach(lot => {
+        if (!lots[lot.name]) lots[lot.name] = [];
+        lots[lot.name].push({ qty: lot.qty, cost: lot.cost });
       });
 
       // 2. Sort consumptions chronologically
@@ -136,10 +166,10 @@ export default function Analytics() {
         let qtyToCost = Number(c.quantity || 0);
         let totalCost = 0;
 
-        if (lots[name]) {
+        if (lots[name] && lots[name].length > 0) {
           for (let i = 0; i < lots[name].length && qtyToCost > 0; i++) {
             const lot = lots[name][i];
-            if (lot.qty > 0) {
+            if (lot.qty > 0 && lot.cost > 0) {
               const consumedFromLot = Math.min(qtyToCost, lot.qty);
               totalCost += consumedFromLot * lot.cost;
               lot.qty -= consumedFromLot;
@@ -148,10 +178,10 @@ export default function Analytics() {
           }
         }
 
-        // If no purchase history or lots exhausted
+        // Fallback cost calculation
         if (qtyToCost > 0) {
+          // Fallback 1: Manual estimated cost from Site
           if (Number(c.estimated_cost) > 0) {
-            // Fallback 1: Manual estimated cost from Site
             totalCost += qtyToCost * Number(c.estimated_cost);
           } else {
             // Fallback 2: Original BOM estimate
@@ -159,8 +189,18 @@ export default function Analytics() {
             const bomMat = Array.isArray(scope?.bom_materials) 
               ? scope.bom_materials.find((m: any) => (m.material_name || '').toLowerCase().trim() === name)
               : null;
-            const fallbackCost = bomMat ? Number(bomMat.unit_cost || 0) : 0;
-            totalCost += qtyToCost * fallbackCost;
+            
+            if (bomMat && Number(bomMat.unit_cost) > 0) {
+              // Material is in BOM
+              totalCost += qtyToCost * Number(bomMat.unit_cost);
+            } else {
+              // Fallback 3: Use any available delivery/purchase unit cost for this material
+              const matchingLot = allLots.find(lot => lot.name === name && lot.cost > 0);
+              if (matchingLot) {
+                totalCost += qtyToCost * matchingLot.cost;
+              }
+              // If still no cost found, totalCost remains as calculated (may be 0)
+            }
           }
         }
 
