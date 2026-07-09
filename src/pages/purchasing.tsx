@@ -872,7 +872,7 @@ export default function Purchasing() {
 
   return (
     <Layout>
-      <div className="space-y-4 sm:space-y-6 flex flex-col h-full px-3 sm:px-0">
+      <div className="space-y-4 sm:space-y-6 flex flex-col h-full">
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
           <div>
             <h1 className="text-xl sm:text-2xl md:text-3xl font-heading font-bold">Purchasing</h1>
@@ -1237,7 +1237,7 @@ export default function Purchasing() {
             </div>
           )}
 
-          <div className="overflow-auto rounded-md border h-full relative -mx-3 sm:mx-0">
+          <div className="overflow-auto rounded-md border h-full relative">
             <Table className="min-w-[1400px] table-fixed text-xs">
               <TableHeader className="sticky top-0 bg-background z-10">
                 <TableRow className="border-b">

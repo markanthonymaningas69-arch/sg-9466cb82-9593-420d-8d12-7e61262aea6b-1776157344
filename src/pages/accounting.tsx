@@ -143,18 +143,18 @@ export default function Accounting() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-          <div className="overflow-x-auto pb-2">
-            <TabsList className="shrink-0 flex flex-wrap w-full gap-1 h-auto bg-transparent p-0">
-              <TabsTrigger value="dashboard" className="flex-1 min-w-[70px] h-9 text-xs data-[state=active]:bg-blue-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-blue-700 bg-blue-50 text-blue-700 hover:bg-blue-100">
+          <div className="overflow-x-auto pb-2 -mx-3 px-3 sm:mx-0 sm:px-0">
+            <TabsList className="shrink-0 inline-flex w-auto min-w-full gap-1 h-auto bg-transparent p-0">
+              <TabsTrigger value="dashboard" className="flex-shrink-0 min-w-[70px] h-9 text-xs data-[state=active]:bg-blue-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-blue-700 bg-blue-50 text-blue-700 hover:bg-blue-100">
                 <Landmark className="h-3 w-3 mr-1.5 hidden sm:inline" /> Dash
               </TabsTrigger>
-              <TabsTrigger value="journal" className="flex-1 min-w-[70px] h-9 text-xs data-[state=active]:bg-indigo-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-indigo-700 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
+              <TabsTrigger value="journal" className="flex-shrink-0 min-w-[70px] h-9 text-xs data-[state=active]:bg-indigo-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-indigo-700 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
                 <FileSpreadsheet className="h-3 w-3 mr-1.5 hidden sm:inline" /> Journal
               </TabsTrigger>
-              <TabsTrigger value="payroll" className="flex-1 min-w-[70px] h-9 text-xs data-[state=active]:bg-emerald-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-emerald-700 bg-emerald-50 text-emerald-700 hover:bg-emerald-100">
+              <TabsTrigger value="payroll" className="flex-shrink-0 min-w-[70px] h-9 text-xs data-[state=active]:bg-emerald-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-emerald-700 bg-emerald-50 text-emerald-700 hover:bg-emerald-100">
                 <Users className="h-3 w-3 mr-1.5 hidden sm:inline" /> Payroll
               </TabsTrigger>
-              <TabsTrigger value="vouchers" className="flex-1 min-w-[70px] h-9 text-xs data-[state=active]:bg-amber-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-amber-700 bg-amber-50 text-amber-700 hover:bg-amber-100 relative">
+              <TabsTrigger value="vouchers" className="flex-shrink-0 min-w-[70px] h-9 text-xs data-[state=active]:bg-amber-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-amber-700 bg-amber-50 text-amber-700 hover:bg-amber-100 relative">
                 <Receipt className="h-3 w-3 mr-1.5 hidden sm:inline" /> 
                 Vouchers
                 {approvedVouchersCount > 0 && approvedVoucherIds !== seenVoucherIds && activeTab !== 'vouchers' && (
@@ -163,13 +163,13 @@ export default function Accounting() {
                   </Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="liquidations" className="flex-1 min-w-[70px] h-9 text-xs data-[state=active]:bg-orange-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-orange-700 bg-orange-50 text-orange-700 hover:bg-orange-100">
+              <TabsTrigger value="liquidations" className="flex-shrink-0 min-w-[70px] h-9 text-xs data-[state=active]:bg-orange-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-orange-700 bg-orange-50 text-orange-700 hover:bg-orange-100">
                 <CircleDollarSign className="h-3 w-3 mr-1.5 hidden sm:inline" /> Liquidate
               </TabsTrigger>
-              <TabsTrigger value="billing" className="flex-1 min-w-[70px] h-9 text-xs data-[state=active]:bg-teal-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-teal-700 bg-teal-50 text-teal-700 hover:bg-teal-100">
+              <TabsTrigger value="billing" className="flex-shrink-0 min-w-[90px] h-9 text-xs data-[state=active]:bg-teal-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-teal-700 bg-teal-50 text-teal-700 hover:bg-teal-100">
                 <FileText className="h-3 w-3 mr-1.5 hidden sm:inline" /> Billing
               </TabsTrigger>
-              <TabsTrigger value="incoming" className="flex-1 min-w-[90px] h-9 text-xs data-[state=active]:bg-cyan-700 data-[state=active]:text-white border border-transparent data-[state=active]:border-cyan-800 bg-cyan-50 text-cyan-700 hover:bg-cyan-100 relative">
+              <TabsTrigger value="incoming" className="flex-shrink-0 min-w-[130px] h-9 text-xs data-[state=active]:bg-cyan-700 data-[state=active]:text-white border border-transparent data-[state=active]:border-cyan-800 bg-cyan-50 text-cyan-700 hover:bg-cyan-100 relative">
                 Incoming Requests
                 {incomingRequests.filter((request) => request.workflowStatus === "in_accounting").length > 0 && (
                   <Badge variant="destructive" className="ml-1 h-4 min-w-4 flex items-center justify-center p-0 px-1 text-[9px] absolute -top-1 -right-1">
@@ -177,37 +177,37 @@ export default function Accounting() {
                   </Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="tax" className="flex-1 min-w-[70px] h-9 text-xs data-[state=active]:bg-purple-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-purple-700 bg-purple-50 text-purple-700 hover:bg-purple-100">
+              <TabsTrigger value="tax" className="flex-shrink-0 min-w-[70px] h-9 text-xs data-[state=active]:bg-purple-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-purple-700 bg-purple-50 text-purple-700 hover:bg-purple-100">
                 <FileText className="h-3 w-3 mr-1.5 hidden sm:inline" /> Tax
               </TabsTrigger>
             </TabsList>
           </div>
 
-          <TabsContent value="dashboard" className="flex-1 mt-0">
+          <TabsContent value="dashboard" className="flex-1 mt-3 space-y-4">
             <AccountingDashboard onTabChange={setActiveTab} />
           </TabsContent>
           
-          <TabsContent value="journal" className="flex-1 mt-0">
+          <TabsContent value="journal" className="flex-1 mt-3 space-y-4">
             <JournalOpEx />
           </TabsContent>
           
-          <TabsContent value="payroll" className="flex-1 mt-0">
+          <TabsContent value="payroll" className="flex-1 mt-3 space-y-4">
             <PayrollTab />
           </TabsContent>
 
-          <TabsContent value="vouchers" className="flex-1 mt-0">
+          <TabsContent value="vouchers" className="flex-1 mt-3 space-y-4">
             <VouchersTab />
           </TabsContent>
 
-          <TabsContent value="liquidations" className="flex-1 mt-0">
+          <TabsContent value="liquidations" className="flex-1 mt-3 space-y-4">
             <LiquidationsTab />
           </TabsContent>
 
-          <TabsContent value="billing" className="flex-1 mt-0">
+          <TabsContent value="billing" className="flex-1 mt-3 space-y-4">
             <ProjectBillingTab projectId="" />
           </TabsContent>
 
-          <TabsContent value="incoming" className="flex-1 mt-0">
+          <TabsContent value="incoming" className="flex-1 mt-3 space-y-4">
             <Card>
               <CardContent className="p-0">
                 <div className="overflow-x-auto rounded-md border">
@@ -281,7 +281,7 @@ export default function Accounting() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="tax" className="flex-1 mt-0">
+          <TabsContent value="tax" className="flex-1 mt-3 space-y-4">
             <TaxReportTab />
           </TabsContent>
         </Tabs>
