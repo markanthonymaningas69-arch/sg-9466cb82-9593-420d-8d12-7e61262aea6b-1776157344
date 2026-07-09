@@ -117,7 +117,31 @@ export default function Warehouse() {
         .select("*, projects(name)")
         .eq("is_archived", false)
     ]);
-    setItems(itemsData as WarehouseItem[] || []);
+    
+    const allItems = itemsData as WarehouseItem[] || [];
+    
+    // Debug: Log items to check for missing vest and demolition hammer
+    console.log("=== WAREHOUSE DEBUG ===");
+    console.log("Total items loaded:", allItems.length);
+    console.log("Items with null project_id (Main warehouse):", allItems.filter(i => !i.project_id).length);
+    console.log("Items with project_id (Project warehouse):", allItems.filter(i => i.project_id).length);
+    
+    const vest = allItems.find(i => i.name.toLowerCase().includes("vest"));
+    const hammer = allItems.find(i => i.name.toLowerCase().includes("hammer") || i.name.toLowerCase().includes("demolition"));
+    
+    if (vest) {
+      console.log("VEST found:", { name: vest.name, project_id: vest.project_id, category: vest.category, quantity: vest.quantity });
+    } else {
+      console.log("VEST NOT FOUND in database");
+    }
+    
+    if (hammer) {
+      console.log("HAMMER found:", { name: hammer.name, project_id: hammer.project_id, category: hammer.category, quantity: hammer.quantity });
+    } else {
+      console.log("HAMMER NOT FOUND in database");
+    }
+    
+    setItems(allItems);
     setProjects(projectsData || []);
     setMasterItems(masterData || []);
     setDeliveries(deliveriesData || []);
@@ -136,18 +160,35 @@ export default function Warehouse() {
       unit_cost: parseFloat(formData.unit_cost) || 0,
       reorder_level: parseInt(formData.reorder_level) || 0,
       last_restocked: formData.last_restocked,
-      project_id: null // Always add to main warehouse first
+      project_id: null // CRITICAL: Always null for Main warehouse items added via "Add Item" button
     };
 
-    if (editingItem) {
-      await warehouseService.update(editingItem.id, itemData);
-    } else {
-      await warehouseService.create(itemData as any);
-    }
+    try {
+      if (editingItem) {
+        await warehouseService.update(editingItem.id, itemData);
+        toast({
+          title: "Success",
+          description: "Item updated successfully",
+        });
+      } else {
+        await warehouseService.create(itemData as any);
+        toast({
+          title: "Success", 
+          description: `${itemData.name} added to Main Warehouse`,
+        });
+      }
 
-    setDialogOpen(false);
-    resetForm();
-    loadData();
+      setDialogOpen(false);
+      resetForm();
+      await loadData();
+    } catch (error) {
+      console.error("Error saving item:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save item",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleEdit = (item: WarehouseItem) => {
