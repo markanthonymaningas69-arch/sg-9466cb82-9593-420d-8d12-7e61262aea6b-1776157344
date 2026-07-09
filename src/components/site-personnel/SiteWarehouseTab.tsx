@@ -480,50 +480,41 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
     event.preventDefault();
 
     try {
-      const linesToSave = [...pendingLines];
+      const itemName = formData.bom_scope_id 
+        ? (formData.item_name || formData.custom_item_name)
+        : (formData.custom_item_name || formData.item_name);
 
-      if (formData.item_name && formData.quantity && formData.unit && formData.unit_cost) {
-        linesToSave.push({
-          bom_scope_id: formData.bom_scope_id,
-          item_name: formData.item_name,
-          quantity: formData.quantity,
-          unit: formData.unit,
-          unit_cost: formData.unit_cost,
-        });
-      }
+      const deliveryPayload = {
+        project_id: projectId,
+        transaction_type: "purchase" as const,
+        bom_scope_id: formData.bom_scope_id === "others" ? null : (formData.bom_scope_id || null),
+        item_name: itemName,
+        quantity: Number(formData.quantity),
+        unit: formData.unit,
+        unit_cost: Number(formData.unit_cost || 0),
+        amount: Number(formData.quantity || 0) * Number(formData.unit_cost || 0),
+        supplier: formData.supplier,
+        delivery_date: formData.delivery_date,
+        receipt_number: formData.receipt_number || null,
+        notes: formData.notes || null,
+        status: "pending",
+      };
 
-      if (linesToSave.length === 0) {
-        toast({
-          title: "No material lines",
-          description: "Add at least one material for this receipt",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const results = await Promise.all(linesToSave.map((line) => siteService.createDelivery(buildLinePayload(line))));
-      const failedResult = results.find((result) => result.error);
-
-      if (failedResult?.error) {
-        throw failedResult.error;
-      }
+      await siteService.createDelivery(deliveryPayload);
 
       toast({
         title: "Success",
-        description:
-          linesToSave.length === 1
-            ? "Site purchase recorded successfully"
-            : "Site purchase recorded successfully with multiple materials",
+        description: "Site purchase recorded successfully",
       });
 
       setDialogOpen(false);
-      resetForm();
+      setFormData(defaultFormState);
       await loadData();
     } catch (error) {
-      console.error("Error creating site purchase record:", error);
+      console.error("Error recording site purchase:", error);
       toast({
         title: "Error",
-        description: "Failed to save the record",
+        description: "Failed to record the purchase",
         variant: "destructive",
       });
     }
@@ -619,7 +610,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
     const firstItem = group.items[0];
     setEditingGroup(group);
     setEditFormData({
-      bom_scope_id: firstItem.bom_scope_id || "",
+      bom_scope_id: firstItem.bom_scope_id || "others",
       item_name: firstItem.item_name,
       quantity: String(firstItem.quantity || ""),
       unit: firstItem.unit || "",
@@ -645,7 +636,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
       const itemToUpdate = editingGroup.items[0];
       
       const { error } = await siteService.updateDelivery(itemToUpdate.id, {
-        bom_scope_id: editFormData.bom_scope_id || null,
+        bom_scope_id: editFormData.bom_scope_id === "others" ? null : (editFormData.bom_scope_id || null),
         item_name: editFormData.item_name,
         quantity: Number(editFormData.quantity),
         unit: editFormData.unit,
@@ -1481,6 +1472,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                                 {scope.name}
                               </SelectItem>
                             ))}
+                            <SelectItem value="others">Others (OCM)</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
