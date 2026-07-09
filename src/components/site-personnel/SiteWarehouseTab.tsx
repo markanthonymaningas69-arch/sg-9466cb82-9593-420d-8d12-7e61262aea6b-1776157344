@@ -369,7 +369,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
       // Combine both sources for Ready for Receiving
       const combinedReadyForReceiving = [...readyData, ...transformedDeployments];
 
-      setRecords((deliveriesData as DeliveryRecord[]);
+      setRecords(deliveriesData as DeliveryRecord[]);
       setScopes(
         (scopesData as ScopeOption[]).map((scope) => ({
           id: scope.id,
