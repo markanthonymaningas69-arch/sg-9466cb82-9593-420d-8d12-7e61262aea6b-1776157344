@@ -361,7 +361,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
         actual_quantity: null,
         remarks: deployment.notes || null,
         created_at: deployment.created_at,
-        updated_at: deployment.updated_at || deployment.created_at,
+        updated_at: deployment.created_at,
         site_requests: null,
         voucher_requests: null,
         purchases: null,
@@ -753,10 +753,10 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
           };
 
           const deliveryRes = await siteService.createDelivery(deliveryPayload);
-          if (!deliveryRes || !deliveryRes.id) {
+          if (!deliveryRes?.data?.id) {
             throw new Error("Failed to create delivery record");
           }
-          deliveryId = deliveryRes.id;
+          deliveryId = deliveryRes.data.id;
         }
 
         await requestWorkflowService.markReceived({
@@ -770,7 +770,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           await notificationService.createNotification({
-            user_id: user.id,
+            recipient_user_id: user.id,
             title: "Item Received",
             message: `${getRelationItem(selectedReadyRecord.site_requests)?.item_name || "Item"} has been marked as received`,
             type: "info",
