@@ -511,7 +511,7 @@ export default function Warehouse() {
 
         <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); setCategoryFilter("all"); setProjectFilter("all"); setDateFilter(""); }} className="flex-1 flex flex-col min-h-0">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mt-2">
-            <TabsList className="shrink-0 flex flex-wrap w-full sm:w-auto gap-1 h-auto bg-transparent p-0">
+            <TabsList className="shrink-0 flex flex-wrap w-full gap-1 h-auto bg-transparent p-0">
               <TabsTrigger value="main" className="flex-1 sm:flex-none min-w-[80px] h-9 text-xs data-[state=active]:bg-blue-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-blue-700 bg-blue-50 text-blue-700 hover:bg-blue-100">
                 <WarehouseIcon className="h-3 w-3 mr-1.5 hidden sm:inline" /> Main
               </TabsTrigger>
@@ -601,8 +601,8 @@ export default function Warehouse() {
 
           <TabsContent value="main" className="flex-1 mt-4 data-[state=active]:flex flex-col min-h-0">
             <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none bg-background">
-              <div className="overflow-y-auto rounded-md border h-full relative bg-background">
-                <Table>
+              <div className="overflow-x-auto rounded-md border h-full relative bg-background -mx-3 px-3 sm:mx-0 sm:px-0">
+                <Table className="min-w-[900px]">
                   <TableHeader className="sticky top-0 bg-muted z-10">
                     <TableRow>
                       <TableHead>Date</TableHead>
@@ -672,8 +672,8 @@ export default function Warehouse() {
 
           <TabsContent value="project" className="flex-1 mt-4 data-[state=active]:flex flex-col min-h-0">
             <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none bg-background">
-              <div className="overflow-y-auto rounded-md border h-full relative bg-background">
-                <Table>
+              <div className="overflow-x-auto rounded-md border h-full relative bg-background -mx-3 px-3 sm:mx-0 sm:px-0">
+                <Table className="min-w-[800px]">
                   <TableHeader className="sticky top-0 bg-muted z-10 border-b">
                     <TableRow>
                       <TableHead className="font-bold text-foreground">Item Name</TableHead>
@@ -766,8 +766,8 @@ export default function Warehouse() {
 
           <TabsContent value="deployments" className="flex-1 mt-4 data-[state=active]:flex flex-col min-h-0">
             <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none bg-background">
-              <div className="overflow-y-auto rounded-md border h-full relative bg-background">
-                <Table>
+              <div className="overflow-x-auto rounded-md border h-full relative bg-background -mx-3 px-3 sm:mx-0 sm:px-0">
+                <Table className="min-w-[700px]">
                   <TableHeader className="sticky top-0 bg-muted z-10 border-b">
                     <TableRow>
                       <TableHead>Date</TableHead>
@@ -831,8 +831,8 @@ export default function Warehouse() {
 
           <TabsContent value="balance" className="flex-1 mt-4 data-[state=active]:flex flex-col min-h-0">
             <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none bg-background">
-              <div className="overflow-y-auto rounded-md border h-full relative bg-background">
-                <Table>
+              <div className="overflow-x-auto rounded-md border h-full relative bg-background -mx-3 px-3 sm:mx-0 sm:px-0">
+                <Table className="min-w-[700px]">
                   <TableHeader className="sticky top-0 bg-muted z-10 border-b">
                     <TableRow>
                       <TableHead className="font-bold text-foreground">Item Name</TableHead>

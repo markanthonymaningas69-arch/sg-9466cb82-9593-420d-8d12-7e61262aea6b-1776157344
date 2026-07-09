@@ -895,64 +895,66 @@ export default function Personnel() {
               <CardHeader>
                 <CardTitle>{workerFilter === 'office' ? 'Office Staff' : 'Construction Workers'}</CardTitle>
               </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Project</TableHead>
-                      <TableHead>Contact</TableHead>
-                      <TableHead>Rate</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Source</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredPersonnel.map((person) => (
-                      <TableRow key={person.id}>
-                        <TableCell className="font-medium">{person.name}</TableCell>
-                        <TableCell>{person.role}</TableCell>
-                        <TableCell>{person.projects?.name || "Unassigned"}</TableCell>
-                        <TableCell>{person.phone || "-"}</TableCell>
-                        <TableCell>
-                          {workerFilter === 'office' 
-                            ? `${currency} ${person.hourly_rate?.toLocaleString() || 0}/hr`
-                            : `${currency} ${person.daily_rate?.toLocaleString() || 0}/day`
-                          }
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={statusColors[person.status] || "bg-gray-100 text-gray-800"}>
-                            {person.status.replace("_", " ")}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-[10px] bg-muted/50">
-                            {person.updated_source || person.created_source || 'Human Resources'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button size="icon" variant="ghost" onClick={() => handleEdit(person)} disabled={isLocked}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button size="icon" variant="ghost" onClick={() => handleDelete(person.id)} title="Archive" disabled={isLocked}>
-                              <Archive className="h-4 w-4 text-orange-600" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {filteredPersonnel.length === 0 && (
+              <CardContent className="p-0 sm:p-6">
+                <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+                  <Table className="min-w-[900px]">
+                    <TableHeader>
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
-                          No {workerFilter === 'office' ? 'office staff' : 'construction workers'} found.
-                        </TableCell>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Project</TableHead>
+                        <TableHead>Contact</TableHead>
+                        <TableHead>Rate</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Source</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredPersonnel.map((person) => (
+                        <TableRow key={person.id}>
+                          <TableCell className="font-medium">{person.name}</TableCell>
+                          <TableCell>{person.role}</TableCell>
+                          <TableCell>{person.projects?.name || "Unassigned"}</TableCell>
+                          <TableCell>{person.phone || "-"}</TableCell>
+                          <TableCell>
+                            {workerFilter === 'office' 
+                              ? `${currency} ${person.hourly_rate?.toLocaleString() || 0}/hr`
+                              : `${currency} ${person.daily_rate?.toLocaleString() || 0}/day`
+                            }
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={statusColors[person.status] || "bg-gray-100 text-gray-800"}>
+                              {person.status.replace("_", " ")}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-[10px] bg-muted/50">
+                              {person.updated_source || person.created_source || 'Human Resources'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button size="icon" variant="ghost" onClick={() => handleEdit(person)} disabled={isLocked}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button size="icon" variant="ghost" onClick={() => handleDelete(person.id)} title="Archive" disabled={isLocked}>
+                                <Archive className="h-4 w-4 text-orange-600" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {filteredPersonnel.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
+                            No {workerFilter === 'office' ? 'office staff' : 'construction workers'} found.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1116,38 +1118,40 @@ export default function Personnel() {
               <CardHeader>
                 <CardTitle>Attendance Summary - {workerFilterLabel}</CardTitle>
               </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Personnel</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Days Worked</TableHead>
-                      <TableHead>Days Absent</TableHead>
-                      <TableHead>Total Regular Hours</TableHead>
-                      <TableHead>Total Overtime</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {attendanceSummaryRows.map((row) => (
-                      <TableRow key={row.id}>
-                        <TableCell className="font-medium">{row.name}</TableCell>
-                        <TableCell>{row.role}</TableCell>
-                        <TableCell className="font-semibold text-green-600">{row.daysWorked}</TableCell>
-                        <TableCell className="font-semibold text-red-600">{row.daysAbsent}</TableCell>
-                        <TableCell>{row.totalHours}h</TableCell>
-                        <TableCell>{row.totalOvertime}h</TableCell>
-                      </TableRow>
-                    ))}
-                    {attendanceSummaryRows.length === 0 && (
+              <CardContent className="p-0 sm:p-6">
+                <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+                  <Table className="min-w-[700px]">
+                    <TableHeader>
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
-                          No attendance records found for {workerFilterLabel.toLowerCase()} in this period.
-                        </TableCell>
+                        <TableHead>Personnel</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Days Worked</TableHead>
+                        <TableHead>Days Absent</TableHead>
+                        <TableHead>Total Regular Hours</TableHead>
+                        <TableHead>Total Overtime</TableHead>
                       </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {attendanceSummaryRows.map((row) => (
+                        <TableRow key={row.id}>
+                          <TableCell className="font-medium">{row.name}</TableCell>
+                          <TableCell>{row.role}</TableCell>
+                          <TableCell className="font-semibold text-green-600">{row.daysWorked}</TableCell>
+                          <TableCell className="font-semibold text-red-600">{row.daysAbsent}</TableCell>
+                          <TableCell>{row.totalHours}h</TableCell>
+                          <TableCell>{row.totalOvertime}h</TableCell>
+                        </TableRow>
+                      ))}
+                      {attendanceSummaryRows.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
+                            No attendance records found for {workerFilterLabel.toLowerCase()} in this period.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1241,50 +1245,52 @@ export default function Personnel() {
               <CardHeader>
                 <CardTitle>Leave Requests - {workerFilterLabel}</CardTitle>
               </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Personnel</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Start Date</TableHead>
-                      <TableHead>End Date</TableHead>
-                      <TableHead>Days</TableHead>
-                      <TableHead>Reason</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredLeaveRequests.map((leave) => (
-                      <TableRow key={leave.id}>
-                        <TableCell className="font-medium">{leave.personnel?.name}</TableCell>
-                        <TableCell className="capitalize">{leave.leave_type}</TableCell>
-                        <TableCell>{new Date(leave.start_date).toLocaleDateString()}</TableCell>
-                        <TableCell>{new Date(leave.end_date).toLocaleDateString()}</TableCell>
-                        <TableCell>{leave.days_requested}</TableCell>
-                        <TableCell className="max-w-xs truncate">{leave.reason}</TableCell>
-                        <TableCell>
-                          <Badge className={statusColors[leave.status]}>
-                            {leave.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button size="icon" variant="ghost" onClick={() => handleDeleteLeave(leave.id)} title="Archive" disabled={isLocked}>
-                            <Archive className="h-4 w-4 text-orange-600" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {filteredLeaveRequests.length === 0 && (
+              <CardContent className="p-0 sm:p-6">
+                <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+                  <Table className="min-w-[800px]">
+                    <TableHeader>
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
-                          No leave requests found for {workerFilterLabel.toLowerCase()}.
-                        </TableCell>
+                        <TableHead>Personnel</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Start Date</TableHead>
+                        <TableHead>End Date</TableHead>
+                        <TableHead>Days</TableHead>
+                        <TableHead>Reason</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredLeaveRequests.map((leave) => (
+                        <TableRow key={leave.id}>
+                          <TableCell className="font-medium">{leave.personnel?.name}</TableCell>
+                          <TableCell className="capitalize">{leave.leave_type}</TableCell>
+                          <TableCell>{new Date(leave.start_date).toLocaleDateString()}</TableCell>
+                          <TableCell>{new Date(leave.end_date).toLocaleDateString()}</TableCell>
+                          <TableCell>{leave.days_requested}</TableCell>
+                          <TableCell className="max-w-xs truncate">{leave.reason}</TableCell>
+                          <TableCell>
+                            <Badge className={statusColors[leave.status]}>
+                              {leave.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button size="icon" variant="ghost" onClick={() => handleDeleteLeave(leave.id)} title="Archive" disabled={isLocked}>
+                              <Archive className="h-4 w-4 text-orange-600" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {filteredLeaveRequests.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
+                            No leave requests found for {workerFilterLabel.toLowerCase()}.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1397,88 +1403,90 @@ export default function Personnel() {
                 <CardHeader>
                   <CardTitle>Visa & Passport Tracking - {workerFilterLabel}</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Personnel</TableHead>
-                        <TableHead>Country</TableHead>
-                        <TableHead>Passport No.</TableHead>
-                        <TableHead>Passport Expiry</TableHead>
-                        <TableHead>Visa No.</TableHead>
-                        <TableHead>Visa Expiry</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredVisas.map((record) => {
-                        const daysToPassportExpiry = record.passport_expiry_date ? Math.ceil((new Date(record.passport_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
-                        const daysToVisaExpiry = record.visa_expiry_date ? Math.ceil((new Date(record.visa_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
-                        const minDays = Math.min(daysToPassportExpiry, daysToVisaExpiry);
+                <CardContent className="p-0 sm:p-6">
+                  <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+                    <Table className="min-w-[900px]">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Personnel</TableHead>
+                          <TableHead>Country</TableHead>
+                          <TableHead>Passport No.</TableHead>
+                          <TableHead>Passport Expiry</TableHead>
+                          <TableHead>Visa No.</TableHead>
+                          <TableHead>Visa Expiry</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredVisas.map((record) => {
+                          const daysToPassportExpiry = record.passport_expiry_date ? Math.ceil((new Date(record.passport_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
+                          const daysToVisaExpiry = record.visa_expiry_date ? Math.ceil((new Date(record.visa_expiry_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : Infinity;
+                          const minDays = Math.min(daysToPassportExpiry, daysToVisaExpiry);
 
-                        let statusColor = "bg-green-100 text-green-800";
-                        let statusText = "Active";
+                          let statusColor = "bg-green-100 text-green-800";
+                          let statusText = "Active";
 
-                        if (minDays < 0) {
-                          if (record.status === "noted") {
-                            statusColor = "bg-gray-100 text-gray-800";
-                            statusText = "Expired / Noted";
-                          } else {
-                            statusColor = "bg-red-100 text-red-800";
-                            statusText = "Expired";
+                          if (minDays < 0) {
+                            if (record.status === "noted") {
+                              statusColor = "bg-gray-100 text-gray-800";
+                              statusText = "Expired / Noted";
+                            } else {
+                              statusColor = "bg-red-100 text-red-800";
+                              statusText = "Expired";
+                            }
+                          } else if (minDays <= 30) {
+                            if (record.status === "noted") {
+                              statusColor = "bg-gray-100 text-gray-800";
+                              statusText = "Expiring Soon / Noted";
+                            } else {
+                              statusColor = "bg-orange-100 text-orange-800";
+                              statusText = "Expiring Soon";
+                            }
                           }
-                        } else if (minDays <= 30) {
-                          if (record.status === "noted") {
-                            statusColor = "bg-gray-100 text-gray-800";
-                            statusText = "Expiring Soon / Noted";
-                          } else {
-                            statusColor = "bg-orange-100 text-orange-800";
-                            statusText = "Expiring Soon";
-                          }
-                        }
 
-                        return (
-                          <TableRow key={record.id} className={minDays <= 30 && record.status !== "noted" ? "bg-red-50/50" : ""}>
-                            <TableCell className="font-medium">{record.personnel?.name}</TableCell>
-                            <TableCell>{record.country}</TableCell>
-                            <TableCell className="font-mono text-sm">{record.passport_number || "-"}</TableCell>
-                            <TableCell className={daysToPassportExpiry <= 30 && record.status !== "noted" ? "text-red-700 font-bold bg-red-100/50" : ""}>
-                              {record.passport_expiry_date ? new Date(record.passport_expiry_date).toLocaleDateString() : "-"}
-                            </TableCell>
-                            <TableCell className="font-mono text-sm">{record.visa_number || "-"}</TableCell>
-                            <TableCell className={daysToVisaExpiry <= 30 && record.status !== "noted" ? "text-red-700 font-bold bg-red-100/50" : ""}>
-                              {record.visa_expiry_date ? new Date(record.visa_expiry_date).toLocaleDateString() : "-"}
-                            </TableCell>
-                            <TableCell>
-                              <Badge className={statusColor}>{statusText}</Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {minDays <= 30 && record.status !== "noted" && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 border-orange-200 text-orange-700 bg-orange-50 hover:bg-orange-100"
-                                  onClick={() => handleCheckVisa(record.id)}
-                                  disabled={isLocked}
-                                >
-                                  <Check className="h-3 w-3 mr-1" />
-                                  Check
-                                </Button>
-                              )}
+                          return (
+                            <TableRow key={record.id} className={minDays <= 30 && record.status !== "noted" ? "bg-red-50/50" : ""}>
+                              <TableCell className="font-medium">{record.personnel?.name}</TableCell>
+                              <TableCell>{record.country}</TableCell>
+                              <TableCell className="font-mono text-sm">{record.passport_number || "-"}</TableCell>
+                              <TableCell className={daysToPassportExpiry <= 30 && record.status !== "noted" ? "text-red-700 font-bold bg-red-100/50" : ""}>
+                                {record.passport_expiry_date ? new Date(record.passport_expiry_date).toLocaleDateString() : "-"}
+                              </TableCell>
+                              <TableCell className="font-mono text-sm">{record.visa_number || "-"}</TableCell>
+                              <TableCell className={daysToVisaExpiry <= 30 && record.status !== "noted" ? "text-red-700 font-bold bg-red-100/50" : ""}>
+                                {record.visa_expiry_date ? new Date(record.visa_expiry_date).toLocaleDateString() : "-"}
+                              </TableCell>
+                              <TableCell>
+                                <Badge className={statusColor}>{statusText}</Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {minDays <= 30 && record.status !== "noted" && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 border-orange-200 text-orange-700 bg-orange-50 hover:bg-orange-100"
+                                    onClick={() => handleCheckVisa(record.id)}
+                                    disabled={isLocked}
+                                  >
+                                    <Check className="h-3 w-3 mr-1" />
+                                    Check
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                        {filteredVisas.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
+                              No visa or passport records found for {workerFilterLabel.toLowerCase()}.
                             </TableCell>
                           </TableRow>
-                        );
-                      })}
-                      {filteredVisas.length === 0 && (
-                        <TableRow>
-                          <TableCell colSpan={8} className="text-center py-6 text-muted-foreground">
-                            No visa or passport records found for {workerFilterLabel.toLowerCase()}.
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>

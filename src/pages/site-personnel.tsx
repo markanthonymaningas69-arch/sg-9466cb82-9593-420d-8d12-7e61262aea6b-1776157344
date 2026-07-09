@@ -173,9 +173,9 @@ export default function SitePersonnelPage() {
         </div>
 
         <Card className="border shadow-sm">
-          <CardHeader className="px-4 py-3">
+          <CardHeader className="px-3 py-3 sm:px-4">
             <CardTitle className="text-sm font-semibold">Site Operations</CardTitle>
-            <div className="overflow-x-auto overflow-y-hidden pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="overflow-x-auto overflow-y-hidden pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <Tabs defaultValue="deliveries" className="space-y-3">
                 <TabsList className="inline-flex h-9 min-w-max flex-nowrap items-center justify-start gap-1 rounded-md bg-slate-100 p-1">
                   <TabsTrigger
