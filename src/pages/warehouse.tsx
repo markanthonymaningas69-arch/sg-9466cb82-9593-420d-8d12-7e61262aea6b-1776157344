@@ -207,6 +207,8 @@ export default function Warehouse() {
   const uniqueCategories = Array.from(new Set(items.map(i => getCategoryLabel(i.category || "Uncategorized"))));
 
   // Splitting and Filtering Logic
+  // IMPORTANT: Main warehouse items should ALWAYS appear in the list, even when quantity is 0
+  // Items are only removed if explicitly deleted by the user clicking the Delete button
   const mainWarehouseItems = items.filter(item => !item.project_id);
   const projectWarehouseItems = items.filter(item => item.project_id);
 
@@ -256,6 +258,8 @@ export default function Warehouse() {
       const remainingQty = selectedItem.quantity - deployQty;
 
       // Update warehouse inventory quantity
+      // NOTE: Item remains in Main warehouse list even when quantity reaches 0
+      // It will show as "Depleted" with disabled Deploy button
       const { error: updateError } = await supabase
         .from("inventory")
         .update({ 
@@ -710,7 +714,11 @@ export default function Warehouse() {
                     {filteredMain.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                          No items found in the Main Warehouse.
+                          {mainWarehouseItems.length === 0 ? (
+                            <>No items found in the Main Warehouse. Click "Add Item" to get started.</>
+                          ) : (
+                            <>No items match the current filters. {categoryFilter !== "all" || dateFilter ? <button onClick={() => { setCategoryFilter("all"); setDateFilter(""); }} className="text-primary underline ml-1">Clear filters</button> : null}</>
+                          )}
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -768,20 +776,7 @@ export default function Warehouse() {
                                 size="sm"
                                 variant="outline"
                                 className="h-7 px-2"
-                                onClick={() => {
-                                  setSelectedItem(item);
-                                  setEditForm({
-                                    item_name: item.name,
-                                    category: item.category || "",
-                                    quantity: String(item.quantity),
-                                    unit: item.unit,
-                                    unit_cost: String(item.unit_cost || 0),
-                                    supplier: "",
-                                    minimum_stock: String(item.reorder_level || 0),
-                                    notes: "",
-                                  });
-                                  setEditDialogOpen(true);
-                                }}
+                                onClick={() => handleEdit(item)}
                               >
                                 Edit
                               </Button>
@@ -790,7 +785,8 @@ export default function Warehouse() {
                                 variant="outline"
                                 className="h-7 px-2"
                                 onClick={() => {
-                                  setSelectedItem(item);
+                                  setDeployingItem(item);
+                                  setDeployForm({ projectId: "", quantity: "", notes: "" });
                                   setDeployDialogOpen(true);
                                 }}
                                 disabled={item.quantity === 0}
