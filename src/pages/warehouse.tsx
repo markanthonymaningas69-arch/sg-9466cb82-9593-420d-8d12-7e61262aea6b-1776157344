@@ -69,10 +69,22 @@ export default function Warehouse() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deployDialogOpen, setDeployDialogOpen] = useState(false);
   const [deploymentDialogOpen, setDeploymentDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<WarehouseItem | null>(null);
+  const [selectedItem, setSelectedItem] = useState<WarehouseItem | null>(null);
   const [deployingItem, setDeployingItem] = useState<WarehouseItem | null>(null);
   const [editingDeployment, setEditingDeployment] = useState<any>(null);
-  const [deployForm, setDeployForm] = useState({ project_id: "", quantity: 1 });
+  const [deployForm, setDeployForm] = useState({ projectId: "", quantity: "", notes: "" });
+  const [editForm, setEditForm] = useState({
+    item_name: "",
+    category: "",
+    quantity: "",
+    unit: "",
+    unit_cost: "",
+    supplier: "",
+    minimum_stock: "",
+    notes: "",
+  });
   const [deploymentForm, setDeploymentForm] = useState({ quantity: 0 });
   const [isManualName, setIsManualName] = useState(false);
   const [isManualCategory, setIsManualCategory] = useState(false);
@@ -215,6 +227,81 @@ export default function Warehouse() {
     setDeploymentDialogOpen(false);
     setEditingDeployment(null);
     loadData();
+  };
+
+  const handleDeploy = async () => {
+    if (!selectedItem || !deployForm.projectId || !deployForm.quantity) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const deployQty = Number(deployForm.quantity);
+    if (deployQty <= 0 || deployQty > selectedItem.quantity) {
+      toast({
+        title: "Invalid Quantity",
+        description: "Deployment quantity must be greater than 0 and not exceed available stock",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const remainingQty = selectedItem.quantity - deployQty;
+
+      // Update warehouse inventory quantity
+      const { error: updateError } = await supabase
+        .from("warehouse_inventory")
+        .update({ 
+          quantity: remainingQty,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", selectedItem.id);
+
+      if (updateError) throw updateError;
+
+      // Create delivery record for site
+      const deliveryPayload = {
+        project_id: deployForm.projectId,
+        transaction_type: "transfer" as const,
+        item_name: selectedItem.name,
+        quantity: deployQty,
+        unit: selectedItem.unit,
+        unit_cost: selectedItem.unit_cost || 0,
+        amount: deployQty * (selectedItem.unit_cost || 0),
+        supplier: "Main Warehouse",
+        delivery_date: new Date().toISOString().split("T")[0],
+        receipt_number: `WH-${selectedItem.id.slice(0, 8)}-${Date.now()}`,
+        notes: deployForm.notes || `Deployed from Main Warehouse`,
+        status: "pending",
+      };
+
+      const { error: deliveryError } = await supabase
+        .from("deliveries")
+        .insert(deliveryPayload);
+
+      if (deliveryError) throw deliveryError;
+
+      toast({
+        title: "Success",
+        description: `Deployed ${deployQty} ${selectedItem.unit} to site. Remaining: ${remainingQty} ${selectedItem.unit}`,
+      });
+
+      setDeployDialogOpen(false);
+      setSelectedItem(null);
+      setDeployForm({ projectId: "", quantity: "", notes: "" });
+      await loadInventory();
+    } catch (error) {
+      console.error("Error deploying item:", error);
+      toast({
+        title: "Error",
+        description: "Failed to deploy item to site",
+        variant: "destructive",
+      });
+    }
   };
 
   const filteredMain = mainWarehouseItems.filter(item => {
@@ -626,15 +713,16 @@ export default function Warehouse() {
                     ) : (
                       filteredMain.map((item) => (
                         <TableRow key={item.id} className={item.quantity === 0 ? "opacity-50" : ""}>
+                          <TableCell>{item.last_restocked || "—"}</TableCell>
                           <TableCell className="font-medium">
                             <div className="flex items-center gap-2">
-                              {item.item_name}
+                              {item.name}
                               {item.quantity === 0 && (
                                 <Badge variant="outline" className="text-[10px] h-5 bg-red-50 text-red-700 border-red-200">
                                   Depleted
                                 </Badge>
                               )}
-                              {item.quantity > 0 && item.quantity <= (item.minimum_stock || 0) && (
+                              {item.quantity > 0 && item.quantity <= (item.reorder_level || 0) && (
                                 <Badge variant="outline" className="text-[10px] h-5 bg-amber-50 text-amber-700 border-amber-200">
                                   Low Stock
                                 </Badge>
@@ -651,11 +739,26 @@ export default function Warehouse() {
                               {item.quantity} {item.unit}
                             </span>
                           </TableCell>
+                          <TableCell className="text-right">{item.reorder_level || 0}</TableCell>
                           <TableCell className="text-right">{formatCurrency(item.unit_cost || 0)}</TableCell>
                           <TableCell className="text-right font-medium">
                             {formatCurrency((item.quantity || 0) * (item.unit_cost || 0))}
                           </TableCell>
-                          <TableCell>{item.supplier || "—"}</TableCell>
+                          <TableCell>
+                            {item.quantity === 0 ? (
+                              <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                Depleted
+                              </Badge>
+                            ) : item.quantity <= (item.reorder_level || 0) ? (
+                              <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                                Low Stock
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                In Stock
+                              </Badge>
+                            )}
+                          </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">
                               <Button
@@ -665,14 +768,14 @@ export default function Warehouse() {
                                 onClick={() => {
                                   setSelectedItem(item);
                                   setEditForm({
-                                    item_name: item.item_name,
+                                    item_name: item.name,
                                     category: item.category || "",
                                     quantity: String(item.quantity),
                                     unit: item.unit,
                                     unit_cost: String(item.unit_cost || 0),
-                                    supplier: item.supplier || "",
-                                    minimum_stock: String(item.minimum_stock || 0),
-                                    notes: item.notes || "",
+                                    supplier: "",
+                                    minimum_stock: String(item.reorder_level || 0),
+                                    notes: "",
                                   });
                                   setEditDialogOpen(true);
                                 }}
