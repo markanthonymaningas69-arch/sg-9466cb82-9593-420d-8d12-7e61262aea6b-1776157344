@@ -770,7 +770,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           await notificationService.createNotification({
-            recipient_user_id: user.id,
+            user_id: user.id,
             title: "Item Received",
             message: `${getRelationItem(selectedReadyRecord.site_requests)?.item_name || "Item"} has been marked as received`,
             type: "info",
