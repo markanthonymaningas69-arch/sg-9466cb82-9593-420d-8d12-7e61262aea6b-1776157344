@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 import { warehouseService } from "@/services/warehouseService";
 import { projectService } from "@/services/projectService";
 import { useSettings } from "@/contexts/SettingsProvider";
@@ -51,6 +52,7 @@ const STANDARD_UNITS = [
 
 export default function Warehouse() {
   const { formatCurrency, isLocked } = useSettings();
+  const { toast } = useToast();
   const [items, setItems] = useState<WarehouseItem[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [masterItems, setMasterItems] = useState<any[]>([]);
@@ -254,7 +256,7 @@ export default function Warehouse() {
 
       // Update warehouse inventory quantity
       const { error: updateError } = await supabase
-        .from("warehouse_inventory")
+        .from("inventory")
         .update({ 
           quantity: remainingQty,
           updated_at: new Date().toISOString()
@@ -293,7 +295,7 @@ export default function Warehouse() {
       setDeployDialogOpen(false);
       setSelectedItem(null);
       setDeployForm({ projectId: "", quantity: "", notes: "" });
-      await loadInventory();
+      await loadData();
     } catch (error) {
       console.error("Error deploying item:", error);
       toast({
@@ -514,8 +516,8 @@ export default function Warehouse() {
                   <div className="space-y-2">
                     <Label>Target Project *</Label>
                     <Select 
-                      value={deployForm.project_id} 
-                      onValueChange={(val) => setDeployForm({ ...deployForm, project_id: val })} 
+                      value={deployForm.projectId} 
+                      onValueChange={(val) => setDeployForm({ ...deployForm, projectId: val })} 
                       required
                     >
                       <SelectTrigger><SelectValue placeholder="Select active project" /></SelectTrigger>
@@ -532,7 +534,7 @@ export default function Warehouse() {
                       min="1" 
                       max={deployingItem.quantity} 
                       value={deployForm.quantity} 
-                      onChange={(e) => setDeployForm({ ...deployForm, quantity: parseInt(e.target.value) || 1 })} 
+                      onChange={(e) => setDeployForm({ ...deployForm, quantity: e.target.value })} 
                       required 
                     />
                   </div>
