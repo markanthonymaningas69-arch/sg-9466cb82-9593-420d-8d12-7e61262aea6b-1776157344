@@ -2464,6 +2464,68 @@ export type Database = {
           },
         ]
       }
+      site_warehouse_inventory: {
+        Row: {
+          category: string
+          created_at: string
+          date_received: string
+          id: string
+          item_name: string
+          notes: string | null
+          project_id: string
+          quantity: number
+          received_by: string
+          status: string
+          supplier: string | null
+          total_value: number
+          unit: string
+          unit_cost: number
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          date_received: string
+          id?: string
+          item_name: string
+          notes?: string | null
+          project_id: string
+          quantity?: number
+          received_by: string
+          status?: string
+          supplier?: string | null
+          total_value?: number
+          unit: string
+          unit_cost?: number
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          date_received?: string
+          id?: string
+          item_name?: string
+          notes?: string | null
+          project_id?: string
+          quantity?: number
+          received_by?: string
+          status?: string
+          supplier?: string | null
+          total_value?: number
+          unit?: string
+          unit_cost?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_warehouse_inventory_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stripe_subscription_transactions: {
         Row: {
           amount: number

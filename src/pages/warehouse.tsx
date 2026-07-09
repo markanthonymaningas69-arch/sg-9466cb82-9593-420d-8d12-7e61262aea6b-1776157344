@@ -625,39 +625,79 @@ export default function Warehouse() {
                       </TableRow>
                     ) : (
                       filteredMain.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell className="text-muted-foreground whitespace-nowrap">{item.last_restocked || "-"}</TableCell>
-                          <TableCell className="font-medium">{item.name}</TableCell>
+                        <TableRow key={item.id} className={item.quantity === 0 ? "opacity-50" : ""}>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              {item.item_name}
+                              {item.quantity === 0 && (
+                                <Badge variant="outline" className="text-[10px] h-5 bg-red-50 text-red-700 border-red-200">
+                                  Depleted
+                                </Badge>
+                              )}
+                              {item.quantity > 0 && item.quantity <= (item.minimum_stock || 0) && (
+                                <Badge variant="outline" className="text-[10px] h-5 bg-amber-50 text-amber-700 border-amber-200">
+                                  Low Stock
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell>
-                            <Badge variant="outline">{getCategoryLabel(item.category || "-")}</Badge>
+                            <Badge variant="outline" className="text-[10px] h-5">
+                              {item.category || "Uncategorized"}
+                            </Badge>
                           </TableCell>
-                          <TableCell className="text-right font-semibold">{item.quantity} {item.unit}</TableCell>
-                          <TableCell className="text-right text-muted-foreground">{item.reorder_level || 0} {item.unit}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(item.unit_cost)}</TableCell>
-                          <TableCell className="text-right font-semibold text-primary">
-                            {formatCurrency(item.quantity * item.unit_cost)}
+                          <TableCell className="text-right font-medium">
+                            <span className={item.quantity === 0 ? "text-red-600" : ""}>
+                              {item.quantity} {item.unit}
+                            </span>
                           </TableCell>
-                          <TableCell>
-                            {item.quantity <= (item.reorder_level || 0) ? (
-                              <Badge className="bg-warning/20 text-warning border-warning/50">Low Stock</Badge>
-                            ) : (
-                              <Badge className="bg-success/20 text-success border-success/50">In Stock</Badge>
-                            )}
+                          <TableCell className="text-right">{formatCurrency(item.unit_cost || 0)}</TableCell>
+                          <TableCell className="text-right font-medium">
+                            {formatCurrency((item.quantity || 0) * (item.unit_cost || 0))}
                           </TableCell>
+                          <TableCell>{item.supplier || "—"}</TableCell>
                           <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button size="sm" variant="default" className="bg-blue-600 hover:bg-blue-700" disabled={isLocked} onClick={() => {
-                                setDeployingItem(item);
-                                setDeployForm({ project_id: "", quantity: 1 });
-                                setDeployDialogOpen(true);
-                              }}>
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2"
+                                onClick={() => {
+                                  setSelectedItem(item);
+                                  setEditForm({
+                                    item_name: item.item_name,
+                                    category: item.category || "",
+                                    quantity: String(item.quantity),
+                                    unit: item.unit,
+                                    unit_cost: String(item.unit_cost || 0),
+                                    supplier: item.supplier || "",
+                                    minimum_stock: String(item.minimum_stock || 0),
+                                    notes: item.notes || "",
+                                  });
+                                  setEditDialogOpen(true);
+                                }}
+                              >
+                                Edit
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2"
+                                onClick={() => {
+                                  setSelectedItem(item);
+                                  setDeployDialogOpen(true);
+                                }}
+                                disabled={item.quantity === 0}
+                              >
                                 Deploy
                               </Button>
-                              <Button size="sm" variant="ghost" onClick={() => handleEdit(item)} disabled={isLocked}>
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button size="sm" variant="ghost" onClick={() => handleDelete(item.id)} title="Archive" disabled={isLocked}>
-                                <Archive className="h-4 w-4 text-orange-600" />
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2 text-destructive hover:text-destructive"
+                                onClick={() => handleDelete(item.id)}
+                              >
+                                <Trash2 className="h-3 w-3" />
                               </Button>
                             </div>
                           </TableCell>
