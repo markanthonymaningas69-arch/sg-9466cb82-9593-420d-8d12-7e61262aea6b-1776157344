@@ -165,6 +165,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
   const [selectedReceiptGroup, setSelectedReceiptGroup] = useState<ReceiptGroup | null>(null);
   const [selectedReadyRecord, setSelectedReadyRecord] = useState<ReadyForReceivingRecord | null>(null);
   const [receivingDialogOpen, setReceivingDialogOpen] = useState(false);
+  const [viewDetailsDialogOpen, setViewDetailsDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<ReceiptGroup | null>(null);
   const [editFormData, setEditFormData] = useState<FormState>(defaultFormState);
@@ -1040,55 +1041,48 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                 </div>
               ) : (
                 <div className="mt-2.5 overflow-auto rounded-md border bg-background">
-                  <Table className="min-w-[940px] table-fixed text-xs">
+                  <Table className="min-w-[800px] table-fixed text-xs">
                     <TableHeader className="sticky top-0 z-10 bg-background">
                       <TableRow>
-                        <TableHead className="h-8 w-[220px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Item</TableHead>
-                        <TableHead className="h-8 w-[140px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Supplier</TableHead>
-                        <TableHead className="h-8 w-[130px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Voucher No.</TableHead>
-                        <TableHead className="h-8 w-[130px] whitespace-nowrap px-2 text-center text-[11px] uppercase tracking-wide">Status</TableHead>
-                        <TableHead className="h-8 w-[110px] whitespace-nowrap px-2 text-right text-[11px] uppercase tracking-wide">Qty</TableHead>
-                        <TableHead className="h-8 w-[170px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Last Update</TableHead>
-                        <TableHead className="h-8 w-[96px] whitespace-nowrap px-2 text-right text-[11px] uppercase tracking-wide">Action</TableHead>
+                        <TableHead className="h-8 w-[200px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Receipt Number</TableHead>
+                        <TableHead className="h-8 w-[150px] whitespace-nowrap px-2 text-right text-[11px] uppercase tracking-wide">Total Cost</TableHead>
+                        <TableHead className="h-8 w-[180px] whitespace-nowrap px-2 text-[11px] uppercase tracking-wide">Source</TableHead>
+                        <TableHead className="h-8 w-[120px] whitespace-nowrap px-2 text-right text-[11px] uppercase tracking-wide">Action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {readyForReceiving.map((record) => {
                         const linkedSiteRequest = getRelationItem(record.site_requests);
-                        const isEligible = Boolean(record.voucher_number) && record.lifecycle_status === "ready_for_delivery" && !record.received_at;
+                        const linkedPurchase = getRelationItem(record.purchases);
+                        const isFromWarehouse = !linkedPurchase?.order_number;
+                        const source = isFromWarehouse ? "Main Warehouse" : "Purchasing";
 
                         return (
                           <TableRow key={record.id} className="border-b last:border-b-0">
                             <TableCell className="px-2 py-1.5 align-middle">
-                              <CompactText value={linkedSiteRequest?.item_name || "—"} className="max-w-[202px] font-medium text-foreground" />
+                              <CompactText value={record.voucher_number || "—"} className="max-w-[182px] font-medium" />
+                            </TableCell>
+                            <TableCell className="px-2 py-1.5 text-right align-middle whitespace-nowrap font-medium">
+                              {formatCurrency(record.total_amount)}
                             </TableCell>
                             <TableCell className="px-2 py-1.5 align-middle">
-                              <CompactText value={record.supplier || "—"} className="max-w-[122px]" />
-                            </TableCell>
-                            <TableCell className="px-2 py-1.5 align-middle">
-                              <CompactText value={record.voucher_number || "—"} className="max-w-[112px]" />
-                            </TableCell>
-                            <TableCell className="px-2 py-1.5 text-center align-middle">
-                              <div className="flex justify-center">
-                                <Badge variant={record.received_at ? "default" : "secondary"} className="h-5 whitespace-nowrap px-1.5 text-[10px]">
-                                  {record.received_at ? "Received" : record.lifecycle_status.replaceAll("_", " ")}
-                                </Badge>
-                              </div>
-                            </TableCell>
-                            <TableCell className="px-2 py-1.5 text-right align-middle whitespace-nowrap">
-                              {linkedSiteRequest?.quantity || 0} {linkedSiteRequest?.unit || ""}
-                            </TableCell>
-                            <TableCell className="px-2 py-1.5 align-middle text-muted-foreground">
-                              <CompactText value={record.updated_at ? new Date(record.updated_at).toLocaleString() : "—"} className="max-w-[152px]" />
+                              <Badge variant="outline" className="h-5 whitespace-nowrap px-1.5 text-[10px]">
+                                {source}
+                              </Badge>
                             </TableCell>
                             <TableCell className="px-2 py-1.5 text-right align-middle">
-                              {record.received_at ? (
-                                <span className="text-[11px] text-muted-foreground">Received</span>
-                              ) : (
-                                <Button size="sm" className="h-7 px-2 text-[11px]" disabled={!isEligible} onClick={() => openReceiveDialog(record)}>
-                                  Receive
-                                </Button>
-                              )}
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="h-7 px-2 text-[11px]" 
+                                onClick={() => {
+                                  setSelectedReadyRecord(record);
+                                  setViewDetailsDialogOpen(true);
+                                }}
+                              >
+                                <Eye className="mr-1 h-3 w-3" />
+                                View
+                              </Button>
                             </TableCell>
                           </TableRow>
                         );
@@ -1445,6 +1439,117 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                           </Button>
                           <Button type="button" onClick={() => void handleMarkReceived()} disabled={savingReceipt}>
                             {savingReceipt ? "Saving..." : "Confirm Received"}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog open={viewDetailsDialogOpen} onOpenChange={setViewDetailsDialogOpen}>
+                  <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader className="space-y-1">
+                      <DialogTitle className="text-base">
+                        Delivery Details - {selectedReadyRecord?.voucher_number || "Receipt"}
+                      </DialogTitle>
+                    </DialogHeader>
+
+                    {selectedReadyRecord ? (
+                      <div className="space-y-4">
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="space-y-1 rounded-md border bg-muted/30 p-3 text-xs">
+                            <p className="text-muted-foreground">Source</p>
+                            <p className="font-medium text-foreground">
+                              {getRelationItem(selectedReadyRecord.purchases)?.order_number ? "Purchasing" : "Main Warehouse"}
+                            </p>
+                          </div>
+                          <div className="space-y-1 rounded-md border bg-muted/30 p-3 text-xs">
+                            <p className="text-muted-foreground">Supplier</p>
+                            <p className="font-medium text-foreground">{selectedReadyRecord.supplier || "—"}</p>
+                          </div>
+                          <div className="space-y-1 rounded-md border bg-muted/30 p-3 text-xs">
+                            <p className="text-muted-foreground">Voucher Number</p>
+                            <p className="font-medium text-foreground">{selectedReadyRecord.voucher_number || "—"}</p>
+                          </div>
+                          <div className="space-y-1 rounded-md border bg-muted/30 p-3 text-xs">
+                            <p className="text-muted-foreground">Total Amount</p>
+                            <p className="font-medium text-foreground">
+                              {formatCurrency(selectedReadyRecord.total_amount)}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="rounded-md border">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Item Name</TableHead>
+                                <TableHead className="text-right">Qty</TableHead>
+                                <TableHead className="text-right">Unit Cost</TableHead>
+                                <TableHead className="text-right">Total Cost</TableHead>
+                                <TableHead className="text-right">Action</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              <TableRow>
+                                <TableCell className="font-medium">
+                                  {getRelationItem(selectedReadyRecord.site_requests)?.item_name || "—"}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {selectedReadyRecord.actual_quantity || getRelationItem(selectedReadyRecord.site_requests)?.quantity || 0}{" "}
+                                  {getRelationItem(selectedReadyRecord.site_requests)?.unit || ""}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {selectedReadyRecord.total_amount && selectedReadyRecord.actual_quantity 
+                                    ? formatCurrency(selectedReadyRecord.total_amount / selectedReadyRecord.actual_quantity)
+                                    : "—"}
+                                </TableCell>
+                                <TableCell className="text-right font-medium">
+                                  {formatCurrency(selectedReadyRecord.total_amount)}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex justify-end gap-1">
+                                    <Button 
+                                      size="sm" 
+                                      className="h-7 px-2 text-[11px]"
+                                      disabled={selectedReadyRecord.received_at !== null}
+                                      onClick={() => {
+                                        setViewDetailsDialogOpen(false);
+                                        openReceiveDialog(selectedReadyRecord);
+                                      }}
+                                    >
+                                      Receive
+                                    </Button>
+                                    <Button 
+                                      size="sm" 
+                                      variant="outline"
+                                      className="h-7 px-2 text-[11px]"
+                                      disabled={selectedReadyRecord.received_at !== null}
+                                    >
+                                      Return
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            </TableBody>
+                          </Table>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="view-notes" className="text-xs">Notes</Label>
+                          <Textarea
+                            id="view-notes"
+                            rows={3}
+                            className="text-xs"
+                            value={selectedReadyRecord.remarks || ""}
+                            readOnly
+                            placeholder="No notes available"
+                          />
+                        </div>
+
+                        <div className="flex justify-end">
+                          <Button type="button" variant="outline" onClick={() => setViewDetailsDialogOpen(false)}>
+                            Close
                           </Button>
                         </div>
                       </div>
