@@ -176,50 +176,14 @@ export default function SitePersonnelPage() {
           <CardHeader className="px-3 py-3 sm:px-4">
             <CardTitle className="text-sm font-semibold">Site Operations</CardTitle>
             <div className="overflow-x-auto overflow-y-hidden pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <Tabs defaultValue="deliveries" className="space-y-3">
-                <TabsList className="inline-flex h-9 min-w-max flex-nowrap items-center justify-start gap-1 rounded-md bg-slate-100 p-1">
-                  <TabsTrigger
-                    value="deliveries"
-                    className="h-7 shrink-0 gap-1.5 whitespace-nowrap rounded-md px-2 text-[11px] font-semibold leading-none text-amber-700 data-[state=active]:bg-amber-100 data-[state=active]:text-amber-950"
-                  >
-                    <Package className="h-3.5 w-3.5" />
-                    <span>Deliveries</span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="site-warehouse"
-                    className="h-7 shrink-0 gap-1.5 whitespace-nowrap rounded-md px-2 text-[11px] font-semibold leading-none text-sky-700 data-[state=active]:bg-sky-100 data-[state=active]:text-sky-950"
-                  >
-                    <WarehouseIcon className="h-3.5 w-3.5" />
-                    <span>Site Warehouse</span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="usage"
-                    className="h-7 shrink-0 gap-1.5 whitespace-nowrap rounded-md px-2 text-[11px] font-semibold leading-none text-rose-700 data-[state=active]:bg-rose-100 data-[state=active]:text-rose-950"
-                  >
-                    <TrendingDown className="h-3.5 w-3.5" />
-                    <span>Usage</span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="requests"
-                    className="h-7 shrink-0 gap-1.5 whitespace-nowrap rounded-md px-2 text-[11px] font-semibold leading-none text-violet-700 data-[state=active]:bg-violet-100 data-[state=active]:text-violet-950"
-                  >
-                    <FileText className="h-3.5 w-3.5" />
-                    <span>Requests</span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="progress"
-                    className="h-7 shrink-0 gap-1.5 whitespace-nowrap rounded-md px-2 text-[11px] font-semibold leading-none text-emerald-700 data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-950"
-                  >
-                    <TrendingUp className="h-3.5 w-3.5" />
-                    <span>Accomplishments</span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="attendance"
-                    className="h-7 shrink-0 gap-1.5 whitespace-nowrap rounded-md px-2 text-[11px] font-semibold leading-none text-indigo-700 data-[state=active]:bg-indigo-100 data-[state=active]:text-indigo-950"
-                  >
-                    <Users className="h-3.5 w-3.5" />
-                    <span>Attendance</span>
-                  </TabsTrigger>
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className="grid w-full grid-cols-6 h-auto">
+                  <TabsTrigger value="warehouse" className="text-xs py-2">Warehouse</TabsTrigger>
+                  <TabsTrigger value="deliveries" className="text-xs py-2">Site Purchase & Deliveries</TabsTrigger>
+                  <TabsTrigger value="inventory" className="text-xs py-2">Inventory</TabsTrigger>
+                  <TabsTrigger value="attendance" className="text-xs py-2">Attendance</TabsTrigger>
+                  <TabsTrigger value="requests" className="text-xs py-2">Site Requests</TabsTrigger>
+                  <TabsTrigger value="usage" className="text-xs py-2">Material Usage</TabsTrigger>
                 </TabsList>
 
                 <CardContent className="px-4 pb-4 pt-0">
