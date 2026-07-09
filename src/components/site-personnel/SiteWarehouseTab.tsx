@@ -14,7 +14,7 @@ import { siteService } from "@/services/siteService";
 import { requestWorkflowService } from "@/services/requestWorkflowService";
 import { notificationService } from "@/services/notificationService";
 import { CompactText } from "@/components/site-personnel/CompactText";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 
 type TransactionType = "site_purchase" | "delivery";
 const OTHER_MATERIAL_OPTION = "__others__";
@@ -81,7 +81,7 @@ interface ReceiptGroup {
 
 interface ReadyForReceivingRecord {
   id: string;
-  site_request_id: string;
+  site_request_id: string | null;
   purchase_id: string | null;
   voucher_request_id: string | null;
   voucher_id: string | null;
@@ -94,7 +94,10 @@ interface ReadyForReceivingRecord {
   received_at: string | null;
   remarks: string | null;
   initial_approval_request_id: string | null;
-  site_requests?: { item_name?: string | null; quantity?: number | null; unit?: string | null; requested_by?: string | null } | Array<{ item_name?: string | null; quantity?: number | null; unit?: string | null; requested_by?: string | null }> | null;
+  target_module?: string;
+  delivery_id?: string | null;
+  project_id?: string;
+  site_requests?: { item_name?: string | null; quantity?: number | null; unit?: string | null; requested_by?: string | null; bom_scope_id?: string | null } | Array<{ item_name?: string | null; quantity?: number | null; unit?: string | null; requested_by?: string | null; bom_scope_id?: string | null }> | null;
   purchases?: { order_number?: string | null; item_name?: string | null } | Array<{ order_number?: string | null; item_name?: string | null }> | null;
   voucher_requests?: { description?: string | null; total_amount?: number | null } | Array<{ description?: string | null; total_amount?: number | null }> | null;
 }
