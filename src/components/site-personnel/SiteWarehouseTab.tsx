@@ -712,9 +712,19 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
     setSavingReceipt(true);
     try {
       const isWarehouseDeployment = selectedReadyRecord.target_module === "warehouse_deployment";
+      let itemName = "";
+      let quantity = 0;
+      let unit = "";
+      let unitCost = 0;
       
       if (isWarehouseDeployment) {
         // Handle warehouse deployment - update the delivery status
+        const warehouseDelivery = (selectedReadyRecord as any)._warehouse_delivery;
+        itemName = warehouseDelivery.item_name || "";
+        quantity = Number(receivingForm.actualQuantity) || warehouseDelivery.quantity || 0;
+        unit = warehouseDelivery.unit || "";
+        unitCost = warehouseDelivery.unit_cost || 0;
+        
         const { error: deliveryError } = await supabase
           .from("deliveries")
           .update({
@@ -727,23 +737,28 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
       } else {
         // Handle purchasing flow
         let deliveryId = selectedReadyRecord.delivery_id;
+        const linkedReq = getRelationItem(selectedReadyRecord.site_requests);
+        
+        if (!linkedReq) {
+          throw new Error("Site request not found");
+        }
+
+        itemName = linkedReq.item_name || "";
+        quantity = Number(receivingForm.actualQuantity) || linkedReq.quantity || 0;
+        unit = linkedReq.unit || "";
+        unitCost = selectedReadyRecord.total_amount && quantity > 0
+          ? selectedReadyRecord.total_amount / quantity
+          : 0;
 
         if (!deliveryId) {
-          const linkedReq = getRelationItem(selectedReadyRecord.site_requests);
-          if (!linkedReq) {
-            throw new Error("Site request not found");
-          }
-
           const deliveryPayload = {
             project_id: selectedReadyRecord.project_id,
             transaction_type: "purchase" as const,
             bom_scope_id: linkedReq.bom_scope_id || null,
-            item_name: linkedReq.item_name,
-            quantity: Number(receivingForm.actualQuantity) || linkedReq.quantity,
-            unit: linkedReq.unit,
-            unit_cost: selectedReadyRecord.total_amount && receivingForm.actualQuantity
-              ? selectedReadyRecord.total_amount / Number(receivingForm.actualQuantity)
-              : 0,
+            item_name: itemName,
+            quantity: quantity,
+            unit: unit,
+            unit_cost: unitCost,
             amount: selectedReadyRecord.total_amount,
             supplier: selectedReadyRecord.supplier || "",
             delivery_date: new Date().toISOString().split("T")[0],
@@ -766,22 +781,41 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
           actualQuantity: receivingForm.actualQuantity ? Number(receivingForm.actualQuantity) : null,
           remarks: receivingForm.remarks || null,
         });
+      }
 
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          await notificationService.createNotification({
-            recipient_user_id: user.id,
-            title: "Item Received",
-            message: `${getRelationItem(selectedReadyRecord.site_requests)?.item_name || "Item"} has been marked as received`,
-            type: "info",
-            related_module: "site_personnel",
-          });
-        }
+      // Add received item to Site Warehouse inventory
+      // Determine category: Materials or Tools & Equipments based on item name keywords
+      const toolKeywords = ["tool", "equipment", "machinery", "hammer", "drill", "saw", "wrench", "ladder", "scaffolding"];
+      const isToolOrEquipment = toolKeywords.some(keyword => itemName.toLowerCase().includes(keyword));
+      const category = isToolOrEquipment ? "Tools & Equipments" : "Materials";
+
+      const inventoryPayload = {
+        project_id: projectId,
+        item_name: itemName,
+        category: category,
+        quantity: quantity,
+        unit: unit,
+        unit_cost: unitCost,
+        total_value: quantity * unitCost,
+        supplier: selectedReadyRecord.supplier || "Main Warehouse",
+        date_received: new Date().toISOString().split("T")[0],
+        received_by: receivingForm.receivedBy,
+        notes: receivingForm.remarks || null,
+        status: "available"
+      };
+
+      const { error: inventoryError } = await supabase
+        .from("site_warehouse_inventory")
+        .insert(inventoryPayload);
+
+      if (inventoryError) {
+        console.error("Error adding to warehouse inventory:", inventoryError);
+        throw inventoryError;
       }
 
       toast({
         title: "Success",
-        description: "Item marked as received",
+        description: `Item received and added to Site Warehouse (${category})`,
       });
 
       setReceivingDialogOpen(false);
