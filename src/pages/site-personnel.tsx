@@ -31,6 +31,7 @@ export default function SitePersonnelPage() {
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [recycleBinVersion, setRecycleBinVersion] = useState(0);
+  const [activeTab, setActiveTab] = useState("deliveries");
 
   useEffect(() => {
     void checkAuth();
