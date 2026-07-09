@@ -14,6 +14,7 @@ import { siteService } from "@/services/siteService";
 import { requestWorkflowService } from "@/services/requestWorkflowService";
 import { notificationService } from "@/services/notificationService";
 import { CompactText } from "@/components/site-personnel/CompactText";
+import { supabase } from "@/lib/supabase";
 
 type TransactionType = "site_purchase" | "delivery";
 const OTHER_MATERIAL_OPTION = "__others__";
@@ -315,48 +316,72 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
   }, [projectId]);
 
   async function loadData() {
-    try {
-      setLoading(true);
+    if (!projectId) return;
 
-      const [deliveriesResult, scopesResult, materialsResult] = await Promise.all([
+    setLoading(true);
+    try {
+      const [deliveriesRes, scopesRes, readyRes, warehouseDeploymentsRes] = await Promise.all([
         siteService.getDeliveries(projectId),
         siteService.getScopeOfWorks(projectId),
-        siteService.getBomMaterials(projectId),
+        requestWorkflowService.getReadyForReceiving(projectId),
+        supabase
+          .from("deliveries")
+          .select("*")
+          .eq("project_id", projectId)
+          .eq("supplier", "Main Warehouse")
+          .eq("status", "pending")
+          .order("delivery_date", { ascending: false })
       ]);
 
-      if (deliveriesResult.error) {
-        throw deliveriesResult.error;
-      }
+      const deliveriesData = deliveriesRes.data || [];
+      const scopesData = scopesRes.data || [];
+      const readyData = readyRes || [];
+      const warehouseDeployments = warehouseDeploymentsRes.data || [];
 
-      if (scopesResult.error) {
-        throw scopesResult.error;
-      }
+      // Transform warehouse deployments into the same format as request_execution_tracking
+      const transformedDeployments = warehouseDeployments.map(deployment => ({
+        id: deployment.id,
+        site_request_id: null,
+        initial_approval_request_id: null,
+        project_id: deployment.project_id,
+        target_module: "warehouse_deployment",
+        lifecycle_status: "ready_for_delivery" as const,
+        purchase_id: null,
+        voucher_request_id: null,
+        voucher_id: null,
+        voucher_number: deployment.receipt_number || `WH-${deployment.id.slice(0, 8)}`,
+        delivery_id: deployment.id,
+        supplier: "Main Warehouse",
+        total_amount: (deployment.quantity || 0) * (deployment.unit_cost || 0),
+        received_by: null,
+        received_at: null,
+        actual_quantity: null,
+        remarks: deployment.notes || null,
+        created_at: deployment.created_at,
+        updated_at: deployment.updated_at || deployment.created_at,
+        site_requests: null,
+        voucher_requests: null,
+        purchases: null,
+        // Store the actual delivery data for easy access
+        _warehouse_delivery: deployment
+      }));
 
-      if (materialsResult.error) {
-        throw materialsResult.error;
-      }
+      // Combine both sources for Ready for Receiving
+      const combinedReadyForReceiving = [...readyData, ...transformedDeployments];
 
-      setRecords((deliveriesResult.data || []) as DeliveryRecord[]);
-      setReadyForReceiving((await requestWorkflowService.getReadyForReceiving(projectId)) as ReadyForReceivingRecord[]);
+      setRecords((deliveriesData as DeliveryRecord[]);
       setScopes(
-        (scopesResult.data || []).map((scope) => ({
+        (scopesData as ScopeOption[]).map((scope) => ({
           id: scope.id,
           name: scope.name || "Untitled scope",
         }))
       );
-      setMaterials(
-        (materialsResult.data || []).map((material) => ({
-          id: material.id,
-          name: material.name,
-          unit: material.unit || "",
-          scope_id: material.scope_id || null,
-        }))
-      );
+      setReadyForReceiving(combinedReadyForReceiving as ReadyForReceivingRecord[]);
     } catch (error) {
-      console.error("Error loading purchase and delivery records:", error);
+      console.error("Error loading data:", error);
       toast({
         title: "Error",
-        description: "Failed to load purchase and delivery data",
+        description: "Failed to load deliveries data",
         variant: "destructive",
       });
     } finally {
@@ -672,96 +697,99 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
   }
 
   async function handleMarkReceived() {
-    if (!selectedReadyRecord) {
-      return;
-    }
-
-    if (!selectedReadyRecord.voucher_number || selectedReadyRecord.lifecycle_status !== "ready_for_delivery" || selectedReadyRecord.received_at) {
+    if (!selectedReadyRecord || !receivingForm.receivedBy) {
       toast({
-        title: "Receiving locked",
-        description: "Only voucher-approved records that are ready for delivery can be marked as received.",
+        title: "Validation Error",
+        description: "Received by field is required",
         variant: "destructive",
       });
       return;
     }
 
+    setSavingReceipt(true);
     try {
-      setSavingReceipt(true);
-      const linkedSiteRequest = getRelationItem(selectedReadyRecord.site_requests);
-      const itemLabel = linkedSiteRequest?.item_name || "Request item";
+      const isWarehouseDeployment = selectedReadyRecord.target_module === "warehouse_deployment";
+      
+      if (isWarehouseDeployment) {
+        // Handle warehouse deployment - update the delivery status
+        const { error: deliveryError } = await supabase
+          .from("deliveries")
+          .update({
+            status: "received",
+            notes: receivingForm.remarks || null
+          })
+          .eq("id", selectedReadyRecord.delivery_id);
 
-      // Mark as received in the workflow
-      await requestWorkflowService.markReceived({
-        siteRequestId: selectedReadyRecord.site_request_id,
-        deliveryId: selectedReadyRecord.purchase_id,
-        receivedBy: receivingForm.receivedBy || "Site Personnel",
-        actualQuantity: receivingForm.actualQuantity ? Number(receivingForm.actualQuantity) : null,
-        remarks: receivingForm.remarks || null,
-      });
+        if (deliveryError) throw deliveryError;
+      } else {
+        // Handle purchasing flow
+        let deliveryId = selectedReadyRecord.delivery_id;
 
-      // Create delivery record for inventory receiving workflow
-      const deliveryPayload = {
-        project_id: projectId,
-        transaction_type: "delivery" as const,
-        bom_scope_id: null,
-        item_name: linkedSiteRequest?.item_name || itemLabel,
-        quantity: receivingForm.actualQuantity ? Number(receivingForm.actualQuantity) : (linkedSiteRequest?.quantity || 0),
-        unit: linkedSiteRequest?.unit || "",
-        supplier: selectedReadyRecord.supplier || "Main Warehouse",
-        delivery_date: new Date().toISOString().split("T")[0],
-        received_by: receivingForm.receivedBy || "Site Personnel",
-        notes: receivingForm.remarks || `Received from voucher ${selectedReadyRecord.voucher_number}`,
-        status: "pending",
-        unit_cost: null,
-        amount: null,
-        receipt_number: selectedReadyRecord.voucher_number,
-      };
+        if (!deliveryId) {
+          const linkedReq = getRelationItem(selectedReadyRecord.site_requests);
+          if (!linkedReq) {
+            throw new Error("Site request not found");
+          }
 
-      await siteService.createDelivery(deliveryPayload);
+          const deliveryPayload = {
+            project_id: selectedReadyRecord.project_id,
+            transaction_type: "purchase" as const,
+            bom_scope_id: linkedReq.bom_scope_id || null,
+            item_name: linkedReq.item_name,
+            quantity: Number(receivingForm.actualQuantity) || linkedReq.quantity,
+            unit: linkedReq.unit,
+            unit_cost: selectedReadyRecord.total_amount && receivingForm.actualQuantity
+              ? selectedReadyRecord.total_amount / Number(receivingForm.actualQuantity)
+              : 0,
+            amount: selectedReadyRecord.total_amount,
+            supplier: selectedReadyRecord.supplier || "",
+            delivery_date: new Date().toISOString().split("T")[0],
+            receipt_number: selectedReadyRecord.voucher_number || null,
+            notes: receivingForm.remarks || null,
+            status: "received",
+          };
 
-      if (selectedReadyRecord.initial_approval_request_id) {
-        await notificationService.createNotification({
-          approvalRequestId: selectedReadyRecord.initial_approval_request_id,
-          audienceModule: "Purchasing",
-          targetSurface: "Purchasing",
-          eventType: "request_received",
-          title: "Delivery received on site",
-          message: `${itemLabel} has been marked as received`,
-          payload: {
-            siteRequestId: selectedReadyRecord.site_request_id,
-            purchaseId: selectedReadyRecord.purchase_id,
-            voucherNumber: selectedReadyRecord.voucher_number,
-          },
+          const deliveryRes = await siteService.createDelivery(deliveryPayload);
+          if (!deliveryRes || !deliveryRes.id) {
+            throw new Error("Failed to create delivery record");
+          }
+          deliveryId = deliveryRes.id;
+        }
+
+        await requestWorkflowService.markReceived({
+          siteRequestId: selectedReadyRecord.site_request_id!,
+          deliveryId,
+          receivedBy: receivingForm.receivedBy,
+          actualQuantity: receivingForm.actualQuantity ? Number(receivingForm.actualQuantity) : null,
+          remarks: receivingForm.remarks || null,
         });
 
-        await notificationService.createNotification({
-          approvalRequestId: selectedReadyRecord.initial_approval_request_id,
-          audienceModule: "Accounting",
-          targetSurface: "Accounting",
-          eventType: "request_received",
-          title: "Delivery received on site",
-          message: `${itemLabel} has been marked as received`,
-          payload: {
-            siteRequestId: selectedReadyRecord.site_request_id,
-            purchaseId: selectedReadyRecord.purchase_id,
-            voucherNumber: selectedReadyRecord.voucher_number,
-          },
-        });
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await notificationService.createNotification({
+            user_id: user.id,
+            title: "Item Received",
+            message: `${getRelationItem(selectedReadyRecord.site_requests)?.item_name || "Item"} has been marked as received`,
+            type: "info",
+            related_module: "site_personnel",
+          });
+        }
       }
 
       toast({
-        title: "Received",
-        description: "The delivery was confirmed and is now ready for warehouse receiving.",
+        title: "Success",
+        description: "Item marked as received",
       });
 
       setReceivingDialogOpen(false);
       setSelectedReadyRecord(null);
+      setReceivingForm({ receivedBy: "", actualQuantity: "", remarks: "" });
       await loadData();
     } catch (error) {
-      console.error("Error marking request as received:", error);
+      console.error("Error marking received:", error);
       toast({
         title: "Error",
-        description: "Failed to confirm receiving.",
+        description: "Failed to mark item as received",
         variant: "destructive",
       });
     } finally {
@@ -1052,10 +1080,18 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                     </TableHeader>
                     <TableBody>
                       {readyForReceiving.map((record) => {
+                        // Check if this is a warehouse deployment
+                        const isWarehouseDeployment = record.target_module === "warehouse_deployment";
+                        const warehouseDelivery = (record as any)._warehouse_delivery;
+                        
                         const linkedSiteRequest = getRelationItem(record.site_requests);
                         const linkedPurchase = getRelationItem(record.purchases);
-                        const isFromWarehouse = !linkedPurchase?.order_number;
-                        const source = isFromWarehouse ? "Main Warehouse" : "Purchasing";
+                        const source = isWarehouseDeployment ? "Main Warehouse" : "Purchasing";
+                        
+                        // For warehouse deployments, calculate total from the delivery record
+                        const totalCost = isWarehouseDeployment && warehouseDelivery
+                          ? (warehouseDelivery.quantity || 0) * (warehouseDelivery.unit_cost || 0)
+                          : record.total_amount;
 
                         return (
                           <TableRow key={record.id} className="border-b last:border-b-0">
@@ -1063,7 +1099,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                               <CompactText value={record.voucher_number || "—"} className="max-w-[182px] font-medium" />
                             </TableCell>
                             <TableCell className="px-2 py-1.5 text-right align-middle whitespace-nowrap font-medium">
-                              {formatCurrency(record.total_amount)}
+                              {formatCurrency(totalCost)}
                             </TableCell>
                             <TableCell className="px-2 py-1.5 align-middle">
                               <Badge variant="outline" className="h-5 whitespace-nowrap px-1.5 text-[10px]">
@@ -1460,7 +1496,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                           <div className="space-y-1 rounded-md border bg-muted/30 p-3 text-xs">
                             <p className="text-muted-foreground">Source</p>
                             <p className="font-medium text-foreground">
-                              {getRelationItem(selectedReadyRecord.purchases)?.order_number ? "Purchasing" : "Main Warehouse"}
+                              {selectedReadyRecord.target_module === "warehouse_deployment" ? "Main Warehouse" : "Purchasing"}
                             </p>
                           </div>
                           <div className="space-y-1 rounded-md border bg-muted/30 p-3 text-xs">
@@ -1468,13 +1504,17 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                             <p className="font-medium text-foreground">{selectedReadyRecord.supplier || "—"}</p>
                           </div>
                           <div className="space-y-1 rounded-md border bg-muted/30 p-3 text-xs">
-                            <p className="text-muted-foreground">Voucher Number</p>
+                            <p className="text-muted-foreground">Receipt/Voucher Number</p>
                             <p className="font-medium text-foreground">{selectedReadyRecord.voucher_number || "—"}</p>
                           </div>
                           <div className="space-y-1 rounded-md border bg-muted/30 p-3 text-xs">
                             <p className="text-muted-foreground">Total Amount</p>
                             <p className="font-medium text-foreground">
-                              {formatCurrency(selectedReadyRecord.total_amount)}
+                              {formatCurrency(
+                                selectedReadyRecord.target_module === "warehouse_deployment" && (selectedReadyRecord as any)._warehouse_delivery
+                                  ? ((selectedReadyRecord as any)._warehouse_delivery.quantity || 0) * ((selectedReadyRecord as any)._warehouse_delivery.unit_cost || 0)
+                                  : selectedReadyRecord.total_amount
+                              )}
                             </p>
                           </div>
                         </div>
@@ -1493,19 +1533,28 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                             <TableBody>
                               <TableRow>
                                 <TableCell className="font-medium">
-                                  {getRelationItem(selectedReadyRecord.site_requests)?.item_name || "—"}
+                                  {selectedReadyRecord.target_module === "warehouse_deployment" && (selectedReadyRecord as any)._warehouse_delivery
+                                    ? (selectedReadyRecord as any)._warehouse_delivery.item_name
+                                    : (getRelationItem(selectedReadyRecord.site_requests)?.item_name || "—")}
                                 </TableCell>
                                 <TableCell className="text-right">
-                                  {selectedReadyRecord.actual_quantity || getRelationItem(selectedReadyRecord.site_requests)?.quantity || 0}{" "}
-                                  {getRelationItem(selectedReadyRecord.site_requests)?.unit || ""}
+                                  {selectedReadyRecord.target_module === "warehouse_deployment" && (selectedReadyRecord as any)._warehouse_delivery
+                                    ? `${(selectedReadyRecord as any)._warehouse_delivery.quantity || 0} ${(selectedReadyRecord as any)._warehouse_delivery.unit || ""}`
+                                    : `${selectedReadyRecord.actual_quantity || getRelationItem(selectedReadyRecord.site_requests)?.quantity || 0} ${getRelationItem(selectedReadyRecord.site_requests)?.unit || ""}`}
                                 </TableCell>
                                 <TableCell className="text-right">
-                                  {selectedReadyRecord.total_amount && selectedReadyRecord.actual_quantity 
-                                    ? formatCurrency(selectedReadyRecord.total_amount / selectedReadyRecord.actual_quantity)
-                                    : "—"}
+                                  {selectedReadyRecord.target_module === "warehouse_deployment" && (selectedReadyRecord as any)._warehouse_delivery
+                                    ? formatCurrency((selectedReadyRecord as any)._warehouse_delivery.unit_cost || 0)
+                                    : (selectedReadyRecord.total_amount && selectedReadyRecord.actual_quantity 
+                                      ? formatCurrency(selectedReadyRecord.total_amount / selectedReadyRecord.actual_quantity)
+                                      : "—")}
                                 </TableCell>
                                 <TableCell className="text-right font-medium">
-                                  {formatCurrency(selectedReadyRecord.total_amount)}
+                                  {formatCurrency(
+                                    selectedReadyRecord.target_module === "warehouse_deployment" && (selectedReadyRecord as any)._warehouse_delivery
+                                      ? ((selectedReadyRecord as any)._warehouse_delivery.quantity || 0) * ((selectedReadyRecord as any)._warehouse_delivery.unit_cost || 0)
+                                      : selectedReadyRecord.total_amount
+                                  )}
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <div className="flex justify-end gap-1">
