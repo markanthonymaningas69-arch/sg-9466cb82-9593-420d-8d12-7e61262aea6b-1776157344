@@ -826,8 +826,8 @@ export default function SchedulePage() {
 
   return (
     <Layout>
-      <div className="-m-6 h-[calc(100vh-4rem)] overflow-hidden p-3 lg:p-4">
-        <div className="flex h-full flex-col gap-3">
+      <div className="-m-3 sm:-m-6 h-[calc(100vh-4rem)] overflow-hidden p-2 sm:p-3 lg:p-4">
+        <div className="flex h-full flex-col gap-2 sm:gap-3">
           <div className="flex flex-col gap-2">
             <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
               <div className="min-w-0">
@@ -938,8 +938,8 @@ export default function SchedulePage() {
                   </div>
                 </div>
               ) : viewMode === "list" ? (
-                <div className="h-full overflow-auto">
-                  <table className="w-full text-sm">
+                <div className="h-full overflow-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+                  <table className="w-full text-sm min-w-[700px]">
                     <thead className="sticky top-0 z-10 bg-background">
                       <tr className="border-b text-left text-muted-foreground">
                         <th className="px-3 py-2 font-medium">Task</th>

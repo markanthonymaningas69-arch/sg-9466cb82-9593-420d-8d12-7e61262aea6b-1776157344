@@ -422,8 +422,8 @@ export default function Projects() {
             <CardTitle>All Projects</CardTitle>
           </CardHeader>
           <CardContent className="p-0 sm:p-6">
-            <div className="overflow-x-auto">
-              <Table className="text-[11px] sm:text-xs">
+            <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+              <Table className="text-[11px] sm:text-xs min-w-[800px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="min-w-[150px] px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Project Name</TableHead>

@@ -506,8 +506,8 @@ export default function Dashboard() {
             <CardTitle>Project Portfolio Status</CardTitle>
           </CardHeader>
           <CardContent className="p-0 sm:p-4">
-            <div className="overflow-x-auto">
-              <Table className="text-[10px] sm:text-xs">
+            <div className="overflow-x-auto -mx-3 sm:mx-0">
+              <Table className="text-[10px] sm:text-xs min-w-[1200px]">
                 <TableHeader className="bg-muted/50">
                   <TableRow>
                     <TableHead className="min-w-[120px] px-2 text-[10px] sm:text-[11px]">Project</TableHead>
