@@ -212,13 +212,14 @@ export default function Warehouse() {
 
   const handleDeploySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!deployingItem || !deployForm.project_id) return;
+    if (!deployingItem || !deployForm.projectId) return;
     
-    await warehouseService.deployItem(deployingItem.id, deployForm.project_id, deployForm.quantity);
+    const quantityToDeploy = Number(deployForm.quantity);
+    await warehouseService.deployItem(deployingItem.id, deployForm.projectId, quantityToDeploy);
     
     setDeployDialogOpen(false);
     setDeployingItem(null);
-    setDeployForm({ project_id: "", quantity: 1 });
+    setDeployForm({ projectId: "", quantity: "", notes: "" });
     loadData();
   };
 
