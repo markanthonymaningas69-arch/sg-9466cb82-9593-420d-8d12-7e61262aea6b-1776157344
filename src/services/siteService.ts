@@ -232,9 +232,35 @@ export const siteService = {
       throw new Error("Company ID not found");
     }
 
-    const deliveryWithCompany = {
-      ...delivery,
+    // Validate required fields
+    if (!delivery.project_id) {
+      throw new Error("Project ID is required");
+    }
+
+    if (!delivery.item_name) {
+      throw new Error("Item name is required");
+    }
+
+    if (!delivery.delivery_date) {
+      throw new Error("Delivery date is required");
+    }
+
+    // Build the complete delivery object with all required fields
+    const deliveryWithCompany: Database["public"]["Tables"]["deliveries"]["Insert"] = {
       company_id: profile.company_id,
+      project_id: delivery.project_id,
+      item_name: delivery.item_name,
+      delivery_date: delivery.delivery_date,
+      transaction_type: delivery.transaction_type || "purchase",
+      quantity: delivery.quantity || 0,
+      unit: delivery.unit || "",
+      unit_cost: delivery.unit_cost || 0,
+      amount: delivery.amount || 0,
+      supplier: delivery.supplier || "",
+      bom_scope_id: delivery.bom_scope_id || null,
+      receipt_number: delivery.receipt_number || null,
+      notes: delivery.notes || null,
+      status: delivery.status || "pending",
     };
 
     const { data, error } = await supabase
