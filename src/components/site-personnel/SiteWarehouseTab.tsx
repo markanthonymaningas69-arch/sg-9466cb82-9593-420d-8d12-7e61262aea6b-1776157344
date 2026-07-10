@@ -513,6 +513,15 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
     console.log("Project ID:", projectId);
 
     // Validation
+    if (!projectId) {
+      toast({
+        title: "Validation Error",
+        description: "Project ID is missing",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!formData.item_name && !formData.custom_item_name) {
       toast({
         title: "Validation Error",
@@ -525,7 +534,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
     if (!formData.quantity || Number(formData.quantity) <= 0) {
       toast({
         title: "Validation Error",
-        description: "Please enter a valid quantity",
+        description: "Please enter a valid quantity greater than 0",
         variant: "destructive",
       });
       return;
@@ -549,15 +558,26 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
       return;
     }
 
+    if (!formData.delivery_date) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a delivery date",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
-      const itemName = formData.bom_scope_id 
-        ? (formData.item_name || formData.custom_item_name)
-        : (formData.custom_item_name || formData.item_name);
+      const itemName = formData.custom_item_name || formData.item_name;
+
+      if (!itemName) {
+        throw new Error("Item name is required");
+      }
 
       const deliveryPayload = {
         project_id: projectId,
         transaction_type: "purchase" as const,
-        bom_scope_id: formData.bom_scope_id === "others" ? null : (formData.bom_scope_id || null),
+        bom_scope_id: formData.bom_scope_id === "others" || !formData.bom_scope_id ? null : formData.bom_scope_id,
         item_name: itemName,
         quantity: Number(formData.quantity),
         unit: formData.unit,
@@ -577,7 +597,12 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
       console.log("Response:", response);
 
       if (response.error) {
+        console.error("Response error:", response.error);
         throw response.error;
+      }
+
+      if (!response.data) {
+        throw new Error("No data returned from createDelivery");
       }
 
       toast({
@@ -588,11 +613,16 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
       setDialogOpen(false);
       setFormData(defaultFormState);
       await loadData();
-    } catch (error) {
-      console.error("Error recording site purchase:", error);
+    } catch (error: any) {
+      console.error("=== ERROR DETAILS ===");
+      console.error("Error object:", error);
+      console.error("Error message:", error?.message);
+      console.error("Error code:", error?.code);
+      console.error("Error details:", error?.details);
+      
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to record the purchase",
+        description: error?.message || "Failed to record the purchase. Please check the console for details.",
         variant: "destructive",
       });
     }
