@@ -530,10 +530,13 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
       return;
     }
 
-    if (!formData.item_name && !formData.custom_item_name) {
+    // Determine the final item name - prioritize custom_item_name if it's filled, otherwise use item_name
+    const finalItemName = formData.custom_item_name.trim() || formData.item_name.trim();
+
+    if (!finalItemName) {
       toast({
         title: "Validation Error",
-        description: "Please enter an item name",
+        description: "Please enter or select an item name",
         variant: "destructive",
       });
       return;
@@ -576,17 +579,11 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
     }
 
     try {
-      const itemName = formData.custom_item_name || formData.item_name;
-
-      if (!itemName) {
-        throw new Error("Item name is required");
-      }
-
       const deliveryPayload = {
         project_id: projectId,
         transaction_type: "purchase" as const,
         bom_scope_id: formData.bom_scope_id === "others" || !formData.bom_scope_id ? null : formData.bom_scope_id,
-        item_name: itemName,
+        item_name: finalItemName,
         quantity: Number(formData.quantity),
         unit: formData.unit,
         unit_cost: Number(formData.unit_cost || 0),
