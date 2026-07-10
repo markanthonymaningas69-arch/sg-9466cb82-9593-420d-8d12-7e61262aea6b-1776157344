@@ -508,6 +508,47 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    console.log("=== SITE PURCHASE SAVE DEBUG ===");
+    console.log("Form data:", formData);
+    console.log("Project ID:", projectId);
+
+    // Validation
+    if (!formData.item_name && !formData.custom_item_name) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter an item name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.quantity || Number(formData.quantity) <= 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a valid quantity",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.unit) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a unit",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.supplier) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a supplier",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const itemName = formData.bom_scope_id 
         ? (formData.item_name || formData.custom_item_name)
@@ -529,7 +570,15 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
         status: "pending",
       };
 
-      await siteService.createDelivery(deliveryPayload);
+      console.log("Delivery payload:", deliveryPayload);
+
+      const response = await siteService.createDelivery(deliveryPayload);
+
+      console.log("Response:", response);
+
+      if (response.error) {
+        throw response.error;
+      }
 
       toast({
         title: "Success",
@@ -543,7 +592,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
       console.error("Error recording site purchase:", error);
       toast({
         title: "Error",
-        description: "Failed to record the purchase",
+        description: error instanceof Error ? error.message : "Failed to record the purchase",
         variant: "destructive",
       });
     }
