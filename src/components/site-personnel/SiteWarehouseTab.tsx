@@ -323,7 +323,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
 
     setLoading(true);
     try {
-      const [deliveriesRes, scopesRes, readyRes, warehouseDeploymentsRes] = await Promise.all([
+      const [deliveriesRes, scopesRes, readyRes, warehouseDeploymentsRes, materialsRes] = await Promise.all([
         siteService.getDeliveries(projectId),
         siteService.getScopeOfWorks(projectId),
         requestWorkflowService.getReadyForReceiving(projectId),
@@ -333,13 +333,15 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
           .eq("project_id", projectId)
           .eq("supplier", "Main Warehouse")
           .eq("status", "pending")
-          .order("delivery_date", { ascending: false })
+          .order("delivery_date", { ascending: false }),
+        siteService.getBomMaterials(projectId)
       ]);
 
       const deliveriesData = deliveriesRes.data || [];
       const scopesData = scopesRes.data || [];
       const readyData = readyRes || [];
       const warehouseDeployments = warehouseDeploymentsRes.data || [];
+      const materialsData = materialsRes.data || [];
 
       // Transform warehouse deployments into the same format as request_execution_tracking
       const transformedDeployments = warehouseDeployments.map(deployment => ({
@@ -379,6 +381,12 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
           name: scope.name || "Untitled scope",
         }))
       );
+      setMaterials(materialsData.map((m: any) => ({
+        id: m.id,
+        name: m.name,
+        unit: m.unit,
+        scope_id: m.scope_id
+      })));
       setReadyForReceiving(combinedReadyForReceiving as ReadyForReceivingRecord[]);
     } catch (error) {
       console.error("Error loading data:", error);
