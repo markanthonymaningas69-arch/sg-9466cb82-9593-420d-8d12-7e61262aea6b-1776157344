@@ -951,27 +951,43 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                         {scope.name}
                       </SelectItem>
                     ))}
+                    <SelectItem value="others">Others (OCM)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-1">
                 <Label htmlFor="material" className="text-[11px]">
-                  Select Material
+                  {formData.bom_scope_id === "others" ? "Material Name" : "Select Material"}
                 </Label>
-                <Select value={selectedMaterialValue} onValueChange={handleMaterialChange} disabled={!formData.bom_scope_id}>
-                  <SelectTrigger id="material" className="h-8 text-xs">
-                    <SelectValue placeholder={formData.bom_scope_id ? "Select material" : "Select scope first"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {filteredMaterials.map((material) => (
-                      <SelectItem key={material.id} value={material.name}>
-                        {material.name}
-                      </SelectItem>
-                    ))}
-                    <SelectItem value={OTHER_MATERIAL_OPTION}>Others</SelectItem>
-                  </SelectContent>
-                </Select>
+                {formData.bom_scope_id === "others" ? (
+                  <Input
+                    id="material"
+                    className="h-8 text-xs"
+                    value={formData.custom_item_name}
+                    onChange={(e) => setFormData({ 
+                      ...formData, 
+                      custom_item_name: e.target.value,
+                      item_name: e.target.value, // Keep both in sync
+                    })}
+                    placeholder="Enter material name"
+                    required
+                  />
+                ) : (
+                  <Select value={selectedMaterialValue} onValueChange={handleMaterialChange} disabled={!formData.bom_scope_id}>
+                    <SelectTrigger id="material" className="h-8 text-xs">
+                      <SelectValue placeholder={formData.bom_scope_id ? "Select material" : "Select scope first"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredMaterials.map((material) => (
+                        <SelectItem key={material.id} value={material.name}>
+                          {material.name}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value={OTHER_MATERIAL_OPTION}>Others</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
 
               {selectedMaterialValue === OTHER_MATERIAL_OPTION ? (
@@ -1016,7 +1032,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                   <Label htmlFor="unit" className="text-[11px]">
                     Unit
                   </Label>
-                  {isOtherMaterial ? (
+                  {formData.bom_scope_id === "others" || isOtherMaterial ? (
                     <Input
                       id="unit"
                       className="h-8 text-xs"
