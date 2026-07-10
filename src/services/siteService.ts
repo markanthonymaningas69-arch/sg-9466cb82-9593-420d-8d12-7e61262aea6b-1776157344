@@ -560,10 +560,18 @@ export const siteService = {
   },
 
   async getBomMaterials(projectId: string) {
-    const { data, error } = await supabase
-      .from("bom")
-      .select("id, name, unit, scope_id")
+    const { data: bom } = await supabase
+      .from("bill_of_materials")
+      .select("id")
       .eq("project_id", projectId)
+      .maybeSingle();
+      
+    if (!bom) return { data: [], error: null };
+
+    const { data, error } = await supabase
+      .from("bom_items")
+      .select("id, name, unit, scope_id")
+      .eq("bom_id", bom.id)
       .order("name");
 
     return { data, error };
