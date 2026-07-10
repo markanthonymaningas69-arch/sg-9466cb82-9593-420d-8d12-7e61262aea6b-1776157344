@@ -200,20 +200,15 @@ export const siteService = {
   },
 
   // Deliveries Management
-  async getDeliveries(projectId: string, dateFilter?: string) {
-    let query = supabase
+  async getDeliveries(projectId: string) {
+    const { data, error } = await supabase
       .from("deliveries")
       .select("*, projects(name), bom_scope_of_work(name)")
       .eq("project_id", projectId)
       .eq("is_archived", false)
       .order("delivery_date", { ascending: false });
-      
-    if (dateFilter) {
-      query = query.eq("delivery_date", dateFilter);
-    }
     
-    const { data, error } = await query;
-    return { data: data || [], error };
+    return { data, error };
   },
 
   async createDelivery(delivery: Partial<Database["public"]["Tables"]["deliveries"]["Insert"]>) {
@@ -565,37 +560,13 @@ export const siteService = {
   },
 
   async getBomMaterials(projectId: string) {
-    const { data: bom } = await supabase
-      .from("bill_of_materials")
-      .select("id")
-      .eq("project_id", projectId)
-      .maybeSingle();
-      
-    if (!bom) return { data: [], error: null };
-
-    const { data: scopes } = await supabase
-      .from("bom_scope_of_work")
-      .select("id")
-      .eq("bom_id", bom.id);
-      
-    if (!scopes || scopes.length === 0) return { data: [], error: null };
-    
-    const scopeIds = scopes.map(s => s.id);
-
     const { data, error } = await supabase
-      .from("bom_materials")
-      .select("id, material_name, unit, scope_id")
-      .in("scope_id", scopeIds)
-      .order("material_name", { ascending: true });
-    
-    const formattedData = data?.map(m => ({
-      id: m.id,
-      name: m.material_name || "Unknown Material",
-      unit: m.unit || "",
-      scope_id: m.scope_id
-    })) || [];
-    
-    return { data: formattedData as any, error };
+      .from("bom")
+      .select("id, name, unit, scope_id")
+      .eq("project_id", projectId)
+      .order("name");
+
+    return { data, error };
   },
 
   // Scope of Works Management
