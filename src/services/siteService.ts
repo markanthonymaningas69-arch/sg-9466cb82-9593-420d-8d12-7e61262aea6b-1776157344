@@ -216,14 +216,39 @@ export const siteService = {
     return { data: data || [], error };
   },
 
-  async createDelivery(delivery: DeliveryInsert) {
+  async createDelivery(delivery: Partial<Database["public"]["Tables"]["deliveries"]["Insert"]>) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error("User not authenticated");
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("company_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.company_id) {
+      throw new Error("Company ID not found");
+    }
+
+    const deliveryWithCompany = {
+      ...delivery,
+      company_id: profile.company_id,
+    };
+
     const { data, error } = await supabase
       .from("deliveries")
-      .insert(delivery)
+      .insert(deliveryWithCompany)
       .select()
       .single();
-    
-    return { data, error };
+
+    if (error) {
+      console.error("Error creating delivery:", error);
+      throw error;
+    }
+
+    return { data, error: null };
   },
 
   async updateDelivery(id: string, updates: Partial<DeliveryInsert>) {
