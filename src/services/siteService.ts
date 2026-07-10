@@ -569,12 +569,20 @@ export const siteService = {
     if (!bom) return { data: [], error: null };
 
     const { data, error } = await supabase
-      .from("bom_items")
-      .select("id, name, unit, scope_id")
-      .eq("bom_id", bom.id)
-      .order("name");
+      .from("bom_materials")
+      .select("id, material_name, unit, scope_id")
+      .eq("scope_id", bom.id)
+      .order("material_name");
 
-    return { data, error };
+    // Transform to match expected format
+    const transformedData = (data || []).map(item => ({
+      id: item.id,
+      name: item.material_name,
+      unit: item.unit,
+      scope_id: item.scope_id
+    }));
+
+    return { data: transformedData, error };
   },
 
   // Scope of Works Management
