@@ -771,7 +771,7 @@ export default function Warehouse() {
                               {item.name}
                               {item.quantity === 0 && (
                                 <Badge variant="outline" className="text-[10px] h-5 bg-red-50 text-red-700 border-red-200">
-                                  Depleted
+                                  Out of Stock
                                 </Badge>
                               )}
                               {item.quantity > 0 && item.quantity <= (item.reorder_level || 0) && (
@@ -799,7 +799,7 @@ export default function Warehouse() {
                           <TableCell>
                             {item.quantity === 0 ? (
                               <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                                Depleted
+                                Out of Stock
                               </Badge>
                             ) : item.quantity <= (item.reorder_level || 0) ? (
                               <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">

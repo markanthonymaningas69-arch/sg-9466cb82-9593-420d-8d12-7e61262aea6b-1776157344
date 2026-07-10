@@ -123,14 +123,10 @@ export const warehouseService = {
     });
 
     // 4. Deduct from main warehouse
+    // IMPORTANT: Keep the item in Main warehouse even when quantity reaches 0
+    // It will show as "Depleted" in the UI with a disabled Deploy button
     const remainingQuantity = mainItem.quantity - quantityToDeploy;
-    if (remainingQuantity <= 0) {
-      // If none left, just delete the main warehouse record
-      await this.delete(mainItem.id);
-    } else {
-      // Update with remaining amount
-      await this.update(mainItem.id, { quantity: remainingQuantity });
-    }
+    await this.update(mainItem.id, { quantity: remainingQuantity });
 
     return { success: true };
   },
