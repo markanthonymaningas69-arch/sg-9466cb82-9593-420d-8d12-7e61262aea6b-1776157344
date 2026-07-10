@@ -560,6 +560,7 @@ export const siteService = {
   },
 
   async getBomMaterials(projectId: string) {
+    // First get the BOM for this project
     const { data: bom } = await supabase
       .from("bill_of_materials")
       .select("id")
@@ -568,10 +569,21 @@ export const siteService = {
       
     if (!bom) return { data: [], error: null };
 
+    // Get all scope_of_works for this BOM
+    const { data: scopes } = await supabase
+      .from("bom_scope_of_work")
+      .select("id")
+      .eq("bom_id", bom.id);
+
+    if (!scopes || scopes.length === 0) return { data: [], error: null };
+
+    const scopeIds = scopes.map(s => s.id);
+
+    // Get all materials from all scopes
     const { data, error } = await supabase
       .from("bom_materials")
       .select("id, material_name, unit, scope_id")
-      .eq("scope_id", bom.id)
+      .in("scope_id", scopeIds)
       .order("material_name");
 
     // Transform to match expected format
