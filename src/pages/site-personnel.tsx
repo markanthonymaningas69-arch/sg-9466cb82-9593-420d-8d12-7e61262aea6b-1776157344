@@ -179,12 +179,42 @@ export default function SitePersonnelPage() {
             <div className="overflow-x-auto overflow-y-hidden pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="grid w-full grid-cols-6 h-auto">
-                  <TabsTrigger value="deliveries" className="text-xs py-2">Site Purchase & Deliveries</TabsTrigger>
-                  <TabsTrigger value="site-warehouse" className="text-xs py-2">Site Warehouse</TabsTrigger>
-                  <TabsTrigger value="usage" className="text-xs py-2">Usage</TabsTrigger>
-                  <TabsTrigger value="requests" className="text-xs py-2">Requests</TabsTrigger>
-                  <TabsTrigger value="progress" className="text-xs py-2">Accomplishment</TabsTrigger>
-                  <TabsTrigger value="attendance" className="text-xs py-2">Attendance</TabsTrigger>
+                  <TabsTrigger 
+                    value="deliveries" 
+                    className="text-xs py-2 data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900"
+                  >
+                    Site Purchase & Deliveries
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="site-warehouse" 
+                    className="text-xs py-2 data-[state=active]:bg-purple-100 data-[state=active]:text-purple-900"
+                  >
+                    Site Warehouse
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="usage" 
+                    className="text-xs py-2 data-[state=active]:bg-orange-100 data-[state=active]:text-orange-900"
+                  >
+                    Usage
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="requests" 
+                    className="text-xs py-2 data-[state=active]:bg-green-100 data-[state=active]:text-green-900"
+                  >
+                    Requests
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="progress" 
+                    className="text-xs py-2 data-[state=active]:bg-teal-100 data-[state=active]:text-teal-900"
+                  >
+                    Accomplishment
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="attendance" 
+                    className="text-xs py-2 data-[state=active]:bg-indigo-100 data-[state=active]:text-indigo-900"
+                  >
+                    Attendance
+                  </TabsTrigger>
                 </TabsList>
 
                 <CardContent className="px-4 pb-4 pt-0">
