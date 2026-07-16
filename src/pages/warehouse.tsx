@@ -192,6 +192,66 @@ export default function Warehouse() {
     setIsManualUnit(false);
   };
 
+  const handleDeploySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!deployingItem || !deployForm.projectId || !deployForm.quantity) {
+      return;
+    }
+
+    const deployQty = parseInt(deployForm.quantity);
+    
+    if (deployQty > deployingItem.quantity) {
+      toast({
+        title: "Error",
+        description: "Deploy quantity exceeds available stock",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Create project inventory record
+      const { error: createError } = await supabase.from("inventory").insert({
+        name: deployingItem.name,
+        category: deployingItem.category,
+        quantity: deployQty,
+        unit: deployingItem.unit,
+        unit_cost: deployingItem.unit_cost,
+        reorder_level: 0,
+        project_id: deployForm.projectId,
+        last_restocked: new Date().toISOString().split("T")[0]
+      });
+
+      if (createError) throw createError;
+
+      // Reduce quantity from main warehouse
+      const { error: updateError } = await supabase
+        .from("inventory")
+        .update({ quantity: deployingItem.quantity - deployQty })
+        .eq("id", deployingItem.id);
+
+      if (updateError) throw updateError;
+
+      toast({
+        title: "Success",
+        description: `Deployed ${deployQty} ${deployingItem.unit} of ${deployingItem.name} to project`,
+      });
+
+      setDeployDialogOpen(false);
+      setDeployingItem(null);
+      setDeployForm({ projectId: "", quantity: "", notes: "" });
+      await loadData();
+    } catch (error) {
+      console.error("Error deploying item:", error);
+      toast({
+        title: "Error",
+        description: "Failed to deploy item",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getCategoryLabel = (val: string) => {
     const legacyMap: Record<string, string> = { materials: "Construction Materials", tools: "Tools", equipment: "Equipments", safety: "PPE" };
     return legacyMap[val] || val;
