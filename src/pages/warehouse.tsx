@@ -56,38 +56,19 @@ export default function Warehouse() {
   const [items, setItems] = useState<WarehouseItem[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [masterItems, setMasterItems] = useState<any[]>([]);
-  const [deliveries, setDeliveries] = useState<any[]>([]);
-  const [consumptions, setConsumptions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Tabs and Filters
-  const [activeTab, setActiveTab] = useState("main");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [projectFilter, setProjectFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   
   // Form State
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deployDialogOpen, setDeployDialogOpen] = useState(false);
-  const [deploymentDialogOpen, setDeploymentDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<WarehouseItem | null>(null);
-  const [selectedItem, setSelectedItem] = useState<WarehouseItem | null>(null);
   const [deployingItem, setDeployingItem] = useState<WarehouseItem | null>(null);
-  const [editingDeployment, setEditingDeployment] = useState<any>(null);
   const [deployForm, setDeployForm] = useState({ projectId: "", quantity: "", notes: "" });
-  const [editForm, setEditForm] = useState({
-    item_name: "",
-    category: "",
-    quantity: "",
-    unit: "",
-    unit_cost: "",
-    supplier: "",
-    minimum_stock: "",
-    notes: "",
-  });
-  const [deploymentForm, setDeploymentForm] = useState({ quantity: 0 });
   const [isManualName, setIsManualName] = useState(false);
   const [isManualCategory, setIsManualCategory] = useState(false);
   const [isManualUnit, setIsManualUnit] = useState(false);
@@ -107,45 +88,17 @@ export default function Warehouse() {
 
   const loadData = async () => {
     setLoading(true);
-    const [{ data: itemsData }, { data: projectsData }, { data: masterData }, { data: deliveriesData }, { data: consumptionsData }] = await Promise.all([
+    const [{ data: itemsData }, { data: projectsData }, { data: masterData }] = await Promise.all([
       warehouseService.getAll(),
       projectService.getAll(),
-      projectService.getMasterItems(),
-      supabase.from("deliveries").select("*, projects(name)"),
-      supabase
-        .from("material_consumption")
-        .select("*, projects(name)")
-        .eq("is_archived", false)
+      projectService.getMasterItems()
     ]);
     
     const allItems = itemsData as WarehouseItem[] || [];
     
-    // Debug: Log items to check for missing vest and demolition hammer
-    console.log("=== WAREHOUSE DEBUG ===");
-    console.log("Total items loaded:", allItems.length);
-    console.log("Items with null project_id (Main warehouse):", allItems.filter(i => !i.project_id).length);
-    console.log("Items with project_id (Project warehouse):", allItems.filter(i => i.project_id).length);
-    
-    const vest = allItems.find(i => i.name.toLowerCase().includes("vest"));
-    const hammer = allItems.find(i => i.name.toLowerCase().includes("hammer") || i.name.toLowerCase().includes("demolition"));
-    
-    if (vest) {
-      console.log("VEST found:", { name: vest.name, project_id: vest.project_id, category: vest.category, quantity: vest.quantity });
-    } else {
-      console.log("VEST NOT FOUND in database");
-    }
-    
-    if (hammer) {
-      console.log("HAMMER found:", { name: hammer.name, project_id: hammer.project_id, category: hammer.category, quantity: hammer.quantity });
-    } else {
-      console.log("HAMMER NOT FOUND in database");
-    }
-    
     setItems(allItems);
     setProjects(projectsData || []);
     setMasterItems(masterData || []);
-    setDeliveries(deliveriesData || []);
-    setConsumptions(consumptionsData || []);
     setLoading(false);
   };
 
@@ -247,146 +200,13 @@ export default function Warehouse() {
   // Generate dynamic unique categories from the actual items in the database
   const uniqueCategories = Array.from(new Set(items.map(i => getCategoryLabel(i.category || "Uncategorized"))));
 
-  // Splitting and Filtering Logic
-  // IMPORTANT: Main warehouse items should ALWAYS appear in the list, even when quantity is 0
-  // Items are only removed if explicitly deleted by the user clicking the Delete button
+  // Main warehouse items only
   const mainWarehouseItems = items.filter(item => !item.project_id);
-  const projectWarehouseItems = items.filter(item => item.project_id);
-
-  const handleDeploySubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!deployingItem || !deployForm.projectId) return;
-    
-    const quantityToDeploy = Number(deployForm.quantity);
-    await warehouseService.deployItem(deployingItem.id, deployForm.projectId, quantityToDeploy);
-    
-    setDeployDialogOpen(false);
-    setDeployingItem(null);
-    setDeployForm({ projectId: "", quantity: "", notes: "" });
-    loadData();
-  };
-
-  const handleDeploymentSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingDeployment) return;
-    await warehouseService.updateDeployment(editingDeployment.id, deploymentForm.quantity);
-    setDeploymentDialogOpen(false);
-    setEditingDeployment(null);
-    loadData();
-  };
-
-  const handleDeploy = async () => {
-    if (!selectedItem || !deployForm.projectId || !deployForm.quantity) {
-      toast({
-        title: "Validation Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const deployQty = Number(deployForm.quantity);
-    if (deployQty <= 0 || deployQty > selectedItem.quantity) {
-      toast({
-        title: "Invalid Quantity",
-        description: "Deployment quantity must be greater than 0 and not exceed available stock",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const remainingQty = selectedItem.quantity - deployQty;
-
-      // Update warehouse inventory quantity
-      // NOTE: Item remains in Main warehouse list even when quantity reaches 0
-      // It will show as "Depleted" with disabled Deploy button
-      const { error: updateError } = await supabase
-        .from("inventory")
-        .update({ 
-          quantity: remainingQty,
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", selectedItem.id);
-
-      if (updateError) throw updateError;
-
-      // Create delivery record for site
-      const deliveryPayload = {
-        project_id: deployForm.projectId,
-        transaction_type: "transfer" as const,
-        item_name: selectedItem.name,
-        quantity: deployQty,
-        unit: selectedItem.unit,
-        unit_cost: selectedItem.unit_cost || 0,
-        amount: deployQty * (selectedItem.unit_cost || 0),
-        supplier: "Main Warehouse",
-        delivery_date: new Date().toISOString().split("T")[0],
-        receipt_number: `WH-${selectedItem.id.slice(0, 8)}-${Date.now()}`,
-        notes: deployForm.notes || `Deployed from Main Warehouse`,
-        status: "pending",
-      };
-
-      const { error: deliveryError } = await supabase
-        .from("deliveries")
-        .insert(deliveryPayload);
-
-      if (deliveryError) throw deliveryError;
-
-      toast({
-        title: "Success",
-        description: `Deployed ${deployQty} ${selectedItem.unit} to site. Remaining: ${remainingQty} ${selectedItem.unit}`,
-      });
-
-      setDeployDialogOpen(false);
-      setSelectedItem(null);
-      setDeployForm({ projectId: "", quantity: "", notes: "" });
-      await loadData();
-    } catch (error) {
-      console.error("Error deploying item:", error);
-      toast({
-        title: "Error",
-        description: "Failed to deploy item to site",
-        variant: "destructive",
-      });
-    }
-  };
 
   const filteredMain = mainWarehouseItems.filter(item => {
     const matchCategory = categoryFilter === "all" || getCategoryLabel(item.category || "Uncategorized") === categoryFilter;
     const matchDate = !dateFilter || item.last_restocked === dateFilter;
     return matchCategory && matchDate;
-  });
-
-  const filteredProject = projectWarehouseItems.filter(item => {
-    const matchCategory = categoryFilter === "all" || getCategoryLabel(item.category || "Uncategorized") === categoryFilter;
-    const matchProject = projectFilter === "all" || item.project_id === projectFilter;
-    const matchDate = !dateFilter || item.last_restocked === dateFilter || item.created_at?.startsWith(dateFilter);
-    return matchCategory && matchProject && matchDate;
-  });
-
-  // Calculate Balance Checking summaries
-  const balanceSummary = Object.values(items.reduce((acc, item) => {
-    const key = `${item.name}-${item.unit}`;
-    if (!acc[key]) {
-      acc[key] = {
-        name: item.name,
-        category: getCategoryLabel(item.category || "Uncategorized"),
-        unit: item.unit,
-        mainQty: 0,
-        deployedQty: 0,
-      };
-    }
-    if (item.project_id) {
-      acc[key].deployedQty += item.quantity;
-    } else {
-      acc[key].mainQty += item.quantity;
-    }
-    return acc;
-  }, {} as Record<string, any>));
-
-  const filteredBalance = balanceSummary.filter(item => {
-    return categoryFilter === "all" || item.category === categoryFilter;
   });
 
   const totalValue = items.reduce((sum, item) => sum + (item.quantity * item.unit_cost), 0);
@@ -409,143 +229,141 @@ export default function Warehouse() {
             <h1 className="text-3xl font-heading font-bold">Inventory Management</h1>
             <p className="text-muted-foreground mt-1">Track materials, tools, equipment, and PPE</p>
           </div>
-          {activeTab === "main" && (
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={resetForm} disabled={isLocked}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Item
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>{editingItem ? "Edit Item" : "Add New Item"}</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Item Name *</Label>
-                      {!isManualName ? (
-                        <Select value={formData.name} onValueChange={(val) => {
-                          if (val === "others") {
-                            setIsManualName(true);
-                            setFormData({ ...formData, name: "" });
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={resetForm} disabled={isLocked}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Item
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>{editingItem ? "Edit Item" : "Add New Item"}</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Item Name *</Label>
+                    {!isManualName ? (
+                      <Select value={formData.name} onValueChange={(val) => {
+                        if (val === "others") {
+                          setIsManualName(true);
+                          setFormData({ ...formData, name: "" });
+                        } else {
+                          const item = masterItems.find(m => m.name === val);
+                          if (item) {
+                            setFormData({
+                              ...formData,
+                              name: val,
+                              category: item.category,
+                              unit: item.unit,
+                              unit_cost: item.default_cost.toString()
+                            });
+                            setIsManualCategory(item.category ? !STANDARD_CATEGORIES.includes(item.category) : false);
+                            setIsManualUnit(item.unit ? !STANDARD_UNITS.includes(item.unit) : false);
                           } else {
-                            const item = masterItems.find(m => m.name === val);
-                            if (item) {
-                              setFormData({
-                                ...formData,
-                                name: val,
-                                category: item.category,
-                                unit: item.unit,
-                                unit_cost: item.default_cost.toString()
-                              });
-                              setIsManualCategory(item.category ? !STANDARD_CATEGORIES.includes(item.category) : false);
-                              setIsManualUnit(item.unit ? !STANDARD_UNITS.includes(item.unit) : false);
-                            } else {
-                              setFormData({ ...formData, name: val });
-                            }
+                            setFormData({ ...formData, name: val });
                           }
-                        }} required>
-                          <SelectTrigger><SelectValue placeholder="Select from catalog" /></SelectTrigger>
-                          <SelectContent>
-                            {masterItems.map(m => <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>)}
-                            <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <div className="flex gap-2">
-                          <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Custom item name" required />
-                          <Button type="button" variant="outline" className="px-2" onClick={() => { setIsManualName(false); setFormData({ ...formData, name: "" }); }}>List</Button>
-                        </div>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Category *</Label>
-                      {!isManualCategory ? (
-                        <Select value={formData.category} onValueChange={(val) => {
-                          if (val === "others") {
-                            setIsManualCategory(true);
-                            setFormData({ ...formData, category: "" });
-                          } else {
-                            setFormData({ ...formData, category: val });
-                          }
-                        }} required>
-                          <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                          <SelectContent>
-                            {STANDARD_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                            <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <div className="flex gap-2">
-                          <Input
-                            value={formData.category}
-                            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                            placeholder="Custom category"
-                            required
-                          />
-                          <Button type="button" variant="outline" className="px-2" onClick={() => {
-                            setIsManualCategory(false);
-                            setFormData({ ...formData, category: "" });
-                          }}>List</Button>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="quantity">Quantity *</Label>
-                      <Input id="quantity" type="number" value={formData.quantity} onChange={(e) => setFormData({ ...formData, quantity: e.target.value })} required />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="unit">Unit *</Label>
-                      {!isManualUnit ? (
-                        <Select value={formData.unit} onValueChange={(val) => {
-                          if (val === "Other") {
-                            setIsManualUnit(true);
-                            setFormData({ ...formData, unit: "" });
-                          } else {
-                            setFormData({ ...formData, unit: val });
-                          }
-                        }} required>
-                          <SelectTrigger><SelectValue placeholder="Select unit" /></SelectTrigger>
-                          <SelectContent>
-                            {STANDARD_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                            <SelectItem value="Other" className="font-semibold text-blue-600">Other (Manual Input)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <div className="flex gap-2">
-                          <Input id="unit" value={formData.unit} onChange={(e) => setFormData({ ...formData, unit: e.target.value })} placeholder="Custom unit" required />
-                          <Button type="button" variant="outline" className="px-2" onClick={() => {
-                            setIsManualUnit(false);
-                            setFormData({ ...formData, unit: "" });
-                          }}>List</Button>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="unit_cost">Unit Cost *</Label>
-                      <Input id="unit_cost" type="number" step="0.01" value={formData.unit_cost} onChange={(e) => setFormData({ ...formData, unit_cost: e.target.value })} required />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="reorder_level">Low Stock Alert Level *</Label>
-                      <Input id="reorder_level" type="number" value={formData.reorder_level} onChange={(e) => setFormData({ ...formData, reorder_level: e.target.value })} required />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="last_restocked">Re-stock Date *</Label>
-                      <Input id="last_restocked" type="date" value={formData.last_restocked} onChange={(e) => setFormData({ ...formData, last_restocked: e.target.value })} required />
-                    </div>
+                        }
+                      }} required>
+                        <SelectTrigger><SelectValue placeholder="Select from catalog" /></SelectTrigger>
+                        <SelectContent>
+                          {masterItems.map(m => <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>)}
+                          <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="flex gap-2">
+                        <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Custom item name" required />
+                        <Button type="button" variant="outline" className="px-2" onClick={() => { setIsManualName(false); setFormData({ ...formData, name: "" }); }}>List</Button>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex justify-end gap-2 pt-4">
-                    <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                    <Button type="submit">{editingItem ? "Update" : "Add Item"}</Button>
+                  <div className="space-y-2">
+                    <Label>Category *</Label>
+                    {!isManualCategory ? (
+                      <Select value={formData.category} onValueChange={(val) => {
+                        if (val === "others") {
+                          setIsManualCategory(true);
+                          setFormData({ ...formData, category: "" });
+                        } else {
+                          setFormData({ ...formData, category: val });
+                        }
+                      }} required>
+                        <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                        <SelectContent>
+                          {STANDARD_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                          <SelectItem value="others" className="font-semibold text-blue-600">Others (Manual Input)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="flex gap-2">
+                        <Input
+                          value={formData.category}
+                          onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                          placeholder="Custom category"
+                          required
+                        />
+                        <Button type="button" variant="outline" className="px-2" onClick={() => {
+                          setIsManualCategory(false);
+                          setFormData({ ...formData, category: "" });
+                        }}>List</Button>
+                      </div>
+                    )}
                   </div>
-                </form>
-              </DialogContent>
-            </Dialog>
-          )}
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="quantity">Quantity *</Label>
+                    <Input id="quantity" type="number" value={formData.quantity} onChange={(e) => setFormData({ ...formData, quantity: e.target.value })} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="unit">Unit *</Label>
+                    {!isManualUnit ? (
+                      <Select value={formData.unit} onValueChange={(val) => {
+                        if (val === "Other") {
+                          setIsManualUnit(true);
+                          setFormData({ ...formData, unit: "" });
+                        } else {
+                          setFormData({ ...formData, unit: val });
+                        }
+                      }} required>
+                        <SelectTrigger><SelectValue placeholder="Select unit" /></SelectTrigger>
+                        <SelectContent>
+                          {STANDARD_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                          <SelectItem value="Other" className="font-semibold text-blue-600">Other (Manual Input)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="flex gap-2">
+                        <Input id="unit" value={formData.unit} onChange={(e) => setFormData({ ...formData, unit: e.target.value })} placeholder="Custom unit" required />
+                        <Button type="button" variant="outline" className="px-2" onClick={() => {
+                          setIsManualUnit(false);
+                          setFormData({ ...formData, unit: "" });
+                        }}>List</Button>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="unit_cost">Unit Cost *</Label>
+                    <Input id="unit_cost" type="number" step="0.01" value={formData.unit_cost} onChange={(e) => setFormData({ ...formData, unit_cost: e.target.value })} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="reorder_level">Low Stock Alert Level *</Label>
+                    <Input id="reorder_level" type="number" value={formData.reorder_level} onChange={(e) => setFormData({ ...formData, reorder_level: e.target.value })} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="last_restocked">Re-stock Date *</Label>
+                    <Input id="last_restocked" type="date" value={formData.last_restocked} onChange={(e) => setFormData({ ...formData, last_restocked: e.target.value })} required />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+                  <Button type="submit">{editingItem ? "Update" : "Add Item"}</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
 
           <Dialog open={deployDialogOpen} onOpenChange={setDeployDialogOpen}>
             <DialogContent>
@@ -593,43 +411,6 @@ export default function Warehouse() {
               )}
             </DialogContent>
           </Dialog>
-
-          <Dialog open={deploymentDialogOpen} onOpenChange={setDeploymentDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Edit Deployment Quantity</DialogTitle>
-              </DialogHeader>
-              {editingDeployment && (
-                <form onSubmit={handleDeploymentSubmit} className="space-y-4">
-                  <div className="bg-muted p-4 rounded-lg">
-                    <div className="font-semibold text-lg">{editingDeployment.item_name}</div>
-                    <div className="text-sm text-muted-foreground">Deployed to: {editingDeployment.projects?.name}</div>
-                    <div className="text-sm text-muted-foreground mt-1">Status: <Badge variant="outline" className="ml-1">{editingDeployment.status?.toUpperCase()}</Badge></div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label>Deployed Quantity ({editingDeployment.unit}) *</Label>
-                    <Input 
-                      type="number" 
-                      step="0.01"
-                      min="0.01" 
-                      value={deploymentForm.quantity} 
-                      onChange={(e) => setDeploymentForm({ quantity: parseFloat(e.target.value) || 0 })} 
-                      required 
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Changing this will automatically update the Site Deliveries list and adjust the Main Warehouse balance accordingly.
-                    </p>
-                  </div>
-                  
-                  <div className="flex justify-end gap-2 pt-4">
-                    <Button type="button" variant="outline" onClick={() => setDeploymentDialogOpen(false)}>Cancel</Button>
-                    <Button type="submit">Save Changes</Button>
-                  </div>
-                </form>
-              )}
-            </DialogContent>
-          </Dialog>
         </div>
 
         <div className="grid gap-4 md:grid-cols-1 max-w-sm shrink-0">
@@ -644,26 +425,13 @@ export default function Warehouse() {
           </Card>
         </div>
 
-        <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); setCategoryFilter("all"); setProjectFilter("all"); setDateFilter(""); }} className="flex-1 flex flex-col min-h-0">
+        <div className="flex-1 flex flex-col min-h-0">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mt-2">
-            <TabsList className="shrink-0 flex flex-wrap w-full gap-1 h-auto bg-transparent p-0">
-              <TabsTrigger value="main" className="flex-1 sm:flex-none min-w-[80px] h-9 text-xs data-[state=active]:bg-blue-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-blue-700 bg-blue-50 text-blue-700 hover:bg-blue-100">
-                <WarehouseIcon className="h-3 w-3 mr-1.5 hidden sm:inline" /> Main
-              </TabsTrigger>
-              <TabsTrigger value="balance" className="flex-1 sm:flex-none min-w-[80px] h-9 text-xs data-[state=active]:bg-indigo-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-indigo-700 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
-                <FileSpreadsheet className="h-3 w-3 mr-1.5 hidden sm:inline" /> Balance
-              </TabsTrigger>
-              <TabsTrigger value="deployments" className="flex-1 sm:flex-none min-w-[80px] h-9 text-xs data-[state=active]:bg-emerald-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-emerald-700 bg-emerald-50 text-emerald-700 hover:bg-emerald-100">
-                <Truck className="h-3 w-3 mr-1.5 hidden sm:inline" /> Deploy
-              </TabsTrigger>
-              <TabsTrigger value="project" className="flex-1 sm:flex-none min-w-[80px] h-9 text-xs data-[state=active]:bg-amber-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-amber-700 bg-amber-50 text-amber-700 hover:bg-amber-100">
-                <Building2 className="h-3 w-3 mr-1.5 hidden sm:inline" /> Project
-              </TabsTrigger>
-            </TabsList>
+            <h2 className="text-xl font-semibold">Main Warehouse</h2>
             <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="shrink-0 h-9 w-full sm:w-auto">
               <Filter className="h-4 w-4 mr-2" />
               {showFilters ? "Hide Filters" : "Filters"}
-              {(categoryFilter !== "all" || projectFilter !== "all" || dateFilter) && (
+              {(categoryFilter !== "all" || dateFilter) && (
                 <span className="ml-2 flex h-2 w-2 rounded-full bg-primary shadow-[0_0_4px_rgba(var(--primary),0.5)]"></span>
               )}
             </Button>
@@ -683,383 +451,142 @@ export default function Warehouse() {
                   </SelectContent>
                 </Select>
               </div>
-              
-              {activeTab === "project" && (
-                <div className="space-y-1">
-                  <Label className="text-xs">Filter by Project:</Label>
-                  <Select value={projectFilter} onValueChange={setProjectFilter}>
-                    <SelectTrigger className="w-[200px] h-9 bg-background">
-                      <SelectValue placeholder="All Projects" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Projects</SelectItem>
-                      {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              
-              {activeTab === "deployments" && (
-                <div className="space-y-1">
-                  <Label className="text-xs">Filter by Project:</Label>
-                  <Select value={projectFilter} onValueChange={setProjectFilter}>
-                    <SelectTrigger className="w-[200px] h-9 bg-background">
-                      <SelectValue placeholder="All Projects" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Projects</SelectItem>
-                      {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
 
-              {activeTab !== "balance" && (
-                <div className="space-y-1">
-                  <Label className="text-xs">Filter by Date:</Label>
-                  <Input 
-                    type="date" 
-                    className="w-[200px] h-9 bg-background" 
-                    value={dateFilter} 
-                    onChange={(e) => setDateFilter(e.target.value)} 
-                  />
-                </div>
-              )}
+              <div className="space-y-1">
+                <Label className="text-xs">Filter by Date:</Label>
+                <Input 
+                  type="date" 
+                  className="w-[200px] h-9 bg-background" 
+                  value={dateFilter} 
+                  onChange={(e) => setDateFilter(e.target.value)} 
+                />
+              </div>
               
-              {(categoryFilter !== "all" || projectFilter !== "all" || dateFilter) && (
-                <Button variant="ghost" size="sm" onClick={() => { setCategoryFilter("all"); setProjectFilter("all"); setDateFilter(""); }} className="text-muted-foreground h-9 ml-1">
+              {(categoryFilter !== "all" || dateFilter) && (
+                <Button variant="ghost" size="sm" onClick={() => { setCategoryFilter("all"); setDateFilter(""); }} className="text-muted-foreground h-9 ml-1">
                   Clear Filters
                 </Button>
               )}
             </div>
           )}
 
-          <TabsContent value="main" className="flex-1 mt-4 data-[state=active]:flex flex-col min-h-0">
-            <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none bg-background">
-              <div className="overflow-x-auto rounded-md border h-full relative bg-background -mx-3 px-3 sm:mx-0 sm:px-0">
-                <Table className="min-w-[900px]">
-                  <TableHeader className="sticky top-0 bg-muted z-10">
+          <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none bg-background mt-4">
+            <div className="overflow-x-auto rounded-md border h-full relative bg-background -mx-3 px-3 sm:mx-0 sm:px-0">
+              <Table className="min-w-[900px]">
+                <TableHeader className="sticky top-0 bg-muted z-10">
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Item Name</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead className="text-right">Quantity</TableHead>
+                    <TableHead className="text-right">Restock Value</TableHead>
+                    <TableHead className="text-right">Unit Price</TableHead>
+                    <TableHead className="text-right">Total Value</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredMain.length === 0 ? (
                     <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Item Name</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead className="text-right">Quantity</TableHead>
-                      <TableHead className="text-right">Restock Value</TableHead>
-                      <TableHead className="text-right">Unit Price</TableHead>
-                      <TableHead className="text-right">Total Value</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                        {mainWarehouseItems.length === 0 ? (
+                          <>No items found in the Main Warehouse. Click "Add Item" to get started.</>
+                        ) : (
+                          <>No items match the current filters. {categoryFilter !== "all" || dateFilter ? <button onClick={() => { setCategoryFilter("all"); setDateFilter(""); }} className="text-primary underline ml-1">Clear filters</button> : null}</>
+                        )}
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredMain.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                          {mainWarehouseItems.length === 0 ? (
-                            <>No items found in the Main Warehouse. Click "Add Item" to get started.</>
-                          ) : (
-                            <>No items match the current filters. {categoryFilter !== "all" || dateFilter ? <button onClick={() => { setCategoryFilter("all"); setDateFilter(""); }} className="text-primary underline ml-1">Clear filters</button> : null}</>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredMain.map((item) => (
-                        <TableRow key={item.id} className={item.quantity === 0 ? "opacity-50" : ""}>
-                          <TableCell>{item.last_restocked || "—"}</TableCell>
-                          <TableCell className="font-medium">
-                            <div className="flex items-center gap-2">
-                              {item.name}
-                              {item.quantity === 0 && (
-                                <Badge variant="outline" className="text-[10px] h-5 bg-red-50 text-red-700 border-red-200">
-                                  Out of Stock
-                                </Badge>
-                              )}
-                              {item.quantity > 0 && item.quantity <= (item.reorder_level || 0) && (
-                                <Badge variant="outline" className="text-[10px] h-5 bg-amber-50 text-amber-700 border-amber-200">
-                                  Low Stock
-                                </Badge>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="text-[10px] h-5">
-                              {item.category || "Uncategorized"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            <span className={item.quantity === 0 ? "text-red-600" : ""}>
-                              {item.quantity} {item.unit}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-right">{item.reorder_level || 0}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(item.unit_cost || 0)}</TableCell>
-                          <TableCell className="text-right font-medium">
-                            {formatCurrency((item.quantity || 0) * (item.unit_cost || 0))}
-                          </TableCell>
-                          <TableCell>
-                            {item.quantity === 0 ? (
-                              <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                  ) : (
+                    filteredMain.map((item) => (
+                      <TableRow key={item.id} className={item.quantity === 0 ? "opacity-50" : ""}>
+                        <TableCell>{item.last_restocked || "—"}</TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            {item.name}
+                            {item.quantity === 0 && (
+                              <Badge variant="outline" className="text-[10px] h-5 bg-red-50 text-red-700 border-red-200">
                                 Out of Stock
                               </Badge>
-                            ) : item.quantity <= (item.reorder_level || 0) ? (
-                              <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                            )}
+                            {item.quantity > 0 && item.quantity <= (item.reorder_level || 0) && (
+                              <Badge variant="outline" className="text-[10px] h-5 bg-amber-50 text-amber-700 border-amber-200">
                                 Low Stock
                               </Badge>
-                            ) : (
-                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                In Stock
-                              </Badge>
                             )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-1">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 px-2"
-                                onClick={() => handleEdit(item)}
-                              >
-                                Edit
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 px-2"
-                                onClick={() => {
-                                  setDeployingItem(item);
-                                  setDeployForm({ projectId: "", quantity: "", notes: "" });
-                                  setDeployDialogOpen(true);
-                                }}
-                                disabled={item.quantity === 0}
-                              >
-                                Deploy
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 px-2 text-destructive hover:text-destructive"
-                                onClick={() => handleDelete(item.id)}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="project" className="flex-1 mt-4 data-[state=active]:flex flex-col min-h-0">
-            <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none bg-background">
-              <div className="overflow-x-auto rounded-md border h-full relative bg-background -mx-3 px-3 sm:mx-0 sm:px-0">
-                <Table className="min-w-[800px]">
-                  <TableHeader className="sticky top-0 bg-muted z-10 border-b">
-                    <TableRow>
-                      <TableHead className="font-bold text-foreground">Item Name</TableHead>
-                      <TableHead className="font-bold text-foreground">Category</TableHead>
-                      <TableHead className="font-bold text-foreground">Project</TableHead>
-                      <TableHead className="text-right font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900">Total Received</TableHead>
-                      <TableHead className="text-right font-bold text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30">Total Consumed</TableHead>
-                      <TableHead className="text-right font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-900">Current Balance</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(() => {
-                      const projInvMap: Record<string, any> = {};
-                      
-                      deliveries.filter(d => d.status === "received").forEach(d => {
-                        if (projectFilter !== "all" && d.project_id !== projectFilter) return;
-                        if (dateFilter && d.delivery_date !== dateFilter) return;
-                        
-                        const key = `${d.project_id}-${d.item_name}-${d.unit}`;
-                        if (!projInvMap[key]) {
-                          const mItem = masterItems.find(m => m.name.toLowerCase() === d.item_name.toLowerCase());
-                          projInvMap[key] = {
-                            project_id: d.project_id,
-                            project_name: d.projects?.name || "Unknown",
-                            name: d.item_name,
-                            category: mItem ? mItem.category : "Uncategorized",
-                            unit: d.unit,
-                            received: 0,
-                            consumed: 0,
-                            balance: 0
-                          };
-                        }
-                        projInvMap[key].received += d.quantity;
-                        projInvMap[key].balance += d.quantity;
-                      });
-
-                      consumptions.forEach(c => {
-                        if (projectFilter !== "all" && c.project_id !== projectFilter) return;
-                        if (dateFilter && c.date_used !== dateFilter) return;
-
-                        const key = `${c.project_id}-${c.item_name}-${c.unit}`;
-                        if (!projInvMap[key]) {
-                          const mItem = masterItems.find(m => m.name.toLowerCase() === c.item_name.toLowerCase());
-                          projInvMap[key] = {
-                            project_id: c.project_id,
-                            project_name: c.projects?.name || "Unknown",
-                            name: c.item_name,
-                            category: mItem ? mItem.category : "Uncategorized",
-                            unit: c.unit,
-                            received: 0,
-                            consumed: 0,
-                            balance: 0
-                          };
-                        }
-                        projInvMap[key].consumed += c.quantity;
-                        projInvMap[key].balance -= c.quantity;
-                      });
-
-                      const siteInventory = Object.values(projInvMap).filter((item: any) => {
-                         const matchCategory = categoryFilter === "all" || item.category === categoryFilter;
-                         return matchCategory;
-                      }).sort((a: any, b: any) => a.project_name.localeCompare(b.project_name) || a.name.localeCompare(b.name));
-
-                      if (siteInventory.length === 0) {
-                        return (
-                          <TableRow>
-                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                              No project inventory found matching the filters.
-                            </TableCell>
-                          </TableRow>
-                        );
-                      }
-
-                      return siteInventory.map((item: any, idx) => (
-                        <TableRow key={idx} className="hover:bg-muted/50">
-                          <TableCell className="font-medium text-foreground">{item.name}</TableCell>
-                          <TableCell><Badge variant="outline" className="text-xs">{item.category}</Badge></TableCell>
-                          <TableCell><Badge variant="secondary" className="font-semibold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900">{item.project_name}</Badge></TableCell>
-                          <TableCell className="text-right font-semibold text-blue-700 dark:text-blue-400 bg-blue-50/30 dark:bg-blue-950/20 border-l">{item.received} <span className="text-xs text-blue-400 dark:text-blue-500 font-normal">{item.unit}</span></TableCell>
-                          <TableCell className="text-right font-semibold text-orange-700 dark:text-orange-400 bg-orange-50/30 dark:bg-orange-950/20">{item.consumed} <span className="text-xs text-orange-400 dark:text-orange-500 font-normal">{item.unit}</span></TableCell>
-                          <TableCell className={`text-right font-bold text-lg border-r ${item.balance < 0 ? 'text-red-600 dark:text-red-400 bg-red-50/30 dark:bg-red-950/20' : 'text-green-700 dark:text-green-400 bg-green-50/30 dark:bg-green-950/20'}`}>{item.balance} <span className={`text-xs font-normal ${item.balance < 0 ? 'text-red-400 dark:text-red-500' : 'text-green-500 dark:text-green-400'}`}>{item.unit}</span></TableCell>
-                        </TableRow>
-                      ));
-                    })()}
-                  </TableBody>
-                </Table>
-              </div>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="deployments" className="flex-1 mt-4 data-[state=active]:flex flex-col min-h-0">
-            <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none bg-background">
-              <div className="overflow-x-auto rounded-md border h-full relative bg-background -mx-3 px-3 sm:mx-0 sm:px-0">
-                <Table className="min-w-[700px]">
-                  <TableHeader className="sticky top-0 bg-muted z-10 border-b">
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Project</TableHead>
-                      <TableHead>Item</TableHead>
-                      <TableHead className="text-right">Quantity</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(() => {
-                      const deployedList = deliveries.filter(d => d.supplier === "Main Warehouse");
-                      const filteredDeployed = deployedList.filter(d => {
-                        const matchProject = projectFilter === "all" || d.project_id === projectFilter;
-                        const matchDate = !dateFilter || d.delivery_date === dateFilter;
-                        const mItem = masterItems.find(m => m.name.toLowerCase() === d.item_name.toLowerCase());
-                        const cat = mItem ? mItem.category : "Uncategorized";
-                        const matchCategory = categoryFilter === "all" || cat === categoryFilter;
-                        return matchProject && matchDate && matchCategory;
-                      }).sort((a,b) => new Date(b.delivery_date).getTime() - new Date(a.delivery_date).getTime());
-
-                      if (filteredDeployed.length === 0) {
-                        return (
-                          <TableRow>
-                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                              No deployments found matching the filter.
-                            </TableCell>
-                          </TableRow>
-                        );
-                      }
-
-                      return filteredDeployed.map(d => (
-                        <TableRow key={d.id}>
-                          <TableCell>{d.delivery_date}</TableCell>
-                          <TableCell><Badge variant="secondary">{d.projects?.name || "Unknown"}</Badge></TableCell>
-                          <TableCell className="font-medium">{d.item_name}</TableCell>
-                          <TableCell className="text-right font-semibold">{d.quantity} <span className="text-xs text-muted-foreground font-normal">{d.unit}</span></TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className={d.status === 'received' ? 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900' : 'bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-900'}>
-                              {d.status?.toUpperCase()}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-[10px] h-5">
+                            {item.category || "Uncategorized"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          <span className={item.quantity === 0 ? "text-red-600" : ""}>
+                            {item.quantity} {item.unit}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">{item.reorder_level || 0}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(item.unit_cost || 0)}</TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency((item.quantity || 0) * (item.unit_cost || 0))}
+                        </TableCell>
+                        <TableCell>
+                          {item.quantity === 0 ? (
+                            <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                              Out of Stock
                             </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button size="sm" variant="ghost" disabled={isLocked} onClick={() => {
-                              setEditingDeployment(d);
-                              setDeploymentForm({ quantity: d.quantity });
-                              setDeploymentDialogOpen(true);
-                            }}>
-                              <Pencil className="h-4 w-4 text-blue-600" /> Edit Qty
+                          ) : item.quantity <= (item.reorder_level || 0) ? (
+                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                              Low Stock
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                              In Stock
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2"
+                              onClick={() => handleEdit(item)}
+                            >
+                              Edit
                             </Button>
-                          </TableCell>
-                        </TableRow>
-                      ));
-                    })()}
-                  </TableBody>
-                </Table>
-              </div>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="balance" className="flex-1 mt-4 data-[state=active]:flex flex-col min-h-0">
-            <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none bg-background">
-              <div className="overflow-x-auto rounded-md border h-full relative bg-background -mx-3 px-3 sm:mx-0 sm:px-0">
-                <Table className="min-w-[700px]">
-                  <TableHeader className="sticky top-0 bg-muted z-10 border-b">
-                    <TableRow>
-                      <TableHead className="font-bold text-foreground">Item Name</TableHead>
-                      <TableHead className="font-bold text-foreground">Category</TableHead>
-                      <TableHead className="text-right font-bold text-foreground border-l bg-muted/50">Total Items (Restocked)</TableHead>
-                      <TableHead className="text-right font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30">Total Deployed</TableHead>
-                      <TableHead className="text-right font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30 border-r">Main Balance</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredBalance.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                          No items found matching the filter.
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2"
+                              onClick={() => {
+                                setDeployingItem(item);
+                                setDeployForm({ projectId: "", quantity: "", notes: "" });
+                                setDeployDialogOpen(true);
+                              }}
+                              disabled={item.quantity === 0}
+                            >
+                              Deploy
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2 text-destructive hover:text-destructive"
+                              onClick={() => handleDelete(item.id)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
-                    ) : (
-                      filteredBalance.map((item, idx) => {
-                        const totalRestocked = item.mainQty + item.deployedQty;
-                        return (
-                          <TableRow key={idx} className="hover:bg-muted/50">
-                            <TableCell className="font-medium text-foreground">{item.name}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{item.category}</Badge>
-                            </TableCell>
-                            <TableCell className="text-right font-bold text-lg border-l bg-muted/30">
-                              {totalRestocked} <span className="text-xs text-muted-foreground font-normal">{item.unit}</span>
-                            </TableCell>
-                            <TableCell className="text-right font-semibold text-blue-700 dark:text-blue-400 bg-blue-50/30 dark:bg-blue-950/20">
-                              {item.deployedQty} <span className="text-xs text-blue-400 dark:text-blue-500 font-normal">{item.unit}</span>
-                            </TableCell>
-                            <TableCell className="text-right font-semibold text-green-700 dark:text-green-400 bg-green-50/30 dark:bg-green-950/20 border-r">
-                              {item.mainQty} <span className="text-xs text-green-400 dark:text-green-500 font-normal">{item.unit}</span>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+        </div>
       </div>
     </Layout>
   );
