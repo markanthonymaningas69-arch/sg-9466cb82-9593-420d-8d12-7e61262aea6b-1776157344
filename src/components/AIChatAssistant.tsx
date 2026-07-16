@@ -109,9 +109,8 @@ export function AIChatAssistant({ contained = false }: AIChatAssistantProps) {
       attendance,
       progress,
       bomScopes,
-      bomItems,
+      bomMaterials,
       bomIndirectCosts,
-      materialRequests,
       manpowerCatalog,
     ] = await Promise.all([
       supabase.from("vouchers").select("*").order("date", { ascending: false }).limit(200),
@@ -129,10 +128,9 @@ export function AIChatAssistant({ contained = false }: AIChatAssistantProps) {
       supabase.from("project_tasks").select("*").order("sort_order", { ascending: true }).limit(500),
       supabase.from("site_attendance").select("*").order("date", { ascending: false }).limit(300),
       supabase.from("bom_progress_updates").select("*").order("update_date", { ascending: false }).limit(300),
-      supabase.from("bom_scopes").select("*").order("created_at", { ascending: false }).limit(500),
-      supabase.from("bom_items").select("*").order("created_at", { ascending: false }).limit(1000),
+      supabase.from("bom_scope_of_work").select("*").order("created_at", { ascending: false }).limit(500),
+      supabase.from("bom_materials").select("*").order("created_at", { ascending: false }).limit(1000),
       supabase.from("bom_indirect_costs").select("*").order("created_at", { ascending: false }).limit(200),
-      supabase.from("material_requests").select("*").order("request_date", { ascending: false }).limit(200),
       supabase.from("manpower_rate_catalog").select("*").limit(200),
     ]);
 
@@ -141,6 +139,11 @@ export function AIChatAssistant({ contained = false }: AIChatAssistantProps) {
       currentProjectId && allProjects.length > 0
         ? allProjects.find((project) => String(project.id) === String(currentProjectId)) || null
         : null;
+
+    // Filter material requests from site_requests
+    const materialRequestsData = Array.isArray(requests.data)
+      ? requests.data.filter((r: any) => r.request_type === "Materials")
+      : [];
 
     setProjectData({
       accounting: Array.isArray(vouchers.data) ? vouchers.data : [],
@@ -164,10 +167,10 @@ export function AIChatAssistant({ contained = false }: AIChatAssistantProps) {
       progressUpdates: Array.isArray(progress.data) ? progress.data : [],
       progress: Array.isArray(progress.data) ? progress.data : [],
       bomScopes: Array.isArray(bomScopes.data) ? bomScopes.data : [],
-      bomMaterials: Array.isArray(bomItems.data) ? bomItems.data : [],
-      bomItems: Array.isArray(bomItems.data) ? bomItems.data : [],
+      bomMaterials: Array.isArray(bomMaterials.data) ? bomMaterials.data : [],
+      bomItems: Array.isArray(bomMaterials.data) ? bomMaterials.data : [],
       bomIndirectCosts: Array.isArray(bomIndirectCosts.data) ? bomIndirectCosts.data : [],
-      materialRequests: Array.isArray(materialRequests.data) ? materialRequests.data : [],
+      materialRequests: materialRequestsData,
       manpowerCatalog: Array.isArray(manpowerCatalog.data) ? manpowerCatalog.data : [],
     });
 
