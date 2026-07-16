@@ -269,7 +269,7 @@ export default function Warehouse() {
     return matchCategory && matchDate;
   });
 
-  const totalValue = items.reduce((sum, item) => sum + (item.quantity * item.unit_cost), 0);
+  const totalValue = mainWarehouseItems.reduce((sum, item) => sum + (item.quantity * item.unit_cost), 0);
 
   if (loading) {
     return (
