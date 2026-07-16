@@ -211,16 +211,89 @@ function buildSystemPrompt(projectData: any, uiContext?: { module?: string; tab?
   if (allProjects?.length > 0) {
     prompt += `=== PROJECTS OVERVIEW ===\n`;
     prompt += `Total Projects: ${allProjects.length}\n`;
-    const activeProjects = allProjects.filter((p: any) => p.status === 'active');
-    const completedProjects = allProjects.filter((p: any) => p.status === 'completed');
-    prompt += `Active: ${activeProjects.length}, Completed: ${completedProjects.length}\n`;
     
-    if (activeProjects.length > 0 && queryType === "advanced") {
-      prompt += `Active Projects:\n`;
-      activeProjects.slice(0, 5).forEach((p: any) => {
-        prompt += `- ${p.name}: Budget ${formatCurrency(p.budget || 0)}\n`;
+    // Improved active project detection: check status field OR check for recent activity
+    const activeProjects = allProjects.filter((p: any) => {
+      // Explicit active status
+      if (p.status === 'active') return true;
+      
+      // Check for recent progress updates for this project
+      const hasRecentProgress = progressUpdates?.some((update: any) => 
+        update.project_id === p.id && 
+        new Date(update.update_date) > new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) // Last 90 days
+      );
+      
+      // Check for recent attendance for this project
+      const hasRecentAttendance = siteAttendance?.some((att: any) =>
+        att.project_id === p.id &&
+        new Date(att.date) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // Last 30 days
+      );
+      
+      // Check for scheduled tasks
+      const hasScheduledTasks = scheduleTasks?.some((task: any) => 
+        task.project_id === p.id && task.status !== 'completed'
+      );
+      
+      // Consider active if has progress, attendance, or open tasks
+      return hasRecentProgress || hasRecentAttendance || hasScheduledTasks;
+    });
+    
+    const completedProjects = allProjects.filter((p: any) => p.status === 'completed');
+    const ongoingProjects = activeProjects.filter((p: any) => p.status !== 'completed');
+    
+    prompt += `Active/Ongoing: ${ongoingProjects.length}, Completed: ${completedProjects.length}\n`;
+    
+    // Show details for ongoing projects
+    if (ongoingProjects.length > 0 && queryType === "advanced") {
+      prompt += `\nOngoing Projects:\n`;
+      ongoingProjects.slice(0, 5).forEach((p: any) => {
+        prompt += `- ${p.name}: Budget ${formatCurrency(p.budget || 0)}`;
+        
+        // Add progress info if available
+        const projectProgress = progressUpdates?.filter((u: any) => u.project_id === p.id);
+        if (projectProgress?.length > 0) {
+          const latestProgress = projectProgress.sort((a: any, b: any) => 
+            new Date(b.update_date).getTime() - new Date(a.update_date).getTime()
+          )[0];
+          if (latestProgress?.accomplishment_percentage) {
+            prompt += ` | Progress: ${latestProgress.accomplishment_percentage.toFixed(1)}%`;
+          }
+        }
+        
+        prompt += `\n`;
       });
     }
+    
+    // Add accomplishment summary for all projects
+    if (progressUpdates?.length > 0 && queryType === "advanced") {
+      prompt += `\nCurrent Project Accomplishments:\n`;
+      
+      // Group progress by project
+      const progressByProject = progressUpdates.reduce((acc: any, update: any) => {
+        if (!acc[update.project_id]) {
+          acc[update.project_id] = [];
+        }
+        acc[update.project_id].push(update);
+        return acc;
+      }, {});
+      
+      // Show latest accomplishment for each active project
+      ongoingProjects.forEach((project: any) => {
+        const projectUpdates = progressByProject[project.id] || [];
+        if (projectUpdates.length > 0) {
+          const latest = projectUpdates.sort((a: any, b: any) => 
+            new Date(b.update_date).getTime() - new Date(a.update_date).getTime()
+          )[0];
+          
+          prompt += `- ${project.name}: ${latest.accomplishment_percentage?.toFixed(1) || 0}% complete`;
+          if (latest.scope_name) {
+            prompt += ` (Latest: ${latest.scope_name})`;
+          }
+          prompt += `\n`;
+        }
+      });
+    }
+    
     prompt += `\n`;
   }
 
