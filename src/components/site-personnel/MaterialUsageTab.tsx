@@ -757,8 +757,8 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
                           <TableCell className="font-medium">{record.item_name}</TableCell>
                           <TableCell>{record.quantity}</TableCell>
                           <TableCell>{record.unit}</TableCell>
-                          <TableCell>{unitCost.toFixed(2)}</TableCell>
-                          <TableCell className="font-semibold">{totalCost.toFixed(2)}</TableCell>
+                          <TableCell>{record.unit_cost ? unitCost.toFixed(2) : "—"}</TableCell>
+                          <TableCell className="font-semibold">{record.unit_cost ? totalCost.toFixed(2) : "—"}</TableCell>
                           <TableCell className="max-w-[220px] truncate text-xs text-muted-foreground">{record.notes || "—"}</TableCell>
                           <TableCell>
                             <Button variant="ghost" size="icon" onClick={() => void handleDelete(record.id)}>
