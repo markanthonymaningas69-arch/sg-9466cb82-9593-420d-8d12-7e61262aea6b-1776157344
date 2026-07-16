@@ -18,6 +18,7 @@ interface MaterialUsage {
   item_name: string;
   quantity: number;
   unit: string;
+  unit_cost?: number | null;
   date_used: string;
   notes?: string | null;
   created_at: string;
@@ -49,6 +50,7 @@ interface MaterialUsageFormData {
   item_name: string;
   quantity: string;
   unit: string;
+  unit_cost: string;
   date_used: string;
   notes: string;
 }
@@ -59,6 +61,7 @@ function getDefaultFormData(): MaterialUsageFormData {
     item_name: "",
     quantity: "",
     unit: "",
+    unit_cost: "",
     date_used: new Date().toISOString().split("T")[0],
     notes: "",
   };
@@ -173,11 +176,17 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
   const historySummary = useMemo(() => {
     const scopeCount = new Set(filteredUsageRecords.map((record) => getScopeLabel(record))).size;
     const totalQuantity = filteredUsageRecords.reduce((sum, record) => sum + Number(record.quantity || 0), 0);
+    const grandTotal = filteredUsageRecords.reduce((sum, record) => {
+      const qty = Number(record.quantity || 0);
+      const cost = Number(record.unit_cost || 0);
+      return sum + (qty * cost);
+    }, 0);
 
     return {
       recordCount: filteredUsageRecords.length,
       scopeCount,
       totalQuantity,
+      grandTotal,
     };
   }, [filteredUsageRecords]);
 
@@ -198,6 +207,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
           item_name,
           quantity,
           unit,
+          unit_cost,
           date_used,
           notes,
           created_at,
@@ -287,6 +297,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
         item_name: formData.item_name,
         quantity: Number(formData.quantity),
         unit: formData.unit,
+        unit_cost: formData.unit_cost ? Number(formData.unit_cost) : null,
         date_used: formData.date_used,
         notes: formData.notes || null,
         recorded_by: "Site Personnel",
@@ -548,6 +559,18 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
               </div>
 
               <div>
+                <Label htmlFor="unit_cost">Unit Cost (Optional)</Label>
+                <Input
+                  id="unit_cost"
+                  type="number"
+                  step="0.01"
+                  value={formData.unit_cost}
+                  onChange={(event) => setFormData((prev) => ({ ...prev, unit_cost: event.target.value }))}
+                  placeholder="0.00"
+                />
+              </div>
+
+              <div>
                 <Label htmlFor="date_used">Usage Date</Label>
                 <Input
                   id="date_used"
@@ -698,6 +721,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
                 <span>{historySummary.recordCount} records</span>
                 <span>{historySummary.scopeCount} scopes</span>
                 <span>Total quantity used: {historySummary.totalQuantity}</span>
+                <span className="font-semibold">Grand Total: {historySummary.grandTotal.toFixed(2)}</span>
               </div>
             </div>
 
@@ -715,26 +739,40 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
                       <TableHead>Material Name</TableHead>
                       <TableHead>Quantity Used</TableHead>
                       <TableHead>Unit</TableHead>
+                      <TableHead>Unit Cost</TableHead>
+                      <TableHead>Total Cost</TableHead>
                       <TableHead>Notes</TableHead>
                       <TableHead className="w-[80px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredUsageRecords.map((record) => (
-                      <TableRow key={record.id}>
-                        <TableCell>{new Date(record.date_used).toLocaleDateString()}</TableCell>
-                        <TableCell>{getScopeLabel(record)}</TableCell>
-                        <TableCell className="font-medium">{record.item_name}</TableCell>
-                        <TableCell>{record.quantity}</TableCell>
-                        <TableCell>{record.unit}</TableCell>
-                        <TableCell className="max-w-[220px] truncate text-xs text-muted-foreground">{record.notes || "—"}</TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="icon" onClick={() => void handleDelete(record.id)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {filteredUsageRecords.map((record) => {
+                      const unitCost = Number(record.unit_cost || 0);
+                      const totalCost = Number(record.quantity || 0) * unitCost;
+                      
+                      return (
+                        <TableRow key={record.id}>
+                          <TableCell>{new Date(record.date_used).toLocaleDateString()}</TableCell>
+                          <TableCell>{getScopeLabel(record)}</TableCell>
+                          <TableCell className="font-medium">{record.item_name}</TableCell>
+                          <TableCell>{record.quantity}</TableCell>
+                          <TableCell>{record.unit}</TableCell>
+                          <TableCell>{unitCost.toFixed(2)}</TableCell>
+                          <TableCell className="font-semibold">{totalCost.toFixed(2)}</TableCell>
+                          <TableCell className="max-w-[220px] truncate text-xs text-muted-foreground">{record.notes || "—"}</TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="icon" onClick={() => void handleDelete(record.id)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    <TableRow className="bg-muted/50 font-semibold border-t-2">
+                      <TableCell colSpan={6} className="text-right">Grand Total:</TableCell>
+                      <TableCell className="font-bold text-primary">{historySummary.grandTotal.toFixed(2)}</TableCell>
+                      <TableCell colSpan={2}></TableCell>
+                    </TableRow>
                   </TableBody>
                 </Table>
               </div>

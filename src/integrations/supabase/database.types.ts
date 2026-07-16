@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -1363,6 +1363,7 @@ export type Database = {
           quantity: number
           recorded_by: string | null
           unit: string
+          unit_cost: number | null
         }
         Insert: {
           archived_at?: string | null
@@ -1379,6 +1380,7 @@ export type Database = {
           quantity: number
           recorded_by?: string | null
           unit: string
+          unit_cost?: number | null
         }
         Update: {
           archived_at?: string | null
@@ -1395,6 +1397,7 @@ export type Database = {
           quantity?: number
           recorded_by?: string | null
           unit?: string
+          unit_cost?: number | null
         }
         Relationships: [
           {
