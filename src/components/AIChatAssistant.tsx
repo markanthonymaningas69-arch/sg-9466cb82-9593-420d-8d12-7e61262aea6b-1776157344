@@ -108,6 +108,11 @@ export function AIChatAssistant({ contained = false }: AIChatAssistantProps) {
       tasks,
       attendance,
       progress,
+      bomScopes,
+      bomItems,
+      bomIndirectCosts,
+      materialRequests,
+      manpowerCatalog,
     ] = await Promise.all([
       supabase.from("vouchers").select("*").order("date", { ascending: false }).limit(200),
       supabase.from("accounting_transactions").select("*").order("date", { ascending: false }).limit(200),
@@ -124,6 +129,11 @@ export function AIChatAssistant({ contained = false }: AIChatAssistantProps) {
       supabase.from("project_tasks").select("*").order("sort_order", { ascending: true }).limit(500),
       supabase.from("site_attendance").select("*").order("date", { ascending: false }).limit(300),
       supabase.from("bom_progress_updates").select("*").order("update_date", { ascending: false }).limit(300),
+      supabase.from("bom_scopes").select("*").order("created_at", { ascending: false }).limit(500),
+      supabase.from("bom_items").select("*").order("created_at", { ascending: false }).limit(1000),
+      supabase.from("bom_indirect_costs").select("*").order("created_at", { ascending: false }).limit(200),
+      supabase.from("material_requests").select("*").order("request_date", { ascending: false }).limit(200),
+      supabase.from("manpower_rate_catalog").select("*").limit(200),
     ]);
 
     const allProjects = Array.isArray(projects.data) ? projects.data : [];
@@ -153,6 +163,12 @@ export function AIChatAssistant({ contained = false }: AIChatAssistantProps) {
       attendance: Array.isArray(attendance.data) ? attendance.data : [],
       progressUpdates: Array.isArray(progress.data) ? progress.data : [],
       progress: Array.isArray(progress.data) ? progress.data : [],
+      bomScopes: Array.isArray(bomScopes.data) ? bomScopes.data : [],
+      bomMaterials: Array.isArray(bomItems.data) ? bomItems.data : [],
+      bomItems: Array.isArray(bomItems.data) ? bomItems.data : [],
+      bomIndirectCosts: Array.isArray(bomIndirectCosts.data) ? bomIndirectCosts.data : [],
+      materialRequests: Array.isArray(materialRequests.data) ? materialRequests.data : [],
+      manpowerCatalog: Array.isArray(manpowerCatalog.data) ? manpowerCatalog.data : [],
     });
 
     setIsDataLoading(false);

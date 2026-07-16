@@ -174,6 +174,8 @@ function buildSystemPrompt(projectData: any, uiContext?: { module?: string; tab?
   const bomMaterials = projectData.bomMaterials;
   const bomIndirectCosts = projectData.bomIndirectCosts;
   const focusedProject = projectData.focusedProject;
+  const materialRequests = projectData.materialRequests || [];
+  const manpowerCatalog = projectData.manpowerCatalog || [];
 
   let prompt = `You are an AI assistant analyzing construction management system data.\n\n`;
   
@@ -392,14 +394,26 @@ function buildSystemPrompt(projectData: any, uiContext?: { module?: string; tab?
     prompt += `BOM Scopes: ${bomScopes?.length || 0}\n`;
     prompt += `BOM Materials: ${bomMaterials?.length || 0}\n`;
     prompt += `Indirect Cost Lines: ${bomIndirectCosts?.length || 0}\n`;
-    prompt += `Progress Updates: ${progressUpdates?.length || 0}\n\n`;
+    prompt += `Progress Updates: ${progressUpdates?.length || 0}\n`;
+    
+    // Calculate BOM totals
+    if (bomScopes?.length > 0) {
+      const totalBomBudget = bomScopes.reduce((sum: number, scope: any) => sum + (Number(scope.total_cost) || 0), 0);
+      prompt += `Total BOM Budget: ${formatCurrency(totalBomBudget)}\n`;
+    }
+    if (bomMaterials?.length > 0) {
+      const totalMaterialsCost = bomMaterials.reduce((sum: number, item: any) => sum + ((Number(item.quantity) || 0) * (Number(item.unit_cost) || 0)), 0);
+      prompt += `Total Materials Cost: ${formatCurrency(totalMaterialsCost)}\n`;
+    }
+    prompt += `\n`;
   }
 
-  if ((deliveries?.length > 0 || materialConsumption?.length > 0 || siteRequests?.length > 0 || siteAttendance?.length > 0) && queryType === "advanced") {
+  if ((deliveries?.length > 0 || materialConsumption?.length > 0 || siteRequests?.length > 0 || siteAttendance?.length > 0 || materialRequests?.length > 0) && queryType === "advanced") {
     prompt += `=== SITE PERSONNEL ===\n`;
     prompt += `Deliveries: ${deliveries?.length || 0}\n`;
     prompt += `Material Usage Logs: ${materialConsumption?.length || 0}\n`;
     prompt += `Site Requests: ${siteRequests?.length || 0}\n`;
+    prompt += `Material Requests: ${materialRequests?.length || 0}\n`;
     prompt += `Attendance Records: ${siteAttendance?.length || 0}\n`;
 
     const totalConsumedItems = Array.isArray(materialConsumption)
@@ -408,13 +422,27 @@ function buildSystemPrompt(projectData: any, uiContext?: { module?: string; tab?
     if (totalConsumedItems > 0) {
       prompt += `Total Logged Material Consumption Quantity: ${totalConsumedItems}\n`;
     }
+    
+    // Material requests summary
+    if (materialRequests?.length > 0) {
+      const pendingRequests = materialRequests.filter((r: any) => r.status === 'pending').length;
+      const approvedRequests = materialRequests.filter((r: any) => r.status === 'approved').length;
+      prompt += `Material Requests Status: Pending: ${pendingRequests}, Approved: ${approvedRequests}\n`;
+    }
     prompt += `\n`;
   }
 
-  if ((cashAdvances?.length > 0 || leaveRequests?.length > 0) && queryType === "advanced") {
-    prompt += `=== HR & WORKFORCE REQUESTS ===\n`;
+  if ((cashAdvances?.length > 0 || leaveRequests?.length > 0 || manpowerCatalog?.length > 0) && queryType === "advanced") {
+    prompt += `=== HR & WORKFORCE ===\n`;
     prompt += `Cash Advance Requests: ${cashAdvances?.length || 0}\n`;
-    prompt += `Leave Requests: ${leaveRequests?.length || 0}\n\n`;
+    prompt += `Leave Requests: ${leaveRequests?.length || 0}\n`;
+    prompt += `Manpower Rate Catalog Entries: ${manpowerCatalog?.length || 0}\n`;
+    
+    if (manpowerCatalog?.length > 0) {
+      const avgDailyRate = manpowerCatalog.reduce((sum: number, m: any) => sum + (Number(m.daily_rate) || 0), 0) / manpowerCatalog.length;
+      prompt += `Average Daily Rate: ${formatCurrency(avgDailyRate)}\n`;
+    }
+    prompt += `\n`;
   }
 
   prompt += `=== RESPONSE RULES ===\n`;
