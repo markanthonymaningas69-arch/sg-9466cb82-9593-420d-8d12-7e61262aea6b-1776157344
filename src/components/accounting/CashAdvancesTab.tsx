@@ -116,6 +116,9 @@ export function CashAdvancesTab() {
         cashAdvancesService.getSummaryStats(),
       ]);
 
+      console.log("Cash Advances - Personnel loaded:", personnelResponse.data?.length || 0);
+      console.log("Cash Advances - Projects loaded:", projectsResponse.data?.length || 0);
+
       setAdvances(advancesData);
       setPersonnel(personnelResponse.data || []);
       setProjects(projectsResponse.data || []);
@@ -341,16 +344,27 @@ export function CashAdvancesTab() {
                   onValueChange={handlePersonnelSelect}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select personnel" />
+                    <SelectValue placeholder={personnel.length === 0 ? "No personnel available - Add in HR first" : "Select personnel"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {personnel.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name} - {p.position}
-                      </SelectItem>
-                    ))}
+                    {personnel.length === 0 ? (
+                      <div className="p-2 text-sm text-muted-foreground text-center">
+                        No personnel found. Please add workers in the Human Resources tab first.
+                      </div>
+                    ) : (
+                      personnel.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name} - {p.position}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
+                {personnel.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    ⚠️ You need to add personnel in the Human Resources tab before recording cash advances
+                  </p>
+                )}
               </div>
 
               <div>
