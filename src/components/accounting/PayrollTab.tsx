@@ -229,6 +229,8 @@ export function PayrollTab() {
     
     try {
       console.log("PayrollTab - Starting voucher creation...");
+      
+      // Get next voucher number
       const { data: existingVouchers } = await supabase.from('vouchers').select('id').eq('type', 'payment');
       const nextNum = (existingVouchers?.length || 0) + 1;
       const vNumber = `PV-${new Date().getFullYear()}-${String(nextNum).padStart(3, '0')}`;
@@ -239,26 +241,26 @@ export function PayrollTab() {
 
       const voucherPayload = {
         voucher_number: vNumber,
-        type: "payment",
+        type: "payment" as const,
         date: new Date().toISOString().split("T")[0],
         payee: `Payroll: ${projName}`,
         description: `Automated Payroll Generation: ${filters.startDate} to ${filters.endDate} for ${projName}`,
         amount: totalNetPay,
-        status: "pending",
         project_id: filters.projectId === "all" ? null : filters.projectId
       };
 
       console.log("PayrollTab - Voucher payload:", voucherPayload);
 
-      const { data: createdVoucher, error: voucherError } = await supabase
-        .from('vouchers')
-        .insert(voucherPayload)
-        .select()
-        .single();
+      // Use the accounting service to create voucher (handles approval center)
+      const { data: createdVoucher, error: voucherError } = await accountingService.createVoucher(voucherPayload);
 
       if (voucherError) {
         console.error("PayrollTab - Voucher creation error:", voucherError);
         throw voucherError;
+      }
+
+      if (!createdVoucher) {
+        throw new Error("Voucher was not created");
       }
 
       console.log("PayrollTab - Voucher created:", createdVoucher);
@@ -285,7 +287,12 @@ export function PayrollTab() {
 
         if (deductionsError) {
           console.error("PayrollTab - Error saving deductions:", deductionsError);
-          throw deductionsError;
+          // Don't throw - voucher is already created, just log the error
+          toast({
+            title: "Warning",
+            description: "Voucher created but deductions may not be saved. Check console for details.",
+            variant: "destructive"
+          });
         }
       }
 
@@ -305,26 +312,35 @@ export function PayrollTab() {
 
       console.log("PayrollTab - Cash Advance Deductions to create:", cashAdvanceDeductions);
 
-      // Create deduction promises
-      const deductionPromises = cashAdvanceDeductions.map(d => 
-        cashAdvancesService.createCashAdvanceDeduction({
-          cash_advance_id: d.cash_advance_id,
-          amount: d.amount,
-          deduction_date: d.deduction_date,
-          deduction_source: d.deduction_source,
-          notes: d.notes
-        })
-      );
+      if (cashAdvanceDeductions.length > 0) {
+        // Create deduction promises
+        const deductionPromises = cashAdvanceDeductions.map(d => 
+          cashAdvancesService.createCashAdvanceDeduction({
+            cash_advance_id: d.cash_advance_id,
+            amount: d.amount,
+            deduction_date: d.deduction_date,
+            deduction_source: d.deduction_source,
+            notes: d.notes
+          })
+        );
 
-      const deductionResults = await Promise.all(deductionPromises);
-      console.log("PayrollTab - Deductions created successfully:", deductionResults);
+        try {
+          const deductionResults = await Promise.all(deductionPromises);
+          console.log("PayrollTab - Cash advance deductions created successfully:", deductionResults);
+        } catch (caError) {
+          console.error("PayrollTab - Error creating cash advance deductions:", caError);
+          // Don't throw - voucher is already created
+        }
+      }
 
       toast({ 
         title: "Payroll Processed!", 
-        description: `Voucher created for ${formatCurrency(totalNetPay)} and ${deductionPromises.length} cash advance deductions recorded.`,
+        description: `Voucher ${vNumber} created for ${formatCurrency(totalNetPay)}${cashAdvanceDeductions.length > 0 ? ` with ${cashAdvanceDeductions.length} cash advance deductions` : ''}.`,
         className: "bg-emerald-600 text-white border-emerald-700" 
       });
 
+      // Clear payroll data after successful submission
+      setPayrollData([]);
       loadPayroll();
     } catch (error: any) {
       console.error("PayrollTab - Error processing payroll:", error);
