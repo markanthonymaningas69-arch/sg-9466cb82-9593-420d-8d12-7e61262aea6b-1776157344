@@ -209,10 +209,26 @@ export function PayrollTab() {
   };
 
   const handleSendToVoucher = async () => {
-    if (payrollData.length === 0) return;
+    console.log("PayrollTab - Send to Voucher clicked");
+    console.log("PayrollTab - Payroll data count:", payrollData.length);
+    console.log("PayrollTab - Total net pay:", totalNetPay);
+    console.log("PayrollTab - Is sending:", isSending);
+    console.log("PayrollTab - Is locked:", isLocked);
+    
+    if (payrollData.length === 0) {
+      console.log("PayrollTab - No payroll data, returning");
+      toast({
+        title: "No payroll data",
+        description: "Generate payroll first by clicking 'Apply Filter'",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setIsSending(true);
     
     try {
+      console.log("PayrollTab - Starting voucher creation...");
       const { data: existingVouchers } = await supabase.from('vouchers').select('id').eq('type', 'payment');
       const nextNum = (existingVouchers?.length || 0) + 1;
       const vNumber = `PV-${new Date().getFullYear()}-${String(nextNum).padStart(3, '0')}`;
@@ -232,13 +248,18 @@ export function PayrollTab() {
         project_id: filters.projectId === "all" ? null : filters.projectId
       };
 
+      console.log("PayrollTab - Voucher payload:", voucherPayload);
+
       const { data: createdVoucher, error: voucherError } = await supabase
         .from('vouchers')
         .insert(voucherPayload)
         .select()
         .single();
 
-      if (voucherError) throw voucherError;
+      if (voucherError) {
+        console.error("PayrollTab - Voucher creation error:", voucherError);
+        throw voucherError;
+      }
 
       console.log("PayrollTab - Voucher created:", createdVoucher);
 
@@ -307,9 +328,15 @@ export function PayrollTab() {
       loadPayroll();
     } catch (error: any) {
       console.error("PayrollTab - Error processing payroll:", error);
+      console.error("PayrollTab - Error details:", {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      });
       toast({ 
         title: "Failed to process payroll", 
-        description: error.message, 
+        description: error.message || "Unknown error occurred. Check browser console for details.", 
         variant: "destructive" 
       });
     } finally {
