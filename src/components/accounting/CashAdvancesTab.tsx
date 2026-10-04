@@ -322,6 +322,19 @@ export function CashAdvancesTab() {
               ))}
             </SelectContent>
           </Select>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => {
+              loadData();
+              if (selectedPersonnel) {
+                loadPersonnelAdvances(selectedPersonnel);
+              }
+            }}
+            disabled={loading}
+          >
+            {loading ? "Refreshing..." : "Refresh"}
+          </Button>
         </div>
 
         <Dialog open={newAdvanceOpen} onOpenChange={setNewAdvanceOpen}>
