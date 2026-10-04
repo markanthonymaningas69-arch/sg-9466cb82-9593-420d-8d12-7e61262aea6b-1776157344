@@ -48,6 +48,21 @@ export function CashAdvancesTab() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ totalActive: 0, totalOutstanding: 0, personnelWithAdvances: 0 });
 
+  // Edit advance state
+  const [editAdvanceOpen, setEditAdvanceOpen] = useState(false);
+  const [editingAdvance, setEditingAdvance] = useState<CashAdvance | null>(null);
+  const [editForm, setEditForm] = useState({
+    amount: "",
+    date: "",
+    purpose: "",
+    notes: "",
+    project_id: "",
+  });
+
+  // Delete confirmation state
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [advanceToDelete, setAdvanceToDelete] = useState<string | null>(null);
+
   // New advance form state
   const [newAdvanceOpen, setNewAdvanceOpen] = useState(false);
   const [newAdvanceForm, setNewAdvanceForm] = useState({
@@ -189,6 +204,198 @@ export function CashAdvancesTab() {
         variant: "destructive",
       });
     }
+  };
+
+  const handleEditAdvance = (advance: CashAdvance) => {
+    setEditingAdvance(advance);
+    setEditForm({
+      amount: advance.amount.toString(),
+      date: advance.date,
+      purpose: advance.purpose || "",
+      notes: advance.notes || "",
+      project_id: advance.project_id || "",
+    });
+    setEditAdvanceOpen(true);
+  };
+
+  const handleUpdateAdvance = async () => {
+    if (!editingAdvance) return;
+
+    try {
+      await cashAdvancesService.updateCashAdvance(editingAdvance.id, {
+        amount: parseFloat(editForm.amount),
+        date: editForm.date,
+        purpose: editForm.purpose || undefined,
+        notes: editForm.notes || undefined,
+        project_id: editForm.project_id || null,
+      });
+
+      toast({
+        title: "Success",
+        description: "Cash advance updated successfully",
+      });
+
+      setEditAdvanceOpen(false);
+      setEditingAdvance(null);
+      loadData();
+      if (selectedPersonnel) {
+        loadPersonnelAdvances(selectedPersonnel);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error updating advance",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteAdvance = async () => {
+    if (!advanceToDelete) return;
+
+    try {
+      await cashAdvancesService.deleteCashAdvance(advanceToDelete);
+
+      toast({
+        title: "Success",
+        description: "Cash advance deleted successfully",
+      });
+
+      setDeleteConfirmOpen(false);
+      setAdvanceToDelete(null);
+      loadData();
+      if (selectedPersonnel) {
+        loadPersonnelAdvances(selectedPersonnel);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error deleting advance",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handlePrintPersonnelReport = () => {
+    if (!selectedPersonnel) return;
+
+    const personnelData = personnel.find(p => p.id === selectedPersonnel);
+    if (!personnelData) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const totalAdvances = personnelAdvances.reduce((sum, a) => sum + a.amount, 0);
+    const totalDeductions = personnelAdvances.reduce((sum, a) => 
+      sum + a.deductions.reduce((dSum, d) => dSum + d.amount, 0), 0);
+    const totalOutstanding = personnelAdvances.reduce((sum, a) => sum + a.balance, 0);
+
+    const advanceRows = personnelAdvances.map(advance => {
+      const deductionsList = advance.deductions.map(d => 
+        `<tr style="background: #f9fafb;">
+          <td style="padding: 8px; border: 1px solid #ddd; padding-left: 40px;">${format(new Date(d.deduction_date), "MMM dd, yyyy")}</td>
+          <td style="padding: 8px; border: 1px solid #ddd; text-align: right; color: #dc2626;">-${formatCurrency(d.amount)}</td>
+          <td style="padding: 8px; border: 1px solid #ddd; font-size: 12px;">${d.deduction_source}</td>
+          <td style="padding: 8px; border: 1px solid #ddd; font-size: 12px; color: #6b7280;">${d.notes || '-'}</td>
+        </tr>`
+      ).join('');
+
+      return `
+        <tr>
+          <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">${format(new Date(advance.date), "MMM dd, yyyy")}</td>
+          <td style="padding: 8px; border: 1px solid #ddd; text-align: right; font-weight: bold;">${formatCurrency(advance.amount)}</td>
+          <td style="padding: 8px; border: 1px solid #ddd;"><span class="badge ${advance.status === 'active' ? 'bg-blue' : advance.status === 'fully_paid' ? 'bg-green' : 'bg-gray'}">${advance.status}</span></td>
+          <td style="padding: 8px; border: 1px solid #ddd; font-size: 12px;">${advance.purpose || '-'}</td>
+        </tr>
+        ${deductionsList}
+        <tr style="background: #e0f2fe;">
+          <td colspan="2" style="padding: 8px; border: 1px solid #ddd; text-align: right; font-weight: bold;">Balance:</td>
+          <td colspan="2" style="padding: 8px; border: 1px solid #ddd; font-weight: bold; color: ${advance.balance > 0 ? '#dc2626' : '#059669'};">${formatCurrency(advance.balance)}</td>
+        </tr>
+        <tr style="height: 10px;"><td colspan="4" style="border: none;"></td></tr>
+      `;
+    }).join('');
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Cash Advance Report - ${personnelData.name}</title>
+          <style>
+            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 40px; color: #222; margin: 0; }
+            .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 15px; }
+            .header h1 { margin: 0; font-size: 24px; text-transform: uppercase; letter-spacing: 1px; }
+            .header p { margin: 5px 0 0 0; font-size: 14px; color: #555; }
+            .info-section { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+            .info-item { display: flex; }
+            .label { font-weight: bold; width: 120px; }
+            .value { flex: 1; }
+            table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 13px; }
+            th { background: #111; color: white; padding: 10px 8px; text-align: left; border: 1px solid #000; font-size: 11px; text-transform: uppercase; }
+            .summary-box { margin-top: 30px; display: flex; justify-content: flex-end; gap: 40px; padding: 20px; background: #f9fafb; border: 1px solid #ddd; }
+            .summary-item { text-align: right; }
+            .summary-label { font-size: 12px; color: #6b7280; margin-bottom: 5px; }
+            .summary-value { font-size: 20px; font-weight: bold; }
+            .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; text-transform: uppercase; font-weight: bold; }
+            .bg-blue { background: #3b82f6; color: white; }
+            .bg-green { background: #10b981; color: white; }
+            .bg-gray { background: #6b7280; color: white; }
+            @media print {
+              body { padding: 20px; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>CASH ADVANCE REPORT</h1>
+            <p>Complete History of Advances and Deductions</p>
+          </div>
+          
+          <div class="info-section">
+            <div class="info-item"><div class="label">Employee:</div><div class="value">${personnelData.name}</div></div>
+            <div class="info-item"><div class="label">Position:</div><div class="value">${personnelData.role || '-'}</div></div>
+            <div class="info-item"><div class="label">Report Date:</div><div class="value">${format(new Date(), "MMMM dd, yyyy")}</div></div>
+            <div class="info-item"><div class="label">Total Advances:</div><div class="value">${personnelAdvances.length}</div></div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th style="text-align: right;">Amount</th>
+                <th>Status</th>
+                <th>Purpose</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${advanceRows}
+            </tbody>
+          </table>
+
+          <div class="summary-box">
+            <div class="summary-item">
+              <div class="summary-label">Total Advances</div>
+              <div class="summary-value">${formatCurrency(totalAdvances)}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Total Deductions</div>
+              <div class="summary-value" style="color: #059669;">-${formatCurrency(totalDeductions)}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Total Outstanding</div>
+              <div class="summary-value" style="color: ${totalOutstanding > 0 ? '#dc2626' : '#059669'};">${formatCurrency(totalOutstanding)}</div>
+            </div>
+          </div>
+          
+          <script>
+            window.onload = function() { window.print(); }
+          </script>
+        </body>
+      </html>
+    `;
+    
+    printWindow.document.write(html);
+    printWindow.document.close();
   };
 
   const formatCurrency = (amount: number) => {
@@ -400,14 +607,123 @@ export function CashAdvancesTab() {
         </Dialog>
       </div>
 
+      {/* Edit Advance Dialog */}
+      <Dialog open={editAdvanceOpen} onOpenChange={setEditAdvanceOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Cash Advance</DialogTitle>
+            <DialogDescription>Update cash advance details</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Amount *</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={editForm.amount}
+                onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })}
+                placeholder="0.00"
+              />
+            </div>
+
+            <div>
+              <Label>Date *</Label>
+              <Input
+                type="date"
+                value={editForm.date}
+                onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <Label>Project</Label>
+              <Select
+                value={editForm.project_id || "none"}
+                onValueChange={(val) => setEditForm({ ...editForm, project_id: val === "none" ? "" : val })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select project (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Purpose</Label>
+              <Input
+                value={editForm.purpose}
+                onChange={(e) => setEditForm({ ...editForm, purpose: e.target.value })}
+                placeholder="e.g., Emergency, Travel, etc."
+              />
+            </div>
+
+            <div>
+              <Label>Notes</Label>
+              <Textarea
+                value={editForm.notes}
+                onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                placeholder="Additional notes..."
+                rows={3}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setEditAdvanceOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleUpdateAdvance}>Save Changes</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Cash Advance</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this cash advance? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteAdvance}>
+              Delete
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Main Content */}
       {selectedPersonnel ? (
         <Card>
           <CardHeader>
-            <CardTitle>
-              Cash Advance History - {personnel.find((p) => p.id === selectedPersonnel)?.name}
-            </CardTitle>
-            <CardDescription>Complete history of advances and deductions</CardDescription>
+            <div className="flex justify-between items-center">
+              <div>
+                <CardTitle>
+                  Cash Advance History - {personnel.find((p) => p.id === selectedPersonnel)?.name}
+                </CardTitle>
+                <CardDescription>Complete history of advances and deductions</CardDescription>
+              </div>
+              <Button onClick={handlePrintPersonnelReport} variant="outline">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+                  <polyline points="6 9 6 2 18 2 18 9"/>
+                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+                  <rect width="12" height="8" x="6" y="14"/>
+                </svg>
+                Print Report
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
@@ -426,9 +742,39 @@ export function CashAdvancesTab() {
                         <p className="text-sm text-muted-foreground">Project: {advance.project.name}</p>
                       )}
                     </div>
-                    <div className="text-right">
-                      <div className="text-sm text-muted-foreground">Outstanding:</div>
-                      <div className="text-lg font-bold">{formatCurrency(advance.balance)}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-right mr-4">
+                        <div className="text-sm text-muted-foreground">Outstanding:</div>
+                        <div className="text-lg font-bold">{formatCurrency(advance.balance)}</div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        onClick={() => handleEditAdvance(advance)}
+                        title="Edit"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                          <path d="m15 5 4 4"/>
+                        </svg>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => {
+                          setAdvanceToDelete(advance.id);
+                          setDeleteConfirmOpen(true);
+                        }}
+                        title="Delete"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 6h18"/>
+                          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                        </svg>
+                      </Button>
                     </div>
                   </div>
 
@@ -483,6 +829,7 @@ export function CashAdvancesTab() {
                   <TableHead>Balance</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Purpose</TableHead>
+                  <TableHead className="text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -502,6 +849,38 @@ export function CashAdvancesTab() {
                       <Badge className={getStatusColor(advance.status)}>{advance.status}</Badge>
                     </TableCell>
                     <TableCell className="text-sm">{advance.purpose || "-"}</TableCell>
+                    <TableCell>
+                      <div className="flex justify-center gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          onClick={() => handleEditAdvance(advance)}
+                          title="Edit"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                            <path d="m15 5 4 4"/>
+                          </svg>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => {
+                            setAdvanceToDelete(advance.id);
+                            setDeleteConfirmOpen(true);
+                          }}
+                          title="Delete"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 6h18"/>
+                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                          </svg>
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

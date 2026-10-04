@@ -217,6 +217,32 @@ export const cashAdvancesService = {
     if (error) throw error;
   },
 
+  async updateCashAdvance(id: string, updates: Partial<CashAdvance>) {
+    const { data, error } = await supabase
+      .from("cash_advances")
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data;
+  },
+
+  async deleteCashAdvance(id: string) {
+    const { error } = await supabase
+      .from("cash_advances")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  },
+
   // Delete cash advance deduction
   async deleteDeduction(deductionId: string): Promise<void> {
     const { error } = await supabase
