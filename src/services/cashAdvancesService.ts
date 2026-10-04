@@ -59,7 +59,7 @@ export const cashAdvancesService = {
       .order("date", { ascending: false });
 
     if (error) throw error;
-    return data as CashAdvance[];
+    return (data || []) as unknown as CashAdvance[];
   },
 
   // Get cash advances by personnel
@@ -97,7 +97,7 @@ export const cashAdvancesService = {
         return {
           ...advance,
           deductions: deductions || [],
-        } as CashAdvanceWithDeductions;
+        } as unknown as CashAdvanceWithDeductions;
       })
     );
 
@@ -135,7 +135,7 @@ export const cashAdvancesService = {
       .single();
 
     if (error) throw error;
-    return data as CashAdvance;
+    return data as unknown as CashAdvance;
   },
 
   // Add deduction to cash advance

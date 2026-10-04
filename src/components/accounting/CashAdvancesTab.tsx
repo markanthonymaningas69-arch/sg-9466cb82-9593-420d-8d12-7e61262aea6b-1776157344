@@ -81,16 +81,16 @@ export function CashAdvancesTab() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [advancesData, personnelData, projectsData, statsData] = await Promise.all([
+      const [advancesData, personnelResponse, projectsResponse, statsData] = await Promise.all([
         cashAdvancesService.getAllCashAdvances(),
-        personnelService.getAllPersonnel(),
-        projectService.getAllProjects(),
+        personnelService.getAll(),
+        projectService.getAll(),
         cashAdvancesService.getSummaryStats(),
       ]);
 
       setAdvances(advancesData);
-      setPersonnel(personnelData);
-      setProjects(projectsData);
+      setPersonnel(personnelResponse.data || []);
+      setProjects(projectsResponse.data || []);
       setStats(statsData);
     } catch (error: any) {
       toast({

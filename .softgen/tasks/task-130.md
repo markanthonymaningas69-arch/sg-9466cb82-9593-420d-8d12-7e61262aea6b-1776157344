@@ -17,12 +17,12 @@ Add a Cash Advances management tab to the accounting module where users can:
 - See outstanding balances
 
 ## Checklist
-- [ ] Create cash_advances table with worker_id, amount, date, status, deduction tracking
-- [ ] Create cash_advance_deductions table for tracking repayment history
-- [ ] Create CashAdvancesTab.tsx component with advance entry form and history view
-- [ ] Add cashAdvancesService.ts for database operations
-- [ ] Update accounting.tsx to include the new Cash Advances tab
-- [ ] Add RLS policies for cash advances tables
+- [x] Create cash_advances table with worker_id, amount, date, status, deduction tracking
+- [x] Create cash_advance_deductions table for tracking repayment history
+- [x] Create CashAdvancesTab.tsx component with advance entry form and history view
+- [x] Add cashAdvancesService.ts for database operations
+- [x] Update accounting.tsx to include the new Cash Advances tab
+- [x] Add RLS policies for cash advances tables
 
 ## Acceptance
 - Users can record new cash advances for any worker
