@@ -32,6 +32,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cashAdvancesService, CashAdvance, CashAdvanceWithDeductions } from "@/services/cashAdvancesService";
 import { personnelService } from "@/services/personnelService";
 import { projectService } from "@/services/projectService";
+import { supabase } from "@/integrations/supabase/client";
 import { Plus, MinusCircle, Wallet, Users, TrendingUp } from "lucide-react";
 import { format } from "date-fns";
 import { useSettings } from "@/contexts/SettingsProvider";
@@ -67,6 +68,41 @@ export function CashAdvancesTab() {
     deduction_source: "manual",
     notes: "",
   });
+
+  // Handler for personnel selection - auto-fills project
+  const handlePersonnelSelect = async (personnelId: string) => {
+    setNewAdvanceForm({ ...newAdvanceForm, personnel_id: personnelId, project_id: "" });
+    
+    try {
+      // Fetch the personnel's current site assignment
+      const { data: assignments, error } = await supabase
+        .from("site_assignments")
+        .select("project_id, projects(id, name)")
+        .eq("personnel_id", personnelId)
+        .eq("status", "active")
+        .order("assigned_date", { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      // Auto-fill project if personnel has an active assignment
+      if (assignments && assignments.length > 0 && assignments[0].project_id) {
+        setNewAdvanceForm(prev => ({ 
+          ...prev, 
+          personnel_id: personnelId,
+          project_id: assignments[0].project_id 
+        }));
+        
+        toast({
+          title: "Project auto-filled",
+          description: `Assigned to: ${assignments[0].projects?.name}`,
+        });
+      }
+    } catch (error: any) {
+      console.error("Error fetching assignment:", error);
+      // Don't show error toast, just leave project empty
+    }
+  };
 
   useEffect(() => {
     loadData();
@@ -310,7 +346,7 @@ export function CashAdvancesTab() {
                 <Label>Personnel *</Label>
                 <Select
                   value={newAdvanceForm.personnel_id}
-                  onValueChange={(val) => setNewAdvanceForm({ ...newAdvanceForm, personnel_id: val })}
+                  onValueChange={handlePersonnelSelect}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select personnel" />
@@ -326,7 +362,7 @@ export function CashAdvancesTab() {
               </div>
 
               <div>
-                <Label>Project (Optional)</Label>
+                <Label>Project {newAdvanceForm.project_id && "(Auto-filled from assignment)"}</Label>
                 <Select
                   value={newAdvanceForm.project_id || "none"}
                   onValueChange={(val) => setNewAdvanceForm({ ...newAdvanceForm, project_id: val === "none" ? "" : val })}
@@ -343,6 +379,11 @@ export function CashAdvancesTab() {
                     ))}
                   </SelectContent>
                 </Select>
+                {newAdvanceForm.project_id && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    You can change this if needed
+                  </p>
+                )}
               </div>
 
               <div>
