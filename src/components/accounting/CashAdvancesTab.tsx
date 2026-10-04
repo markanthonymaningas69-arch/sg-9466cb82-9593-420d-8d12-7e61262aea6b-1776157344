@@ -136,9 +136,13 @@ export function CashAdvancesTab() {
 
   const loadPersonnelAdvances = async (personnelId: string) => {
     try {
+      console.log("CashAdvancesTab - Loading advances for personnel:", personnelId);
       const data = await cashAdvancesService.getCashAdvancesByPersonnel(personnelId);
+      console.log("CashAdvancesTab - Advances loaded:", data);
+      console.log("CashAdvancesTab - Deductions count:", data.map(a => ({ id: a.id, deductions: a.deductions.length })));
       setPersonnelAdvances(data);
     } catch (error: any) {
+      console.error("CashAdvancesTab - Error loading personnel advances:", error);
       toast({
         title: "Error loading personnel advances",
         description: error.message,

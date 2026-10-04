@@ -64,6 +64,8 @@ export const cashAdvancesService = {
 
   // Get cash advances by personnel
   async getCashAdvancesByPersonnel(personnelId: string): Promise<CashAdvanceWithDeductions[]> {
+    console.log("cashAdvancesService - Fetching advances for personnel:", personnelId);
+    
     const { data: advances, error: advancesError } = await supabase
       .from("cash_advances")
       .select(`
@@ -81,7 +83,12 @@ export const cashAdvancesService = {
       .eq("personnel_id", personnelId)
       .order("date", { ascending: false });
 
-    if (advancesError) throw advancesError;
+    if (advancesError) {
+      console.error("cashAdvancesService - Error fetching advances:", advancesError);
+      throw advancesError;
+    }
+
+    console.log("cashAdvancesService - Advances fetched:", advances);
 
     // Get deductions for each advance
     const advancesWithDeductions = await Promise.all(
@@ -92,7 +99,12 @@ export const cashAdvancesService = {
           .eq("cash_advance_id", advance.id)
           .order("deduction_date", { ascending: false });
 
-        if (deductionsError) throw deductionsError;
+        if (deductionsError) {
+          console.error("cashAdvancesService - Error fetching deductions for advance:", advance.id, deductionsError);
+          throw deductionsError;
+        }
+
+        console.log(`cashAdvancesService - Deductions for advance ${advance.id}:`, deductions);
 
         return {
           ...advance,
@@ -101,6 +113,7 @@ export const cashAdvancesService = {
       })
     );
 
+    console.log("cashAdvancesService - Final advances with deductions:", advancesWithDeductions);
     return advancesWithDeductions;
   },
 
@@ -168,6 +181,8 @@ export const cashAdvancesService = {
     deduction_source: string;
     notes?: string;
   }): Promise<CashAdvanceDeduction> {
+    console.log("cashAdvancesService - Creating deduction:", deduction);
+    
     const { data: userData } = await supabase.auth.getUser();
     const recorded_by = userData?.user?.id || "system";
 
@@ -180,7 +195,12 @@ export const cashAdvancesService = {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error("cashAdvancesService - Error creating deduction:", error);
+      throw error;
+    }
+    
+    console.log("cashAdvancesService - Deduction created successfully:", data);
     return data as CashAdvanceDeduction;
   },
 

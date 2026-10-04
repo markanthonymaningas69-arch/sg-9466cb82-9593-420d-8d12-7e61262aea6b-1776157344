@@ -235,21 +235,35 @@ export function PayrollTab() {
       const { error: voucherError } = await accountingService.createVoucher(voucherPayload);
       if (voucherError) throw voucherError;
 
-      const deductionPromises = payrollData.flatMap(emp => 
+      // Get all cash advance deductions to process
+      const cashAdvanceDeductions = payrollData.flatMap(emp => 
         emp.deductions
           .filter(d => d.type === "cash_advance" && d.cash_advance_id)
-          .map(d => 
-            cashAdvancesService.createCashAdvanceDeduction({
-              cash_advance_id: d.cash_advance_id!,
-              amount: d.amount,
-              deduction_date: d.date,
-              deduction_source: "payroll",
-              notes: d.notes || `Payroll deduction: ${filters.startDate} to ${filters.endDate}`
-            })
-          )
+          .map(d => ({
+            employee_name: emp.name,
+            cash_advance_id: d.cash_advance_id!,
+            amount: d.amount,
+            deduction_date: d.date,
+            deduction_source: "payroll",
+            notes: d.notes || `Payroll deduction: ${filters.startDate} to ${filters.endDate}`
+          }))
       );
 
-      await Promise.all(deductionPromises);
+      console.log("PayrollTab - Cash Advance Deductions to create:", cashAdvanceDeductions);
+
+      // Create deduction promises
+      const deductionPromises = cashAdvanceDeductions.map(d => 
+        cashAdvancesService.createCashAdvanceDeduction({
+          cash_advance_id: d.cash_advance_id,
+          amount: d.amount,
+          deduction_date: d.deduction_date,
+          deduction_source: d.deduction_source,
+          notes: d.notes
+        })
+      );
+
+      const deductionResults = await Promise.all(deductionPromises);
+      console.log("PayrollTab - Deductions created successfully:", deductionResults);
 
       toast({ 
         title: "Payroll Processed!", 
@@ -259,6 +273,7 @@ export function PayrollTab() {
 
       loadPayroll();
     } catch (error: any) {
+      console.error("PayrollTab - Error processing payroll:", error);
       toast({ 
         title: "Failed to process payroll", 
         description: error.message, 
