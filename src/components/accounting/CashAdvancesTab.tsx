@@ -317,7 +317,7 @@ export function CashAdvancesTab() {
               <SelectItem value="all">All personnel</SelectItem>
               {personnel.map((p) => (
                 <SelectItem key={p.id} value={p.id}>
-                  {p.name} - {p.position}
+                  {p.name} - {p.role}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -354,7 +354,7 @@ export function CashAdvancesTab() {
                     ) : (
                       personnel.map((p) => (
                         <SelectItem key={p.id} value={p.id}>
-                          {p.name} - {p.position}
+                          {p.name} - {p.role}
                         </SelectItem>
                       ))
                     )}
@@ -548,7 +548,7 @@ export function CashAdvancesTab() {
                     <TableCell>
                       <div>
                         <div className="font-medium">{advance.personnel?.name}</div>
-                        <div className="text-sm text-muted-foreground">{advance.personnel?.position}</div>
+                        <div className="text-sm text-muted-foreground">{advance.personnel?.role}</div>
                       </div>
                     </TableCell>
                     <TableCell>{advance.project?.name || "-"}</TableCell>
