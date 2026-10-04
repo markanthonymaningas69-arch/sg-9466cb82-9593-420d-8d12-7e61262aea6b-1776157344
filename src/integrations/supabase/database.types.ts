@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -1612,6 +1612,67 @@ export type Database = {
             columns: ["personnel_id"]
             isOneToOne: false
             referencedRelation: "personnel"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_voucher_deductions: {
+        Row: {
+          amount: number
+          cash_advance_id: string | null
+          created_at: string | null
+          deduction_date: string
+          deduction_type: string
+          id: string
+          notes: string | null
+          personnel_id: string | null
+          updated_at: string | null
+          voucher_id: string | null
+        }
+        Insert: {
+          amount: number
+          cash_advance_id?: string | null
+          created_at?: string | null
+          deduction_date: string
+          deduction_type: string
+          id?: string
+          notes?: string | null
+          personnel_id?: string | null
+          updated_at?: string | null
+          voucher_id?: string | null
+        }
+        Update: {
+          amount?: number
+          cash_advance_id?: string | null
+          created_at?: string | null
+          deduction_date?: string
+          deduction_type?: string
+          id?: string
+          notes?: string | null
+          personnel_id?: string | null
+          updated_at?: string | null
+          voucher_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_voucher_deductions_cash_advance_id_fkey"
+            columns: ["cash_advance_id"]
+            isOneToOne: false
+            referencedRelation: "cash_advances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_voucher_deductions_personnel_id_fkey"
+            columns: ["personnel_id"]
+            isOneToOne: false
+            referencedRelation: "personnel"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_voucher_deductions_voucher_id_fkey"
+            columns: ["voucher_id"]
+            isOneToOne: false
+            referencedRelation: "vouchers"
             referencedColumns: ["id"]
           },
         ]
