@@ -278,12 +278,12 @@ export function CashAdvancesTab() {
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-4">
           <Label>View by Personnel:</Label>
-          <Select value={selectedPersonnel || ""} onValueChange={(val) => setSelectedPersonnel(val || null)}>
+          <Select value={selectedPersonnel || "all"} onValueChange={(val) => setSelectedPersonnel(val === "all" ? null : val)}>
             <SelectTrigger className="w-[300px]">
               <SelectValue placeholder="All personnel" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All personnel</SelectItem>
+              <SelectItem value="all">All personnel</SelectItem>
               {personnel.map((p) => (
                 <SelectItem key={p.id} value={p.id}>
                   {p.name} - {p.position}
@@ -328,14 +328,14 @@ export function CashAdvancesTab() {
               <div>
                 <Label>Project (Optional)</Label>
                 <Select
-                  value={newAdvanceForm.project_id}
-                  onValueChange={(val) => setNewAdvanceForm({ ...newAdvanceForm, project_id: val })}
+                  value={newAdvanceForm.project_id || "none"}
+                  onValueChange={(val) => setNewAdvanceForm({ ...newAdvanceForm, project_id: val === "none" ? "" : val })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select project (optional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {projects.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.name}
