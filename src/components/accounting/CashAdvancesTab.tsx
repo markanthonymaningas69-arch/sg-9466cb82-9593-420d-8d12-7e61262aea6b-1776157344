@@ -69,6 +69,33 @@ export function CashAdvancesTab() {
     notes: "",
   });
 
+  // Handler for personnel selection - auto-fills project from HR assignment
+  const handlePersonnelSelect = (personnelId: string) => {
+    const selectedPerson = personnel.find((p) => p.id === personnelId);
+    
+    if (selectedPerson?.project_id) {
+      setNewAdvanceForm({ 
+        ...newAdvanceForm, 
+        personnel_id: personnelId,
+        project_id: selectedPerson.project_id 
+      });
+      
+      const projectName = projects.find((p) => p.id === selectedPerson.project_id)?.name;
+      if (projectName) {
+        toast({
+          title: "Project auto-filled",
+          description: `Assigned to: ${projectName}`,
+        });
+      }
+    } else {
+      setNewAdvanceForm({ 
+        ...newAdvanceForm, 
+        personnel_id: personnelId,
+        project_id: "" 
+      });
+    }
+  };
+
   useEffect(() => {
     loadData();
   }, []);
@@ -311,7 +338,7 @@ export function CashAdvancesTab() {
                 <Label>Personnel *</Label>
                 <Select
                   value={newAdvanceForm.personnel_id}
-                  onValueChange={(val) => setNewAdvanceForm({ ...newAdvanceForm, personnel_id: val })}
+                  onValueChange={handlePersonnelSelect}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select personnel" />
@@ -327,7 +354,7 @@ export function CashAdvancesTab() {
               </div>
 
               <div>
-                <Label>Project (Optional)</Label>
+                <Label>Project {newAdvanceForm.project_id && "(Auto-filled from HR)"}</Label>
                 <Select
                   value={newAdvanceForm.project_id || "none"}
                   onValueChange={(val) => setNewAdvanceForm({ ...newAdvanceForm, project_id: val === "none" ? "" : val })}
@@ -344,6 +371,11 @@ export function CashAdvancesTab() {
                     ))}
                   </SelectContent>
                 </Select>
+                {newAdvanceForm.project_id && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    You can change this if needed
+                  </p>
+                )}
               </div>
 
               <div>
