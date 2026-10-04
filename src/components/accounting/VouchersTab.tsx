@@ -268,7 +268,12 @@ export function VouchersTab() {
     const projectId = voucher.project_id || "all";
 
     try {
+      console.log("VouchersTab - Loading payroll details for voucher:", voucher.id, voucher.voucher_number);
+      console.log("VouchersTab - Date range:", startDate, "to", endDate);
+      console.log("VouchersTab - Project:", projectId);
+
       const { data } = await accountingService.getPayrollData(startDate, endDate, projectId);
+      console.log("VouchersTab - Attendance data loaded:", data?.length, "records");
       
       // Group by personnel
       const grouped: Record<string, any> = {};
@@ -295,7 +300,11 @@ export function VouchersTab() {
         grouped[p.id].days_present += 1;
       });
 
+      console.log("VouchersTab - Grouped personnel:", Object.keys(grouped).length, "employees");
+      console.log("VouchersTab - Personnel IDs in group:", Object.keys(grouped));
+
       // Fetch deductions from database for this voucher
+      console.log("VouchersTab - Fetching deductions for voucher_id:", voucher.id);
       const { data: deductionsData, error: deductionsError } = await supabase
         .from('payroll_voucher_deductions')
         .select('*')
@@ -304,16 +313,39 @@ export function VouchersTab() {
       if (deductionsError) {
         console.error("VouchersTab - Error loading deductions:", deductionsError);
       } else {
-        console.log("VouchersTab - Deductions loaded:", deductionsData);
+        console.log("VouchersTab - Deductions loaded from DB:", deductionsData?.length || 0, "records");
+        console.log("VouchersTab - Deductions data:", deductionsData);
+        
         // Add deductions to corresponding employees
         (deductionsData || []).forEach((deduction: any) => {
+          console.log("VouchersTab - Processing deduction:", {
+            personnel_id: deduction.personnel_id,
+            personnel_name: deduction.personnel_name,
+            amount: deduction.amount,
+            type: deduction.deduction_type
+          });
+          
           if (grouped[deduction.personnel_id]) {
+            console.log("VouchersTab - Adding deduction to employee:", deduction.personnel_name);
             grouped[deduction.personnel_id].deductions.push({
               type: deduction.deduction_type,
               amount: deduction.amount,
               date: deduction.deduction_date,
               notes: deduction.notes
             });
+          } else {
+            console.warn("VouchersTab - Employee not found in grouped data:", {
+              personnel_id: deduction.personnel_id,
+              personnel_name: deduction.personnel_name,
+              available_ids: Object.keys(grouped)
+            });
+          }
+        });
+
+        console.log("VouchersTab - Deductions added. Checking final state:");
+        Object.values(grouped).forEach((emp: any) => {
+          if (emp.deductions.length > 0) {
+            console.log(`VouchersTab - ${emp.name} has ${emp.deductions.length} deductions:`, emp.deductions);
           }
         });
       }
@@ -336,10 +368,17 @@ export function VouchersTab() {
 
       processedData.sort((a, b) => a.name.localeCompare(b.name));
       
+      console.log("VouchersTab - Final processed data:", processedData.length, "employees");
+      console.log("VouchersTab - Employees with deductions:", processedData.filter(e => e.deductions.length > 0).map(e => ({
+        name: e.name,
+        deductions: e.deductions.length
+      })));
+      
       setPayrollDetails(processedData);
       setSelectedVoucher(voucher);
       setPayrollDetailsOpen(true);
     } catch (error: any) {
+      console.error("VouchersTab - Error in handlePrintPayrollDetails:", error);
       toast({
         title: "Error loading payroll details",
         description: error.message,
