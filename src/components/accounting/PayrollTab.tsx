@@ -270,7 +270,6 @@ export function PayrollTab() {
         emp.deductions.map(d => ({
           voucher_id: createdVoucher.id,
           personnel_id: emp.id,
-          personnel_name: emp.name,
           deduction_type: d.type,
           amount: d.amount,
           deduction_date: d.date,
@@ -287,13 +286,10 @@ export function PayrollTab() {
 
         if (deductionsError) {
           console.error("PayrollTab - Error saving deductions:", deductionsError);
-          // Don't throw - voucher is already created, just log the error
-          toast({
-            title: "Warning",
-            description: "Voucher created but deductions may not be saved. Check console for details.",
-            variant: "destructive"
-          });
+          throw deductionsError;
         }
+        
+        console.log("PayrollTab - Deductions saved successfully");
       }
 
       // Get all cash advance deductions to process
