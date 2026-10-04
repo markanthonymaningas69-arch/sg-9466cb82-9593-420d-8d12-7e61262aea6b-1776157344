@@ -16,7 +16,7 @@ export interface CashAdvance {
   personnel?: {
     id: string;
     name: string;
-    position: string;
+    role: string;
   };
   project?: {
     id: string;
@@ -49,7 +49,7 @@ export const cashAdvancesService = {
         personnel:personnel_id (
           id,
           name,
-          position
+          role
         ),
         project:project_id (
           id,
@@ -71,7 +71,7 @@ export const cashAdvancesService = {
         personnel:personnel_id (
           id,
           name,
-          position
+          role
         ),
         project:project_id (
           id,
@@ -125,7 +125,7 @@ export const cashAdvancesService = {
         personnel:personnel_id (
           id,
           name,
-          position
+          role
         ),
         project:project_id (
           id,
