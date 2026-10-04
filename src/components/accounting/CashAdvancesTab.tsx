@@ -59,16 +59,6 @@ export function CashAdvancesTab() {
     notes: "",
   });
 
-  // New deduction form state
-  const [deductionDialogOpen, setDeductionDialogOpen] = useState(false);
-  const [selectedAdvanceForDeduction, setSelectedAdvanceForDeduction] = useState<string | null>(null);
-  const [deductionForm, setDeductionForm] = useState({
-    amount: "",
-    deduction_date: format(new Date(), "yyyy-MM-dd"),
-    deduction_source: "manual",
-    notes: "",
-  });
-
   // Handler for personnel selection - auto-fills project from HR assignment
   const handlePersonnelSelect = (personnelId: string) => {
     const selectedPerson = personnel.find((p) => p.id === personnelId);
@@ -195,55 +185,6 @@ export function CashAdvancesTab() {
     } catch (error: any) {
       toast({
         title: "Error creating advance",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleAddDeduction = async () => {
-    try {
-      if (!selectedAdvanceForDeduction || !deductionForm.amount) {
-        toast({
-          title: "Missing fields",
-          description: "Please fill in all required fields",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const personnelName = personnel.find((p) => p.id === selectedPersonnel)?.name || "User";
-
-      await cashAdvancesService.addDeduction({
-        cash_advance_id: selectedAdvanceForDeduction,
-        amount: parseFloat(deductionForm.amount),
-        deduction_date: deductionForm.deduction_date,
-        deduction_source: deductionForm.deduction_source,
-        notes: deductionForm.notes || undefined,
-        recorded_by: personnelName,
-      });
-
-      toast({
-        title: "Success",
-        description: "Deduction recorded successfully",
-      });
-
-      setDeductionDialogOpen(false);
-      setSelectedAdvanceForDeduction(null);
-      setDeductionForm({
-        amount: "",
-        deduction_date: format(new Date(), "yyyy-MM-dd"),
-        deduction_source: "manual",
-        notes: "",
-      });
-
-      loadData();
-      if (selectedPersonnel) {
-        loadPersonnelAdvances(selectedPersonnel);
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error adding deduction",
         description: error.message,
         variant: "destructive",
       });
@@ -491,20 +432,6 @@ export function CashAdvancesTab() {
                     </div>
                   </div>
 
-                  {advance.balance > 0 && advance.status === "active" && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setSelectedAdvanceForDeduction(advance.id);
-                        setDeductionDialogOpen(true);
-                      }}
-                    >
-                      <MinusCircle className="mr-2 h-4 w-4" />
-                      Add Deduction
-                    </Button>
-                  )}
-
                   {advance.deductions.length > 0 && (
                     <div className="mt-4">
                       <h4 className="text-sm font-semibold mb-2">Deduction History:</h4>
@@ -586,71 +513,6 @@ export function CashAdvancesTab() {
           </CardContent>
         </Card>
       )}
-
-      {/* Deduction Dialog */}
-      <Dialog open={deductionDialogOpen} onOpenChange={setDeductionDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Record Deduction</DialogTitle>
-            <DialogDescription>Record a deduction/repayment for this cash advance</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Amount *</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={deductionForm.amount}
-                onChange={(e) => setDeductionForm({ ...deductionForm, amount: e.target.value })}
-                placeholder="0.00"
-              />
-            </div>
-
-            <div>
-              <Label>Date *</Label>
-              <Input
-                type="date"
-                value={deductionForm.deduction_date}
-                onChange={(e) => setDeductionForm({ ...deductionForm, deduction_date: e.target.value })}
-              />
-            </div>
-
-            <div>
-              <Label>Source</Label>
-              <Select
-                value={deductionForm.deduction_source}
-                onValueChange={(val) => setDeductionForm({ ...deductionForm, deduction_source: val })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="manual">Manual</SelectItem>
-                  <SelectItem value="payroll">Payroll Deduction</SelectItem>
-                  <SelectItem value="cash">Cash Payment</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label>Notes</Label>
-              <Textarea
-                value={deductionForm.notes}
-                onChange={(e) => setDeductionForm({ ...deductionForm, notes: e.target.value })}
-                placeholder="Additional notes..."
-                rows={3}
-              />
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setDeductionDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleAddDeduction}>Record Deduction</Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
