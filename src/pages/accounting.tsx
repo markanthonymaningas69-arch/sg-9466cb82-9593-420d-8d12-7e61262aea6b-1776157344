@@ -8,9 +8,10 @@ import { VouchersTab } from "@/components/accounting/VouchersTab";
 import { LiquidationsTab } from "@/components/accounting/LiquidationsTab";
 import { TaxReportTab } from "@/components/accounting/TaxReportTab";
 import { ProjectBillingTab } from "@/components/accounting/ProjectBillingTab";
+import { CashAdvancesTab } from "@/components/accounting/CashAdvancesTab";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Landmark, FileSpreadsheet, Users, Receipt, CircleDollarSign, FileText } from "lucide-react";
+import { Landmark, FileSpreadsheet, Users, Receipt, CircleDollarSign, FileText, Wallet } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { approvalCenterService, type ApprovalRequest } from "@/services/approvalCenterService";
@@ -169,6 +170,9 @@ export default function Accounting() {
               <TabsTrigger value="billing" className="flex-shrink-0 min-w-[90px] h-9 text-xs data-[state=active]:bg-teal-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-teal-700 bg-teal-50 text-teal-700 hover:bg-teal-100">
                 <FileText className="h-3 w-3 mr-1.5 hidden sm:inline" /> Billing
               </TabsTrigger>
+              <TabsTrigger value="cash-advances" className="flex-shrink-0 min-w-[90px] h-9 text-xs data-[state=active]:bg-rose-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-rose-700 bg-rose-50 text-rose-700 hover:bg-rose-100">
+                <Wallet className="h-3 w-3 mr-1.5 hidden sm:inline" /> Cash Advances
+              </TabsTrigger>
               <TabsTrigger value="incoming" className="flex-shrink-0 min-w-[130px] h-9 text-xs data-[state=active]:bg-cyan-700 data-[state=active]:text-white border border-transparent data-[state=active]:border-cyan-800 bg-cyan-50 text-cyan-700 hover:bg-cyan-100 relative">
                 Incoming Requests
                 {incomingRequests.filter((request) => request.workflowStatus === "in_accounting").length > 0 && (
@@ -205,6 +209,10 @@ export default function Accounting() {
 
           <TabsContent value="billing" className="flex-1 mt-3 space-y-4">
             <ProjectBillingTab projectId="" />
+          </TabsContent>
+
+          <TabsContent value="cash-advances" className="flex-1 mt-3 space-y-4">
+            <CashAdvancesTab />
           </TabsContent>
 
           <TabsContent value="incoming" className="flex-1 mt-3 space-y-4">
