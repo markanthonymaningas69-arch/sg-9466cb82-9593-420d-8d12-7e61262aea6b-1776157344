@@ -160,6 +160,30 @@ export const cashAdvancesService = {
     return data as CashAdvanceDeduction;
   },
 
+  // Create cash advance deduction (alias for payroll integration)
+  async createCashAdvanceDeduction(deduction: {
+    cash_advance_id: string;
+    amount: number;
+    deduction_date: string;
+    deduction_source: string;
+    notes?: string;
+  }): Promise<CashAdvanceDeduction> {
+    const { data: userData } = await supabase.auth.getUser();
+    const recorded_by = userData?.user?.id || "system";
+
+    const { data, error } = await supabase
+      .from("cash_advance_deductions")
+      .insert({
+        ...deduction,
+        recorded_by,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data as CashAdvanceDeduction;
+  },
+
   // Update cash advance status
   async updateCashAdvanceStatus(
     advanceId: string,
