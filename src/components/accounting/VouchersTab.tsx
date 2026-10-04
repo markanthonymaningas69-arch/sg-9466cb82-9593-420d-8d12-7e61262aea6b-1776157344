@@ -295,6 +295,29 @@ export function VouchersTab() {
         grouped[p.id].days_present += 1;
       });
 
+      // Fetch deductions from database for this voucher
+      const { data: deductionsData, error: deductionsError } = await supabase
+        .from('payroll_voucher_deductions')
+        .select('*')
+        .eq('voucher_id', voucher.id);
+
+      if (deductionsError) {
+        console.error("VouchersTab - Error loading deductions:", deductionsError);
+      } else {
+        console.log("VouchersTab - Deductions loaded:", deductionsData);
+        // Add deductions to corresponding employees
+        (deductionsData || []).forEach((deduction: any) => {
+          if (grouped[deduction.personnel_id]) {
+            grouped[deduction.personnel_id].deductions.push({
+              type: deduction.deduction_type,
+              amount: deduction.amount,
+              date: deduction.deduction_date,
+              notes: deduction.notes
+            });
+          }
+        });
+      }
+
       const processedData = Object.values(grouped).map(emp => {
         const hourlyRate = emp.daily_rate / 8;
         const regPay = emp.total_reg_hours * hourlyRate;

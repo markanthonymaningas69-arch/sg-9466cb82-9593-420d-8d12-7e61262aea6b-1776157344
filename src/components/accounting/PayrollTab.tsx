@@ -232,8 +232,41 @@ export function PayrollTab() {
         project_id: filters.projectId === "all" ? null : filters.projectId
       };
 
-      const { error: voucherError } = await accountingService.createVoucher(voucherPayload);
+      const { data: createdVoucher, error: voucherError } = await supabase
+        .from('vouchers')
+        .insert(voucherPayload)
+        .select()
+        .single();
+
       if (voucherError) throw voucherError;
+
+      console.log("PayrollTab - Voucher created:", createdVoucher);
+
+      // Save payroll deductions to database
+      const payrollDeductionRecords = payrollData.flatMap(emp => 
+        emp.deductions.map(d => ({
+          voucher_id: createdVoucher.id,
+          personnel_id: emp.id,
+          personnel_name: emp.name,
+          deduction_type: d.type,
+          amount: d.amount,
+          deduction_date: d.date,
+          notes: d.notes || null,
+          cash_advance_id: d.cash_advance_id || null
+        }))
+      );
+
+      if (payrollDeductionRecords.length > 0) {
+        console.log("PayrollTab - Saving deduction records:", payrollDeductionRecords);
+        const { error: deductionsError } = await supabase
+          .from('payroll_voucher_deductions')
+          .insert(payrollDeductionRecords);
+
+        if (deductionsError) {
+          console.error("PayrollTab - Error saving deductions:", deductionsError);
+          throw deductionsError;
+        }
+      }
 
       // Get all cash advance deductions to process
       const cashAdvanceDeductions = payrollData.flatMap(emp => 
