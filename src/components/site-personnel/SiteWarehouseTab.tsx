@@ -438,7 +438,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
     setFormData((prev) => ({
       ...prev,
       item_name: materialName,
-      custom_item_name: "",
+      custom_item_name: materialName, // Sync both fields
       unit: selectedMaterial?.unit || "",
     }));
   }
@@ -516,10 +516,6 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    console.log("=== SITE PURCHASE SAVE DEBUG ===");
-    console.log("Form data:", formData);
-    console.log("Project ID:", projectId);
-
     // Validation
     if (!projectId) {
       toast({
@@ -530,13 +526,13 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
       return;
     }
 
-    // Determine the final item name - prioritize custom_item_name if it's filled, otherwise use item_name
-    const finalItemName = formData.custom_item_name.trim() || formData.item_name.trim();
+    // Determine the final item name - use item_name as primary source
+    const finalItemName = formData.item_name.trim() || formData.custom_item_name.trim();
 
     if (!finalItemName) {
       toast({
         title: "Validation Error",
-        description: "Please enter or select an item name",
+        description: "Please enter or select a material name",
         variant: "destructive",
       });
       return;
@@ -551,19 +547,19 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
       return;
     }
 
-    if (!formData.unit) {
+    if (!formData.unit || !formData.unit.trim()) {
       toast({
         title: "Validation Error",
-        description: "Please select a unit",
+        description: "Please select or enter a unit",
         variant: "destructive",
       });
       return;
     }
 
-    if (!formData.supplier) {
+    if (!formData.supplier || !formData.supplier.trim()) {
       toast({
         title: "Validation Error",
-        description: "Please enter a supplier",
+        description: "Please enter a supplier name",
         variant: "destructive",
       });
       return;
@@ -585,24 +581,19 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
         bom_scope_id: formData.bom_scope_id === "others" || !formData.bom_scope_id ? null : formData.bom_scope_id,
         item_name: finalItemName,
         quantity: Number(formData.quantity),
-        unit: formData.unit,
+        unit: formData.unit.trim(),
         unit_cost: Number(formData.unit_cost || 0),
         amount: Number(formData.quantity || 0) * Number(formData.unit_cost || 0),
-        supplier: formData.supplier,
+        supplier: formData.supplier.trim(),
         delivery_date: formData.delivery_date,
-        receipt_number: formData.receipt_number || null,
-        notes: formData.notes || null,
+        receipt_number: formData.receipt_number.trim() || null,
+        notes: formData.notes.trim() || null,
         status: "pending",
       };
 
-      console.log("Delivery payload:", deliveryPayload);
-
       const response = await siteService.createDelivery(deliveryPayload);
 
-      console.log("Response:", response);
-
       if (response.error) {
-        console.error("Response error:", response.error);
         throw response.error;
       }
 
@@ -619,15 +610,11 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
       setFormData(defaultFormState);
       await loadData();
     } catch (error: any) {
-      console.error("=== ERROR DETAILS ===");
-      console.error("Error object:", error);
-      console.error("Error message:", error?.message);
-      console.error("Error code:", error?.code);
-      console.error("Error details:", error?.details);
+      console.error("Error saving purchase:", error);
       
       toast({
         title: "Error",
-        description: error?.message || "Failed to record the purchase. Please check the console for details.",
+        description: error?.message || "Failed to record the purchase",
         variant: "destructive",
       });
     }
