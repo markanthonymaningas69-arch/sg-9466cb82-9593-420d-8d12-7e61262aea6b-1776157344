@@ -9,12 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { formatCurrency } from "@/lib/currency";
 
 type RentalExpense = Database["public"]["Tables"]["rental_expenses"]["Row"];
-type ScopeOfWork = Database["public"]["Tables"]["bom_scope_of_work"]["Row"];
 
 interface RentalFormData {
   rental_type: "Tools" | "Equipment" | "Accommodation" | "Other";
@@ -26,7 +23,6 @@ interface RentalFormData {
   rental_end_date: string;
   supplier: string;
   notes: string;
-  bom_scope_id: string;
 }
 
 const initialFormData: RentalFormData = {
@@ -38,8 +34,7 @@ const initialFormData: RentalFormData = {
   rental_start_date: new Date().toISOString().split("T")[0],
   rental_end_date: new Date().toISOString().split("T")[0],
   supplier: "",
-  notes: "",
-  bom_scope_id: ""
+  notes: ""
 };
 
 function calculateRentalDays(startDate: string, endDate?: string | null): number {
@@ -48,7 +43,7 @@ function calculateRentalDays(startDate: string, endDate?: string | null): number
   const end = new Date(endDate);
   const diffTime = end.getTime() - start.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  return Math.max(0, diffDays + 1); // Include both start and end day
+  return Math.max(0, diffDays + 1);
 }
 
 function calculateRentalCost(quantity: number, ratePerUnit: number, startDate: string, endDate?: string | null): number {
@@ -60,12 +55,8 @@ function calculateRentalCost(quantity: number, ratePerUnit: number, startDate: s
 export function RentalsTab({ projectId }: { projectId: string }) {
   const { toast } = useToast();
   const [rentals, setRentals] = useState<RentalExpense[]>([]);
-  const [scopes, setScopes] = useState<ScopeOfWork[]>([]);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<RentalFormData>(initialFormData);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [filterType, setFilterType] = useState<string>("all");
-  const [filterScope, setFilterScope] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filters, setFilters] = useState({
@@ -89,39 +80,17 @@ export function RentalsTab({ projectId }: { projectId: string }) {
   useEffect(() => {
     if (projectId) {
       loadRentals();
-      loadScopes();
     }
   }, [projectId]);
-
-  const loadScopes = async () => {
-    try {
-      const { data: bomData } = await supabase
-        .from("bill_of_materials")
-        .select("id")
-        .eq("project_id", projectId)
-        .single();
-
-      if (bomData) {
-        const { data: scopesData } = await supabase
-          .from("bom_scope_of_work")
-          .select("*")
-          .eq("bom_id", bomData.id)
-          .order("name");
-
-        setScopes(scopesData || []);
-      }
-    } catch (error) {
-      console.error("Error loading scopes:", error);
-    }
-  };
 
   const loadRentals = async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from("rental_expenses")
-        .select("*, bom_scope_of_work(name)")
+        .select("*")
         .eq("project_id", projectId)
+        .eq("is_archived", false)
         .order("rental_start_date", { ascending: false });
 
       if (error) throw error;
@@ -163,15 +132,14 @@ export function RentalsTab({ projectId }: { projectId: string }) {
         rental_start_date: formData.rental_start_date,
         rental_end_date: formData.rental_end_date || null,
         supplier: formData.supplier || null,
-        notes: formData.notes || null,
-        bom_scope_id: formData.bom_scope_id || null,
+        notes: formData.notes || null
       });
 
       if (error) throw error;
 
       toast({
         title: "Success",
-        description: "Rental expense recorded",
+        description: "Rental expense recorded"
       });
 
       setFormData(initialFormData);
@@ -182,7 +150,7 @@ export function RentalsTab({ projectId }: { projectId: string }) {
       toast({
         title: "Error",
         description: error.message || "Failed to record rental expense",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   }
@@ -200,7 +168,7 @@ export function RentalsTab({ projectId }: { projectId: string }) {
 
       toast({
         title: "Moved to recycle bin",
-        description: "Rental record archived",
+        description: "Rental record archived"
       });
 
       await loadRentals();
@@ -209,34 +177,29 @@ export function RentalsTab({ projectId }: { projectId: string }) {
       toast({
         title: "Error",
         description: "Failed to delete rental record",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   }
 
   const filteredRentals = useMemo(() => {
     return rentals.filter(rental => {
-      // Type filter
       if (filters.rentalType !== "all" && rental.rental_type !== filters.rentalType) {
         return false;
       }
       
-      // Item name filter
       if (filters.itemName && !rental.item_name.toLowerCase().includes(filters.itemName.toLowerCase())) {
         return false;
       }
       
-      // Supplier filter
       if (filters.supplier && (!rental.supplier || !rental.supplier.toLowerCase().includes(filters.supplier.toLowerCase()))) {
         return false;
       }
       
-      // Date from filter
       if (filters.dateFrom && rental.rental_start_date < filters.dateFrom) {
         return false;
       }
       
-      // Date to filter
       if (filters.dateTo && rental.rental_start_date > filters.dateTo) {
         return false;
       }
@@ -260,7 +223,7 @@ export function RentalsTab({ projectId }: { projectId: string }) {
     return {
       recordCount: filteredRentals.length,
       typeCount,
-      totalCost,
+      totalCost
     };
   }, [filteredRentals]);
 
@@ -280,10 +243,15 @@ export function RentalsTab({ projectId }: { projectId: string }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-4">
-        <CardTitle className="flex items-center gap-2">
-          <Wrench className="h-5 w-5" />
-          Rental Expenses
-        </CardTitle>
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <Wrench className="h-5 w-5" />
+            Rental Expenses
+          </CardTitle>
+          <CardDescription className="mt-1.5">
+            Track tools, equipment, accommodation, and other rental costs
+          </CardDescription>
+        </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button size="sm">
@@ -296,46 +264,24 @@ export function RentalsTab({ projectId }: { projectId: string }) {
               <DialogTitle>Record Rental Expense</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="rental_type">Rental Type</Label>
-                  <Select
-                    value={formData.rental_type}
-                    onValueChange={(value: "Tools" | "Equipment" | "Accommodation" | "Other") =>
-                      setFormData(prev => ({ ...prev, rental_type: value }))
-                    }
-                  >
-                    <SelectTrigger id="rental_type">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Tools">Tools</SelectItem>
-                      <SelectItem value="Equipment">Equipment</SelectItem>
-                      <SelectItem value="Accommodation">Accommodation</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="bom_scope_id">Scope of Work (Optional)</Label>
-                  <Select
-                    value={formData.bom_scope_id}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, bom_scope_id: value }))}
-                  >
-                    <SelectTrigger id="bom_scope_id">
-                      <SelectValue placeholder="Select scope (optional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">None / General</SelectItem>
-                      {scopes.map(scope => (
-                        <SelectItem key={scope.id} value={scope.id}>
-                          {scope.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div>
+                <Label htmlFor="rental_type">Rental Type</Label>
+                <Select
+                  value={formData.rental_type}
+                  onValueChange={(value: "Tools" | "Equipment" | "Accommodation" | "Other") =>
+                    setFormData(prev => ({ ...prev, rental_type: value }))
+                  }
+                >
+                  <SelectTrigger id="rental_type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Tools">Tools</SelectItem>
+                    <SelectItem value="Equipment">Equipment</SelectItem>
+                    <SelectItem value="Accommodation">Accommodation</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
@@ -572,7 +518,6 @@ export function RentalsTab({ projectId }: { projectId: string }) {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Type</TableHead>
-                      <TableHead>Scope</TableHead>
                       <TableHead>Item Name</TableHead>
                       <TableHead>Quantity</TableHead>
                       <TableHead>Rate/Day</TableHead>
@@ -602,9 +547,6 @@ export function RentalsTab({ projectId }: { projectId: string }) {
                               {rental.rental_type}
                             </span>
                           </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {(rental as any).bom_scope_of_work?.name || "General"}
-                          </TableCell>
                           <TableCell className="font-medium">{rental.item_name}</TableCell>
                           <TableCell>
                             {rental.quantity} {rental.unit}
@@ -629,7 +571,7 @@ export function RentalsTab({ projectId }: { projectId: string }) {
                       );
                     })}
                     <TableRow className="border-t-2 bg-muted/50 font-semibold">
-                      <TableCell colSpan={8} className="text-right">
+                      <TableCell colSpan={7} className="text-right">
                         Grand Total:
                       </TableCell>
                       <TableCell className="font-bold text-primary">{rentalsSummary.totalCost.toFixed(2)}</TableCell>
