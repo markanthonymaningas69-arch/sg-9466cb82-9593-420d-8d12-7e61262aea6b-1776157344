@@ -66,6 +66,25 @@ export function RentalsTab({ projectId }: { projectId: string }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [filterType, setFilterType] = useState<string>("all");
   const [filterScope, setFilterScope] = useState<string>("all");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filters, setFilters] = useState({
+    rentalType: "all",
+    itemName: "",
+    supplier: "",
+    dateFrom: "",
+    dateTo: ""
+  });
+
+  const clearFilters = () => {
+    setFilters({
+      rentalType: "all",
+      itemName: "",
+      supplier: "",
+      dateFrom: "",
+      dateTo: ""
+    });
+  };
 
   useEffect(() => {
     if (projectId) {
@@ -156,6 +175,7 @@ export function RentalsTab({ projectId }: { projectId: string }) {
       });
 
       setFormData(initialFormData);
+      setDialogOpen(false);
       await loadRentals();
     } catch (error: any) {
       console.error("Error recording rental:", error);
@@ -196,13 +216,34 @@ export function RentalsTab({ projectId }: { projectId: string }) {
 
   const filteredRentals = useMemo(() => {
     return rentals.filter(rental => {
-      const typeMatch = filterType === "all" || rental.rental_type === filterType;
-      const scopeMatch = filterScope === "all" || 
-        (filterScope === "unassigned" && !rental.bom_scope_id) ||
-        rental.bom_scope_id === filterScope;
-      return typeMatch && scopeMatch;
+      // Type filter
+      if (filters.rentalType !== "all" && rental.rental_type !== filters.rentalType) {
+        return false;
+      }
+      
+      // Item name filter
+      if (filters.itemName && !rental.item_name.toLowerCase().includes(filters.itemName.toLowerCase())) {
+        return false;
+      }
+      
+      // Supplier filter
+      if (filters.supplier && (!rental.supplier || !rental.supplier.toLowerCase().includes(filters.supplier.toLowerCase()))) {
+        return false;
+      }
+      
+      // Date from filter
+      if (filters.dateFrom && rental.rental_start_date < filters.dateFrom) {
+        return false;
+      }
+      
+      // Date to filter
+      if (filters.dateTo && rental.rental_start_date > filters.dateTo) {
+        return false;
+      }
+      
+      return true;
     });
-  }, [rentals, filterType, filterScope]);
+  }, [rentals, filters]);
 
   const rentalsSummary = useMemo(() => {
     const totalCost = filteredRentals.reduce((sum, rental) => {
