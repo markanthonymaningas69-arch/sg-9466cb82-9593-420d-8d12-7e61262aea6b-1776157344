@@ -1,7 +1,7 @@
 -- Create rental_expenses table
 CREATE TABLE IF NOT EXISTS rental_expenses (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  company_id uuid NOT NULL REFERENCES company_settings(id) ON DELETE CASCADE,
   project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   rental_type text NOT NULL CHECK (rental_type IN ('Tools', 'Equipment', 'Accommodation', 'Other')),
   item_name text NOT NULL,
