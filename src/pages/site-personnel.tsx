@@ -176,75 +176,86 @@ export default function SitePersonnelPage() {
         <Card className="border shadow-sm">
           <CardHeader className="px-3 py-3 sm:px-4">
             <CardTitle className="text-sm font-semibold">Site Operations</CardTitle>
-            <div className="overflow-x-auto overflow-y-hidden pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-6 h-auto">
+          </CardHeader>
+          <CardContent className="px-0 pb-4 pt-0 sm:px-4">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <div className="overflow-x-auto overflow-y-hidden pb-2 px-3 sm:px-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <TabsList className="inline-flex w-auto min-w-full sm:grid sm:w-full sm:grid-cols-6 h-auto">
                   <TabsTrigger 
                     value="deliveries" 
-                    className="text-xs py-2 data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900"
+                    className="flex-shrink-0 gap-1.5 text-xs py-2 px-3 data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900"
                   >
-                    Site Purchase & Deliveries
+                    <Package className="h-4 w-4" />
+                    <span className="hidden sm:inline">Site Purchase & Deliveries</span>
+                    <span className="sm:hidden">Deliveries</span>
                   </TabsTrigger>
                   <TabsTrigger 
                     value="site-warehouse" 
-                    className="text-xs py-2 data-[state=active]:bg-purple-100 data-[state=active]:text-purple-900"
+                    className="flex-shrink-0 gap-1.5 text-xs py-2 px-3 data-[state=active]:bg-purple-100 data-[state=active]:text-purple-900"
                   >
-                    Site Warehouse
+                    <WarehouseIcon className="h-4 w-4" />
+                    <span className="hidden sm:inline">Site Warehouse</span>
+                    <span className="sm:hidden">Warehouse</span>
                   </TabsTrigger>
                   <TabsTrigger 
                     value="usage" 
-                    className="text-xs py-2 data-[state=active]:bg-orange-100 data-[state=active]:text-orange-900"
+                    className="flex-shrink-0 gap-1.5 text-xs py-2 px-3 data-[state=active]:bg-orange-100 data-[state=active]:text-orange-900"
                   >
-                    Usage
+                    <TrendingDown className="h-4 w-4" />
+                    <span>Usage</span>
                   </TabsTrigger>
                   <TabsTrigger 
                     value="requests" 
-                    className="text-xs py-2 data-[state=active]:bg-green-100 data-[state=active]:text-green-900"
+                    className="flex-shrink-0 gap-1.5 text-xs py-2 px-3 data-[state=active]:bg-green-100 data-[state=active]:text-green-900"
                   >
-                    Requests
+                    <FileText className="h-4 w-4" />
+                    <span>Requests</span>
                   </TabsTrigger>
                   <TabsTrigger 
                     value="progress" 
-                    className="text-xs py-2 data-[state=active]:bg-teal-100 data-[state=active]:text-teal-900"
+                    className="flex-shrink-0 gap-1.5 text-xs py-2 px-3 data-[state=active]:bg-teal-100 data-[state=active]:text-teal-900"
                   >
-                    Accomplishment
+                    <TrendingUp className="h-4 w-4" />
+                    <span className="hidden sm:inline">Accomplishment</span>
+                    <span className="sm:hidden">Progress</span>
                   </TabsTrigger>
                   <TabsTrigger 
                     value="attendance" 
-                    className="text-xs py-2 data-[state=active]:bg-indigo-100 data-[state=active]:text-indigo-900"
+                    className="flex-shrink-0 gap-1.5 text-xs py-2 px-3 data-[state=active]:bg-indigo-100 data-[state=active]:text-indigo-900"
                   >
-                    Attendance
+                    <Users className="h-4 w-4" />
+                    <span>Attendance</span>
                   </TabsTrigger>
                 </TabsList>
+              </div>
 
-                <CardContent className="px-4 pb-4 pt-0">
-                  <TabsContent value="deliveries" className="mt-0">
-                    <SiteWarehouseTab key={`deliveries-${selectedProjectId}-${recycleBinVersion}`} projectId={selectedProjectId} />
-                  </TabsContent>
+              <div className="px-3 sm:px-0">
+                <TabsContent value="deliveries" className="mt-0">
+                  <SiteWarehouseTab key={`deliveries-${selectedProjectId}-${recycleBinVersion}`} projectId={selectedProjectId} />
+                </TabsContent>
 
-                  <TabsContent value="site-warehouse" className="mt-0">
-                    <SiteWarehouseInventoryTab key={`inventory-${selectedProjectId}-${recycleBinVersion}`} projectId={selectedProjectId} />
-                  </TabsContent>
+                <TabsContent value="site-warehouse" className="mt-0">
+                  <SiteWarehouseInventoryTab key={`inventory-${selectedProjectId}-${recycleBinVersion}`} projectId={selectedProjectId} />
+                </TabsContent>
 
-                  <TabsContent value="usage" className="mt-0">
-                    <MaterialUsageTab key={`usage-${selectedProjectId}-${recycleBinVersion}`} projectId={selectedProjectId} />
-                  </TabsContent>
+                <TabsContent value="usage" className="mt-0">
+                  <MaterialUsageTab key={`usage-${selectedProjectId}-${recycleBinVersion}`} projectId={selectedProjectId} />
+                </TabsContent>
 
-                  <TabsContent value="requests" className="mt-0">
-                    <SiteRequestsTab key={`requests-${selectedProjectId}-${recycleBinVersion}`} projectId={selectedProjectId} />
-                  </TabsContent>
+                <TabsContent value="requests" className="mt-0">
+                  <SiteRequestsTab key={`requests-${selectedProjectId}-${recycleBinVersion}`} projectId={selectedProjectId} />
+                </TabsContent>
 
-                  <TabsContent value="progress" className="mt-0">
-                    <ProgressTab key={`progress-${selectedProjectId}-${recycleBinVersion}`} projectId={selectedProjectId} />
-                  </TabsContent>
+                <TabsContent value="progress" className="mt-0">
+                  <ProgressTab key={`progress-${selectedProjectId}-${recycleBinVersion}`} projectId={selectedProjectId} />
+                </TabsContent>
 
-                  <TabsContent value="attendance" className="mt-0">
-                    <AttendanceTab key={`attendance-${selectedProjectId}-${recycleBinVersion}`} projectId={selectedProjectId} />
-                  </TabsContent>
-                </CardContent>
-              </Tabs>
-            </div>
-          </CardHeader>
+                <TabsContent value="attendance" className="mt-0">
+                  <AttendanceTab key={`attendance-${selectedProjectId}-${recycleBinVersion}`} projectId={selectedProjectId} />
+                </TabsContent>
+              </div>
+            </Tabs>
+          </CardContent>
         </Card>
       </div>
     </Layout>
