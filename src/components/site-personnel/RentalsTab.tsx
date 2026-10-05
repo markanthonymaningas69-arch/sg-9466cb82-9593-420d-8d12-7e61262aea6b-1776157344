@@ -3,15 +3,18 @@ import { Plus, Trash2, Wrench, Filter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/database.types";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { formatCurrency } from "@/lib/currency";
 
 type RentalExpense = Database["public"]["Tables"]["rental_expenses"]["Row"];
+type ScopeOfWork = Database["public"]["Tables"]["bom_scope_of_work"]["Row"];
 
 interface RentalFormData {
   rental_type: "Tools" | "Equipment" | "Accommodation" | "Other";
@@ -23,21 +26,21 @@ interface RentalFormData {
   rental_end_date: string;
   supplier: string;
   notes: string;
+  bom_scope_id: string;
 }
 
-function getDefaultFormData(): RentalFormData {
-  return {
-    rental_type: "Tools",
-    item_name: "",
-    quantity: "1",
-    unit: "unit",
-    rate_per_unit: "",
-    rental_start_date: new Date().toISOString().split("T")[0],
-    rental_end_date: "",
-    supplier: "",
-    notes: "",
-  };
-}
+const initialFormData: RentalFormData = {
+  rental_type: "Tools",
+  item_name: "",
+  quantity: "1",
+  unit: "day",
+  rate_per_unit: "",
+  rental_start_date: new Date().toISOString().split("T")[0],
+  rental_end_date: new Date().toISOString().split("T")[0],
+  supplier: "",
+  notes: "",
+  bom_scope_id: ""
+};
 
 function calculateRentalDays(startDate: string, endDate?: string | null): number {
   if (!endDate) return 0;
@@ -57,95 +60,63 @@ function calculateRentalCost(quantity: number, ratePerUnit: number, startDate: s
 export function RentalsTab({ projectId }: { projectId: string }) {
   const { toast } = useToast();
   const [rentals, setRentals] = useState<RentalExpense[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [formData, setFormData] = useState<RentalFormData>(getDefaultFormData);
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [filters, setFilters] = useState({
-    rentalType: "all",
-    itemName: "",
-    supplier: "",
-    dateFrom: "",
-    dateTo: "",
-  });
-
-  const filteredRentals = useMemo(() => {
-    const itemQuery = filters.itemName.trim().toLowerCase();
-    const supplierQuery = filters.supplier.trim().toLowerCase();
-
-    return rentals.filter((rental) => {
-      if (filters.rentalType !== "all" && rental.rental_type !== filters.rentalType) {
-        return false;
-      }
-
-      if (itemQuery && !rental.item_name.toLowerCase().includes(itemQuery)) {
-        return false;
-      }
-
-      if (supplierQuery && !(rental.supplier || "").toLowerCase().includes(supplierQuery)) {
-        return false;
-      }
-
-      if (filters.dateFrom && rental.rental_start_date < filters.dateFrom) {
-        return false;
-      }
-
-      if (filters.dateTo && rental.rental_start_date > filters.dateTo) {
-        return false;
-      }
-
-      return true;
-    });
-  }, [filters, rentals]);
-
-  const rentalsSummary = useMemo(() => {
-    const totalCost = filteredRentals.reduce((sum, rental) => {
-      return sum + calculateRentalCost(
-        Number(rental.quantity),
-        Number(rental.rate_per_unit),
-        rental.rental_start_date,
-        rental.rental_end_date
-      );
-    }, 0);
-
-    const typeCount = new Set(filteredRentals.map((r) => r.rental_type)).size;
-
-    return {
-      recordCount: filteredRentals.length,
-      typeCount,
-      totalCost,
-    };
-  }, [filteredRentals]);
+  const [scopes, setScopes] = useState<ScopeOfWork[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState<RentalFormData>(initialFormData);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [filterType, setFilterType] = useState<string>("all");
+  const [filterScope, setFilterScope] = useState<string>("all");
 
   useEffect(() => {
-    void loadRentals();
+    if (projectId) {
+      loadRentals();
+      loadScopes();
+    }
   }, [projectId]);
 
-  async function loadRentals() {
+  const loadScopes = async () => {
     try {
-      setLoading(true);
+      const { data: bomData } = await supabase
+        .from("bill_of_materials")
+        .select("id")
+        .eq("project_id", projectId)
+        .single();
 
+      if (bomData) {
+        const { data: scopesData } = await supabase
+          .from("bom_scope_of_work")
+          .select("*")
+          .eq("bom_id", bomData.id)
+          .order("name");
+
+        setScopes(scopesData || []);
+      }
+    } catch (error) {
+      console.error("Error loading scopes:", error);
+    }
+  };
+
+  const loadRentals = async () => {
+    setLoading(true);
+    try {
       const { data, error } = await supabase
         .from("rental_expenses")
-        .select("*")
+        .select("*, bom_scope_of_work(name)")
         .eq("project_id", projectId)
-        .eq("is_archived", false)
         .order("rental_start_date", { ascending: false });
 
       if (error) throw error;
-
       setRentals(data || []);
-    } catch (error) {
-      console.error("Error loading rentals:", error);
+    } catch (error: any) {
       toast({
-        title: "Error",
-        description: "Failed to load rental expenses",
-        variant: "destructive",
+        title: "Error loading rentals",
+        description: error.message,
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -174,6 +145,7 @@ export function RentalsTab({ projectId }: { projectId: string }) {
         rental_end_date: formData.rental_end_date || null,
         supplier: formData.supplier || null,
         notes: formData.notes || null,
+        bom_scope_id: formData.bom_scope_id || null,
       });
 
       if (error) throw error;
@@ -183,8 +155,7 @@ export function RentalsTab({ projectId }: { projectId: string }) {
         description: "Rental expense recorded",
       });
 
-      setDialogOpen(false);
-      setFormData(getDefaultFormData());
+      setFormData(initialFormData);
       await loadRentals();
     } catch (error: any) {
       console.error("Error recording rental:", error);
@@ -223,15 +194,34 @@ export function RentalsTab({ projectId }: { projectId: string }) {
     }
   }
 
-  function clearFilters() {
-    setFilters({
-      rentalType: "all",
-      itemName: "",
-      supplier: "",
-      dateFrom: "",
-      dateTo: "",
+  const filteredRentals = useMemo(() => {
+    return rentals.filter(rental => {
+      const typeMatch = filterType === "all" || rental.rental_type === filterType;
+      const scopeMatch = filterScope === "all" || 
+        (filterScope === "unassigned" && !rental.bom_scope_id) ||
+        rental.bom_scope_id === filterScope;
+      return typeMatch && scopeMatch;
     });
-  }
+  }, [rentals, filterType, filterScope]);
+
+  const rentalsSummary = useMemo(() => {
+    const totalCost = filteredRentals.reduce((sum, rental) => {
+      return sum + calculateRentalCost(
+        Number(rental.quantity),
+        Number(rental.rate_per_unit),
+        rental.rental_start_date,
+        rental.rental_end_date
+      );
+    }, 0);
+
+    const typeCount = new Set(filteredRentals.map((r) => r.rental_type)).size;
+
+    return {
+      recordCount: filteredRentals.length,
+      typeCount,
+      totalCost,
+    };
+  }, [filteredRentals]);
 
   const estimatedCost = useMemo(() => {
     if (!formData.quantity || !formData.rate_per_unit || !formData.rental_start_date) {
@@ -265,22 +255,46 @@ export function RentalsTab({ projectId }: { projectId: string }) {
               <DialogTitle>Record Rental Expense</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="rental_type">Rental Type</Label>
-                <Select
-                  value={formData.rental_type}
-                  onValueChange={(value) => setFormData((prev) => ({ ...prev, rental_type: value as any }))}
-                >
-                  <SelectTrigger id="rental_type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Tools">Tools</SelectItem>
-                    <SelectItem value="Equipment">Equipment</SelectItem>
-                    <SelectItem value="Accommodation">Accommodation</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="rental_type">Rental Type</Label>
+                  <Select
+                    value={formData.rental_type}
+                    onValueChange={(value: "Tools" | "Equipment" | "Accommodation" | "Other") =>
+                      setFormData(prev => ({ ...prev, rental_type: value }))
+                    }
+                  >
+                    <SelectTrigger id="rental_type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Tools">Tools</SelectItem>
+                      <SelectItem value="Equipment">Equipment</SelectItem>
+                      <SelectItem value="Accommodation">Accommodation</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="bom_scope_id">Scope of Work (Optional)</Label>
+                  <Select
+                    value={formData.bom_scope_id}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, bom_scope_id: value }))}
+                  >
+                    <SelectTrigger id="bom_scope_id">
+                      <SelectValue placeholder="Select scope (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">None / General</SelectItem>
+                      {scopes.map(scope => (
+                        <SelectItem key={scope.id} value={scope.id}>
+                          {scope.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div>
