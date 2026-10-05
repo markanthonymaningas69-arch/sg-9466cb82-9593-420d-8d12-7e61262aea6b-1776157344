@@ -116,7 +116,7 @@ export default function Analytics() {
         siteService.getDeliveries(projectId),
         siteService.getScopeOfWorks(projectId),
         supabase.from('purchases').select('item_name, quantity, unit_cost, order_date').order('order_date', { ascending: true }),
-        supabase.from('rental_expenses').select('*').eq('project_id', projectId)
+        supabase.from('rental_expenses').select('*').eq('project_id', projectId).eq('is_archived', false)
       ]);
 
       // 1. Build chronological purchase/delivery lots for True FIFO costing
