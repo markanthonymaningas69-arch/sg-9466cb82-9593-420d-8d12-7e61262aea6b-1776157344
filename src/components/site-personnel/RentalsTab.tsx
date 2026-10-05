@@ -572,6 +572,7 @@ export function RentalsTab({ projectId }: { projectId: string }) {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Type</TableHead>
+                      <TableHead>Scope</TableHead>
                       <TableHead>Item Name</TableHead>
                       <TableHead>Quantity</TableHead>
                       <TableHead>Rate/Day</TableHead>
@@ -601,6 +602,9 @@ export function RentalsTab({ projectId }: { projectId: string }) {
                               {rental.rental_type}
                             </span>
                           </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {(rental as any).bom_scope_of_work?.name || "General"}
+                          </TableCell>
                           <TableCell className="font-medium">{rental.item_name}</TableCell>
                           <TableCell>
                             {rental.quantity} {rental.unit}
@@ -625,7 +629,7 @@ export function RentalsTab({ projectId }: { projectId: string }) {
                       );
                     })}
                     <TableRow className="border-t-2 bg-muted/50 font-semibold">
-                      <TableCell colSpan={7} className="text-right">
+                      <TableCell colSpan={8} className="text-right">
                         Grand Total:
                       </TableCell>
                       <TableCell className="font-bold text-primary">{rentalsSummary.totalCost.toFixed(2)}</TableCell>
