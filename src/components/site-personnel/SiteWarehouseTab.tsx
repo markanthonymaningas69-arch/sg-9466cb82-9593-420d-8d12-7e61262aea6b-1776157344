@@ -581,7 +581,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
     try {
       const deliveryPayload = {
         project_id: projectId,
-        transaction_type: "purchase" as const,
+        transaction_type: "site_purchase" as const,
         bom_scope_id: formData.bom_scope_id === "others" || !formData.bom_scope_id ? null : formData.bom_scope_id,
         item_name: finalItemName,
         quantity: Number(formData.quantity),
