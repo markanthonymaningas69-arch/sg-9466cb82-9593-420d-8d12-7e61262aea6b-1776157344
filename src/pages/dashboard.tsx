@@ -83,7 +83,8 @@ export default function Dashboard() {
       { data: progressUpdatesData },
       { data: billingData },
       { data: purchasesData },
-      { data: deliveriesData }
+      { data: deliveriesData },
+      { data: rentalExpensesData }
     ] = await Promise.all([
       supabase.from('projects').select('*').order('created_at', { ascending: false }),
       supabase.from('bill_of_materials').select('project_id, bom_scope_of_work(*, bom_materials(*), bom_labor(*)), bom_indirect_costs(*)'),
@@ -92,7 +93,8 @@ export default function Dashboard() {
       supabase.from('bom_progress_updates').select('bom_scope_id, percentage_completed, update_date').order('update_date', { ascending: true }),
       supabase.from('project_billing').select('project_id, amount, payment_received, status').eq('is_archived', false),
       supabase.from('purchases').select('item_name, quantity, unit_cost, order_date, project_id').order('order_date', { ascending: true }),
-      supabase.from('deliveries').select('item_name, quantity, unit_cost, delivery_date, project_id').order('delivery_date', { ascending: true })
+      supabase.from('deliveries').select('item_name, quantity, unit_cost, delivery_date, project_id').order('delivery_date', { ascending: true }),
+      supabase.from('rental_expenses').select('project_id, rental_start_date, rental_end_date, rate_per_unit, quantity')
     ]);
 
     const projects = projectsData || [];
@@ -103,6 +105,7 @@ export default function Dashboard() {
     const billings = billingData || [];
     const purchases = purchasesData || [];
     const deliveries = deliveriesData || [];
+    const rentalExpenses = rentalExpensesData || [];
     
     let totalVal = 0;
     let totalCst = 0;
@@ -277,7 +280,18 @@ export default function Dashboard() {
         }
       });
 
-      const totalActualCost = actualMatCost + actualLabCost;
+      // Calculate rental costs
+      const projRentals = rentalExpenses.filter(r => r.project_id === p.id);
+      let actualRentalCost = 0;
+      projRentals.forEach((rental: any) => {
+        const startDate = new Date(rental.rental_start_date);
+        const endDate = new Date(rental.rental_end_date);
+        const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        const dailyRate = Number(rental.rate_per_unit || 0) * Number(rental.quantity || 0);
+        actualRentalCost += dailyRate * daysDiff;
+      });
+
+      const totalActualCost = actualMatCost + actualLabCost + actualRentalCost;
 
       const activeBudget = grandTotalCost > 0 ? grandTotalCost : budget;
 

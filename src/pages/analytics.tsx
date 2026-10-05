@@ -109,13 +109,14 @@ export default function Analytics() {
   const loadProjectData = async (projectId: string) => {
     setLoading(true);
     try {
-      const [bomData, consumptionData, attendanceData, deliveriesData, scopesData, purchasesResponse] = await Promise.all([
+      const [bomData, consumptionData, attendanceData, deliveriesData, scopesData, purchasesResponse, rentalExpensesData] = await Promise.all([
         bomService.getByProjectId(projectId),
         siteService.getMaterialConsumption(projectId),
         supabase.from('site_attendance').select('*, personnel(hourly_rate, daily_rate), bom_scope_of_work(id)').eq('project_id', projectId),
         siteService.getDeliveries(projectId),
         siteService.getScopeOfWorks(projectId),
-        supabase.from('purchases').select('item_name, quantity, unit_cost, order_date').order('order_date', { ascending: true })
+        supabase.from('purchases').select('item_name, quantity, unit_cost, order_date').order('order_date', { ascending: true }),
+        supabase.from('rental_expenses').select('*').eq('project_id', projectId)
       ]);
 
       // 1. Build chronological purchase/delivery lots for True FIFO costing
@@ -212,6 +213,9 @@ export default function Analytics() {
       setAttendance(attendanceData.data || []);
       setDeliveries(deliveriesData.data || []);
       
+      // Store rental expenses for later use
+      (window as any).__rentalExpensesData = rentalExpensesData.data || [];
+
       if (scopesData.data && scopesData.data.length > 0) {
         const scopeIds = scopesData.data.map((s: any) => s.id);
         const { data: progressData } = await supabase
@@ -435,6 +439,8 @@ export default function Analytics() {
   const scopeSpendingData = useMemo(() => {
     if (!bom?.bom_scope_of_work || !Array.isArray(bom.bom_scope_of_work)) return [];
 
+    const rentalExpenses = (window as any).__rentalExpensesData || [];
+
     const result = bom.bom_scope_of_work.map((scope: any) => {
       // Allocated Materials
       const allocatedMatCost = Array.isArray(scope.bom_materials) 
@@ -463,6 +469,17 @@ export default function Analytics() {
           return sum + regularCost + overtimeCost;
         }, 0);
 
+      // Actual Rental Costs
+      const actualRentalCost = rentalExpenses
+        .filter((r: any) => r.bom_scope_id === scope.id)
+        .reduce((sum: number, rental: any) => {
+          const startDate = new Date(rental.rental_start_date);
+          const endDate = new Date(rental.rental_end_date);
+          const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+          const dailyRate = Number(rental.rate_per_unit || 0) * Number(rental.quantity || 0);
+          return sum + (dailyRate * daysDiff);
+        }, 0);
+
       return {
         scopeName: scope.name || "Unknown Scope",
         allocatedMatCost,
@@ -470,7 +487,8 @@ export default function Analytics() {
         totalAllocated: allocatedMatCost + allocatedLabCost,
         actualMatCost,
         actualLabCost,
-        totalActual: actualMatCost + actualLabCost
+        actualRentalCost,
+        totalActual: actualMatCost + actualLabCost + actualRentalCost
       };
     });
 
@@ -490,7 +508,17 @@ export default function Analytics() {
         return sum + regularCost + overtimeCost;
       }, 0);
 
-    if (unassignedMatCost > 0 || unassignedLabCost > 0) {
+    const unassignedRentalCost = rentalExpenses
+      .filter((r: any) => !r.bom_scope_id || !bom.bom_scope_of_work.find((s: any) => s.id === r.bom_scope_id))
+      .reduce((sum: number, rental: any) => {
+        const startDate = new Date(rental.rental_start_date);
+        const endDate = new Date(rental.rental_end_date);
+        const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        const dailyRate = Number(rental.rate_per_unit || 0) * Number(rental.quantity || 0);
+        return sum + (dailyRate * daysDiff);
+      }, 0);
+
+    if (unassignedMatCost > 0 || unassignedLabCost > 0 || unassignedRentalCost > 0) {
       result.push({
         scopeName: "General/Unassigned",
         allocatedMatCost: 0,
@@ -498,7 +526,8 @@ export default function Analytics() {
         totalAllocated: 0,
         actualMatCost: unassignedMatCost,
         actualLabCost: unassignedLabCost,
-        totalActual: unassignedMatCost + unassignedLabCost
+        actualRentalCost: unassignedRentalCost,
+        totalActual: unassignedMatCost + unassignedLabCost + unassignedRentalCost
       });
     }
 
@@ -865,7 +894,7 @@ export default function Analytics() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-lg sm:text-xl">Spent vs Allocated per Scope</CardTitle>
-                    <CardDescription className="text-xs sm:text-sm">Financial breakdown of materials and labor allocated vs actuals.</CardDescription>
+                    <CardDescription className="text-xs sm:text-sm">Financial breakdown of materials, labor, and rentals allocated vs actuals.</CardDescription>
                   </CardHeader>
                   <CardContent className="p-0 sm:p-6">
                     <div className="overflow-x-auto">
@@ -878,13 +907,14 @@ export default function Analytics() {
                             <TableHead className="text-right border-r min-w-[120px]">Total Allocated</TableHead>
                             <TableHead className="text-right bg-muted/30 min-w-[120px]">Actual Materials</TableHead>
                             <TableHead className="text-right bg-muted/30 min-w-[120px]">Actual Labor</TableHead>
+                            <TableHead className="text-right bg-muted/30 min-w-[120px]">Actual Rentals</TableHead>
                             <TableHead className="text-right bg-muted/30 min-w-[120px]">Total Actual</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {scopeSpendingData.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                              <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                                 No scope data available.
                               </TableCell>
                             </TableRow>
@@ -900,6 +930,9 @@ export default function Analytics() {
                                 </TableCell>
                                 <TableCell className={`text-right bg-muted/10 font-medium ${row.actualLabCost > row.allocatedLabCost ? 'text-destructive' : ''}`}>
                                   {formatCurrency(row.actualLabCost)}
+                                </TableCell>
+                                <TableCell className="text-right bg-muted/10 font-medium">
+                                  {formatCurrency(row.actualRentalCost || 0)}
                                 </TableCell>
                                 <TableCell className={`text-right bg-muted/10 font-bold ${row.totalActual > row.totalAllocated ? 'text-destructive' : 'text-primary'}`}>
                                   {formatCurrency(row.totalActual)}
