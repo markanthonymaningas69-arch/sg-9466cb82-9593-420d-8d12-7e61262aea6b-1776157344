@@ -11,7 +11,7 @@ BEGIN
   WHERE project_id = NEW.project_id 
     AND lower(item_name) = lower(NEW.item_name)
     AND unit = NEW.unit
-    AND quantity >= NEW.quantity; -- only deduct if enough quantity available
+    AND quantity >= NEW.quantity;
   
   RETURN NEW;
 END;

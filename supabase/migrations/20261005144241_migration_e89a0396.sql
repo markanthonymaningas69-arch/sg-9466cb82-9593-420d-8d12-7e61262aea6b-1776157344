@@ -48,7 +48,7 @@ BEGIN
         ) VALUES (
           NEW.project_id,
           NEW.item_name,
-          'Materials', -- default category
+          'Materials',
           NEW.quantity,
           NEW.unit,
           NEW.unit_cost,
