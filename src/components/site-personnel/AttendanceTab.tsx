@@ -494,17 +494,18 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
 
       {/* Attendance Table */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
             Attendance Records
           </CardTitle>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Dialog open={bulkAddDialogOpen} onOpenChange={setBulkAddDialogOpen}>
               <DialogTrigger asChild>
-                <Button size="sm" variant="outline">
+                <Button size="sm" variant="outline" className="flex-1 sm:flex-none">
                   <Users className="mr-2 h-4 w-4" />
-                  Add All Workers
+                  <span className="hidden xs:inline">Add All Workers</span>
+                  <span className="xs:hidden">Add All</span>
                 </Button>
               </DialogTrigger>
               <DialogContent>
@@ -702,9 +703,10 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
             </Dialog>
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
-                <Button size="sm">
+                <Button size="sm" className="flex-1 sm:flex-none">
                   <Plus className="mr-2 h-4 w-4" />
-                  Mark Attendance
+                  <span className="hidden xs:inline">Mark Attendance</span>
+                  <span className="xs:hidden">Mark</span>
                 </Button>
               </DialogTrigger>
               <DialogContent>
