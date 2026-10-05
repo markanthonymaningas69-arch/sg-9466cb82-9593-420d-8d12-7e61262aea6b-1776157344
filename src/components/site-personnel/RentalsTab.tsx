@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, Wrench, Filter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/database.types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -10,20 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 
-interface RentalExpense {
-  id: string;
-  project_id: string;
-  rental_type: "Tools" | "Equipment" | "Accommodation" | "Other";
-  item_name: string;
-  quantity: number;
-  unit: string;
-  rate_per_unit: number;
-  rental_start_date: string;
-  rental_end_date?: string | null;
-  supplier?: string | null;
-  notes?: string | null;
-  created_at: string;
-}
+type RentalExpense = Database["public"]["Tables"]["rental_expenses"]["Row"];
 
 interface RentalFormData {
   rental_type: "Tools" | "Equipment" | "Accommodation" | "Other";

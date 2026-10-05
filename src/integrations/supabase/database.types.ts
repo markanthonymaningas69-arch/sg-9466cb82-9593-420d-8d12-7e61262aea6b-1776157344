@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-empty-object-type */
+ 
 export type Json =
   | string
   | number
@@ -2348,6 +2348,78 @@ export type Database = {
           },
           {
             foreignKeyName: "purchases_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rental_expenses: {
+        Row: {
+          archived_at: string | null
+          company_id: string
+          created_at: string
+          id: string
+          is_archived: boolean
+          item_name: string
+          notes: string | null
+          project_id: string
+          quantity: number
+          rate_per_unit: number
+          rental_end_date: string | null
+          rental_start_date: string
+          rental_type: string
+          supplier: string | null
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          is_archived?: boolean
+          item_name: string
+          notes?: string | null
+          project_id: string
+          quantity?: number
+          rate_per_unit?: number
+          rental_end_date?: string | null
+          rental_start_date: string
+          rental_type: string
+          supplier?: string | null
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          is_archived?: boolean
+          item_name?: string
+          notes?: string | null
+          project_id?: string
+          quantity?: number
+          rate_per_unit?: number
+          rental_end_date?: string | null
+          rental_start_date?: string
+          rental_type?: string
+          supplier?: string | null
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rental_expenses_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rental_expenses_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
