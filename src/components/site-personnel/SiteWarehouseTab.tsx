@@ -526,36 +526,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
       return;
     }
 
-    // Determine the final item name - use item_name as primary source
-    const finalItemName = formData.item_name.trim() || formData.custom_item_name.trim();
-
-    if (!finalItemName) {
-      toast({
-        title: "Validation Error",
-        description: "Please enter or select a material name",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!formData.quantity || Number(formData.quantity) <= 0) {
-      toast({
-        title: "Validation Error",
-        description: "Please enter a valid quantity greater than 0",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!formData.unit || !formData.unit.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Please select or enter a unit",
-        variant: "destructive",
-      });
-      return;
-    }
-
+    // Common fields validation
     if (!formData.supplier || !formData.supplier.trim()) {
       toast({
         title: "Validation Error",
@@ -575,6 +546,59 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
     }
 
     try {
+      // Case 1: User has added materials to receipt (pendingLines exist)
+      if (pendingLines.length > 0) {
+        const payloads = pendingLines.map(buildLinePayload);
+        const results = await Promise.all(
+          payloads.map((payload) => siteService.createDelivery(payload))
+        );
+
+        const failedResult = results.find((result) => result.error);
+        if (failedResult?.error) {
+          throw failedResult.error;
+        }
+
+        toast({
+          title: "Success",
+          description: `${pendingLines.length} material record(s) saved successfully`,
+        });
+
+        setDialogOpen(false);
+        resetForm();
+        await loadData();
+        return;
+      }
+
+      // Case 2: Single material entry (no pending lines)
+      const finalItemName = formData.item_name.trim() || formData.custom_item_name.trim();
+
+      if (!finalItemName) {
+        toast({
+          title: "Validation Error",
+          description: "Please enter or select a material name",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!formData.quantity || Number(formData.quantity) <= 0) {
+        toast({
+          title: "Validation Error",
+          description: "Please enter a valid quantity greater than 0",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!formData.unit || !formData.unit.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Please select or enter a unit",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const deliveryPayload = {
         project_id: projectId,
         transaction_type: "site_purchase" as const,
@@ -607,7 +631,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
       });
 
       setDialogOpen(false);
-      setFormData(defaultFormState);
+      resetForm();
       await loadData();
     } catch (error: any) {
       console.error("Error saving purchase:", error);
