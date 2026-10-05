@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Package, TrendingDown, FileText, TrendingUp, Users, Warehouse as WarehouseIcon } from "lucide-react";
+import { Package, TrendingDown, FileText, TrendingUp, Users, Warehouse as WarehouseIcon, Wrench } from "lucide-react";
 
 // Import modular tab components
 import { SiteWarehouseTab } from "@/components/site-personnel/SiteWarehouseTab";
@@ -17,6 +17,7 @@ import { SiteRequestsTab } from "@/components/site-personnel/SiteRequestsTab";
 import { ProgressTab } from "@/components/site-personnel/ProgressTab";
 import { AttendanceTab } from "@/components/site-personnel/AttendanceTab";
 import { SitePersonnelRecycleBin } from "@/components/site-personnel/SitePersonnelRecycleBin";
+import { RentalsTab } from "@/components/site-personnel/RentalsTab";
 
 interface Project {
   id: string;
@@ -180,7 +181,7 @@ export default function SitePersonnelPage() {
           <CardContent className="px-0 pb-4 pt-0 sm:px-4">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <div className="overflow-x-auto overflow-y-hidden pb-2 px-3 sm:px-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                <TabsList className="inline-flex w-auto min-w-full sm:grid sm:w-full sm:grid-cols-6 h-auto">
+                <TabsList className="inline-flex w-auto min-w-full sm:grid sm:w-full sm:grid-cols-7 h-auto">
                   <TabsTrigger 
                     value="deliveries" 
                     className="flex-shrink-0 gap-1.5 text-xs py-2 px-3 data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900"
@@ -203,6 +204,13 @@ export default function SitePersonnelPage() {
                   >
                     <TrendingDown className="h-4 w-4" />
                     <span>Usage</span>
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="rentals" 
+                    className="flex-shrink-0 gap-1.5 text-xs py-2 px-3 data-[state=active]:bg-amber-100 data-[state=active]:text-amber-900"
+                  >
+                    <Wrench className="h-4 w-4" />
+                    <span>Rentals</span>
                   </TabsTrigger>
                   <TabsTrigger 
                     value="requests" 
@@ -240,6 +248,10 @@ export default function SitePersonnelPage() {
 
                 <TabsContent value="usage" className="mt-0">
                   <MaterialUsageTab key={`usage-${selectedProjectId}-${recycleBinVersion}`} projectId={selectedProjectId} />
+                </TabsContent>
+
+                <TabsContent value="rentals" className="mt-0">
+                  <RentalsTab key={`rentals-${selectedProjectId}-${recycleBinVersion}`} projectId={selectedProjectId} />
                 </TabsContent>
 
                 <TabsContent value="requests" className="mt-0">
