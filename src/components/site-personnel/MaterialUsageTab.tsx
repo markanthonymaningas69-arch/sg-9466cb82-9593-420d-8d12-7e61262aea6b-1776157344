@@ -741,7 +741,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
 
               <div>
                 <Label htmlFor="unit_cost">
-                  Unit Cost {formData.item_name && formData.item_name !== "__custom__" ? "(Required)" : "(Optional)"}
+                  Unit Cost {formData.item_name && formData.item_name !== "__custom__" ? "(Auto-filled from latest purchase)" : "(Optional)"}
                 </Label>
                 <Input
                   id="unit_cost"
@@ -750,11 +750,13 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
                   value={formData.unit_cost}
                   onChange={(event) => setFormData((prev) => ({ ...prev, unit_cost: event.target.value }))}
                   placeholder="0.00"
+                  disabled={formData.item_name !== "" && formData.item_name !== "__custom__"}
                   required={formData.item_name !== "" && formData.item_name !== "__custom__"}
+                  className={formData.item_name !== "" && formData.item_name !== "__custom__" ? "bg-muted cursor-not-allowed" : ""}
                 />
                 {formData.item_name && formData.item_name !== "__custom__" && !formData.unit_cost && (
                   <p className="text-xs text-orange-600 mt-1">
-                    Unit cost is required for materials from dropdown
+                    No unit cost found in purchases/deliveries
                   </p>
                 )}
               </div>
