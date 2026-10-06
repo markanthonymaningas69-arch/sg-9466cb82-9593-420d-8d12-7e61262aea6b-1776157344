@@ -243,7 +243,7 @@ export default function Dashboard() {
 
         const originalQtyToCost = qtyToCost;
 
-        // Fallback costing - try multiple sources
+        // Fallback costing - try multiple sources sequentially
         if (qtyToCost > 0) {
           // Try 1: estimated_cost from consumption record
           if (Number(c.estimated_cost) > 0) {
@@ -253,28 +253,30 @@ export default function Dashboard() {
             costedQty += qtyToCost;
             qtyToCost = 0;
           }
-          // Try 2: Any matching lot with cost (even if exhausted) - use actual purchase price
-          else {
-            const matchingLot = allLots.find(lot => lot.name === name && lot.cost > 0);
-            if (matchingLot) {
-              const lotCostVal = qtyToCost * matchingLot.cost;
-              totalCost += lotCostVal;
-              lotCosted += lotCostVal;
-              costedQty += qtyToCost;
-              qtyToCost = 0;
-            }
-            // Try 3: Average cost from all lots for this material (actual average purchase price)
-            else if (lots[name] && lots[name].length > 0) {
-              const validLots = lots[name].filter(l => l.cost > 0);
-              if (validLots.length > 0) {
-                const avgCost = validLots.reduce((sum, l) => sum + l.cost, 0) / validLots.length;
-                const avgCostVal = qtyToCost * avgCost;
-                totalCost += avgCostVal;
-                lotCosted += avgCostVal;
-                costedQty += qtyToCost;
-                qtyToCost = 0;
-              }
-            }
+        }
+
+        // Try 2: Any matching lot with cost (even if exhausted) - use actual purchase price
+        if (qtyToCost > 0) {
+          const matchingLot = allLots.find(lot => lot.name === name && lot.cost > 0);
+          if (matchingLot) {
+            const lotCostVal = qtyToCost * matchingLot.cost;
+            totalCost += lotCostVal;
+            lotCosted += lotCostVal;
+            costedQty += qtyToCost;
+            qtyToCost = 0;
+          }
+        }
+
+        // Try 3: Average cost from all lots for this material (actual average purchase price)
+        if (qtyToCost > 0 && lots[name] && lots[name].length > 0) {
+          const validLots = lots[name].filter(l => l.cost > 0);
+          if (validLots.length > 0) {
+            const avgCost = validLots.reduce((sum, l) => sum + l.cost, 0) / validLots.length;
+            const avgCostVal = qtyToCost * avgCost;
+            totalCost += avgCostVal;
+            lotCosted += avgCostVal;
+            costedQty += qtyToCost;
+            qtyToCost = 0;
           }
         }
 
