@@ -94,7 +94,7 @@ export default function Dashboard() {
       supabase.from('project_billing').select('project_id, amount, payment_received, status').eq('is_archived', false),
       supabase.from('purchases').select('item_name, quantity, unit_cost, order_date, project_id').order('order_date', { ascending: true }),
       supabase.from('deliveries').select('item_name, quantity, unit_cost, delivery_date, project_id').order('delivery_date', { ascending: true }),
-      supabase.from('rental_expenses').select('project_id, rental_start_date, rental_end_date, rate_per_unit, quantity').eq('is_archived', false)
+      supabase.from('rental_expenses').select('project_id, item_name, rental_start_date, rental_end_date, rate_per_unit, quantity').eq('is_archived', false)
     ]);
 
     const projects = projectsData || [];
