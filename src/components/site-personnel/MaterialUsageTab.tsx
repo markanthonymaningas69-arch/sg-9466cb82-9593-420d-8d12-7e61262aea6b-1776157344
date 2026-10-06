@@ -379,13 +379,65 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
       ...prev,
       item_name: value,
       unit: selectedMaterial?.unit || "",
+      unit_cost: "", // Reset unit cost when changing material
     }));
 
-    // Check remaining quantity in warehouse
+    // Check remaining quantity in warehouse and fetch unit cost
     if (value && value !== "__custom__") {
       void checkRemainingQuantity(value);
+      void fetchUnitCostForMaterial(value);
     } else {
       setRemainingQty(null);
+    }
+  }
+
+  async function fetchUnitCostForMaterial(materialName: string) {
+    try {
+      // Try to get unit cost from latest purchase or delivery
+      const { data: purchasesData } = await supabase
+        .from("purchases")
+        .select("unit_cost, order_date")
+        .eq("project_id", projectId)
+        .eq("item_name", materialName)
+        .eq("is_archived", false)
+        .order("order_date", { ascending: false })
+        .limit(1);
+
+      const { data: deliveriesData } = await supabase
+        .from("deliveries")
+        .select("unit_cost, delivery_date")
+        .eq("project_id", projectId)
+        .eq("item_name", materialName)
+        .eq("is_archived", false)
+        .order("delivery_date", { ascending: false })
+        .limit(1);
+
+      // Use the most recent cost from either purchases or deliveries
+      let latestCost: number | null = null;
+      
+      if (purchasesData && purchasesData.length > 0) {
+        latestCost = Number(purchasesData[0].unit_cost || 0);
+      }
+      
+      if (deliveriesData && deliveriesData.length > 0) {
+        const deliveryCost = Number(deliveriesData[0].unit_cost || 0);
+        if (!latestCost) {
+          latestCost = deliveryCost;
+        } else {
+          // Compare dates to get most recent
+          const purchaseDate = purchasesData[0].order_date;
+          const deliveryDate = deliveriesData[0].delivery_date;
+          if (new Date(deliveryDate) > new Date(purchaseDate)) {
+            latestCost = deliveryCost;
+          }
+        }
+      }
+
+      if (latestCost !== null && latestCost > 0) {
+        setFormData(prev => ({ ...prev, unit_cost: latestCost.toString() }));
+      }
+    } catch (error) {
+      console.error("Error fetching unit cost:", error);
     }
   }
 
@@ -559,7 +611,9 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
               </div>
 
               <div>
-                <Label htmlFor="unit_cost">Unit Cost (Optional)</Label>
+                <Label htmlFor="unit_cost">
+                  Unit Cost {formData.item_name && formData.item_name !== "__custom__" ? "(Required)" : "(Optional)"}
+                </Label>
                 <Input
                   id="unit_cost"
                   type="number"
@@ -567,7 +621,13 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
                   value={formData.unit_cost}
                   onChange={(event) => setFormData((prev) => ({ ...prev, unit_cost: event.target.value }))}
                   placeholder="0.00"
+                  required={formData.item_name !== "" && formData.item_name !== "__custom__"}
                 />
+                {formData.item_name && formData.item_name !== "__custom__" && !formData.unit_cost && (
+                  <p className="text-xs text-orange-600 mt-1">
+                    Unit cost is required for materials from dropdown
+                  </p>
+                )}
               </div>
 
               <div>
