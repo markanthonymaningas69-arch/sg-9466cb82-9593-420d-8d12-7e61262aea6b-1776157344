@@ -778,7 +778,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
       if (selectedReceiptGroup) {
         const updatedRecords = await siteService.getDeliveries(projectId);
         const updatedItems = (updatedRecords.data || []).filter(
-          (r: DeliveryRecord) => r.receipt_number?.toLowerCase() === selectedReceiptGroup.receiptNumber?.toLowerCase()
+          (r: any) => r.receipt_number?.toLowerCase() === selectedReceiptGroup.receiptNumber?.toLowerCase()
         );
         if (updatedItems.length > 0) {
           setSelectedReceiptGroup({
@@ -796,6 +796,107 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
         variant: "destructive",
       });
     }
+  }
+
+  function openEditDialog(group: ReceiptGroup) {
+    if (group.items.length === 0) return;
+    
+    const firstItem = group.items[0];
+    setEditingGroup(group);
+    setEditFormData({
+      bom_scope_id: firstItem.bom_scope_id || "others",
+      item_name: firstItem.item_name,
+      quantity: String(firstItem.quantity || ""),
+      unit: firstItem.unit || "",
+      unit_cost: String(firstItem.unit_cost || ""),
+      supplier: group.supplier || "",
+      delivery_date: group.deliveryDate || getTodayDate(),
+      receipt_number: group.receiptNumber || "",
+      notes: group.notes || "",
+      custom_item_name: "",
+    });
+    setEditDialogOpen(true);
+  }
+
+  async function handleEditSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!editingGroup || editingGroup.items.length === 0) {
+      return;
+    }
+
+    try {
+      // Update all items in the receipt group
+      const updatePromises = editingGroup.items.map(item => 
+        siteService.updateDelivery(item.id, {
+          supplier: editFormData.supplier,
+          delivery_date: editFormData.delivery_date,
+          receipt_number: editFormData.receipt_number || null,
+          notes: editFormData.notes || null,
+        })
+      );
+
+      const results = await Promise.all(updatePromises);
+      const failedResult = results.find(result => result.error);
+      
+      if (failedResult?.error) {
+        throw failedResult.error;
+      }
+
+      toast({
+        title: "Success",
+        description: "Receipt updated successfully",
+      });
+
+      setEditDialogOpen(false);
+      setEditingGroup(null);
+      await loadData();
+    } catch (error) {
+      console.error("Error updating receipt:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update the receipt",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function handleDeleteGroup(group: ReceiptGroup) {
+    if (!confirm(`Delete this receipt with ${group.items.length} material(s)?`)) {
+      return;
+    }
+
+    try {
+      const deletePromises = group.items.map(item => siteService.deleteDelivery(item.id));
+      const results = await Promise.all(deletePromises);
+      const failedResult = results.find(result => result.error);
+      
+      if (failedResult?.error) {
+        throw failedResult.error;
+      }
+
+      toast({
+        title: "Success",
+        description: `${group.items.length} material record(s) deleted`,
+      });
+      toast({
+        title: "Moved to recycle bin",
+        description: "Records archived from Deliveries",
+      });
+      await loadData();
+    } catch (error) {
+      console.error("Error deleting receipt:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete the receipt",
+        variant: "destructive",
+      });
+    }
+  }
+
+  function openReceiveDialog(record: ReadyForReceivingRecord) {
+    setSelectedReadyRecord(record);
+    setReceivingDialogOpen(true);
   }
 
   async function handleMarkReceived() {
