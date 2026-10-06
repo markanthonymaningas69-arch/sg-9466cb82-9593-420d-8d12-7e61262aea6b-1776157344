@@ -87,7 +87,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState<MaterialUsageFormData>(getDefaultFormData);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [fifoCosts, setFifoCosts] = useState<Map<string, { unitCost: number; totalCost: number }>>(new Map());
+  const [fifoCosts, setFifoCosts] = useState<Map<string, Array<{ qty: number; unitCost: number; totalCost: number }>>>(new Map());
   const [filters, setFilters] = useState({
     scopeId: "all",
     material: "",
@@ -182,9 +182,9 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
     const scopeCount = new Set(filteredUsageRecords.map((record) => getScopeLabel(record))).size;
     const totalQuantity = filteredUsageRecords.reduce((sum, record) => sum + Number(record.quantity || 0), 0);
     const grandTotal = filteredUsageRecords.reduce((sum, record) => {
-      const fifoCost = fifoCosts.get(record.id);
-      if (fifoCost) {
-        return sum + fifoCost.totalCost;
+      const fifoBreakdown = fifoCosts.get(record.id);
+      if (fifoBreakdown) {
+        return sum + fifoBreakdown.reduce((acc, lot) => acc + lot.totalCost, 0);
       }
       // Fallback to stored unit_cost
       const qty = Number(record.quantity || 0);
@@ -264,7 +264,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
         return dateA - dateB;
       });
 
-      const costsMap = new Map<string, { unitCost: number; totalCost: number }>();
+      const costsMap = new Map<string, Array<{ qty: number; unitCost: number; totalCost: number }>>();
 
       // Clone lots for consumption tracking
       const consumptionLots: Record<string, Array<{ qty: number; cost: number }>> = {};
@@ -275,17 +275,19 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
       sortedUsage.forEach((record) => {
         const itemName = (record.item_name || "").toLowerCase().trim();
         let qtyNeeded = Number(record.quantity || 0);
-        let totalCostAccum = 0;
-        let weightedUnitCost = 0;
+        const breakdown: Array<{ qty: number; unitCost: number; totalCost: number }> = [];
 
         // Try to pull from FIFO lots
         if (consumptionLots[itemName] && consumptionLots[itemName].length > 0) {
-          const originalQtyNeeded = qtyNeeded;
-          
           while (qtyNeeded > 0 && consumptionLots[itemName].length > 0) {
             const lot = consumptionLots[itemName][0];
             const qtyFromThisLot = Math.min(qtyNeeded, lot.qty);
-            totalCostAccum += qtyFromThisLot * lot.cost;
+            
+            breakdown.push({
+              qty: qtyFromThisLot,
+              unitCost: lot.cost,
+              totalCost: qtyFromThisLot * lot.cost,
+            });
 
             lot.qty -= qtyFromThisLot;
             qtyNeeded -= qtyFromThisLot;
@@ -294,31 +296,21 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
               consumptionLots[itemName].shift();
             }
           }
-
-          // Calculate weighted average unit cost
-          if (originalQtyNeeded > 0) {
-            weightedUnitCost = totalCostAccum / originalQtyNeeded;
-          }
         }
 
-        // If no lots or lots exhausted, use stored unit_cost as fallback
+        // If still need more qty (no lots or lots exhausted), use stored unit_cost as fallback
         if (qtyNeeded > 0) {
           const fallbackCost = Number(record.unit_cost || 0);
-          totalCostAccum += qtyNeeded * fallbackCost;
-          
-          // Recalculate weighted average with fallback
-          const totalQty = Number(record.quantity || 0);
-          if (totalQty > 0) {
-            weightedUnitCost = totalCostAccum / totalQty;
-          }
-        } else if (weightedUnitCost === 0 && Number(record.quantity || 0) > 0) {
-          weightedUnitCost = totalCostAccum / Number(record.quantity || 0);
+          breakdown.push({
+            qty: qtyNeeded,
+            unitCost: fallbackCost,
+            totalCost: qtyNeeded * fallbackCost,
+          });
         }
 
-        costsMap.set(record.id, {
-          unitCost: weightedUnitCost,
-          totalCost: totalCostAccum,
-        });
+        if (breakdown.length > 0) {
+          costsMap.set(record.id, breakdown);
+        }
       });
 
       setFifoCosts(costsMap);
@@ -942,41 +934,72 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
                   </TableHeader>
                   <TableBody>
                     {filteredUsageRecords.map((record) => {
-                      const fifoCost = fifoCosts.get(record.id);
-                      const unitCost = fifoCost?.unitCost || Number(record.unit_cost || 0);
-                      const totalCost = fifoCost?.totalCost || (Number(record.quantity || 0) * Number(record.unit_cost || 0));
-                      const hasFifoCost = !!fifoCost;
+                      const fifoBreakdown = fifoCosts.get(record.id);
                       
-                      return (
-                        <TableRow key={record.id}>
-                          <TableCell>{new Date(record.date_used).toLocaleDateString()}</TableCell>
-                          <TableCell>{getScopeLabel(record)}</TableCell>
-                          <TableCell className="font-medium">{record.item_name}</TableCell>
-                          <TableCell>{record.quantity}</TableCell>
-                          <TableCell>{record.unit}</TableCell>
-                          <TableCell>
-                            {unitCost > 0 ? (
-                              <span className={hasFifoCost ? "text-green-600 font-medium" : ""}>
-                                {formatAmount(unitCost)}
-                                {hasFifoCost && <span className="text-xs ml-1">(FIFO)</span>}
+                      if (fifoBreakdown && fifoBreakdown.length > 0) {
+                        // Render multiple rows if usage spans multiple lots
+                        return fifoBreakdown.map((lot, lotIndex) => (
+                          <TableRow key={`${record.id}-lot-${lotIndex}`}>
+                            <TableCell>{lotIndex === 0 ? new Date(record.date_used).toLocaleDateString() : ""}</TableCell>
+                            <TableCell>{lotIndex === 0 ? getScopeLabel(record) : ""}</TableCell>
+                            <TableCell className="font-medium">
+                              {record.item_name}
+                              {fifoBreakdown.length > 1 && (
+                                <span className="ml-2 text-xs text-muted-foreground">
+                                  (Lot {lotIndex + 1}/{fifoBreakdown.length})
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell>{lot.qty}</TableCell>
+                            <TableCell>{record.unit}</TableCell>
+                            <TableCell>
+                              <span className="text-green-600 font-medium">
+                                {formatAmount(lot.unitCost)}
+                                <span className="text-xs ml-1">(FIFO)</span>
                               </span>
-                            ) : "—"}
-                          </TableCell>
-                          <TableCell className="font-semibold">
-                            {totalCost > 0 ? (
-                              <span className={hasFifoCost ? "text-green-600" : ""}>
-                                {formatAmount(totalCost)}
-                              </span>
-                            ) : "—"}
-                          </TableCell>
-                          <TableCell className="max-w-[220px] truncate text-xs text-muted-foreground">{record.notes || "—"}</TableCell>
-                          <TableCell>
-                            <Button variant="ghost" size="icon" onClick={() => void handleDelete(record.id)}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
+                            </TableCell>
+                            <TableCell className="font-semibold text-green-600">
+                              {formatAmount(lot.totalCost)}
+                            </TableCell>
+                            <TableCell className="max-w-[220px] truncate text-xs text-muted-foreground">
+                              {lotIndex === 0 ? (record.notes || "—") : ""}
+                            </TableCell>
+                            <TableCell>
+                              {lotIndex === 0 && (
+                                <Button variant="ghost" size="icon" onClick={() => void handleDelete(record.id)}>
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ));
+                      } else {
+                        // Fallback: single row with stored unit_cost
+                        const unitCost = Number(record.unit_cost || 0);
+                        const totalCost = Number(record.quantity || 0) * unitCost;
+                        
+                        return (
+                          <TableRow key={record.id}>
+                            <TableCell>{new Date(record.date_used).toLocaleDateString()}</TableCell>
+                            <TableCell>{getScopeLabel(record)}</TableCell>
+                            <TableCell className="font-medium">{record.item_name}</TableCell>
+                            <TableCell>{record.quantity}</TableCell>
+                            <TableCell>{record.unit}</TableCell>
+                            <TableCell>
+                              {unitCost > 0 ? formatAmount(unitCost) : "—"}
+                            </TableCell>
+                            <TableCell className="font-semibold">
+                              {totalCost > 0 ? formatAmount(totalCost) : "—"}
+                            </TableCell>
+                            <TableCell className="max-w-[220px] truncate text-xs text-muted-foreground">{record.notes || "—"}</TableCell>
+                            <TableCell>
+                              <Button variant="ghost" size="icon" onClick={() => void handleDelete(record.id)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      }
                     })}
                     <TableRow className="bg-muted/50 font-semibold border-t-2">
                       <TableCell colSpan={6} className="text-right">Grand Total:</TableCell>
