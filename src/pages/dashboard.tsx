@@ -203,11 +203,18 @@ export default function Dashboard() {
         lots[lot.name].push({ qty: lot.qty, cost: lot.cost });
       });
 
+      // Sort consumptions by date for proper FIFO processing
+      const sortedConsumptions = [...projCons].sort((a, b) => {
+        const dateA = new Date(a.consumption_date || a.created_at || 0).getTime();
+        const dateB = new Date(b.consumption_date || b.created_at || 0).getTime();
+        return dateA - dateB;
+      });
+
       // Calculate actual material cost using FIFO
       let actualMatCost = 0;
       let ocmCost = 0;
       
-      projCons.forEach((c: any) => {
+      sortedConsumptions.forEach((c: any) => {
         const name = (c.item_name || '').toLowerCase().trim();
         let qtyToCost = Number(c.quantity || c.quantity_used || 0);
         let totalCost = 0;
@@ -264,9 +271,20 @@ export default function Dashboard() {
       let actualLabCost = 0;
       let dateStarted: string | null = null;
       projAtt.forEach((a: any) => {
-        const hrRate = Number(a.personnel?.hourly_rate || (a.personnel?.daily_rate ? a.personnel.daily_rate / 8 : 0));
+        // Ensure personnel data exists
+        if (!a.personnel) {
+          console.warn(`Attendance record ${a.id} missing personnel data for project ${p.name}`);
+          return;
+        }
+
+        const hrRate = Number(a.personnel?.hourly_rate || 0) || (a.personnel?.daily_rate ? Number(a.personnel.daily_rate) / 8 : 0);
         const hoursWorked = Number(a.hours_worked || 0);
         const overtimeHours = Number(a.overtime_hours || 0);
+        
+        if (hoursWorked <= 0 && overtimeHours <= 0) {
+          return; // Skip if no hours recorded
+        }
+
         const regularCost = hoursWorked * hrRate;
         const overtimeCost = overtimeHours * (hrRate * 1.5);
         const laborCost = regularCost + overtimeCost;
