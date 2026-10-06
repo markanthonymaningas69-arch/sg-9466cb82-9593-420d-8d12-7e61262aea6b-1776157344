@@ -83,6 +83,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState<MaterialUsageFormData>(getDefaultFormData);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [fifoCosts, setFifoCosts] = useState<Map<string, { unitCost: number; totalCost: number }>>(new Map());
   const [filters, setFilters] = useState({
     scopeId: "all",
     material: "",
@@ -177,6 +178,11 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
     const scopeCount = new Set(filteredUsageRecords.map((record) => getScopeLabel(record))).size;
     const totalQuantity = filteredUsageRecords.reduce((sum, record) => sum + Number(record.quantity || 0), 0);
     const grandTotal = filteredUsageRecords.reduce((sum, record) => {
+      const fifoCost = fifoCosts.get(record.id);
+      if (fifoCost) {
+        return sum + fifoCost.totalCost;
+      }
+      // Fallback to stored unit_cost
       const qty = Number(record.quantity || 0);
       const cost = Number(record.unit_cost || 0);
       return sum + (qty * cost);
@@ -188,11 +194,134 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
       totalQuantity,
       grandTotal,
     };
-  }, [filteredUsageRecords]);
+  }, [filteredUsageRecords, fifoCosts]);
 
   useEffect(() => {
     void loadData();
   }, [projectId]);
+
+  useEffect(() => {
+    if (usageRecords.length > 0) {
+      void calculateFifoCosts();
+    }
+  }, [usageRecords]);
+
+  async function calculateFifoCosts() {
+    try {
+      // Fetch all purchases and deliveries for this project
+      const { data: purchasesData } = await supabase
+        .from("purchases")
+        .select("item_name, quantity, unit_cost, order_date")
+        .eq("project_id", projectId)
+        .eq("is_archived", false)
+        .order("order_date", { ascending: true });
+
+      const { data: deliveriesData } = await supabase
+        .from("deliveries")
+        .select("item_name, quantity, unit_cost, delivery_date")
+        .eq("project_id", projectId)
+        .eq("is_archived", false)
+        .order("delivery_date", { ascending: true });
+
+      // Build FIFO lots per material
+      const fifoLots: Record<string, Array<{ qty: number; cost: number; date: string }>> = {};
+
+      // Add purchases to lots
+      (purchasesData || []).forEach((p: any) => {
+        const itemName = (p.item_name || "").toLowerCase().trim();
+        if (!fifoLots[itemName]) fifoLots[itemName] = [];
+        fifoLots[itemName].push({
+          qty: Number(p.quantity || 0),
+          cost: Number(p.unit_cost || 0),
+          date: p.order_date,
+        });
+      });
+
+      // Add deliveries to lots
+      (deliveriesData || []).forEach((d: any) => {
+        const itemName = (d.item_name || "").toLowerCase().trim();
+        if (!fifoLots[itemName]) fifoLots[itemName] = [];
+        fifoLots[itemName].push({
+          qty: Number(d.quantity || 0),
+          cost: Number(d.unit_cost || 0),
+          date: d.delivery_date,
+        });
+      });
+
+      // Sort lots by date (FIFO)
+      for (const itemName in fifoLots) {
+        fifoLots[itemName].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      }
+
+      // Process usage records chronologically with FIFO
+      const sortedUsage = [...usageRecords].sort((a, b) => {
+        const dateA = new Date(a.date_used || a.created_at || 0).getTime();
+        const dateB = new Date(b.date_used || b.created_at || 0).getTime();
+        return dateA - dateB;
+      });
+
+      const costsMap = new Map<string, { unitCost: number; totalCost: number }>();
+
+      // Clone lots for consumption tracking
+      const consumptionLots: Record<string, Array<{ qty: number; cost: number }>> = {};
+      for (const itemName in fifoLots) {
+        consumptionLots[itemName] = fifoLots[itemName].map(lot => ({ qty: lot.qty, cost: lot.cost }));
+      }
+
+      sortedUsage.forEach((record) => {
+        const itemName = (record.item_name || "").toLowerCase().trim();
+        let qtyNeeded = Number(record.quantity || 0);
+        let totalCostAccum = 0;
+        let weightedUnitCost = 0;
+
+        // Try to pull from FIFO lots
+        if (consumptionLots[itemName] && consumptionLots[itemName].length > 0) {
+          const originalQtyNeeded = qtyNeeded;
+          
+          while (qtyNeeded > 0 && consumptionLots[itemName].length > 0) {
+            const lot = consumptionLots[itemName][0];
+            const qtyFromThisLot = Math.min(qtyNeeded, lot.qty);
+            totalCostAccum += qtyFromThisLot * lot.cost;
+
+            lot.qty -= qtyFromThisLot;
+            qtyNeeded -= qtyFromThisLot;
+
+            if (lot.qty <= 0) {
+              consumptionLots[itemName].shift();
+            }
+          }
+
+          // Calculate weighted average unit cost
+          if (originalQtyNeeded > 0) {
+            weightedUnitCost = totalCostAccum / originalQtyNeeded;
+          }
+        }
+
+        // If no lots or lots exhausted, use stored unit_cost as fallback
+        if (qtyNeeded > 0) {
+          const fallbackCost = Number(record.unit_cost || 0);
+          totalCostAccum += qtyNeeded * fallbackCost;
+          
+          // Recalculate weighted average with fallback
+          const totalQty = Number(record.quantity || 0);
+          if (totalQty > 0) {
+            weightedUnitCost = totalCostAccum / totalQty;
+          }
+        } else if (weightedUnitCost === 0 && Number(record.quantity || 0) > 0) {
+          weightedUnitCost = totalCostAccum / Number(record.quantity || 0);
+        }
+
+        costsMap.set(record.id, {
+          unitCost: weightedUnitCost,
+          totalCost: totalCostAccum,
+        });
+      });
+
+      setFifoCosts(costsMap);
+    } catch (error) {
+      console.error("Error calculating FIFO costs:", error);
+    }
+  }
 
   async function loadData() {
     try {
@@ -807,8 +936,10 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
                   </TableHeader>
                   <TableBody>
                     {filteredUsageRecords.map((record) => {
-                      const unitCost = Number(record.unit_cost || 0);
-                      const totalCost = Number(record.quantity || 0) * unitCost;
+                      const fifoCost = fifoCosts.get(record.id);
+                      const unitCost = fifoCost?.unitCost || Number(record.unit_cost || 0);
+                      const totalCost = fifoCost?.totalCost || (Number(record.quantity || 0) * Number(record.unit_cost || 0));
+                      const hasFifoCost = !!fifoCost;
                       
                       return (
                         <TableRow key={record.id}>
@@ -817,8 +948,21 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
                           <TableCell className="font-medium">{record.item_name}</TableCell>
                           <TableCell>{record.quantity}</TableCell>
                           <TableCell>{record.unit}</TableCell>
-                          <TableCell>{record.unit_cost ? unitCost.toFixed(2) : "—"}</TableCell>
-                          <TableCell className="font-semibold">{record.unit_cost ? totalCost.toFixed(2) : "—"}</TableCell>
+                          <TableCell>
+                            {unitCost > 0 ? (
+                              <span className={hasFifoCost ? "text-green-600 font-medium" : ""}>
+                                {unitCost.toFixed(2)}
+                                {hasFifoCost && <span className="text-xs ml-1">(FIFO)</span>}
+                              </span>
+                            ) : "—"}
+                          </TableCell>
+                          <TableCell className="font-semibold">
+                            {totalCost > 0 ? (
+                              <span className={hasFifoCost ? "text-green-600" : ""}>
+                                {totalCost.toFixed(2)}
+                              </span>
+                            ) : "—"}
+                          </TableCell>
                           <TableCell className="max-w-[220px] truncate text-xs text-muted-foreground">{record.notes || "—"}</TableCell>
                           <TableCell>
                             <Button variant="ghost" size="icon" onClick={() => void handleDelete(record.id)}>
