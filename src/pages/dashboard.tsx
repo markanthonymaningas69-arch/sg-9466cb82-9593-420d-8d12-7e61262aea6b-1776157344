@@ -213,11 +213,17 @@ export default function Dashboard() {
       // Calculate actual material cost using FIFO
       let actualMatCost = 0;
       let ocmCost = 0;
+      const uncostedItems: any[] = [];
       
       sortedConsumptions.forEach((c: any) => {
         const name = (c.item_name || '').toLowerCase().trim();
         let qtyToCost = Number(c.quantity || c.quantity_used || 0);
         let totalCost = 0;
+        let costedQty = 0;
+        let fifoCosted = 0;
+        let estimatedCosted = 0;
+        let bomCosted = 0;
+        let lotCosted = 0;
 
         // Apply FIFO
         if (lots[name] && lots[name].length > 0) {
@@ -225,33 +231,93 @@ export default function Dashboard() {
             const lot = lots[name][i];
             if (lot.qty > 0 && lot.cost > 0) {
               const consumedFromLot = Math.min(qtyToCost, lot.qty);
-              totalCost += consumedFromLot * lot.cost;
+              const lotCost = consumedFromLot * lot.cost;
+              totalCost += lotCost;
+              fifoCosted += lotCost;
               lot.qty -= consumedFromLot;
               qtyToCost -= consumedFromLot;
+              costedQty += consumedFromLot;
             }
           }
         }
 
-        // Fallback costing
+        const originalQtyToCost = qtyToCost;
+
+        // Fallback costing - try multiple sources
         if (qtyToCost > 0) {
+          // Try 1: estimated_cost from consumption record
           if (Number(c.estimated_cost) > 0) {
-            totalCost += qtyToCost * Number(c.estimated_cost);
-          } else if (projectBom) {
+            const estCost = qtyToCost * Number(c.estimated_cost);
+            totalCost += estCost;
+            estimatedCosted += estCost;
+            costedQty += qtyToCost;
+            qtyToCost = 0;
+          }
+          // Try 2: BOM unit cost
+          else if (projectBom) {
             const scope = (projectBom.bom_scope_of_work || []).find((s: any) => s.id === c.bom_scope_id);
             const bomMat = scope?.bom_materials?.find((m: any) => (m.material_name || '').toLowerCase().trim() === name);
             
             if (bomMat && Number(bomMat.unit_cost) > 0) {
-              totalCost += qtyToCost * Number(bomMat.unit_cost);
-            } else {
+              const bomCostVal = qtyToCost * Number(bomMat.unit_cost);
+              totalCost += bomCostVal;
+              bomCosted += bomCostVal;
+              costedQty += qtyToCost;
+              qtyToCost = 0;
+            }
+            // Try 3: Any matching lot with cost (even if exhausted)
+            else {
               const matchingLot = allLots.find(lot => lot.name === name && lot.cost > 0);
               if (matchingLot) {
-                totalCost += qtyToCost * matchingLot.cost;
+                const lotCostVal = qtyToCost * matchingLot.cost;
+                totalCost += lotCostVal;
+                lotCosted += lotCostVal;
+                costedQty += qtyToCost;
+                qtyToCost = 0;
               }
+            }
+          }
+          // Try 4: Default average cost from all lots for this material
+          if (qtyToCost > 0 && lots[name] && lots[name].length > 0) {
+            const validLots = lots[name].filter(l => l.cost > 0);
+            if (validLots.length > 0) {
+              const avgCost = validLots.reduce((sum, l) => sum + l.cost, 0) / validLots.length;
+              const avgCostVal = qtyToCost * avgCost;
+              totalCost += avgCostVal;
+              lotCosted += avgCostVal;
+              costedQty += qtyToCost;
+              qtyToCost = 0;
             }
           }
         }
 
+        // Track uncosted items for debugging
+        if (qtyToCost > 0) {
+          uncostedItems.push({
+            item: c.item_name,
+            uncostedQty: qtyToCost,
+            totalQty: Number(c.quantity || c.quantity_used || 0),
+            date: c.date_used
+          });
+        }
+
         actualMatCost += totalCost;
+
+        // Debug logging for Interior Works
+        if (p.name && p.name.toLowerCase().includes('interior') && totalCost > 0) {
+          console.log(`[${p.name}] Material costing for ${c.item_name}:`, {
+            totalQty: Number(c.quantity || c.quantity_used || 0),
+            costedQty,
+            uncostedQty: originalQtyToCost,
+            totalCost,
+            breakdown: {
+              fifo: fifoCosted,
+              estimated: estimatedCosted,
+              bom: bomCosted,
+              avgLot: lotCosted
+            }
+          });
+        }
 
         // Check if this is OCM (not in BOM)
         if (projectBom) {
@@ -322,6 +388,10 @@ export default function Dashboard() {
           attendanceCount: projAtt.length,
           rentalsCount: projRentals.length
         });
+        
+        if (uncostedItems.length > 0) {
+          console.warn(`[${p.name}] Uncosted Materials:`, uncostedItems);
+        }
         
         // Detail material consumptions
         console.log(`[${p.name}] Material Consumptions:`, sortedConsumptions.map(c => ({
