@@ -71,6 +71,10 @@ function getScopeLabel(record: MaterialUsage) {
   return record.bom_scope_of_work?.name || "Unscoped";
 }
 
+function formatAmount(amount: number): string {
+  return amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 export function MaterialUsageTab({ projectId }: { projectId: string }) {
   const { toast } = useToast();
   const [usageRecords, setUsageRecords] = useState<MaterialUsage[]>([]);
@@ -912,7 +916,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
                 <span>{historySummary.recordCount} records</span>
                 <span>{historySummary.scopeCount} scopes</span>
                 <span>Total quantity used: {historySummary.totalQuantity}</span>
-                <span className="font-semibold">Grand Total: {historySummary.grandTotal.toFixed(2)}</span>
+                <span className="font-semibold">Grand Total: {formatAmount(historySummary.grandTotal)}</span>
               </div>
             </div>
 
@@ -953,7 +957,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
                           <TableCell>
                             {unitCost > 0 ? (
                               <span className={hasFifoCost ? "text-green-600 font-medium" : ""}>
-                                {unitCost.toFixed(2)}
+                                {formatAmount(unitCost)}
                                 {hasFifoCost && <span className="text-xs ml-1">(FIFO)</span>}
                               </span>
                             ) : "—"}
@@ -961,7 +965,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
                           <TableCell className="font-semibold">
                             {totalCost > 0 ? (
                               <span className={hasFifoCost ? "text-green-600" : ""}>
-                                {totalCost.toFixed(2)}
+                                {formatAmount(totalCost)}
                               </span>
                             ) : "—"}
                           </TableCell>
@@ -976,7 +980,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
                     })}
                     <TableRow className="bg-muted/50 font-semibold border-t-2">
                       <TableCell colSpan={6} className="text-right">Grand Total:</TableCell>
-                      <TableCell className="font-bold text-primary">{historySummary.grandTotal.toFixed(2)}</TableCell>
+                      <TableCell className="font-bold text-primary">{formatAmount(historySummary.grandTotal)}</TableCell>
                       <TableCell colSpan={2}></TableCell>
                     </TableRow>
                   </TableBody>
