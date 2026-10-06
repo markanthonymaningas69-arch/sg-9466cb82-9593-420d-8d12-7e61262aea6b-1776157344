@@ -286,11 +286,15 @@ export default function Dashboard() {
 
       if (p.name && p.name.toLowerCase().includes('interior')) {
         console.log(`[${p.name}] Labor cost subtotal: ${actualLabCost}`);
-        console.log(`[${p.name}] Starting rental cost calculation with ${projRentals.length} rental records`);
       }
 
       // Calculate rental costs
       const projRentals = rentalExpenses.filter(r => r.project_id === p.id);
+      
+      if (p.name && p.name.toLowerCase().includes('interior')) {
+        console.log(`[${p.name}] Starting rental cost calculation with ${projRentals.length} rental records`);
+      }
+      
       let actualRentalCost = 0;
       projRentals.forEach((rental: any) => {
         const startDate = new Date(rental.rental_start_date);
