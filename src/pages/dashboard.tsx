@@ -205,8 +205,8 @@ export default function Dashboard() {
 
       // Sort consumptions by date for proper FIFO processing
       const sortedConsumptions = [...projCons].sort((a, b) => {
-        const dateA = new Date(a.consumption_date || a.created_at || 0).getTime();
-        const dateB = new Date(b.consumption_date || b.created_at || 0).getTime();
+        const dateA = new Date(a.date_used || a.created_at || 0).getTime();
+        const dateB = new Date(b.date_used || b.created_at || 0).getTime();
         return dateA - dateB;
       });
 
