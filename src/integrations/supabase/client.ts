@@ -10,15 +10,60 @@ if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
   throw new Error('Missing Supabase environment variables. Please check your .env.local file.');
 }
 
+// Custom storage adapter to handle concurrent requests
+class BrowserLocalStorage {
+  private storage: Storage | null = null;
+  private pendingOperations: Map<string, Promise<any>> = new Map();
+
+  constructor() {
+    if (typeof window !== 'undefined') {
+      this.storage = window.localStorage;
+    }
+  }
+
+  async getItem(key: string): Promise<string | null> {
+    // Wait for any pending write operations on this key
+    const pending = this.pendingOperations.get(key);
+    if (pending) {
+      await pending;
+    }
+    return this.storage?.getItem(key) ?? null;
+  }
+
+  async setItem(key: string, value: string): Promise<void> {
+    // Create a promise for this operation
+    const operation = new Promise<void>((resolve) => {
+      this.storage?.setItem(key, value);
+      resolve();
+    });
+
+    this.pendingOperations.set(key, operation);
+    await operation;
+    this.pendingOperations.delete(key);
+  }
+
+  async removeItem(key: string): Promise<void> {
+    const operation = new Promise<void>((resolve) => {
+      this.storage?.removeItem(key);
+      resolve();
+    });
+
+    this.pendingOperations.set(key, operation);
+    await operation;
+    this.pendingOperations.delete(key);
+  }
+}
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storageKey: 'sb-auth-token',
-    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+    storage: new BrowserLocalStorage(),
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
+    flowType: 'pkce',
   },
 });
