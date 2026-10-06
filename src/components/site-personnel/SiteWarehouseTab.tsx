@@ -15,6 +15,7 @@ import { requestWorkflowService } from "@/services/requestWorkflowService";
 import { notificationService } from "@/services/notificationService";
 import { CompactText } from "@/components/site-personnel/CompactText";
 import { supabase } from "@/integrations/supabase/client";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type TransactionType = "site_purchase" | "delivery";
 const OTHER_MATERIAL_OPTION = "__others__";
@@ -182,6 +183,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
     remarks: "",
   });
   const [savingReceipt, setSavingReceipt] = useState(false);
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
 
   const amount = useMemo(() => {
     const quantity = Number(formData.quantity || 0);
@@ -720,6 +722,89 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
         description: "Failed to delete the material",
         variant: "destructive",
       });
+    }
+  }
+
+  async function handleBulkDeleteItems() {
+    if (selectedItemIds.size === 0) {
+      toast({
+        title: "No items selected",
+        description: "Please select at least one material to delete",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!confirm(`Delete ${selectedItemIds.size} selected material(s) from the receipt?`)) {
+      return;
+    }
+
+    try {
+      const deletePromises = Array.from(selectedItemIds).map(id => siteService.deleteDelivery(id));
+      const results = await Promise.all(deletePromises);
+      const failedResult = results.find(result => result.error);
+      
+      if (failedResult?.error) {
+        throw failedResult.error;
+      }
+
+      toast({
+        title: "Success",
+        description: `${selectedItemIds.size} material(s) removed from receipt`,
+      });
+
+      // Clear selection
+      setSelectedItemIds(new Set());
+      
+      // Refresh data and update the view
+      await loadData();
+      
+      // If viewing a receipt group, update it
+      if (selectedReceiptGroup) {
+        const updatedItems = selectedReceiptGroup.items.filter(i => !selectedItemIds.has(i.id));
+        if (updatedItems.length === 0) {
+          // Close dialog if no items left
+          setSelectedReceiptGroup(null);
+        } else {
+          // Update the group with remaining items
+          setSelectedReceiptGroup({
+            ...selectedReceiptGroup,
+            items: updatedItems,
+            totalAmount: updatedItems.reduce((sum, record) => sum + Number(record.amount || 0), 0),
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error deleting items:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete the selected materials",
+        variant: "destructive",
+      });
+    }
+  }
+
+  function toggleItemSelection(itemId: string) {
+    setSelectedItemIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId);
+      } else {
+        newSet.add(itemId);
+      }
+      return newSet;
+    });
+  }
+
+  function toggleAllItems() {
+    if (!selectedReceiptGroup) return;
+    
+    if (selectedItemIds.size === selectedReceiptGroup.items.length) {
+      // Unselect all
+      setSelectedItemIds(new Set());
+    } else {
+      // Select all
+      setSelectedItemIds(new Set(selectedReceiptGroup.items.map(item => item.id)));
     }
   }
 
@@ -1603,7 +1688,12 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                   </Table>
                 </div>
 
-                <Dialog open={Boolean(selectedReceiptGroup)} onOpenChange={(open) => (!open ? setSelectedReceiptGroup(null) : null)}>
+                <Dialog open={Boolean(selectedReceiptGroup)} onOpenChange={(open) => {
+                  if (!open) {
+                    setSelectedReceiptGroup(null);
+                    setSelectedItemIds(new Set());
+                  }
+                }}>
                   <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader className="space-y-1">
                       <DialogTitle className="text-base">
@@ -1640,9 +1730,33 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                           </div>
                         </div>
 
+                        {selectedItemIds.size > 0 && (
+                          <div className="flex items-center justify-between rounded-md border bg-destructive/10 p-3">
+                            <p className="text-sm font-medium">
+                              {selectedItemIds.size} item(s) selected
+                            </p>
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              className="h-8 text-xs"
+                              onClick={() => void handleBulkDeleteItems()}
+                            >
+                              <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                              Delete Selected
+                            </Button>
+                          </div>
+                        )}
+
                         <Table>
                           <TableHeader>
                             <TableRow>
+                              <TableHead className="w-12">
+                                <Checkbox
+                                  checked={selectedItemIds.size === selectedReceiptGroup.items.length && selectedReceiptGroup.items.length > 0}
+                                  onCheckedChange={() => toggleAllItems()}
+                                />
+                              </TableHead>
                               <TableHead>Scope</TableHead>
                               <TableHead>Material</TableHead>
                               <TableHead>Quantity</TableHead>
@@ -1654,6 +1768,12 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                           <TableBody>
                             {selectedReceiptGroup.items.map((item) => (
                               <TableRow key={item.id}>
+                                <TableCell>
+                                  <Checkbox
+                                    checked={selectedItemIds.has(item.id)}
+                                    onCheckedChange={() => toggleItemSelection(item.id)}
+                                  />
+                                </TableCell>
                                 <TableCell>{getScopeName(item)}</TableCell>
                                 <TableCell className="font-medium">{item.item_name}</TableCell>
                                 <TableCell>
