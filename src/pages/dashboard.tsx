@@ -214,10 +214,18 @@ export default function Dashboard() {
       let actualMatCost = 0;
       let ocmCost = 0;
       
+      if (p.name && p.name.toLowerCase().includes('interior')) {
+        console.log(`[${p.name}] Starting material cost calculation with ${projCons.length} consumption records`);
+      }
+      
       projCons.forEach((c: any) => {
         const qty = Number(c.quantity || c.quantity_used || 0);
         const estimatedCost = Number(c.estimated_cost || 0);
         const totalCost = qty * estimatedCost;
+        
+        if (p.name && p.name.toLowerCase().includes('interior')) {
+          console.log(`  Material: ${c.item_name}, Qty: ${qty}, Cost: ${estimatedCost}, Total: ${totalCost}`);
+        }
         
         actualMatCost += totalCost;
 
@@ -236,6 +244,11 @@ export default function Dashboard() {
           }
         }
       });
+
+      if (p.name && p.name.toLowerCase().includes('interior')) {
+        console.log(`[${p.name}] Material cost subtotal: ${actualMatCost}`);
+        console.log(`[${p.name}] Starting labor cost calculation with ${projAtt.length} attendance records`);
+      }
 
       let actualLabCost = 0;
       let dateStarted: string | null = null;
@@ -258,6 +271,10 @@ export default function Dashboard() {
         const overtimeCost = overtimeHours * (hrRate * 1.5);
         const laborCost = regularCost + overtimeCost;
 
+        if (p.name && p.name.toLowerCase().includes('interior')) {
+          console.log(`  Personnel: ${a.personnel?.name}, Hours: ${hoursWorked}, OT: ${overtimeHours}, Rate: ${hrRate}, Cost: ${laborCost}`);
+        }
+
         actualLabCost += laborCost;
 
         if (laborCost > 0 && a.date) {
@@ -267,6 +284,11 @@ export default function Dashboard() {
         }
       });
 
+      if (p.name && p.name.toLowerCase().includes('interior')) {
+        console.log(`[${p.name}] Labor cost subtotal: ${actualLabCost}`);
+        console.log(`[${p.name}] Starting rental cost calculation with ${projRentals.length} rental records`);
+      }
+
       // Calculate rental costs
       const projRentals = rentalExpenses.filter(r => r.project_id === p.id);
       let actualRentalCost = 0;
@@ -275,30 +297,30 @@ export default function Dashboard() {
         const endDate = new Date(rental.rental_end_date);
         const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
         const dailyRate = Number(rental.rate_per_unit || 0) * Number(rental.quantity || 0);
-        actualRentalCost += dailyRate * daysDiff;
+        const rentalCost = dailyRate * daysDiff;
+        
+        if (p.name && p.name.toLowerCase().includes('interior')) {
+          console.log(`  Rental: ${rental.item_name}, Days: ${daysDiff}, Daily Rate: ${dailyRate}, Total: ${rentalCost}`);
+        }
+        
+        actualRentalCost += rentalCost;
       });
+
+      if (p.name && p.name.toLowerCase().includes('interior')) {
+        console.log(`[${p.name}] Rental cost subtotal: ${actualRentalCost}`);
+      }
 
       const totalActualCost = actualMatCost + actualLabCost + actualRentalCost;
 
       // Debug logging for cost calculation
       if (p.name && p.name.toLowerCase().includes('interior')) {
-        console.log(`[${p.name}] Cost Breakdown:`, {
-          materialCost: actualMatCost,
-          laborCost: actualLabCost,
-          rentalCost: actualRentalCost,
-          totalCost: totalActualCost,
-          consumptionsCount: projCons.length,
-          attendanceCount: projAtt.length,
-          rentalsCount: projRentals.length
-        });
-        
-        // Detail material consumptions
-        console.log(`[${p.name}] Material Consumptions:`, projCons.map((c: any) => ({
-          item: c.item_name,
-          qty: c.quantity,
-          estimatedCost: c.estimated_cost,
-          totalCost: Number(c.quantity || 0) * Number(c.estimated_cost || 0)
-        })));
+        console.log(`[${p.name}] ========== FINAL COST BREAKDOWN ==========`);
+        console.log(`  Material Cost: ${actualMatCost}`);
+        console.log(`  Labor Cost: ${actualLabCost}`);
+        console.log(`  Rental Cost: ${actualRentalCost}`);
+        console.log(`  TOTAL COST TO DATE: ${totalActualCost}`);
+        console.log(`  Expected: Materials (36,761) + Labor (40,450) + Rentals (0) = 77,211`);
+        console.log(`===========================================`);
       }
 
       const activeBudget = grandTotalCost > 0 ? grandTotalCost : budget;
