@@ -311,6 +311,46 @@ export default function Dashboard() {
 
       const totalActualCost = actualMatCost + actualLabCost + actualRentalCost;
 
+      // Debug logging for cost calculation
+      if (p.name && p.name.toLowerCase().includes('interior')) {
+        console.log(`[${p.name}] Cost Breakdown:`, {
+          materialCost: actualMatCost,
+          laborCost: actualLabCost,
+          rentalCost: actualRentalCost,
+          totalCost: totalActualCost,
+          consumptionsCount: sortedConsumptions.length,
+          attendanceCount: projAtt.length,
+          rentalsCount: projRentals.length
+        });
+        
+        // Detail material consumptions
+        console.log(`[${p.name}] Material Consumptions:`, sortedConsumptions.map(c => ({
+          item: c.item_name,
+          qty: c.quantity,
+          date: c.date_used,
+          estimatedCost: c.estimated_cost
+        })));
+        
+        // Detail attendance records
+        console.log(`[${p.name}] Attendance Records:`, projAtt.map(a => ({
+          personnel: a.personnel?.name,
+          date: a.date,
+          hoursWorked: a.hours_worked,
+          overtimeHours: a.overtime_hours,
+          hourlyRate: a.personnel?.hourly_rate,
+          dailyRate: a.personnel?.daily_rate
+        })));
+        
+        // Detail rental expenses
+        console.log(`[${p.name}] Rental Expenses:`, projRentals.map(r => ({
+          item: r.item_name,
+          startDate: r.rental_start_date,
+          endDate: r.rental_end_date,
+          ratePerUnit: r.rate_per_unit,
+          quantity: r.quantity
+        })));
+      }
+
       const activeBudget = grandTotalCost > 0 ? grandTotalCost : budget;
 
       const totalBilled = projBilling.reduce((sum, b) => sum + Number(b.amount || 0), 0);
