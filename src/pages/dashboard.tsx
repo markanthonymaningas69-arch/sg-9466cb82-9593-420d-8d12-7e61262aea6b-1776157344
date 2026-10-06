@@ -222,7 +222,7 @@ export default function Dashboard() {
         let costedQty = 0;
         let fifoCosted = 0;
         let estimatedCosted = 0;
-        let bomCosted = 0;
+        const bomCosted = 0;
         let lotCosted = 0;
 
         // Apply FIFO
@@ -253,40 +253,27 @@ export default function Dashboard() {
             costedQty += qtyToCost;
             qtyToCost = 0;
           }
-          // Try 2: BOM unit cost
-          else if (projectBom) {
-            const scope = (projectBom.bom_scope_of_work || []).find((s: any) => s.id === c.bom_scope_id);
-            const bomMat = scope?.bom_materials?.find((m: any) => (m.material_name || '').toLowerCase().trim() === name);
-            
-            if (bomMat && Number(bomMat.unit_cost) > 0) {
-              const bomCostVal = qtyToCost * Number(bomMat.unit_cost);
-              totalCost += bomCostVal;
-              bomCosted += bomCostVal;
+          // Try 2: Any matching lot with cost (even if exhausted) - use actual purchase price
+          else {
+            const matchingLot = allLots.find(lot => lot.name === name && lot.cost > 0);
+            if (matchingLot) {
+              const lotCostVal = qtyToCost * matchingLot.cost;
+              totalCost += lotCostVal;
+              lotCosted += lotCostVal;
               costedQty += qtyToCost;
               qtyToCost = 0;
             }
-            // Try 3: Any matching lot with cost (even if exhausted)
-            else {
-              const matchingLot = allLots.find(lot => lot.name === name && lot.cost > 0);
-              if (matchingLot) {
-                const lotCostVal = qtyToCost * matchingLot.cost;
-                totalCost += lotCostVal;
-                lotCosted += lotCostVal;
+            // Try 3: Average cost from all lots for this material (actual average purchase price)
+            else if (lots[name] && lots[name].length > 0) {
+              const validLots = lots[name].filter(l => l.cost > 0);
+              if (validLots.length > 0) {
+                const avgCost = validLots.reduce((sum, l) => sum + l.cost, 0) / validLots.length;
+                const avgCostVal = qtyToCost * avgCost;
+                totalCost += avgCostVal;
+                lotCosted += avgCostVal;
                 costedQty += qtyToCost;
                 qtyToCost = 0;
               }
-            }
-          }
-          // Try 4: Default average cost from all lots for this material
-          if (qtyToCost > 0 && lots[name] && lots[name].length > 0) {
-            const validLots = lots[name].filter(l => l.cost > 0);
-            if (validLots.length > 0) {
-              const avgCost = validLots.reduce((sum, l) => sum + l.cost, 0) / validLots.length;
-              const avgCostVal = qtyToCost * avgCost;
-              totalCost += avgCostVal;
-              lotCosted += avgCostVal;
-              costedQty += qtyToCost;
-              qtyToCost = 0;
             }
           }
         }
