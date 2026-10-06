@@ -173,6 +173,9 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<ReceiptGroup | null>(null);
   const [editFormData, setEditFormData] = useState<FormState>(defaultFormState);
+  const [editingItem, setEditingItem] = useState<DeliveryRecord | null>(null);
+  const [editItemDialogOpen, setEditItemDialogOpen] = useState(false);
+  const [editItemFormData, setEditItemFormData] = useState<FormState>(defaultFormState);
   const [receivingForm, setReceivingForm] = useState({
     receivedBy: "Site Personnel",
     actualQuantity: "",
@@ -675,101 +678,87 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
     }
   }
 
-  async function handleDeleteGroup(group: ReceiptGroup) {
-    const targetLabel = group.receiptNumber
-      ? `receipt ${group.receiptNumber}`
-      : group.items.length === 1
-        ? "this purchase or delivery record"
-        : "these purchase or delivery records";
-
-    if (!confirm(`Delete ${targetLabel}?`)) {
+  async function handleDeleteItem(item: DeliveryRecord) {
+    if (!confirm("Delete this material from the receipt?")) {
       return;
     }
 
     try {
-      const results = await Promise.all(group.items.map((item) => siteService.deleteDelivery(item.id)));
-      const failedResult = results.find((result) => result.error);
+      const { error } = await siteService.deleteDelivery(item.id);
 
-      if (failedResult?.error) {
-        throw failedResult.error;
-      }
-
-      if (selectedReceiptGroup?.key === group.key) {
-        setSelectedReceiptGroup(null);
+      if (error) {
+        throw error;
       }
 
       toast({
         title: "Success",
-        description: group.items.length > 1 ? "Receipt records deleted" : "Record deleted",
+        description: "Material removed from receipt",
       });
-      toast({
-        title: "Moved to recycle bin",
-        description: group.items.length > 1 ? "Receipt records archived from Deliveries" : "Record archived from Deliveries",
-      });
+      
+      // Refresh data and update the view
       await loadData();
+      
+      // If viewing a receipt group, update it
+      if (selectedReceiptGroup) {
+        const updatedItems = selectedReceiptGroup.items.filter(i => i.id !== item.id);
+        if (updatedItems.length === 0) {
+          // Close dialog if no items left
+          setSelectedReceiptGroup(null);
+        } else {
+          // Update the group with remaining items
+          setSelectedReceiptGroup({
+            ...selectedReceiptGroup,
+            items: updatedItems,
+            totalAmount: updatedItems.reduce((sum, record) => sum + Number(record.amount || 0), 0),
+          });
+        }
+      }
     } catch (error) {
-      console.error("Error deleting record group:", error);
+      console.error("Error deleting item:", error);
       toast({
         title: "Error",
-        description: "Failed to delete the record",
+        description: "Failed to delete the material",
         variant: "destructive",
       });
     }
   }
 
-  function openReceiveDialog(record: ReadyForReceivingRecord) {
-    const linkedSiteRequest = getRelationItem(record.site_requests);
-
-    setSelectedReadyRecord(record);
-    setReceivingForm({
-      receivedBy: linkedSiteRequest?.requested_by || "Site Personnel",
-      actualQuantity: linkedSiteRequest?.quantity ? String(linkedSiteRequest.quantity) : "",
-      remarks: "",
-    });
-    setReceivingDialogOpen(true);
-  }
-
-  function openEditDialog(group: ReceiptGroup) {
-    // Pre-fill form with data from the first item in the group
-    const firstItem = group.items[0];
-    setEditingGroup(group);
-    setEditFormData({
-      bom_scope_id: firstItem.bom_scope_id || "others",
-      item_name: firstItem.item_name,
-      quantity: String(firstItem.quantity || ""),
-      unit: firstItem.unit || "",
-      unit_cost: String(firstItem.unit_cost || ""),
-      supplier: group.supplier || "",
-      delivery_date: group.deliveryDate || getTodayDate(),
-      receipt_number: group.receiptNumber || "",
-      notes: group.notes || "",
+  function openEditItemDialog(item: DeliveryRecord) {
+    setEditingItem(item);
+    setEditItemFormData({
+      bom_scope_id: item.bom_scope_id || "others",
+      item_name: item.item_name,
+      quantity: String(item.quantity || ""),
+      unit: item.unit || "",
+      unit_cost: String(item.unit_cost || ""),
+      supplier: item.supplier || "",
+      delivery_date: item.delivery_date || getTodayDate(),
+      receipt_number: item.receipt_number || "",
+      notes: item.notes || "",
       custom_item_name: "",
     });
-    setEditDialogOpen(true);
+    setEditItemDialogOpen(true);
   }
 
-  async function handleEditSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleEditItemSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!editingGroup || editingGroup.items.length === 0) {
+    if (!editingItem) {
       return;
     }
 
     try {
-      // Update the first item in the group
-      const itemToUpdate = editingGroup.items[0];
-      
-      const { error } = await siteService.updateDelivery(itemToUpdate.id, {
-        bom_scope_id: editFormData.bom_scope_id === "others" ? null : (editFormData.bom_scope_id || null),
-        item_name: editFormData.item_name,
-        quantity: Number(editFormData.quantity),
-        unit: editFormData.unit,
-        unit_cost: Number(editFormData.unit_cost || 0),
-        amount: Number(editFormData.quantity || 0) * Number(editFormData.unit_cost || 0),
-        supplier: editFormData.supplier,
-        delivery_date: editFormData.delivery_date,
-        receipt_number: editFormData.receipt_number || null,
-        notes: editFormData.notes || null,
+      const { error } = await siteService.updateDelivery(editingItem.id, {
+        bom_scope_id: editItemFormData.bom_scope_id === "others" ? null : (editItemFormData.bom_scope_id || null),
+        item_name: editItemFormData.item_name,
+        quantity: Number(editItemFormData.quantity),
+        unit: editItemFormData.unit,
+        unit_cost: Number(editItemFormData.unit_cost || 0),
+        amount: Number(editItemFormData.quantity || 0) * Number(editItemFormData.unit_cost || 0),
+        supplier: editItemFormData.supplier,
+        delivery_date: editItemFormData.delivery_date,
+        receipt_number: editItemFormData.receipt_number || null,
+        notes: editItemFormData.notes || null,
       });
 
       if (error) {
@@ -778,17 +767,32 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
 
       toast({
         title: "Success",
-        description: "Purchase record updated successfully",
+        description: "Material updated successfully",
       });
 
-      setEditDialogOpen(false);
-      setEditingGroup(null);
+      setEditItemDialogOpen(false);
+      setEditingItem(null);
       await loadData();
+      
+      // Refresh the receipt view if open
+      if (selectedReceiptGroup) {
+        const updatedRecords = await siteService.getDeliveries(projectId);
+        const updatedItems = (updatedRecords.data || []).filter(
+          (r: DeliveryRecord) => r.receipt_number?.toLowerCase() === selectedReceiptGroup.receiptNumber?.toLowerCase()
+        );
+        if (updatedItems.length > 0) {
+          setSelectedReceiptGroup({
+            ...selectedReceiptGroup,
+            items: updatedItems as DeliveryRecord[],
+            totalAmount: updatedItems.reduce((sum: number, r: any) => sum + Number(r.amount || 0), 0),
+          });
+        }
+      }
     } catch (error) {
-      console.error("Error updating purchase record:", error);
+      console.error("Error updating material:", error);
       toast({
         title: "Error",
-        description: "Failed to update the record",
+        description: "Failed to update the material",
         variant: "destructive",
       });
     }
@@ -1543,6 +1547,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                               <TableHead>Quantity</TableHead>
                               <TableHead>Unit Cost</TableHead>
                               <TableHead>Amount</TableHead>
+                              <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -1555,6 +1560,31 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
                                 </TableCell>
                                 <TableCell>{formatCurrency(item.unit_cost)}</TableCell>
                                 <TableCell>{formatCurrency(item.amount)}</TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex justify-end gap-1">
+                                    <Button 
+                                      type="button" 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-7 w-7" 
+                                      onClick={() => openEditItemDialog(item)}
+                                    >
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                                        <path d="m15 5 4 4"/>
+                                      </svg>
+                                    </Button>
+                                    <Button 
+                                      type="button" 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-7 w-7" 
+                                      onClick={() => void handleDeleteItem(item)}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
@@ -1910,6 +1940,172 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
 
                       <div className="flex gap-2">
                         <Button type="button" variant="outline" className="h-8 flex-1 text-xs" onClick={() => setEditDialogOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button type="submit" className="h-8 flex-1 text-xs">
+                          Save Changes
+                        </Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog open={editItemDialogOpen} onOpenChange={setEditItemDialogOpen}>
+                  <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+                    <DialogHeader className="space-y-1">
+                      <DialogTitle className="text-base">Edit Material</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleEditItemSubmit} className="space-y-2.5 pb-1">
+                      <div className="space-y-1">
+                        <Label htmlFor="edit_item_scope" className="text-[11px]">
+                          Select Scope
+                        </Label>
+                        <Select value={editItemFormData.bom_scope_id} onValueChange={(value) => setEditItemFormData(prev => ({ ...prev, bom_scope_id: value }))}>
+                          <SelectTrigger id="edit_item_scope" className="h-8 text-xs">
+                            <SelectValue placeholder="Select scope" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {scopes.map((scope) => (
+                              <SelectItem key={scope.id} value={scope.id}>
+                                {scope.name}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value="others">Others (OCM)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label htmlFor="edit_item_name" className="text-[11px]">
+                          Material Name
+                        </Label>
+                        <Input
+                          id="edit_item_name"
+                          className="h-8 text-xs"
+                          value={editItemFormData.item_name}
+                          onChange={(e) => setEditItemFormData(prev => ({ ...prev, item_name: e.target.value }))}
+                          required
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label htmlFor="edit_item_quantity" className="text-[11px]">
+                            Quantity
+                          </Label>
+                          <Input
+                            id="edit_item_quantity"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            className="h-8 text-xs"
+                            value={editItemFormData.quantity}
+                            onChange={(e) => setEditItemFormData(prev => ({ ...prev, quantity: e.target.value }))}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="edit_item_unit" className="text-[11px]">
+                            Unit
+                          </Label>
+                          <Input
+                            id="edit_item_unit"
+                            className="h-8 text-xs"
+                            value={editItemFormData.unit}
+                            onChange={(e) => setEditItemFormData(prev => ({ ...prev, unit: e.target.value }))}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label htmlFor="edit_item_unit_cost" className="text-[11px]">
+                            Unit Cost
+                          </Label>
+                          <Input
+                            id="edit_item_unit_cost"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            className="h-8 text-xs"
+                            value={editItemFormData.unit_cost}
+                            onChange={(e) => setEditItemFormData(prev => ({ ...prev, unit_cost: e.target.value }))}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="edit_item_amount" className="text-[11px]">
+                            Amount
+                          </Label>
+                          <Input 
+                            id="edit_item_amount" 
+                            className="h-8 text-xs" 
+                            value={
+                              editItemFormData.quantity && editItemFormData.unit_cost
+                                ? formatCurrency(Number(editItemFormData.quantity) * Number(editItemFormData.unit_cost))
+                                : "0.00"
+                            } 
+                            readOnly 
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label htmlFor="edit_item_supplier" className="text-[11px]">
+                            Supplier
+                          </Label>
+                          <Input
+                            id="edit_item_supplier"
+                            className="h-8 text-xs"
+                            value={editItemFormData.supplier}
+                            onChange={(e) => setEditItemFormData(prev => ({ ...prev, supplier: e.target.value }))}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="edit_item_receipt_number" className="text-[11px]">
+                            Receipt Number
+                          </Label>
+                          <Input
+                            id="edit_item_receipt_number"
+                            className="h-8 text-xs"
+                            value={editItemFormData.receipt_number}
+                            onChange={(e) => setEditItemFormData(prev => ({ ...prev, receipt_number: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label htmlFor="edit_item_delivery_date" className="text-[11px]">
+                          Purchase Date
+                        </Label>
+                        <Input
+                          id="edit_item_delivery_date"
+                          type="date"
+                          className="h-8 text-xs"
+                          value={editItemFormData.delivery_date}
+                          onChange={(e) => setEditItemFormData(prev => ({ ...prev, delivery_date: e.target.value }))}
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label htmlFor="edit_item_notes" className="text-[11px]">
+                          Notes (Optional)
+                        </Label>
+                        <Textarea
+                          id="edit_item_notes"
+                          rows={2}
+                          className="min-h-[56px] text-xs"
+                          value={editItemFormData.notes}
+                          onChange={(e) => setEditItemFormData(prev => ({ ...prev, notes: e.target.value }))}
+                        />
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button type="button" variant="outline" className="h-8 flex-1 text-xs" onClick={() => setEditItemDialogOpen(false)}>
                           Cancel
                         </Button>
                         <Button type="submit" className="h-8 flex-1 text-xs">
