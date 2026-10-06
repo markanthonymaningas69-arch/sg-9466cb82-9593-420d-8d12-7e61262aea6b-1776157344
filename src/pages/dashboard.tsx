@@ -210,7 +210,7 @@ export default function Dashboard() {
         return dateA - dateB;
       });
 
-      // Calculate actual material cost - simplified direct calculation
+      // Calculate actual material cost using FIFO logic
       let actualMatCost = 0;
       let ocmCost = 0;
       
@@ -218,28 +218,55 @@ export default function Dashboard() {
         console.log(`[${p.name}] Starting material cost calculation with ${projCons.length} consumption records`);
       }
       
-      projCons.forEach((c: any) => {
-        const qty = Number(c.quantity || c.quantity_used || 0);
-        const estimatedCost = Number(c.estimated_cost || 0);
-        const totalCost = qty * estimatedCost;
+      // Clone lots for FIFO consumption tracking
+      const fifoLots: Record<string, { qty: number; cost: number }[]> = {};
+      for (const itemName in lots) {
+        fifoLots[itemName] = lots[itemName].map(lot => ({ ...lot }));
+      }
+      
+      sortedConsumptions.forEach((c: any) => {
+        const itemName = (c.item_name || '').toLowerCase().trim();
+        let qtyNeeded = Number(c.quantity || c.quantity_used || 0);
+        let costAccum = 0;
         
-        if (p.name && p.name.toLowerCase().includes('interior')) {
-          console.log(`  Material: ${c.item_name}, Qty: ${qty}, Cost: ${estimatedCost}, Total: ${totalCost}`);
+        // Try to pull from FIFO lots first
+        if (fifoLots[itemName] && fifoLots[itemName].length > 0) {
+          while (qtyNeeded > 0 && fifoLots[itemName].length > 0) {
+            const lot = fifoLots[itemName][0];
+            const qtyFromThisLot = Math.min(qtyNeeded, lot.qty);
+            costAccum += qtyFromThisLot * lot.cost;
+            
+            lot.qty -= qtyFromThisLot;
+            qtyNeeded -= qtyFromThisLot;
+            
+            if (lot.qty <= 0) {
+              fifoLots[itemName].shift();
+            }
+          }
         }
         
-        actualMatCost += totalCost;
+        // If still need more qty (no lots or lots exhausted), use estimated_cost as fallback
+        if (qtyNeeded > 0) {
+          const estimatedCost = Number(c.estimated_cost || 0);
+          costAccum += qtyNeeded * estimatedCost;
+        }
+        
+        if (p.name && p.name.toLowerCase().includes('interior')) {
+          console.log(`  Material: ${c.item_name}, Qty: ${Number(c.quantity || c.quantity_used || 0)}, FIFO Cost: ${costAccum}`);
+        }
+        
+        actualMatCost += costAccum;
 
         // Check if this is OCM (not in BOM)
         if (projectBom) {
-          const name = (c.item_name || '').toLowerCase().trim();
           const scope = (projectBom.bom_scope_of_work || []).find((s: any) => s.id === c.bom_scope_id);
           if (scope) {
             const isInBom = (scope.bom_materials || []).some((m: any) => 
-              (m.material_name?.toLowerCase() || '') === name
+              (m.material_name?.toLowerCase() || '') === itemName
             );
             
             if (!isInBom) {
-              ocmCost += totalCost;
+              ocmCost += costAccum;
             }
           }
         }
