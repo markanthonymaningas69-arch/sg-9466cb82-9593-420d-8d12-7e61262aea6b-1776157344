@@ -210,106 +210,20 @@ export default function Dashboard() {
         return dateA - dateB;
       });
 
-      // Calculate actual material cost using FIFO
+      // Calculate actual material cost - simplified direct calculation
       let actualMatCost = 0;
       let ocmCost = 0;
-      const uncostedItems: any[] = [];
       
-      sortedConsumptions.forEach((c: any) => {
-        const name = (c.item_name || '').toLowerCase().trim();
-        let qtyToCost = Number(c.quantity || c.quantity_used || 0);
-        let totalCost = 0;
-        let costedQty = 0;
-        let fifoCosted = 0;
-        let estimatedCosted = 0;
-        const bomCosted = 0;
-        let lotCosted = 0;
-
-        // Apply FIFO
-        if (lots[name] && lots[name].length > 0) {
-          for (let i = 0; i < lots[name].length && qtyToCost > 0; i++) {
-            const lot = lots[name][i];
-            if (lot.qty > 0 && lot.cost > 0) {
-              const consumedFromLot = Math.min(qtyToCost, lot.qty);
-              const lotCost = consumedFromLot * lot.cost;
-              totalCost += lotCost;
-              fifoCosted += lotCost;
-              lot.qty -= consumedFromLot;
-              qtyToCost -= consumedFromLot;
-              costedQty += consumedFromLot;
-            }
-          }
-        }
-
-        const originalQtyToCost = qtyToCost;
-
-        // Fallback costing - try multiple sources sequentially
-        if (qtyToCost > 0) {
-          // Try 1: estimated_cost from consumption record
-          if (Number(c.estimated_cost) > 0) {
-            const estCost = qtyToCost * Number(c.estimated_cost);
-            totalCost += estCost;
-            estimatedCosted += estCost;
-            costedQty += qtyToCost;
-            qtyToCost = 0;
-          }
-        }
-
-        // Try 2: Any matching lot with cost (even if exhausted) - use actual purchase price
-        if (qtyToCost > 0) {
-          const matchingLot = allLots.find(lot => lot.name === name && lot.cost > 0);
-          if (matchingLot) {
-            const lotCostVal = qtyToCost * matchingLot.cost;
-            totalCost += lotCostVal;
-            lotCosted += lotCostVal;
-            costedQty += qtyToCost;
-            qtyToCost = 0;
-          }
-        }
-
-        // Try 3: Average cost from all lots for this material (actual average purchase price)
-        if (qtyToCost > 0 && lots[name] && lots[name].length > 0) {
-          const validLots = lots[name].filter(l => l.cost > 0);
-          if (validLots.length > 0) {
-            const avgCost = validLots.reduce((sum, l) => sum + l.cost, 0) / validLots.length;
-            const avgCostVal = qtyToCost * avgCost;
-            totalCost += avgCostVal;
-            lotCosted += avgCostVal;
-            costedQty += qtyToCost;
-            qtyToCost = 0;
-          }
-        }
-
-        // Track uncosted items for debugging
-        if (qtyToCost > 0) {
-          uncostedItems.push({
-            item: c.item_name,
-            uncostedQty: qtyToCost,
-            totalQty: Number(c.quantity || c.quantity_used || 0),
-            date: c.date_used
-          });
-        }
-
+      projCons.forEach((c: any) => {
+        const qty = Number(c.quantity || c.quantity_used || 0);
+        const estimatedCost = Number(c.estimated_cost || 0);
+        const totalCost = qty * estimatedCost;
+        
         actualMatCost += totalCost;
-
-        // Debug logging for Interior Works
-        if (p.name && p.name.toLowerCase().includes('interior') && totalCost > 0) {
-          console.log(`[${p.name}] Material costing for ${c.item_name}:`, {
-            totalQty: Number(c.quantity || c.quantity_used || 0),
-            costedQty,
-            uncostedQty: originalQtyToCost,
-            totalCost,
-            breakdown: {
-              fifo: fifoCosted,
-              estimated: estimatedCosted,
-              bom: bomCosted,
-              avgLot: lotCosted
-            }
-          });
-        }
 
         // Check if this is OCM (not in BOM)
         if (projectBom) {
+          const name = (c.item_name || '').toLowerCase().trim();
           const scope = (projectBom.bom_scope_of_work || []).find((s: any) => s.id === c.bom_scope_id);
           if (scope) {
             const isInBom = (scope.bom_materials || []).some((m: any) => 
@@ -373,40 +287,17 @@ export default function Dashboard() {
           laborCost: actualLabCost,
           rentalCost: actualRentalCost,
           totalCost: totalActualCost,
-          consumptionsCount: sortedConsumptions.length,
+          consumptionsCount: projCons.length,
           attendanceCount: projAtt.length,
           rentalsCount: projRentals.length
         });
         
-        if (uncostedItems.length > 0) {
-          console.warn(`[${p.name}] Uncosted Materials:`, uncostedItems);
-        }
-        
         // Detail material consumptions
-        console.log(`[${p.name}] Material Consumptions:`, sortedConsumptions.map(c => ({
+        console.log(`[${p.name}] Material Consumptions:`, projCons.map((c: any) => ({
           item: c.item_name,
           qty: c.quantity,
-          date: c.date_used,
-          estimatedCost: c.estimated_cost
-        })));
-        
-        // Detail attendance records
-        console.log(`[${p.name}] Attendance Records:`, projAtt.map(a => ({
-          personnel: a.personnel?.name,
-          date: a.date,
-          hoursWorked: a.hours_worked,
-          overtimeHours: a.overtime_hours,
-          hourlyRate: a.personnel?.hourly_rate,
-          dailyRate: a.personnel?.daily_rate
-        })));
-        
-        // Detail rental expenses
-        console.log(`[${p.name}] Rental Expenses:`, projRentals.map(r => ({
-          item: r.item_name,
-          startDate: r.rental_start_date,
-          endDate: r.rental_end_date,
-          ratePerUnit: r.rate_per_unit,
-          quantity: r.quantity
+          estimatedCost: c.estimated_cost,
+          totalCost: Number(c.quantity || 0) * Number(c.estimated_cost || 0)
         })));
       }
 
