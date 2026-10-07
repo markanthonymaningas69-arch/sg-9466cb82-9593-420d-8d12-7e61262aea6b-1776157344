@@ -756,7 +756,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
 
               <div>
                 <Label htmlFor="unit_cost">
-                  Unit Cost {formData.item_name && formData.item_name !== "__custom__" ? "(Auto-filled from latest purchase)" : "(Optional)"}
+                  Unit Cost {formData.item_name && formData.item_name !== "__custom__" ? "(Auto-filled from latest purchase)" : "(Required for custom materials)"}
                 </Label>
                 <Input
                   id="unit_cost"
@@ -766,8 +766,8 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
                   onChange={(event) => setFormData((prev) => ({ ...prev, unit_cost: event.target.value }))}
                   placeholder="0.00"
                   disabled={formData.item_name !== "" && formData.item_name !== "__custom__"}
-                  required={formData.item_name !== "" && formData.item_name !== "__custom__"}
-                  className={formData.item_name !== "" && formData.item_name !== "__custom__" ? "bg-muted cursor-not-allowed" : ""}
+                  required
+                  className={formData.item_cost !== "" && formData.item_name !== "__custom__" ? "bg-muted cursor-not-allowed" : ""}
                 />
                 {formData.item_name && formData.item_name !== "__custom__" && !formData.unit_cost && (
                   <p className="text-xs text-orange-600 mt-1">
