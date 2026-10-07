@@ -767,7 +767,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
                   placeholder="0.00"
                   disabled={formData.item_name !== "" && formData.item_name !== "__custom__"}
                   required
-                  className={formData.item_cost !== "" && formData.item_name !== "__custom__" ? "bg-muted cursor-not-allowed" : ""}
+                  className={formData.unit_cost !== "" && formData.item_name !== "__custom__" ? "bg-muted cursor-not-allowed" : ""}
                 />
                 {formData.item_name && formData.item_name !== "__custom__" && !formData.unit_cost && (
                   <p className="text-xs text-orange-600 mt-1">
