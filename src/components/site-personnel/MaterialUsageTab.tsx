@@ -86,6 +86,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
   const [checkingStock, setCheckingStock] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState<MaterialUsageFormData>(getDefaultFormData);
+  const [customMaterialName, setCustomMaterialName] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [fifoCosts, setFifoCosts] = useState<Map<string, Array<{ qty: number; unitCost: number; totalCost: number }>>>(new Map());
   const [filters, setFilters] = useState({
@@ -415,11 +416,23 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    // Use custom material name if custom option selected
+    const materialName = formData.item_name === "__custom__" ? customMaterialName : formData.item_name;
+
+    if (!materialName || !materialName.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a material name",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const { error } = await supabase.from("material_consumption").insert({
         project_id: projectId,
         bom_scope_id: formData.bom_scope_id === "none" ? null : formData.bom_scope_id,
-        item_name: formData.item_name,
+        item_name: materialName,
         quantity: Number(formData.quantity),
         unit: formData.unit,
         unit_cost: formData.unit_cost ? Number(formData.unit_cost) : null,
@@ -439,6 +452,7 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
 
       setDialogOpen(false);
       setFormData(getDefaultFormData());
+      setCustomMaterialName("");
       setRemainingQty(null);
       void loadData();
     } catch (error: any) {
@@ -506,6 +520,11 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
       unit: selectedMaterial?.unit || "",
       unit_cost: "", // Reset unit cost when changing material
     }));
+
+    // Reset custom material name when switching away from custom
+    if (value !== "__custom__") {
+      setCustomMaterialName("");
+    }
 
     // Check remaining quantity in warehouse and fetch unit cost
     if (value && value !== "__custom__") {
@@ -684,8 +703,8 @@ export function MaterialUsageTab({ projectId }: { projectId: string }) {
                   <Input
                     className="mt-2"
                     placeholder="Enter custom material name"
-                    value={formData.item_name === "__custom__" ? "" : formData.item_name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, item_name: e.target.value }))}
+                    value={customMaterialName}
+                    onChange={(e) => setCustomMaterialName(e.target.value)}
                   />
                 )}
                 
