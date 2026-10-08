@@ -137,6 +137,7 @@ export const subcontractorService = {
     const insertData = {
       subcontractor_id: data.subcontractor_id!,
       project_id: data.project_id!,
+      bom_scope_id: (data as any).bom_scope_id || null,
       payment_number: data.payment_number!,
       amount: data.amount!,
       accomplishment_percent: data.accomplishment_percent || 0,

@@ -27,6 +27,7 @@ export function SubcontractorsTab() {
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [editingSubcontractor, setEditingSubcontractor] = useState<string | null>(null);
   const [selectedSubcontractor, setSelectedSubcontractor] = useState<SubcontractorWithPayments | null>(null);
+  const [availableScopes, setAvailableScopes] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
     project_id: "",
@@ -44,6 +45,7 @@ export function SubcontractorsTab() {
   });
 
   const [paymentFormData, setPaymentFormData] = useState({
+    bom_scope_id: "",
     amount: "",
     accomplishment_percent: "",
     payment_date: new Date().toISOString().split("T")[0],
@@ -196,6 +198,7 @@ export function SubcontractorsTab() {
     const submitData = {
       subcontractor_id: selectedSubcontractor.id,
       project_id: selectedSubcontractor.project_id,
+      bom_scope_id: paymentFormData.bom_scope_id || null,
       payment_number: nextPaymentNumber,
       amount: parseFloat(paymentFormData.amount),
       accomplishment_percent: parseFloat(paymentFormData.accomplishment_percent),
@@ -239,6 +242,7 @@ export function SubcontractorsTab() {
 
   const resetPaymentForm = () => {
     setPaymentFormData({
+      bom_scope_id: "",
       amount: "",
       accomplishment_percent: "",
       payment_date: new Date().toISOString().split("T")[0],
@@ -249,6 +253,7 @@ export function SubcontractorsTab() {
       notes: "",
     });
     setSelectedSubcontractor(null);
+    setAvailableScopes([]);
   };
 
   const getStatusBadge = (status: string) => {
@@ -418,6 +423,18 @@ export function SubcontractorsTab() {
                               const { data } = await subcontractorService.getSubcontractorWithPayments(sub.id);
                               if (data) {
                                 setSelectedSubcontractor(data);
+                                
+                                // Load available scopes for this project
+                                const { data: bomData } = await supabase
+                                  .from("bill_of_materials")
+                                  .select("id, bom_scope_of_work(id, name)")
+                                  .eq("project_id", sub.project_id)
+                                  .single();
+                                
+                                if (bomData?.bom_scope_of_work) {
+                                  setAvailableScopes(bomData.bom_scope_of_work);
+                                }
+                                
                                 setPaymentDialogOpen(true);
                               }
                             }}
@@ -628,6 +645,29 @@ export function SubcontractorsTab() {
               </div>
 
               <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="bom_scope_id">Scope of Work (Optional)</Label>
+                  <Select 
+                    value={paymentFormData.bom_scope_id} 
+                    onValueChange={(val) => setPaymentFormData({ ...paymentFormData, bom_scope_id: val })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select scope (or leave unassigned)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Unassigned / General</SelectItem>
+                      {availableScopes.map((scope: any) => (
+                        <SelectItem key={scope.id} value={scope.id}>
+                          {scope.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Link payment to a specific scope for accurate analytics tracking
+                  </p>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
                     <Label htmlFor="payment_amount">Payment Amount *</Label>
