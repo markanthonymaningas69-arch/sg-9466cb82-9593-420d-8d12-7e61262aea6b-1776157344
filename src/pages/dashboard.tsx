@@ -84,7 +84,8 @@ export default function Dashboard() {
       { data: billingData },
       { data: purchasesData },
       { data: deliveriesData },
-      { data: rentalExpensesData }
+      { data: rentalExpensesData },
+      { data: subcontractorPaymentsData }
     ] = await Promise.all([
       supabase.from('projects').select('*').order('created_at', { ascending: false }),
       supabase.from('bill_of_materials').select('project_id, bom_scope_of_work(*, bom_materials(*), bom_labor(*)), bom_indirect_costs(*)'),
@@ -94,7 +95,8 @@ export default function Dashboard() {
       supabase.from('project_billing').select('project_id, amount, payment_received, status').eq('is_archived', false),
       supabase.from('purchases').select('item_name, quantity, unit_cost, order_date, project_id').order('order_date', { ascending: true }),
       supabase.from('deliveries').select('item_name, quantity, unit_cost, delivery_date, project_id').order('delivery_date', { ascending: true }),
-      supabase.from('rental_expenses').select('project_id, item_name, rental_start_date, rental_end_date, rate_per_unit, quantity').eq('is_archived', false)
+      supabase.from('rental_expenses').select('project_id, item_name, rental_start_date, rental_end_date, rate_per_unit, quantity').eq('is_archived', false),
+      supabase.from('subcontractor_payments').select('project_id, net_amount, status').eq('status', 'paid')
     ]);
 
     const projects = projectsData || [];
@@ -106,6 +108,7 @@ export default function Dashboard() {
     const purchases = purchasesData || [];
     const deliveries = deliveriesData || [];
     const rentalExpenses = rentalExpensesData || [];
+    const subcontractorPayments = subcontractorPaymentsData || [];
     
     let totalVal = 0;
     let totalCst = 0;
@@ -341,7 +344,29 @@ export default function Dashboard() {
         console.log(`[${p.name}] Rental cost subtotal: ${actualRentalCost}`);
       }
 
-      const totalActualCost = actualMatCost + actualLabCost + actualRentalCost;
+      // Calculate subcontractor payments
+      const projSubcontractorPayments = subcontractorPayments.filter(sp => sp.project_id === p.id);
+      
+      if (p.name && p.name.toLowerCase().includes('interior')) {
+        console.log(`[${p.name}] Starting subcontractor payment calculation with ${projSubcontractorPayments.length} payment records`);
+      }
+      
+      let actualSubcontractorCost = 0;
+      projSubcontractorPayments.forEach((payment: any) => {
+        const paymentAmount = Number(payment.net_amount || 0);
+        
+        if (p.name && p.name.toLowerCase().includes('interior')) {
+          console.log(`  Payment: ${paymentAmount}`);
+        }
+        
+        actualSubcontractorCost += paymentAmount;
+      });
+
+      if (p.name && p.name.toLowerCase().includes('interior')) {
+        console.log(`[${p.name}] Subcontractor cost subtotal: ${actualSubcontractorCost}`);
+      }
+
+      const totalActualCost = actualMatCost + actualLabCost + actualRentalCost + actualSubcontractorCost;
 
       // Debug logging for cost calculation
       if (p.name && p.name.toLowerCase().includes('interior')) {
@@ -349,8 +374,8 @@ export default function Dashboard() {
         console.log(`  Material Cost: ${actualMatCost}`);
         console.log(`  Labor Cost: ${actualLabCost}`);
         console.log(`  Rental Cost: ${actualRentalCost}`);
+        console.log(`  Subcontractor Cost: ${actualSubcontractorCost}`);
         console.log(`  TOTAL COST TO DATE: ${totalActualCost}`);
-        console.log(`  Expected: Materials (36,761) + Labor (40,450) + Rentals (0) = 77,211`);
         console.log(`===========================================`);
       }
 
