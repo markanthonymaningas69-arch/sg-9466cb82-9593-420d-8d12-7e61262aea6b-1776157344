@@ -120,6 +120,9 @@ export default function Analytics() {
         supabase.from('subcontractor_payments').select('net_amount, bom_scope_id, status').eq('project_id', projectId).eq('status', 'paid')
       ]);
 
+      console.log('[Analytics] Subcontractor Payments Data:', subcontractorPaymentsData.data);
+      console.log('[Analytics] Total paid subcontractor payments:', subcontractorPaymentsData.data?.length || 0);
+
       // 1. Build chronological purchase/delivery lots for True FIFO costing
       const purchasesList = purchasesResponse.data || [];
       const deliveriesList = deliveriesData.data || [];
@@ -219,6 +222,8 @@ export default function Analytics() {
       
       // Store subcontractor payments for later use
       (window as any).__subcontractorPaymentsData = subcontractorPaymentsData.data || [];
+      
+      console.log('[Analytics] Stored subcontractor payments in window:', (window as any).__subcontractorPaymentsData);
 
       if (scopesData.data && scopesData.data.length > 0) {
         const scopeIds = scopesData.data.map((s: any) => s.id);
@@ -446,6 +451,8 @@ export default function Analytics() {
     const rentalExpenses = (window as any).__rentalExpensesData || [];
     const subcontractorPayments = (window as any).__subcontractorPaymentsData || [];
 
+    console.log('[Analytics scopeSpendingData] Processing with subcontractor payments:', subcontractorPayments);
+
     const result = bom.bom_scope_of_work.map((scope: any) => {
       // Allocated Materials
       const allocatedMatCost = Array.isArray(scope.bom_materials) 
@@ -486,9 +493,21 @@ export default function Analytics() {
         }, 0);
 
       // Actual Subcontractor Costs
-      const actualSubcontractorCost = subcontractorPayments
-        .filter((sp: any) => sp.bom_scope_id === scope.id)
-        .reduce((sum: number, payment: any) => sum + Number(payment.net_amount || 0), 0);
+      const scopeSubcontractorPayments = subcontractorPayments.filter((sp: any) => sp.bom_scope_id === scope.id);
+      console.log(`[Analytics] Scope "${scope.name}" (${scope.id}):`, {
+        totalPayments: subcontractorPayments.length,
+        matchingPayments: scopeSubcontractorPayments.length,
+        payments: scopeSubcontractorPayments
+      });
+      
+      const actualSubcontractorCost = scopeSubcontractorPayments
+        .reduce((sum: number, payment: any) => {
+          const amount = Number(payment.net_amount || 0);
+          console.log(`  - Payment: ${amount} (bom_scope_id: ${payment.bom_scope_id})`);
+          return sum + amount;
+        }, 0);
+      
+      console.log(`  - Total subcontractor cost for scope: ${actualSubcontractorCost}`);
 
       return {
         scopeName: scope.name || "Unknown Scope",
