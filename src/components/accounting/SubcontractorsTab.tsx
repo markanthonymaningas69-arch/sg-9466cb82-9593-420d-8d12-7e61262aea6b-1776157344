@@ -28,6 +28,7 @@ export function SubcontractorsTab() {
   const [editingSubcontractor, setEditingSubcontractor] = useState<string | null>(null);
   const [selectedSubcontractor, setSelectedSubcontractor] = useState<SubcontractorWithPayments | null>(null);
   const [availableScopes, setAvailableScopes] = useState<any[]>([]);
+  const [projectScopes, setProjectScopes] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
     project_id: "",
@@ -74,6 +75,28 @@ export function SubcontractorsTab() {
       supabase.removeChannel(channel);
     };
   }, [selectedProject]);
+
+  useEffect(() => {
+    if (formData.project_id) {
+      loadProjectScopes(formData.project_id);
+    } else {
+      setProjectScopes([]);
+    }
+  }, [formData.project_id]);
+
+  const loadProjectScopes = async (projectId: string) => {
+    const { data: bomData } = await supabase
+      .from("bill_of_materials")
+      .select("id, bom_scope_of_work(id, name)")
+      .eq("project_id", projectId)
+      .single();
+    
+    if (bomData?.bom_scope_of_work) {
+      setProjectScopes(bomData.bom_scope_of_work);
+    } else {
+      setProjectScopes([]);
+    }
+  };
 
   const loadProjects = async () => {
     const { data } = await supabase.from("projects").select("id, name").order("name");
@@ -238,6 +261,7 @@ export function SubcontractorsTab() {
       notes: "",
     });
     setEditingSubcontractor(null);
+    setProjectScopes([]);
   };
 
   const resetPaymentForm = () => {
@@ -495,12 +519,31 @@ export function SubcontractorsTab() {
 
             <div className="grid gap-2">
               <Label htmlFor="scope_of_work">Scope of Work *</Label>
-              <Textarea
-                id="scope_of_work"
-                value={formData.scope_of_work}
-                onChange={(e) => setFormData({ ...formData, scope_of_work: e.target.value })}
-                rows={3}
-              />
+              {!formData.project_id ? (
+                <p className="text-sm text-muted-foreground py-2">
+                  Please select a project first to view available scopes
+                </p>
+              ) : projectScopes.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-2">
+                  No scopes defined for this project. Please add scopes in BOM first.
+                </p>
+              ) : (
+                <Select 
+                  value={formData.scope_of_work} 
+                  onValueChange={(val) => setFormData({ ...formData, scope_of_work: val })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select scope of work" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projectScopes.map((scope: any) => (
+                      <SelectItem key={scope.id} value={scope.name}>
+                        {scope.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
