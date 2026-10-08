@@ -1006,7 +1006,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
         // Handle warehouse deployment - update the delivery status
         const warehouseDelivery = (selectedReadyRecord as any)._warehouse_delivery;
         itemName = warehouseDelivery.item_name || "";
-        quantity = Number(receivingForm.actualQuantity) || warehouseDelivery.quantity || 0;
+        quantity = receivingForm.actualQuantity !== "" ? Number(receivingForm.actualQuantity) : (warehouseDelivery.quantity || 0);
         unit = warehouseDelivery.unit || "";
         unitCost = warehouseDelivery.unit_cost || 0;
         
@@ -1029,7 +1029,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
         }
 
         itemName = linkedReq.item_name || "";
-        quantity = Number(receivingForm.actualQuantity) || linkedReq.quantity || 0;
+        quantity = receivingForm.actualQuantity !== "" ? Number(receivingForm.actualQuantity) : (linkedReq.quantity || 0);
         unit = linkedReq.unit || "";
         unitCost = selectedReadyRecord.total_amount && quantity > 0
           ? selectedReadyRecord.total_amount / quantity
@@ -1063,7 +1063,7 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
           siteRequestId: selectedReadyRecord.site_request_id!,
           deliveryId,
           receivedBy: receivingForm.receivedBy,
-          actualQuantity: receivingForm.actualQuantity ? Number(receivingForm.actualQuantity) : null,
+          actualQuantity: receivingForm.actualQuantity !== "" ? Number(receivingForm.actualQuantity) : null,
           remarks: receivingForm.remarks || null,
         });
       }
