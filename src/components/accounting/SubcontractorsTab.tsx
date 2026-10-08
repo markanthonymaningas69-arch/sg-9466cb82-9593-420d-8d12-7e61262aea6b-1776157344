@@ -218,10 +218,15 @@ export function SubcontractorsTab() {
 
     const nextPaymentNumber = existingPayments?.[0]?.payment_number ? existingPayments[0].payment_number + 1 : 1;
 
+    // Convert __unassigned__ special value to null
+    const bomScopeId = paymentFormData.bom_scope_id === "__unassigned__" || paymentFormData.bom_scope_id === "" 
+      ? null 
+      : paymentFormData.bom_scope_id;
+
     const submitData = {
       subcontractor_id: selectedSubcontractor.id,
       project_id: selectedSubcontractor.project_id,
-      bom_scope_id: paymentFormData.bom_scope_id && paymentFormData.bom_scope_id !== "" ? paymentFormData.bom_scope_id : null,
+      bom_scope_id: bomScopeId,
       payment_number: nextPaymentNumber,
       amount: parseFloat(paymentFormData.amount),
       accomplishment_percent: parseFloat(paymentFormData.accomplishment_percent),
@@ -269,7 +274,7 @@ export function SubcontractorsTab() {
 
   const resetPaymentForm = () => {
     setPaymentFormData({
-      bom_scope_id: "",
+      bom_scope_id: "__unassigned__",
       amount: "",
       accomplishment_percent: "",
       payment_date: new Date().toISOString().split("T")[0],
@@ -701,7 +706,7 @@ export function SubcontractorsTab() {
                       <SelectValue placeholder="Select scope (or leave unassigned)" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Unassigned / General</SelectItem>
+                      <SelectItem value="__unassigned__">Unassigned / General</SelectItem>
                       {availableScopes.map((scope: any) => (
                         <SelectItem key={scope.id} value={scope.id}>
                           {scope.name}
