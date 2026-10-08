@@ -2847,6 +2847,7 @@ export type Database = {
         Row: {
           accomplishment_percent: number
           amount: number
+          bom_scope_id: string | null
           created_at: string | null
           created_by: string | null
           deductions: number | null
@@ -2866,6 +2867,7 @@ export type Database = {
         Insert: {
           accomplishment_percent?: number
           amount: number
+          bom_scope_id?: string | null
           created_at?: string | null
           created_by?: string | null
           deductions?: number | null
@@ -2885,6 +2887,7 @@ export type Database = {
         Update: {
           accomplishment_percent?: number
           amount?: number
+          bom_scope_id?: string | null
           created_at?: string | null
           created_by?: string | null
           deductions?: number | null
@@ -2902,6 +2905,13 @@ export type Database = {
           voucher_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "subcontractor_payments_bom_scope_id_fkey"
+            columns: ["bom_scope_id"]
+            isOneToOne: false
+            referencedRelation: "bom_scope_of_work"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "subcontractor_payments_project_id_fkey"
             columns: ["project_id"]
