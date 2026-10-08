@@ -9,9 +9,10 @@ import { LiquidationsTab } from "@/components/accounting/LiquidationsTab";
 import { TaxReportTab } from "@/components/accounting/TaxReportTab";
 import { ProjectBillingTab } from "@/components/accounting/ProjectBillingTab";
 import { CashAdvancesTab } from "@/components/accounting/CashAdvancesTab";
+import { SubcontractorsTab } from "@/components/accounting/SubcontractorsTab";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Landmark, FileSpreadsheet, Users, Receipt, CircleDollarSign, FileText, Wallet } from "lucide-react";
+import { Landmark, FileSpreadsheet, Users, Receipt, CircleDollarSign, FileText, Wallet, Briefcase } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { approvalCenterService, type ApprovalRequest } from "@/services/approvalCenterService";
@@ -155,6 +156,9 @@ export default function Accounting() {
               <TabsTrigger value="payroll" className="flex-shrink-0 min-w-[70px] h-9 text-xs data-[state=active]:bg-emerald-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-emerald-700 bg-emerald-50 text-emerald-700 hover:bg-emerald-100">
                 <Users className="h-3 w-3 mr-1.5 hidden sm:inline" /> Payroll
               </TabsTrigger>
+              <TabsTrigger value="subcontractors" className="flex-shrink-0 min-w-[110px] h-9 text-xs data-[state=active]:bg-violet-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-violet-700 bg-violet-50 text-violet-700 hover:bg-violet-100">
+                <Briefcase className="h-3 w-3 mr-1.5 hidden sm:inline" /> Subcontractors
+              </TabsTrigger>
               <TabsTrigger value="vouchers" className="flex-shrink-0 min-w-[70px] h-9 text-xs data-[state=active]:bg-amber-600 data-[state=active]:text-white border border-transparent data-[state=active]:border-amber-700 bg-amber-50 text-amber-700 hover:bg-amber-100 relative">
                 <Receipt className="h-3 w-3 mr-1.5 hidden sm:inline" /> 
                 Vouchers
@@ -197,6 +201,10 @@ export default function Accounting() {
           
           <TabsContent value="payroll" className="flex-1 mt-3 space-y-4">
             <PayrollTab />
+          </TabsContent>
+
+          <TabsContent value="subcontractors" className="flex-1 mt-3 space-y-4">
+            <SubcontractorsTab />
           </TabsContent>
 
           <TabsContent value="vouchers" className="flex-1 mt-3 space-y-4">

@@ -2843,6 +2843,153 @@ export type Database = {
           },
         ]
       }
+      subcontractor_payments: {
+        Row: {
+          accomplishment_percent: number
+          amount: number
+          created_at: string | null
+          created_by: string | null
+          deductions: number | null
+          description: string | null
+          id: string
+          net_amount: number | null
+          notes: string | null
+          payment_date: string | null
+          payment_number: number
+          project_id: string
+          retention_amount: number | null
+          status: string
+          subcontractor_id: string
+          updated_at: string | null
+          voucher_id: string | null
+        }
+        Insert: {
+          accomplishment_percent?: number
+          amount: number
+          created_at?: string | null
+          created_by?: string | null
+          deductions?: number | null
+          description?: string | null
+          id?: string
+          net_amount?: number | null
+          notes?: string | null
+          payment_date?: string | null
+          payment_number: number
+          project_id: string
+          retention_amount?: number | null
+          status?: string
+          subcontractor_id: string
+          updated_at?: string | null
+          voucher_id?: string | null
+        }
+        Update: {
+          accomplishment_percent?: number
+          amount?: number
+          created_at?: string | null
+          created_by?: string | null
+          deductions?: number | null
+          description?: string | null
+          id?: string
+          net_amount?: number | null
+          notes?: string | null
+          payment_date?: string | null
+          payment_number?: number
+          project_id?: string
+          retention_amount?: number | null
+          status?: string
+          subcontractor_id?: string
+          updated_at?: string | null
+          voucher_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subcontractor_payments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subcontractor_payments_subcontractor_id_fkey"
+            columns: ["subcontractor_id"]
+            isOneToOne: false
+            referencedRelation: "subcontractors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subcontractor_payments_voucher_id_fkey"
+            columns: ["voucher_id"]
+            isOneToOne: false
+            referencedRelation: "vouchers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subcontractors: {
+        Row: {
+          contact_email: string | null
+          contact_person: string | null
+          contact_phone: string | null
+          contract_amount: number
+          created_at: string | null
+          created_by: string | null
+          end_date: string | null
+          id: string
+          name: string
+          notes: string | null
+          payment_terms: string | null
+          project_id: string
+          scope_of_work: string
+          start_date: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          contact_email?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
+          contract_amount: number
+          created_at?: string | null
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          payment_terms?: string | null
+          project_id: string
+          scope_of_work: string
+          start_date?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          contact_email?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
+          contract_amount?: number
+          created_at?: string | null
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          payment_terms?: string | null
+          project_id?: string
+          scope_of_work?: string
+          start_date?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subcontractors_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscription_billing_snapshots: {
         Row: {
           billing_cycle: string
