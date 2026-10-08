@@ -99,10 +99,23 @@ export const subcontractorService = {
   async createSubcontractor(data: Partial<Subcontractor>) {
     const { data: userData } = await supabase.auth.getUser();
 
-    return supabase.from("subcontractors").insert({
-      ...data,
-      created_by: userData.user?.id,
-    });
+    const insertData = {
+      project_id: data.project_id!,
+      name: data.name!,
+      scope_of_work: data.scope_of_work!,
+      contract_amount: data.contract_amount!,
+      start_date: data.start_date || null,
+      end_date: data.end_date || null,
+      status: data.status || "active",
+      contact_person: data.contact_person || null,
+      contact_email: data.contact_email || null,
+      contact_phone: data.contact_phone || null,
+      payment_terms: data.payment_terms || null,
+      notes: data.notes || null,
+      created_by: userData.user?.id || null,
+    };
+
+    return supabase.from("subcontractors").insert(insertData);
   },
 
   async updateSubcontractor(id: string, data: Partial<Subcontractor>) {
@@ -121,11 +134,24 @@ export const subcontractorService = {
       Number(data.retention_amount || 0) -
       Number(data.deductions || 0);
 
-    return supabase.from("subcontractor_payments").insert({
-      ...data,
+    const insertData = {
+      subcontractor_id: data.subcontractor_id!,
+      project_id: data.project_id!,
+      payment_number: data.payment_number!,
+      amount: data.amount!,
+      accomplishment_percent: data.accomplishment_percent || 0,
+      payment_date: data.payment_date || null,
+      status: data.status || "pending",
+      description: data.description || null,
+      retention_amount: data.retention_amount || 0,
+      deductions: data.deductions || 0,
       net_amount: netAmount,
-      created_by: userData.user?.id,
-    });
+      notes: data.notes || null,
+      voucher_id: data.voucher_id || null,
+      created_by: userData.user?.id || null,
+    };
+
+    return supabase.from("subcontractor_payments").insert(insertData);
   },
 
   async updatePayment(id: string, data: Partial<SubcontractorPayment>) {
@@ -145,29 +171,33 @@ export const subcontractorService = {
   },
 
   async getProgressFromSitePersonnel(projectId: string, scopeOfWork: string) {
-    const { data: progressData } = await supabase
-      .from("progress")
-      .select("*")
-      .eq("project_id", projectId)
-      .ilike("task", `%${scopeOfWork}%`)
-      .order("date", { ascending: false });
+    const { data: bomScopes } = await supabase
+      .from("bom_scope_of_work")
+      .select(`
+        id,
+        name,
+        completion_percentage,
+        bom_id,
+        bill_of_materials!inner(project_id)
+      `)
+      .eq("bill_of_materials.project_id", projectId)
+      .ilike("name", `%${scopeOfWork}%`);
 
-    if (!progressData || progressData.length === 0) {
+    if (!bomScopes || bomScopes.length === 0) {
       return { accomplishment_percent: 0, total_quantity: 0, completed_quantity: 0 };
     }
 
-    const totalQuantity = progressData.reduce((sum, p) => sum + (Number(p.total_quantity) || 0), 0);
-    const completedQuantity = progressData.reduce(
-      (sum, p) => sum + (Number(p.quantity_this_period) || 0),
+    const totalCompletion = bomScopes.reduce(
+      (sum, scope) => sum + (Number(scope.completion_percentage) || 0),
       0
     );
 
-    const accomplishmentPercent = totalQuantity > 0 ? (completedQuantity / totalQuantity) * 100 : 0;
+    const avgCompletion = bomScopes.length > 0 ? totalCompletion / bomScopes.length : 0;
 
     return {
-      accomplishment_percent: Math.min(accomplishmentPercent, 100),
-      total_quantity: totalQuantity,
-      completed_quantity: completedQuantity,
+      accomplishment_percent: Math.min(avgCompletion, 100),
+      total_quantity: bomScopes.length,
+      completed_quantity: totalCompletion,
     };
   },
 };
