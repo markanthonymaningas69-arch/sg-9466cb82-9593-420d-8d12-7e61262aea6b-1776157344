@@ -206,11 +206,12 @@ export function AttendanceTab({ projectId }: { projectId: string }) {
     try {
       setLoading(true);
 
-      // Load personnel for this project
+      // Load personnel for this project - exclude archived/deleted workers
       const { data: personnelData, error: personnelError } = await supabase
         .from("personnel")
         .select("id, name, role")
         .eq("status", "active")
+        .eq("is_archived", false)
         .eq("project_id", projectId);
 
       if (personnelError) throw personnelError;
