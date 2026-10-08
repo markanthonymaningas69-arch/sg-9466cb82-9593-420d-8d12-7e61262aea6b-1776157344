@@ -155,13 +155,18 @@ export const requestWorkflowService = {
   },
 
   async markReceived(input: MarkReceivedInput) {
+    // Explicitly handle 0 as a valid quantity - don't treat it as falsy
+    const actualQuantityValue = input.actualQuantity !== null && input.actualQuantity !== undefined 
+      ? input.actualQuantity 
+      : null;
+
     const { error } = await supabase
       .from("request_execution_tracking")
       .update({
         delivery_id: input.deliveryId || null,
         received_by: input.receivedBy,
         received_at: new Date().toISOString(),
-        actual_quantity: input.actualQuantity ?? null,
+        actual_quantity: actualQuantityValue,
         remarks: input.remarks || null,
         lifecycle_status: "received",
         updated_at: new Date().toISOString(),
