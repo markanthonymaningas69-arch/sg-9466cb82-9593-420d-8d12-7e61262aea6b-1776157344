@@ -203,32 +203,32 @@ export function SubcontractorsTab() {
   };
 
   const handlePaymentSubmit = async () => {
-    console.log('[Payment Submit] Button clicked');
-    console.log('[Payment Submit] Selected Subcontractor:', selectedSubcontractor);
-    console.log('[Payment Submit] Payment Form Data:', paymentFormData);
-
-    // Detailed validation with specific error messages
-    if (!selectedSubcontractor) {
-      console.error('[Payment Submit] No subcontractor selected');
-      toast({ title: "Error", description: "No subcontractor selected", variant: "destructive" });
-      return;
-    }
-
-    if (!paymentFormData.amount || paymentFormData.amount === "" || isNaN(parseFloat(paymentFormData.amount))) {
-      console.error('[Payment Submit] Invalid amount:', paymentFormData.amount);
-      toast({ title: "Error", description: "Please enter a valid payment amount", variant: "destructive" });
-      return;
-    }
-
-    if (!paymentFormData.accomplishment_percent || paymentFormData.accomplishment_percent === "" || isNaN(parseFloat(paymentFormData.accomplishment_percent))) {
-      console.error('[Payment Submit] Invalid accomplishment percent:', paymentFormData.accomplishment_percent);
-      toast({ title: "Error", description: "Please enter a valid accomplishment percentage", variant: "destructive" });
-      return;
-    }
-
-    console.log('[Payment Submit] Validation passed, proceeding with payment creation');
-
     try {
+      console.log('[Payment Submit] Button clicked');
+      console.log('[Payment Submit] Selected Subcontractor:', selectedSubcontractor);
+      console.log('[Payment Submit] Payment Form Data:', paymentFormData);
+
+      // Detailed validation with specific error messages
+      if (!selectedSubcontractor) {
+        console.error('[Payment Submit] No subcontractor selected');
+        toast({ title: "Error", description: "No subcontractor selected", variant: "destructive" });
+        return;
+      }
+
+      if (!paymentFormData.amount || paymentFormData.amount === "" || isNaN(parseFloat(paymentFormData.amount))) {
+        console.error('[Payment Submit] Invalid amount:', paymentFormData.amount);
+        toast({ title: "Error", description: "Please enter a valid payment amount", variant: "destructive" });
+        return;
+      }
+
+      if (!paymentFormData.accomplishment_percent || paymentFormData.accomplishment_percent === "" || isNaN(parseFloat(paymentFormData.accomplishment_percent))) {
+        console.error('[Payment Submit] Invalid accomplishment percent:', paymentFormData.accomplishment_percent);
+        toast({ title: "Error", description: "Please enter a valid accomplishment percentage", variant: "destructive" });
+        return;
+      }
+
+      console.log('[Payment Submit] Validation passed, proceeding with payment creation');
+
       const { data: existingPayments, error: fetchError } = await supabase
         .from("subcontractor_payments")
         .select("payment_number")
@@ -293,7 +293,8 @@ export function SubcontractorsTab() {
       await loadSubcontractors();
       
     } catch (err) {
-      console.error('[Payment Submit] Unexpected error:', err);
+      console.error('[Payment Submit] CAUGHT ERROR AT TOP LEVEL:', err);
+      console.error('[Payment Submit] Error stack:', err instanceof Error ? err.stack : 'No stack trace');
       toast({ 
         title: "Error", 
         description: `Unexpected error: ${err instanceof Error ? err.message : 'Unknown error'}`, 
