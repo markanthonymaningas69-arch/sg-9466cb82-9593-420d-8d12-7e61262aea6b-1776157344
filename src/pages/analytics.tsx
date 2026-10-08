@@ -109,14 +109,15 @@ export default function Analytics() {
   const loadProjectData = async (projectId: string) => {
     setLoading(true);
     try {
-      const [bomData, consumptionData, attendanceData, deliveriesData, scopesData, purchasesResponse, rentalExpensesData] = await Promise.all([
+      const [bomData, consumptionData, attendanceData, deliveriesData, scopesData, purchasesResponse, rentalExpensesData, subcontractorPaymentsData] = await Promise.all([
         bomService.getByProjectId(projectId),
         siteService.getMaterialConsumption(projectId),
         supabase.from('site_attendance').select('*, personnel(hourly_rate, daily_rate), bom_scope_of_work(id)').eq('project_id', projectId),
         siteService.getDeliveries(projectId),
         siteService.getScopeOfWorks(projectId),
         supabase.from('purchases').select('item_name, quantity, unit_cost, order_date').order('order_date', { ascending: true }),
-        supabase.from('rental_expenses').select('*').eq('project_id', projectId).eq('is_archived', false)
+        supabase.from('rental_expenses').select('*').eq('project_id', projectId).eq('is_archived', false),
+        supabase.from('subcontractor_payments').select('net_amount, bom_scope_id, status').eq('project_id', projectId).eq('status', 'paid')
       ]);
 
       // 1. Build chronological purchase/delivery lots for True FIFO costing
@@ -215,6 +216,9 @@ export default function Analytics() {
       
       // Store rental expenses for later use
       (window as any).__rentalExpensesData = rentalExpensesData.data || [];
+      
+      // Store subcontractor payments for later use
+      (window as any).__subcontractorPaymentsData = subcontractorPaymentsData.data || [];
 
       if (scopesData.data && scopesData.data.length > 0) {
         const scopeIds = scopesData.data.map((s: any) => s.id);
@@ -440,6 +444,7 @@ export default function Analytics() {
     if (!bom?.bom_scope_of_work || !Array.isArray(bom.bom_scope_of_work)) return [];
 
     const rentalExpenses = (window as any).__rentalExpensesData || [];
+    const subcontractorPayments = (window as any).__subcontractorPaymentsData || [];
 
     const result = bom.bom_scope_of_work.map((scope: any) => {
       // Allocated Materials
@@ -480,6 +485,11 @@ export default function Analytics() {
           return sum + (dailyRate * daysDiff);
         }, 0);
 
+      // Actual Subcontractor Costs
+      const actualSubcontractorCost = subcontractorPayments
+        .filter((sp: any) => sp.bom_scope_id === scope.id)
+        .reduce((sum: number, payment: any) => sum + Number(payment.net_amount || 0), 0);
+
       return {
         scopeName: scope.name || "Unknown Scope",
         allocatedMatCost,
@@ -488,7 +498,8 @@ export default function Analytics() {
         actualMatCost,
         actualLabCost,
         actualRentalCost,
-        totalActual: actualMatCost + actualLabCost + actualRentalCost
+        actualSubcontractorCost,
+        totalActual: actualMatCost + actualLabCost + actualRentalCost + actualSubcontractorCost
       };
     });
 
@@ -518,7 +529,11 @@ export default function Analytics() {
         return sum + (dailyRate * daysDiff);
       }, 0);
 
-    if (unassignedMatCost > 0 || unassignedLabCost > 0 || unassignedRentalCost > 0) {
+    const unassignedSubcontractorCost = subcontractorPayments
+      .filter((sp: any) => !sp.bom_scope_id || !bom.bom_scope_of_work.find((s: any) => s.id === sp.bom_scope_id))
+      .reduce((sum: number, payment: any) => sum + Number(payment.net_amount || 0), 0);
+
+    if (unassignedMatCost > 0 || unassignedLabCost > 0 || unassignedRentalCost > 0 || unassignedSubcontractorCost > 0) {
       result.push({
         scopeName: "General/Unassigned",
         allocatedMatCost: 0,
@@ -527,7 +542,8 @@ export default function Analytics() {
         actualMatCost: unassignedMatCost,
         actualLabCost: unassignedLabCost,
         actualRentalCost: unassignedRentalCost,
-        totalActual: unassignedMatCost + unassignedLabCost + unassignedRentalCost
+        actualSubcontractorCost: unassignedSubcontractorCost,
+        totalActual: unassignedMatCost + unassignedLabCost + unassignedRentalCost + unassignedSubcontractorCost
       });
     }
 
@@ -908,13 +924,14 @@ export default function Analytics() {
                             <TableHead className="text-right bg-muted/30 min-w-[120px]">Actual Materials</TableHead>
                             <TableHead className="text-right bg-muted/30 min-w-[120px]">Actual Labor</TableHead>
                             <TableHead className="text-right bg-muted/30 min-w-[120px]">Actual Rentals</TableHead>
+                            <TableHead className="text-right bg-muted/30 min-w-[120px]">Actual Subcontractors</TableHead>
                             <TableHead className="text-right bg-muted/30 min-w-[120px]">Total Actual</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {scopeSpendingData.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                              <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                                 No scope data available.
                               </TableCell>
                             </TableRow>
@@ -933,6 +950,9 @@ export default function Analytics() {
                                 </TableCell>
                                 <TableCell className="text-right bg-muted/10 font-medium">
                                   {formatCurrency(row.actualRentalCost || 0)}
+                                </TableCell>
+                                <TableCell className="text-right bg-muted/10 font-medium">
+                                  {formatCurrency(row.actualSubcontractorCost || 0)}
                                 </TableCell>
                                 <TableCell className={`text-right bg-muted/10 font-bold ${row.totalActual > row.totalAllocated ? 'text-destructive' : 'text-primary'}`}>
                                   {formatCurrency(row.totalActual)}
