@@ -174,12 +174,13 @@ export const subcontractorService = {
   async getProgressFromSitePersonnel(projectId: string, scopeOfWork: string) {
     console.log('[Subcontractor Progress] Fetching for project:', projectId, 'scope:', scopeOfWork);
     
-    // First, find matching BOM scopes
+    // Find matching BOM scope and get its completion percentage
     const { data: bomScopes } = await supabase
       .from("bom_scope_of_work")
       .select(`
         id,
         name,
+        completion_percentage,
         bom_id,
         bill_of_materials!inner(project_id)
       `)
@@ -193,45 +194,21 @@ export const subcontractorService = {
       return { accomplishment_percent: 0, total_quantity: 0, completed_quantity: 0 };
     }
 
-    // Get progress records for these scopes
-    const scopeIds = bomScopes.map(s => s.id);
-    
-    const { data: progressRecords } = await supabase
-      .from("site_progress")
-      .select("bom_scope_id, planned_quantity, completed_quantity")
-      .eq("project_id", projectId)
-      .in("bom_scope_id", scopeIds);
-
-    console.log('[Subcontractor Progress] Progress records:', progressRecords);
-
-    if (!progressRecords || progressRecords.length === 0) {
-      console.log('[Subcontractor Progress] No progress records found');
-      return { accomplishment_percent: 0, total_quantity: 0, completed_quantity: 0 };
-    }
-
-    // Calculate total planned vs completed
-    const totalPlanned = progressRecords.reduce(
-      (sum, record) => sum + (Number(record.planned_quantity) || 0),
+    // Average completion percentage across matching scopes
+    const avgCompletion = bomScopes.reduce(
+      (sum, scope) => sum + (Number(scope.completion_percentage) || 0),
       0
-    );
-
-    const totalCompleted = progressRecords.reduce(
-      (sum, record) => sum + (Number(record.completed_quantity) || 0),
-      0
-    );
-
-    const accomplishmentPercent = totalPlanned > 0 ? (totalCompleted / totalPlanned) * 100 : 0;
+    ) / bomScopes.length;
 
     console.log('[Subcontractor Progress] Result:', {
-      totalPlanned,
-      totalCompleted,
-      accomplishmentPercent
+      matchedScopes: bomScopes.length,
+      avgCompletion
     });
 
     return {
-      accomplishment_percent: Math.min(accomplishmentPercent, 100),
-      total_quantity: totalPlanned,
-      completed_quantity: totalCompleted,
+      accomplishment_percent: Math.min(avgCompletion, 100),
+      total_quantity: 0,
+      completed_quantity: 0,
     };
   },
 };
