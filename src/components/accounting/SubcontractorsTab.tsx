@@ -740,30 +740,30 @@ export function SubcontractorsTab() {
         setPaymentDialogOpen(open);
         if (!open) resetPaymentForm();
       }}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create Payment for {selectedSubcontractor?.name}</DialogTitle>
           </DialogHeader>
           {selectedSubcontractor && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-4 p-4 bg-muted rounded-lg">
+            <div className="space-y-3 py-2">
+              <div className="grid grid-cols-3 gap-3 p-3 bg-muted rounded-lg text-sm">
                 <div>
                   <p className="text-xs text-muted-foreground">Contract Amount</p>
-                  <p className="text-lg font-bold">{formatCurrency(selectedSubcontractor.contract_amount)}</p>
+                  <p className="font-bold">{formatCurrency(selectedSubcontractor.contract_amount)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Total Paid</p>
-                  <p className="text-lg font-bold text-success">{formatCurrency(selectedSubcontractor.total_paid || 0)}</p>
+                  <p className="font-bold text-success">{formatCurrency(selectedSubcontractor.total_paid || 0)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Balance</p>
-                  <p className="text-lg font-bold text-amber-600">{formatCurrency(selectedSubcontractor.balance || 0)}</p>
+                  <p className="font-bold text-amber-600">{formatCurrency(selectedSubcontractor.balance || 0)}</p>
                 </div>
               </div>
 
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-muted-foreground">Scope of Work</p>
-                <p className="font-medium">{selectedSubcontractor.scope_of_work}</p>
+              <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+                <p className="text-xs text-muted-foreground">Scope of Work</p>
+                <p className="font-medium text-sm">{selectedSubcontractor.scope_of_work}</p>
                 {availableScopes.find((s: any) => s.name === selectedSubcontractor.scope_of_work) ? (
                   <p className="text-xs text-success mt-1">✓ Linked to BOM scope for analytics tracking</p>
                 ) : (
@@ -771,21 +771,22 @@ export function SubcontractorsTab() {
                 )}
               </div>
 
-              <div className="grid gap-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="payment_amount">Payment Amount *</Label>
+              <div className="grid gap-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="payment_amount" className="text-sm">Payment Amount *</Label>
                     <Input
                       id="payment_amount"
                       type="number"
                       step="0.01"
                       value={paymentFormData.amount}
                       onChange={(e) => setPaymentFormData({ ...paymentFormData, amount: e.target.value })}
+                      className="h-9"
                     />
                   </div>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="accomplishment_percent">Accomplishment (%) *</Label>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="accomplishment_percent" className="text-sm">Accomplishment (%) *</Label>
                     <Input
                       id="accomplishment_percent"
                       type="number"
@@ -793,38 +794,41 @@ export function SubcontractorsTab() {
                       max="100"
                       value={paymentFormData.accomplishment_percent}
                       onChange={(e) => setPaymentFormData({ ...paymentFormData, accomplishment_percent: e.target.value })}
+                      className="h-9"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="retention_amount">Retention Amount</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="retention_amount" className="text-sm">Retention Amount</Label>
                     <Input
                       id="retention_amount"
                       type="number"
                       step="0.01"
                       value={paymentFormData.retention_amount}
                       onChange={(e) => setPaymentFormData({ ...paymentFormData, retention_amount: e.target.value })}
+                      className="h-9"
                     />
                   </div>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="deductions">Deductions</Label>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="deductions" className="text-sm">Deductions</Label>
                     <Input
                       id="deductions"
                       type="number"
                       step="0.01"
                       value={paymentFormData.deductions}
                       onChange={(e) => setPaymentFormData({ ...paymentFormData, deductions: e.target.value })}
+                      className="h-9"
                     />
                   </div>
                 </div>
 
-                <div className="p-3 bg-primary/10 rounded-lg">
+                <div className="p-2.5 bg-primary/10 rounded-lg">
                   <p className="text-sm font-medium">
                     Net Payment Amount:{" "}
-                    <span className="text-lg font-bold text-primary">
+                    <span className="text-base font-bold text-primary">
                       {formatCurrency(
                         (parseFloat(paymentFormData.amount) || 0) -
                         (parseFloat(paymentFormData.retention_amount) || 0) -
@@ -834,21 +838,22 @@ export function SubcontractorsTab() {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="payment_date">Payment Date</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="payment_date" className="text-sm">Payment Date</Label>
                     <Input
                       id="payment_date"
                       type="date"
                       value={paymentFormData.payment_date}
                       onChange={(e) => setPaymentFormData({ ...paymentFormData, payment_date: e.target.value })}
+                      className="h-9"
                     />
                   </div>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="payment_status">Status</Label>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="payment_status" className="text-sm">Status</Label>
                     <Select value={paymentFormData.status} onValueChange={(val: any) => setPaymentFormData({ ...paymentFormData, status: val })}>
-                      <SelectTrigger>
+                      <SelectTrigger className="h-9">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -861,51 +866,53 @@ export function SubcontractorsTab() {
                   </div>
                 </div>
 
-                <div className="grid gap-2">
-                  <Label htmlFor="payment_description">Description</Label>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="payment_description" className="text-sm">Description</Label>
                   <Textarea
                     id="payment_description"
                     value={paymentFormData.description}
                     onChange={(e) => setPaymentFormData({ ...paymentFormData, description: e.target.value })}
                     rows={2}
+                    className="text-sm"
                   />
                 </div>
 
-                <div className="grid gap-2">
-                  <Label htmlFor="payment_notes">Notes</Label>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="payment_notes" className="text-sm">Notes</Label>
                   <Textarea
                     id="payment_notes"
                     value={paymentFormData.notes}
                     onChange={(e) => setPaymentFormData({ ...paymentFormData, notes: e.target.value })}
                     rows={2}
+                    className="text-sm"
                   />
                 </div>
               </div>
 
               {selectedSubcontractor.payments && selectedSubcontractor.payments.length > 0 && (
-                <div className="space-y-2">
-                  <Label>Payment History</Label>
-                  <div className="border rounded-lg overflow-hidden">
+                <div className="space-y-1.5">
+                  <Label className="text-sm">Payment History</Label>
+                  <div className="border rounded-lg overflow-hidden max-h-[200px] overflow-y-auto">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 bg-muted">
                         <TableRow>
-                          <TableHead>#</TableHead>
-                          <TableHead>Amount</TableHead>
-                          <TableHead>Accomplishment</TableHead>
-                          <TableHead>Net</TableHead>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Status</TableHead>
+                          <TableHead className="h-8 text-xs">#</TableHead>
+                          <TableHead className="h-8 text-xs">Amount</TableHead>
+                          <TableHead className="h-8 text-xs">Accomp.</TableHead>
+                          <TableHead className="h-8 text-xs">Net</TableHead>
+                          <TableHead className="h-8 text-xs">Date</TableHead>
+                          <TableHead className="h-8 text-xs">Status</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {selectedSubcontractor.payments.map((payment) => (
-                          <TableRow key={payment.id}>
-                            <TableCell>{payment.payment_number}</TableCell>
-                            <TableCell>{formatCurrency(payment.amount)}</TableCell>
-                            <TableCell>{payment.accomplishment_percent}%</TableCell>
-                            <TableCell className="font-medium">{formatCurrency(payment.net_amount || 0)}</TableCell>
-                            <TableCell>{payment.payment_date ? new Date(payment.payment_date).toLocaleDateString() : "—"}</TableCell>
-                            <TableCell>{getPaymentStatusBadge(payment.status)}</TableCell>
+                          <TableRow key={payment.id} className="text-sm">
+                            <TableCell className="py-2">{payment.payment_number}</TableCell>
+                            <TableCell className="py-2">{formatCurrency(payment.amount)}</TableCell>
+                            <TableCell className="py-2">{payment.accomplishment_percent}%</TableCell>
+                            <TableCell className="py-2 font-medium">{formatCurrency(payment.net_amount || 0)}</TableCell>
+                            <TableCell className="py-2">{payment.payment_date ? new Date(payment.payment_date).toLocaleDateString() : "—"}</TableCell>
+                            <TableCell className="py-2">{getPaymentStatusBadge(payment.status)}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -915,7 +922,7 @@ export function SubcontractorsTab() {
               )}
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="sticky bottom-0 bg-background pt-4 border-t mt-4">
             <Button variant="outline" onClick={() => {
               setPaymentDialogOpen(false);
               resetPaymentForm();
