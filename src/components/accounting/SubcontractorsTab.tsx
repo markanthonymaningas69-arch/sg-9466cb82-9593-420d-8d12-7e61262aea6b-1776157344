@@ -221,7 +221,7 @@ export function SubcontractorsTab() {
     const submitData = {
       subcontractor_id: selectedSubcontractor.id,
       project_id: selectedSubcontractor.project_id,
-      bom_scope_id: paymentFormData.bom_scope_id || null,
+      bom_scope_id: paymentFormData.bom_scope_id && paymentFormData.bom_scope_id !== "" ? paymentFormData.bom_scope_id : null,
       payment_number: nextPaymentNumber,
       amount: parseFloat(paymentFormData.amount),
       accomplishment_percent: parseFloat(paymentFormData.accomplishment_percent),
@@ -233,8 +233,11 @@ export function SubcontractorsTab() {
       notes: paymentFormData.notes || null,
     };
 
+    console.log('[Payment Submit] Data being sent:', submitData);
+
     const { error } = await subcontractorService.createPayment(submitData);
     if (error) {
+      console.error('[Payment Submit] Error:', error);
       toast({ title: "Error", description: error.message, variant: "destructive" });
       return;
     }
