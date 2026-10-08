@@ -1074,33 +1074,38 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
       const isToolOrEquipment = toolKeywords.some(keyword => itemName.toLowerCase().includes(keyword));
       const category = isToolOrEquipment ? "Tools & Equipments" : "Materials";
 
-      const inventoryPayload = {
-        project_id: projectId,
-        item_name: itemName,
-        category: category,
-        quantity: quantity,
-        unit: unit,
-        unit_cost: unitCost,
-        total_value: quantity * unitCost,
-        supplier: selectedReadyRecord.supplier || "Main Warehouse",
-        date_received: new Date().toISOString().split("T")[0],
-        received_by: receivingForm.receivedBy,
-        notes: receivingForm.remarks || null,
-        status: "available"
-      };
+      // Only add to inventory if quantity is greater than 0
+      if (quantity > 0) {
+        const inventoryPayload = {
+          project_id: projectId,
+          item_name: itemName,
+          category: category,
+          quantity: quantity,
+          unit: unit,
+          unit_cost: unitCost,
+          total_value: quantity * unitCost,
+          supplier: selectedReadyRecord.supplier || "Main Warehouse",
+          date_received: new Date().toISOString().split("T")[0],
+          received_by: receivingForm.receivedBy,
+          notes: receivingForm.remarks || null,
+          status: "available"
+        };
 
-      const { error: inventoryError } = await supabase
-        .from("site_warehouse_inventory")
-        .insert(inventoryPayload);
+        const { error: inventoryError } = await supabase
+          .from("site_warehouse_inventory")
+          .insert(inventoryPayload);
 
-      if (inventoryError) {
-        console.error("Error adding to warehouse inventory:", inventoryError);
-        throw inventoryError;
+        if (inventoryError) {
+          console.error("Error adding to warehouse inventory:", inventoryError);
+          throw inventoryError;
+        }
       }
 
       toast({
         title: "Success",
-        description: `Item received and added to Site Warehouse (${category})`,
+        description: quantity > 0 
+          ? `Item received and added to Site Warehouse (${category})`
+          : "Item marked as received (zero quantity)",
       });
 
       setReceivingDialogOpen(false);
