@@ -1071,6 +1071,8 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
           ? Number(receivingForm.actualQuantity) 
           : null;
 
+        console.log("Marking as received with actual quantity:", actualQtyValue, "for site request:", selectedReadyRecord.site_request_id);
+
         await requestWorkflowService.markReceived({
           siteRequestId: selectedReadyRecord.site_request_id!,
           deliveryId,
@@ -1078,6 +1080,8 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
           actualQuantity: actualQtyValue,
           remarks: receivingForm.remarks || null,
         });
+
+        console.log("Successfully marked as received");
       }
 
       // Add received item to Site Warehouse inventory
@@ -1120,15 +1124,21 @@ export function SiteWarehouseTab({ projectId }: { projectId: string }) {
           : "Item marked as received (zero quantity)",
       });
 
+      console.log("Receipt processing complete. Quantity:", quantity);
+
       setReceivingDialogOpen(false);
       setSelectedReadyRecord(null);
       setReceivingForm({ receivedBy: "", actualQuantity: "", remarks: "" });
+      
+      // Reload data to reflect the updated status
       await loadData();
+      
+      console.log("Data reloaded after receiving");
     } catch (error) {
       console.error("Error marking received:", error);
       toast({
         title: "Error",
-        description: "Failed to mark item as received",
+        description: error instanceof Error ? error.message : "Failed to mark item as received",
         variant: "destructive",
       });
     } finally {
