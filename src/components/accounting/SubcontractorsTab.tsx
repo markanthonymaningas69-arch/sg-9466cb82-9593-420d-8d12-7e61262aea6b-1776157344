@@ -204,9 +204,13 @@ export function SubcontractorsTab() {
 
   const handlePaymentSubmit = async () => {
     try {
+      console.log('[Payment Submit] === START ===');
       console.log('[Payment Submit] Button clicked');
       console.log('[Payment Submit] Selected Subcontractor:', selectedSubcontractor);
+      console.log('[Payment Submit] CHECKPOINT 1: After logging subcontractor');
+      
       console.log('[Payment Submit] Payment Form Data:', paymentFormData);
+      console.log('[Payment Submit] CHECKPOINT 2: After logging form data');
 
       // Detailed validation with specific error messages
       if (!selectedSubcontractor) {
@@ -214,18 +218,21 @@ export function SubcontractorsTab() {
         toast({ title: "Error", description: "No subcontractor selected", variant: "destructive" });
         return;
       }
+      console.log('[Payment Submit] CHECKPOINT 3: Subcontractor exists');
 
       if (!paymentFormData.amount || paymentFormData.amount === "" || isNaN(parseFloat(paymentFormData.amount))) {
         console.error('[Payment Submit] Invalid amount:', paymentFormData.amount);
         toast({ title: "Error", description: "Please enter a valid payment amount", variant: "destructive" });
         return;
       }
+      console.log('[Payment Submit] CHECKPOINT 4: Amount validated');
 
       if (!paymentFormData.accomplishment_percent || paymentFormData.accomplishment_percent === "" || isNaN(parseFloat(paymentFormData.accomplishment_percent))) {
         console.error('[Payment Submit] Invalid accomplishment percent:', paymentFormData.accomplishment_percent);
         toast({ title: "Error", description: "Please enter a valid accomplishment percentage", variant: "destructive" });
         return;
       }
+      console.log('[Payment Submit] CHECKPOINT 5: Accomplishment validated');
 
       console.log('[Payment Submit] Validation passed, proceeding with payment creation');
 
@@ -236,6 +243,8 @@ export function SubcontractorsTab() {
         .order("payment_number", { ascending: false })
         .limit(1);
 
+      console.log('[Payment Submit] CHECKPOINT 6: Fetched existing payments');
+
       if (fetchError) {
         console.error('[Payment Submit] Error fetching existing payments:', fetchError);
         toast({ title: "Error", description: `Failed to fetch payment history: ${fetchError.message}`, variant: "destructive" });
@@ -244,6 +253,7 @@ export function SubcontractorsTab() {
 
       const nextPaymentNumber = existingPayments?.[0]?.payment_number ? existingPayments[0].payment_number + 1 : 1;
       console.log('[Payment Submit] Next payment number:', nextPaymentNumber);
+      console.log('[Payment Submit] CHECKPOINT 7: Calculated payment number');
 
       // Auto-detect bom_scope_id by matching subcontractor's scope_of_work with BOM scopes
       let bomScopeId = null;
@@ -260,6 +270,7 @@ export function SubcontractorsTab() {
       } else {
         console.log('[Payment Submit] No available scopes to match against');
       }
+      console.log('[Payment Submit] CHECKPOINT 8: Scope matching complete');
 
       const submitData = {
         subcontractor_id: selectedSubcontractor.id,
@@ -277,8 +288,11 @@ export function SubcontractorsTab() {
       };
 
       console.log('[Payment Submit] Data being sent:', submitData);
+      console.log('[Payment Submit] CHECKPOINT 9: About to call createPayment service');
 
       const { error } = await subcontractorService.createPayment(submitData);
+      
+      console.log('[Payment Submit] CHECKPOINT 10: Service call completed');
       
       if (error) {
         console.error('[Payment Submit] Error from service:', error);
@@ -291,10 +305,13 @@ export function SubcontractorsTab() {
       resetPaymentForm();
       setPaymentDialogOpen(false);
       await loadSubcontractors();
+      console.log('[Payment Submit] === COMPLETE ===');
       
     } catch (err) {
       console.error('[Payment Submit] CAUGHT ERROR AT TOP LEVEL:', err);
       console.error('[Payment Submit] Error stack:', err instanceof Error ? err.stack : 'No stack trace');
+      console.error('[Payment Submit] Error name:', err instanceof Error ? err.name : 'Unknown');
+      console.error('[Payment Submit] Error message:', err instanceof Error ? err.message : String(err));
       toast({ 
         title: "Error", 
         description: `Unexpected error: ${err instanceof Error ? err.message : 'Unknown error'}`, 
