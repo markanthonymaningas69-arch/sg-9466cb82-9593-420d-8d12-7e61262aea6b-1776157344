@@ -46,7 +46,6 @@ export function SubcontractorsTab() {
   });
 
   const [paymentFormData, setPaymentFormData] = useState({
-    bom_scope_id: "",
     amount: "",
     accomplishment_percent: "",
     payment_date: new Date().toISOString().split("T")[0],
@@ -218,10 +217,19 @@ export function SubcontractorsTab() {
 
     const nextPaymentNumber = existingPayments?.[0]?.payment_number ? existingPayments[0].payment_number + 1 : 1;
 
-    // Convert __unassigned__ special value to null
-    const bomScopeId = paymentFormData.bom_scope_id === "__unassigned__" || paymentFormData.bom_scope_id === "" 
-      ? null 
-      : paymentFormData.bom_scope_id;
+    // Auto-detect bom_scope_id by matching subcontractor's scope_of_work with BOM scopes
+    let bomScopeId = null;
+    if (availableScopes.length > 0) {
+      const matchingScope = availableScopes.find(
+        (scope: any) => scope.name === selectedSubcontractor.scope_of_work
+      );
+      if (matchingScope) {
+        bomScopeId = matchingScope.id;
+        console.log('[Payment Submit] Auto-matched scope:', matchingScope.name, '→', matchingScope.id);
+      } else {
+        console.log('[Payment Submit] No matching scope found for:', selectedSubcontractor.scope_of_work);
+      }
+    }
 
     const submitData = {
       subcontractor_id: selectedSubcontractor.id,
@@ -274,7 +282,6 @@ export function SubcontractorsTab() {
 
   const resetPaymentForm = () => {
     setPaymentFormData({
-      bom_scope_id: "__unassigned__",
       amount: "",
       accomplishment_percent: "",
       payment_date: new Date().toISOString().split("T")[0],
@@ -695,30 +702,17 @@ export function SubcontractorsTab() {
                 </div>
               </div>
 
-              <div className="grid gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="bom_scope_id">Scope of Work (Optional)</Label>
-                  <Select 
-                    value={paymentFormData.bom_scope_id} 
-                    onValueChange={(val) => setPaymentFormData({ ...paymentFormData, bom_scope_id: val })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select scope (or leave unassigned)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__unassigned__">Unassigned / General</SelectItem>
-                      {availableScopes.map((scope: any) => (
-                        <SelectItem key={scope.id} value={scope.id}>
-                          {scope.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Link payment to a specific scope for accurate analytics tracking
-                  </p>
-                </div>
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-muted-foreground">Scope of Work</p>
+                <p className="font-medium">{selectedSubcontractor.scope_of_work}</p>
+                {availableScopes.find((s: any) => s.name === selectedSubcontractor.scope_of_work) ? (
+                  <p className="text-xs text-success mt-1">✓ Linked to BOM scope for analytics tracking</p>
+                ) : (
+                  <p className="text-xs text-amber-600 mt-1">⚠ Not linked to BOM scope - payment will be in General/Unassigned</p>
+                )}
+              </div>
 
+              <div className="grid gap-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
                     <Label htmlFor="payment_amount">Payment Amount *</Label>
