@@ -203,62 +203,103 @@ export function SubcontractorsTab() {
   };
 
   const handlePaymentSubmit = async () => {
-    if (!selectedSubcontractor || !paymentFormData.amount || !paymentFormData.accomplishment_percent) {
-      toast({ title: "Error", description: "Please fill in all required fields", variant: "destructive" });
+    console.log('[Payment Submit] Button clicked');
+    console.log('[Payment Submit] Selected Subcontractor:', selectedSubcontractor);
+    console.log('[Payment Submit] Payment Form Data:', paymentFormData);
+
+    // Detailed validation with specific error messages
+    if (!selectedSubcontractor) {
+      console.error('[Payment Submit] No subcontractor selected');
+      toast({ title: "Error", description: "No subcontractor selected", variant: "destructive" });
       return;
     }
 
-    const { data: existingPayments } = await supabase
-      .from("subcontractor_payments")
-      .select("payment_number")
-      .eq("subcontractor_id", selectedSubcontractor.id)
-      .order("payment_number", { ascending: false })
-      .limit(1);
+    if (!paymentFormData.amount || paymentFormData.amount === "" || isNaN(parseFloat(paymentFormData.amount))) {
+      console.error('[Payment Submit] Invalid amount:', paymentFormData.amount);
+      toast({ title: "Error", description: "Please enter a valid payment amount", variant: "destructive" });
+      return;
+    }
 
-    const nextPaymentNumber = existingPayments?.[0]?.payment_number ? existingPayments[0].payment_number + 1 : 1;
+    if (!paymentFormData.accomplishment_percent || paymentFormData.accomplishment_percent === "" || isNaN(parseFloat(paymentFormData.accomplishment_percent))) {
+      console.error('[Payment Submit] Invalid accomplishment percent:', paymentFormData.accomplishment_percent);
+      toast({ title: "Error", description: "Please enter a valid accomplishment percentage", variant: "destructive" });
+      return;
+    }
 
-    // Auto-detect bom_scope_id by matching subcontractor's scope_of_work with BOM scopes
-    let bomScopeId = null;
-    if (availableScopes.length > 0) {
-      const matchingScope = availableScopes.find(
-        (scope: any) => scope.name === selectedSubcontractor.scope_of_work
-      );
-      if (matchingScope) {
-        bomScopeId = matchingScope.id;
-        console.log('[Payment Submit] Auto-matched scope:', matchingScope.name, '→', matchingScope.id);
-      } else {
-        console.log('[Payment Submit] No matching scope found for:', selectedSubcontractor.scope_of_work);
+    console.log('[Payment Submit] Validation passed, proceeding with payment creation');
+
+    try {
+      const { data: existingPayments, error: fetchError } = await supabase
+        .from("subcontractor_payments")
+        .select("payment_number")
+        .eq("subcontractor_id", selectedSubcontractor.id)
+        .order("payment_number", { ascending: false })
+        .limit(1);
+
+      if (fetchError) {
+        console.error('[Payment Submit] Error fetching existing payments:', fetchError);
+        toast({ title: "Error", description: `Failed to fetch payment history: ${fetchError.message}`, variant: "destructive" });
+        return;
       }
+
+      const nextPaymentNumber = existingPayments?.[0]?.payment_number ? existingPayments[0].payment_number + 1 : 1;
+      console.log('[Payment Submit] Next payment number:', nextPaymentNumber);
+
+      // Auto-detect bom_scope_id by matching subcontractor's scope_of_work with BOM scopes
+      let bomScopeId = null;
+      if (availableScopes.length > 0) {
+        const matchingScope = availableScopes.find(
+          (scope: any) => scope.name === selectedSubcontractor.scope_of_work
+        );
+        if (matchingScope) {
+          bomScopeId = matchingScope.id;
+          console.log('[Payment Submit] Auto-matched scope:', matchingScope.name, '→', matchingScope.id);
+        } else {
+          console.log('[Payment Submit] No matching scope found for:', selectedSubcontractor.scope_of_work);
+        }
+      } else {
+        console.log('[Payment Submit] No available scopes to match against');
+      }
+
+      const submitData = {
+        subcontractor_id: selectedSubcontractor.id,
+        project_id: selectedSubcontractor.project_id,
+        bom_scope_id: bomScopeId,
+        payment_number: nextPaymentNumber,
+        amount: parseFloat(paymentFormData.amount),
+        accomplishment_percent: parseFloat(paymentFormData.accomplishment_percent),
+        payment_date: paymentFormData.payment_date || null,
+        status: paymentFormData.status,
+        description: paymentFormData.description || null,
+        retention_amount: parseFloat(paymentFormData.retention_amount) || 0,
+        deductions: parseFloat(paymentFormData.deductions) || 0,
+        notes: paymentFormData.notes || null,
+      };
+
+      console.log('[Payment Submit] Data being sent:', submitData);
+
+      const { error } = await subcontractorService.createPayment(submitData);
+      
+      if (error) {
+        console.error('[Payment Submit] Error from service:', error);
+        toast({ title: "Error", description: `Failed to create payment: ${error.message}`, variant: "destructive" });
+        return;
+      }
+
+      console.log('[Payment Submit] Payment created successfully');
+      toast({ title: "Success", description: "Payment created successfully" });
+      resetPaymentForm();
+      setPaymentDialogOpen(false);
+      await loadSubcontractors();
+      
+    } catch (err) {
+      console.error('[Payment Submit] Unexpected error:', err);
+      toast({ 
+        title: "Error", 
+        description: `Unexpected error: ${err instanceof Error ? err.message : 'Unknown error'}`, 
+        variant: "destructive" 
+      });
     }
-
-    const submitData = {
-      subcontractor_id: selectedSubcontractor.id,
-      project_id: selectedSubcontractor.project_id,
-      bom_scope_id: bomScopeId,
-      payment_number: nextPaymentNumber,
-      amount: parseFloat(paymentFormData.amount),
-      accomplishment_percent: parseFloat(paymentFormData.accomplishment_percent),
-      payment_date: paymentFormData.payment_date || null,
-      status: paymentFormData.status,
-      description: paymentFormData.description || null,
-      retention_amount: parseFloat(paymentFormData.retention_amount) || 0,
-      deductions: parseFloat(paymentFormData.deductions) || 0,
-      notes: paymentFormData.notes || null,
-    };
-
-    console.log('[Payment Submit] Data being sent:', submitData);
-
-    const { error } = await subcontractorService.createPayment(submitData);
-    if (error) {
-      console.error('[Payment Submit] Error:', error);
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-      return;
-    }
-
-    toast({ title: "Success", description: "Payment created successfully" });
-    resetPaymentForm();
-    setPaymentDialogOpen(false);
-    void loadSubcontractors();
   };
 
   const resetForm = () => {
