@@ -112,15 +112,9 @@ export function SubcontractorsTab() {
         data.map(async (sub) => {
           const { data: subData } = await subcontractorService.getSubcontractorWithPayments(sub.id);
           
-          const progressData = await subcontractorService.getProgressFromSitePersonnel(
-            sub.project_id,
-            sub.scope_of_work
-          );
-
           return {
             ...sub,
             ...(subData || {}),
-            accomplishment_percent: progressData.accomplishment_percent,
           } as SubcontractorWithPayments;
         })
       );

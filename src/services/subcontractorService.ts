@@ -81,8 +81,17 @@ export const subcontractorService = {
 
     const balance = Number(subcontractor.contract_amount) - totalPaid;
 
-    const latestPayment = payments?.[payments.length - 1];
+    // Get latest payment's accomplishment (highest payment_number)
+    const latestPayment = payments && payments.length > 0 
+      ? payments[payments.length - 1] 
+      : null;
     const accomplishmentPercent = latestPayment?.accomplishment_percent || 0;
+
+    console.log('[Subcontractor] Latest payment accomplishment:', {
+      subcontractor: subcontractor.name,
+      latestPaymentNumber: latestPayment?.payment_number,
+      accomplishment: accomplishmentPercent
+    });
 
     return {
       data: {
