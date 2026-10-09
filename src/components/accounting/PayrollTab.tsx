@@ -366,27 +366,29 @@ export function PayrollTab() {
     <div className="space-y-4 mt-4">
       <Card className="shadow-sm">
         <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row gap-4 items-end">
-            <div className="space-y-2 flex-1">
-              <Label>Start Date</Label>
-              <Input type="date" value={filters.startDate} onChange={e => setFilters({...filters, startDate: e.target.value})} />
-            </div>
-            <div className="space-y-2 flex-1">
-              <Label>End Date</Label>
-              <Input type="date" value={filters.endDate} onChange={e => setFilters({...filters, endDate: e.target.value})} />
-            </div>
-            <div className="space-y-2 flex-1">
-              <Label>Project Filter</Label>
-              <Select value={filters.projectId} onValueChange={val => setFilters({...filters, projectId: val})}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Projects</SelectItem>
-                  {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+          <div className="flex flex-col gap-4 items-stretch">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Start Date</Label>
+                <Input type="date" value={filters.startDate} onChange={e => setFilters({...filters, startDate: e.target.value})} />
+              </div>
+              <div className="space-y-2">
+                <Label>End Date</Label>
+                <Input type="date" value={filters.endDate} onChange={e => setFilters({...filters, endDate: e.target.value})} />
+              </div>
+              <div className="space-y-2">
+                <Label>Project Filter</Label>
+                <Select value={filters.projectId} onValueChange={val => setFilters({...filters, projectId: val})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Projects</SelectItem>
+                    {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="flex gap-2">
-              <Button onClick={loadPayroll} disabled={loading}>
+              <Button onClick={loadPayroll} disabled={loading} className="w-full sm:w-auto">
                 {loading ? "Calculating..." : "Apply Filter"}
               </Button>
             </div>
@@ -395,30 +397,30 @@ export function PayrollTab() {
       </Card>
 
       <Card className="border-t-0 rounded-t-none shadow-none mt-0">
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardHeader className="flex flex-col lg:flex-row lg:items-center lg:justify-between pb-4 space-y-4 lg:space-y-0">
           <div>
             <CardTitle>Payroll Generation</CardTitle>
             <CardDescription>Computed securely from Site Attendance records</CardDescription>
           </div>
-          <div className="text-right space-y-2">
-            <div>
-              <div className="text-sm text-muted-foreground">Gross Payroll</div>
-              <div className="text-xl font-bold">{formatCurrency(totalPayrollCost)}</div>
+          <div className="grid grid-cols-2 lg:flex lg:flex-col gap-4 lg:gap-2 lg:text-right">
+            <div className="lg:min-w-[200px]">
+              <div className="text-xs sm:text-sm text-muted-foreground">Gross Payroll</div>
+              <div className="text-lg sm:text-xl font-bold">{formatCurrency(totalPayrollCost)}</div>
             </div>
-            <div>
-              <div className="text-sm text-muted-foreground">Total Deductions</div>
-              <div className="text-xl font-bold text-red-600">-{formatCurrency(totalDeductions)}</div>
+            <div className="lg:min-w-[200px]">
+              <div className="text-xs sm:text-sm text-muted-foreground">Total Deductions</div>
+              <div className="text-lg sm:text-xl font-bold text-red-600">-{formatCurrency(totalDeductions)}</div>
             </div>
-            <div className="border-t pt-2">
-              <div className="text-sm text-muted-foreground">Net Payroll</div>
-              <div className="text-2xl font-bold text-emerald-600">{formatCurrency(totalNetPay)}</div>
+            <div className="lg:min-w-[200px] border-t lg:border-t pt-2 col-span-2">
+              <div className="text-xs sm:text-sm text-muted-foreground">Net Payroll</div>
+              <div className="text-xl sm:text-2xl font-bold text-emerald-600">{formatCurrency(totalNetPay)}</div>
             </div>
             {payrollData.length > 0 && (
               <Button 
                 onClick={handleSendToVoucher} 
                 disabled={isSending || isLocked}
                 size="sm" 
-                className="mt-2 w-full bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+                className="mt-2 w-full bg-blue-600 hover:bg-blue-700 text-white shadow-sm col-span-2"
               >
                 {isSending ? "Sending..." : <><FileText className="h-4 w-4 mr-2" />Send to Vouchers</>}
               </Button>
@@ -427,102 +429,106 @@ export function PayrollTab() {
         </CardHeader>
         <CardContent>
           <div className="border rounded-md overflow-hidden">
-            <Table>
-              <TableHeader className="bg-muted/50">
-                <TableRow>
-                  <TableHead>Employee Name</TableHead>
-                  <TableHead>Position</TableHead>
-                  <TableHead className="text-center">Days</TableHead>
-                  <TableHead className="text-center">Reg. Hrs</TableHead>
-                  <TableHead className="text-center">OT Hrs</TableHead>
-                  <TableHead className="text-right">Gross Pay</TableHead>
-                  <TableHead className="text-right">Deductions</TableHead>
-                  <TableHead className="text-right font-bold">Net Pay</TableHead>
-                  <TableHead className="text-center">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {payrollData.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                      No attendance records found for this period.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  payrollData.map((emp) => (
-                    <>
-                      <TableRow key={emp.id}>
-                        <TableCell className="font-medium">
-                          {emp.name}
-                          {emp.cash_advances && emp.cash_advances.length > 0 && (
-                            <Badge variant="outline" className="ml-2 text-xs bg-amber-50 text-amber-700 border-amber-300">
-                              {emp.cash_advances.length} CA
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>{emp.role || "-"}</TableCell>
-                        <TableCell className="text-center">{emp.days_present}</TableCell>
-                        <TableCell className="text-center">{emp.total_reg_hours}</TableCell>
-                        <TableCell className="text-center text-orange-600">{emp.total_ot_hours}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(emp.totalPay)}</TableCell>
-                        <TableCell className="text-right text-red-600">
-                          {emp.deductions.length > 0 ? `-${formatCurrency(emp.deductions.reduce((s, d) => s + d.amount, 0))}` : "-"}
-                        </TableCell>
-                        <TableCell className="text-right font-bold text-emerald-600">{formatCurrency(emp.netPay)}</TableCell>
-                        <TableCell className="text-center">
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            onClick={() => handleAddDeduction(emp)}
-                            className="h-7 text-xs"
-                          >
-                            <Plus className="h-3 w-3 mr-1" />
-                            Add Deduction
-                          </Button>
+            <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <div className="inline-block min-w-full align-middle">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead className="whitespace-nowrap">Employee Name</TableHead>
+                      <TableHead className="whitespace-nowrap">Position</TableHead>
+                      <TableHead className="text-center whitespace-nowrap">Days</TableHead>
+                      <TableHead className="text-center whitespace-nowrap">Reg. Hrs</TableHead>
+                      <TableHead className="text-center whitespace-nowrap">OT Hrs</TableHead>
+                      <TableHead className="text-right whitespace-nowrap">Gross Pay</TableHead>
+                      <TableHead className="text-right whitespace-nowrap">Deductions</TableHead>
+                      <TableHead className="text-right font-bold whitespace-nowrap">Net Pay</TableHead>
+                      <TableHead className="text-center whitespace-nowrap">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {payrollData.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                          No attendance records found for this period.
                         </TableCell>
                       </TableRow>
-                      {emp.deductions.length > 0 && (
-                        <TableRow>
-                          <TableCell colSpan={9} className="bg-muted/30 p-0">
-                            <div className="px-4 py-2">
-                              <div className="text-xs font-medium text-muted-foreground mb-2">Deductions:</div>
-                              <div className="space-y-1">
-                                {emp.deductions.map((deduction) => (
-                                  <div key={deduction.id} className="flex items-center justify-between text-sm bg-background rounded px-3 py-2 border">
-                                    <div className="flex items-center gap-3">
-                                      <Badge variant={deduction.type === "cash_advance" ? "default" : "secondary"} className="text-xs">
-                                        {deduction.type === "cash_advance" ? "Cash Advance" : "Other"}
-                                      </Badge>
-                                      <span className="font-medium text-red-600">{formatCurrency(deduction.amount)}</span>
-                                      <span className="text-muted-foreground">{deduction.date}</span>
-                                      {deduction.notes && <span className="text-sm text-muted-foreground">- {deduction.notes}</span>}
-                                    </div>
-                                    <Button 
-                                      size="sm" 
-                                      variant="ghost" 
-                                      onClick={() => handleRemoveDeduction(emp.id, deduction.id!)}
-                                      className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                                    >
-                                      <MinusCircle className="h-4 w-4" />
-                                    </Button>
+                    ) : (
+                      payrollData.map((emp) => (
+                        <>
+                          <TableRow key={emp.id}>
+                            <TableCell className="font-medium whitespace-nowrap">
+                              {emp.name}
+                              {emp.cash_advances && emp.cash_advances.length > 0 && (
+                                <Badge variant="outline" className="ml-2 text-xs bg-amber-50 text-amber-700 border-amber-300">
+                                  {emp.cash_advances.length} CA
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap">{emp.role || "-"}</TableCell>
+                            <TableCell className="text-center whitespace-nowrap">{emp.days_present}</TableCell>
+                            <TableCell className="text-center whitespace-nowrap">{emp.total_reg_hours}</TableCell>
+                            <TableCell className="text-center text-orange-600 whitespace-nowrap">{emp.total_ot_hours}</TableCell>
+                            <TableCell className="text-right whitespace-nowrap">{formatCurrency(emp.totalPay)}</TableCell>
+                            <TableCell className="text-right text-red-600 whitespace-nowrap">
+                              {emp.deductions.length > 0 ? `-${formatCurrency(emp.deductions.reduce((s, d) => s + d.amount, 0))}` : "-"}
+                            </TableCell>
+                            <TableCell className="text-right font-bold text-emerald-600 whitespace-nowrap">{formatCurrency(emp.netPay)}</TableCell>
+                            <TableCell className="text-center whitespace-nowrap">
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                onClick={() => handleAddDeduction(emp)}
+                                className="h-7 text-xs whitespace-nowrap"
+                              >
+                                <Plus className="h-3 w-3 mr-1" />
+                                Add Deduction
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                          {emp.deductions.length > 0 && (
+                            <TableRow>
+                              <TableCell colSpan={9} className="bg-muted/30 p-0">
+                                <div className="px-4 py-2">
+                                  <div className="text-xs font-medium text-muted-foreground mb-2">Deductions:</div>
+                                  <div className="space-y-1">
+                                    {emp.deductions.map((deduction) => (
+                                      <div key={deduction.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm bg-background rounded px-3 py-2 border">
+                                        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                                          <Badge variant={deduction.type === "cash_advance" ? "default" : "secondary"} className="text-xs">
+                                            {deduction.type === "cash_advance" ? "Cash Advance" : "Other"}
+                                          </Badge>
+                                          <span className="font-medium text-red-600">{formatCurrency(deduction.amount)}</span>
+                                          <span className="text-muted-foreground text-xs sm:text-sm">{deduction.date}</span>
+                                          {deduction.notes && <span className="text-xs sm:text-sm text-muted-foreground">- {deduction.notes}</span>}
+                                        </div>
+                                        <Button 
+                                          size="sm" 
+                                          variant="ghost" 
+                                          onClick={() => handleRemoveDeduction(emp.id, deduction.id!)}
+                                          className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive self-end sm:self-auto"
+                                        >
+                                          <MinusCircle className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    ))}
                                   </div>
-                                ))}
-                              </div>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
 
       <Dialog open={deductionDialogOpen} onOpenChange={setDeductionDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Deduction for {selectedEmployee?.name}</DialogTitle>
             <DialogDescription>
