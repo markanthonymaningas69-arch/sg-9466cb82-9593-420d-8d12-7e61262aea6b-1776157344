@@ -458,11 +458,11 @@ export function CashAdvancesTab() {
       </div>
 
       {/* Action Bar */}
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-4">
-          <Label>View by Personnel:</Label>
+      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 w-full lg:w-auto">
+          <Label className="whitespace-nowrap">View by Personnel:</Label>
           <Select value={selectedPersonnel || "all"} onValueChange={(val) => setSelectedPersonnel(val === "all" ? null : val)}>
-            <SelectTrigger className="w-[300px]">
+            <SelectTrigger className="w-full sm:w-[250px] lg:w-[300px]">
               <SelectValue placeholder="All personnel" />
             </SelectTrigger>
             <SelectContent>
@@ -484,6 +484,7 @@ export function CashAdvancesTab() {
               }
             }}
             disabled={loading}
+            className="w-full sm:w-auto"
           >
             {loading ? "Refreshing..." : "Refresh"}
           </Button>
@@ -491,12 +492,12 @@ export function CashAdvancesTab() {
 
         <Dialog open={newAdvanceOpen} onOpenChange={setNewAdvanceOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="w-full lg:w-auto">
               <Plus className="mr-2 h-4 w-4" />
               New Cash Advance
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Record Cash Advance</DialogTitle>
               <DialogDescription>Record a new cash advance given to a worker or staff member</DialogDescription>
@@ -729,10 +730,10 @@ export function CashAdvancesTab() {
             <div className="space-y-6">
               {personnelAdvances.map((advance) => (
                 <div key={advance.id} className="border rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4">
+                    <div className="flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-semibold text-sm sm:text-base">
                           {formatCurrency(advance.amount)} - {format(new Date(advance.date), "MMM dd, yyyy")}
                         </h3>
                         <Badge className={getStatusColor(advance.status)}>{advance.status}</Badge>
@@ -742,115 +743,12 @@ export function CashAdvancesTab() {
                         <p className="text-sm text-muted-foreground">Project: {advance.project.name}</p>
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="text-right mr-4">
-                        <div className="text-sm text-muted-foreground">Outstanding:</div>
-                        <div className="text-lg font-bold">{formatCurrency(advance.balance)}</div>
+                    <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-2">
+                      <div className="text-right">
+                        <div className="text-xs sm:text-sm text-muted-foreground">Outstanding:</div>
+                        <div className="text-base sm:text-lg font-bold">{formatCurrency(advance.balance)}</div>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                        onClick={() => handleEditAdvance(advance)}
-                        title="Edit"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
-                          <path d="m15 5 4 4"/>
-                        </svg>
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => {
-                          setAdvanceToDelete(advance.id);
-                          setDeleteConfirmOpen(true);
-                        }}
-                        title="Delete"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M3 6h18"/>
-                          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
-                          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
-                        </svg>
-                      </Button>
-                    </div>
-                  </div>
-
-                  {advance.deductions.length > 0 && (
-                    <div className="mt-4">
-                      <h4 className="text-sm font-semibold mb-2">Deduction History:</h4>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Date</TableHead>
-                            <TableHead>Amount</TableHead>
-                            <TableHead>Source</TableHead>
-                            <TableHead>Notes</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {advance.deductions.map((deduction) => (
-                            <TableRow key={deduction.id}>
-                              <TableCell>{format(new Date(deduction.deduction_date), "MMM dd, yyyy")}</TableCell>
-                              <TableCell>{formatCurrency(deduction.amount)}</TableCell>
-                              <TableCell className="capitalize">{deduction.deduction_source}</TableCell>
-                              <TableCell className="text-sm text-muted-foreground">{deduction.notes || "-"}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                </div>
-              ))}
-
-              {personnelAdvances.length === 0 && (
-                <div className="text-center text-muted-foreground py-8">No cash advances found for this personnel</div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>All Cash Advances</CardTitle>
-            <CardDescription>Recent cash advances across all personnel</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Personnel</TableHead>
-                  <TableHead>Project</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Balance</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Purpose</TableHead>
-                  <TableHead className="text-center">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {advances.map((advance) => (
-                  <TableRow key={advance.id}>
-                    <TableCell>{format(new Date(advance.date), "MMM dd, yyyy")}</TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{advance.personnel?.name}</div>
-                        <div className="text-sm text-muted-foreground">{advance.personnel?.role}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>{advance.project?.name || "-"}</TableCell>
-                    <TableCell>{formatCurrency(advance.amount)}</TableCell>
-                    <TableCell className="font-semibold">{formatCurrency(advance.balance)}</TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(advance.status)}>{advance.status}</Badge>
-                    </TableCell>
-                    <TableCell className="text-sm">{advance.purpose || "-"}</TableCell>
-                    <TableCell>
-                      <div className="flex justify-center gap-1">
+                      <div className="flex gap-1">
                         <Button
                           size="sm"
                           variant="ghost"
@@ -880,11 +778,122 @@ export function CashAdvancesTab() {
                           </svg>
                         </Button>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                    </div>
+                  </div>
+
+                  {advance.deductions.length > 0 && (
+                    <div className="mt-4">
+                      <h4 className="text-sm font-semibold mb-2">Deduction History:</h4>
+                      <div className="overflow-x-auto -mx-4 px-4">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Date</TableHead>
+                              <TableHead>Amount</TableHead>
+                              <TableHead>Source</TableHead>
+                              <TableHead>Notes</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {advance.deductions.map((deduction) => (
+                              <TableRow key={deduction.id}>
+                                <TableCell>{format(new Date(deduction.deduction_date), "MMM dd, yyyy")}</TableCell>
+                                <TableCell>{formatCurrency(deduction.amount)}</TableCell>
+                                <TableCell className="capitalize">{deduction.deduction_source}</TableCell>
+                                <TableCell className="text-sm text-muted-foreground">{deduction.notes || "-"}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {personnelAdvances.length === 0 && (
+                <div className="text-center text-muted-foreground py-8">No cash advances found for this personnel</div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>All Cash Advances</CardTitle>
+            <CardDescription>Recent cash advances across all personnel</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <div className="inline-block min-w-full align-middle">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="whitespace-nowrap">Date</TableHead>
+                      <TableHead className="whitespace-nowrap">Personnel</TableHead>
+                      <TableHead className="whitespace-nowrap">Project</TableHead>
+                      <TableHead className="whitespace-nowrap">Amount</TableHead>
+                      <TableHead className="whitespace-nowrap">Balance</TableHead>
+                      <TableHead className="whitespace-nowrap">Status</TableHead>
+                      <TableHead className="whitespace-nowrap">Purpose</TableHead>
+                      <TableHead className="text-center whitespace-nowrap">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {advances.map((advance) => (
+                      <TableRow key={advance.id}>
+                        <TableCell className="whitespace-nowrap">{format(new Date(advance.date), "MMM dd, yyyy")}</TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          <div>
+                            <div className="font-medium">{advance.personnel?.name}</div>
+                            <div className="text-sm text-muted-foreground">{advance.personnel?.role}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">{advance.project?.name || "-"}</TableCell>
+                        <TableCell className="whitespace-nowrap">{formatCurrency(advance.amount)}</TableCell>
+                        <TableCell className="font-semibold whitespace-nowrap">{formatCurrency(advance.balance)}</TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          <Badge className={getStatusColor(advance.status)}>{advance.status}</Badge>
+                        </TableCell>
+                        <TableCell className="text-sm max-w-[200px] truncate">{advance.purpose || "-"}</TableCell>
+                        <TableCell>
+                          <div className="flex justify-center gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              onClick={() => handleEditAdvance(advance)}
+                              title="Edit"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                                <path d="m15 5 4 4"/>
+                              </svg>
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              onClick={() => {
+                                setAdvanceToDelete(advance.id);
+                                setDeleteConfirmOpen(true);
+                              }}
+                              title="Delete"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M3 6h18"/>
+                                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                              </svg>
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
 
             {advances.length === 0 && (
               <div className="text-center text-muted-foreground py-8">No cash advances recorded yet</div>
