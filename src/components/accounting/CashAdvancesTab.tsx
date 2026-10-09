@@ -42,6 +42,7 @@ export function CashAdvancesTab() {
   const { currency } = useSettings();
   const [advances, setAdvances] = useState<CashAdvance[]>([]);
   const [selectedPersonnel, setSelectedPersonnel] = useState<string | null>(null);
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [personnelAdvances, setPersonnelAdvances] = useState<CashAdvanceWithDeductions[]>([]);
   const [personnel, setPersonnel] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
@@ -460,20 +461,42 @@ export function CashAdvancesTab() {
       {/* Action Bar */}
       <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 w-full lg:w-auto">
-          <Label className="whitespace-nowrap">View by Personnel:</Label>
-          <Select value={selectedPersonnel || "all"} onValueChange={(val) => setSelectedPersonnel(val === "all" ? null : val)}>
-            <SelectTrigger className="w-full sm:w-[250px] lg:w-[300px]">
-              <SelectValue placeholder="All personnel" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All personnel</SelectItem>
-              {personnel.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.name} - {p.role}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+            <div className="flex items-center gap-2">
+              <Label className="whitespace-nowrap">Personnel:</Label>
+              <Select value={selectedPersonnel || "all"} onValueChange={(val) => setSelectedPersonnel(val === "all" ? null : val)}>
+                <SelectTrigger className="w-full sm:w-[200px]">
+                  <SelectValue placeholder="All personnel" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All personnel</SelectItem>
+                  {personnel.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name} - {p.role}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Label className="whitespace-nowrap">Project:</Label>
+              <Select value={selectedProject || "all"} onValueChange={(val) => setSelectedProject(val === "all" ? null : val)}>
+                <SelectTrigger className="w-full sm:w-[200px]">
+                  <SelectValue placeholder="All projects" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All projects</SelectItem>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
           <Button 
             variant="outline" 
             size="sm" 
@@ -821,7 +844,11 @@ export function CashAdvancesTab() {
         <Card>
           <CardHeader>
             <CardTitle>All Cash Advances</CardTitle>
-            <CardDescription>Recent cash advances across all personnel</CardDescription>
+            <CardDescription>
+              {selectedProject 
+                ? `Cash advances for ${projects.find(p => p.id === selectedProject)?.name || "selected project"}`
+                : "Recent cash advances across all personnel"}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto -mx-4 sm:mx-0">
@@ -840,7 +867,9 @@ export function CashAdvancesTab() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {advances.map((advance) => (
+                    {advances
+                      .filter((advance) => !selectedProject || advance.project_id === selectedProject)
+                      .map((advance) => (
                       <TableRow key={advance.id}>
                         <TableCell className="whitespace-nowrap">{format(new Date(advance.date), "MMM dd, yyyy")}</TableCell>
                         <TableCell className="whitespace-nowrap">
