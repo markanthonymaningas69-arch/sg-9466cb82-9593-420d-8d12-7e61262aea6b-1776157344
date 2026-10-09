@@ -456,13 +456,15 @@ export function PayrollTab() {
                       payrollData.map((emp) => (
                         <>
                           <TableRow key={emp.id}>
-                            <TableCell className="font-medium whitespace-nowrap">
-                              {emp.name}
-                              {emp.cash_advances && emp.cash_advances.length > 0 && (
-                                <Badge variant="outline" className="ml-2 text-xs bg-amber-50 text-amber-700 border-amber-300">
-                                  {emp.cash_advances.length} CA
-                                </Badge>
-                              )}
+                            <TableCell className="font-medium">
+                              <div className="max-w-[150px] sm:max-w-[200px] lg:max-w-none">
+                                <div className="break-words">{emp.name}</div>
+                                {emp.cash_advances && emp.cash_advances.length > 0 && (
+                                  <Badge variant="outline" className="mt-1 text-xs bg-amber-50 text-amber-700 border-amber-300">
+                                    {emp.cash_advances.length} CA
+                                  </Badge>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell className="whitespace-nowrap">{emp.role || "-"}</TableCell>
                             <TableCell className="text-center whitespace-nowrap">{emp.days_present}</TableCell>
