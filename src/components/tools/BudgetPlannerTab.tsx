@@ -47,8 +47,6 @@ import {
   BarChart3,
 } from "lucide-react";
 
-const COLORS = ["#E1662A", "#0F766E", "#1E40AF", "#7C3AED", "#BE185D", "#D97706", "#059669", "#DC2626"];
-
 export function BudgetPlannerTab() {
   const { toast } = useToast();
   const [plans, setPlans] = useState<BudgetPlanWithDetails[]>([]);
