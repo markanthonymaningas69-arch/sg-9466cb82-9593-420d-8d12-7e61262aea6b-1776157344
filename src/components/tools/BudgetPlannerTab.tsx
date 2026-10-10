@@ -179,11 +179,17 @@ export function BudgetPlannerTab() {
     }));
   }, [planExpenses, selectedPlan]);
 
+  const isLastDayOfMonth = useMemo(() => {
+    const today = new Date();
+    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+    return today.getDate() === lastDay;
+  }, []);
+
   const monthlySavings = useMemo(() => {
-    if (!selectedPlan) return 0;
+    if (!selectedPlan || !isLastDayOfMonth) return null;
     const monthlyBudget = Number(selectedPlan.total_budget) / 12;
     return Math.max(0, monthlyBudget - selectedPlan.monthly_spent);
-  }, [selectedPlan]);
+  }, [selectedPlan, isLastDayOfMonth]);
 
   async function handleCreatePlan() {
     try {
@@ -579,7 +585,9 @@ export function BudgetPlannerTab() {
                       <PiggyBank className="w-3.5 h-3.5 text-teal-600 shrink-0" />
                       <p className="text-[11px] text-muted-foreground leading-tight">Savings</p>
                     </div>
-                    <p className="text-sm font-semibold leading-tight truncate">{formatCurrency(monthlySavings)}</p>
+                    <p className="text-sm font-semibold leading-tight truncate">
+                      {monthlySavings !== null ? formatCurrency(monthlySavings) : "Pending (month end)"}
+                    </p>
                   </CardContent>
                 </Card>
               </div>
