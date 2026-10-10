@@ -479,7 +479,7 @@ export function BudgetPlannerTab() {
       </Dialog>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-1">
+        <Card className="lg:col-span-1 lg:order-2">
           <CardHeader>
             <CardTitle className="text-base">Budget Plans</CardTitle>
           </CardHeader>
@@ -527,7 +527,7 @@ export function BudgetPlannerTab() {
           </CardContent>
         </Card>
 
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 lg:order-1 space-y-6">
           {selectedPlan ? (
             <>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
