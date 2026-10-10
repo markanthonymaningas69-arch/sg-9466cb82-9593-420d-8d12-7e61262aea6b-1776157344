@@ -11,10 +11,10 @@ position: 1
 
 ## Notes
 Create a new Tools module with a Budget Planner tab that enables:
-- Creating budget plans with categories and amounts
+- Creating standalone budget plans (no project linking)
+- Budget creation without start/end dates
 - Logging expenses against budget categories
-- Visual monitoring of budget vs actual expenses
-- Support for multiple budget plans per project
+- Visual monitoring with monthly spending and savings tracking
 - Charts showing budget utilization and expense trends
 
 ## Checklist
@@ -25,9 +25,13 @@ Create a new Tools module with a Budget Planner tab that enables:
 - [x] Implement visual charts (budget vs actual, category breakdown, trends)
 - [x] Create tools.tsx page with navigation
 - [x] Add "Tools" to main navigation menu
+- [x] Remove project linking from budget creation
+- [x] Remove start/end date fields from creation form
+- [x] Add monthly spending display
+- [x] Add monthly savings display
 
 ## Acceptance
-- User can create a new budget plan with multiple categories
+- User can create a new budget plan without project or dates
 - User can log expenses and assign them to budget categories
 - Visual charts display budget utilization and expense patterns
-- Budget plans can be filtered by project
+- Monthly spending and savings are visible on each budget plan
