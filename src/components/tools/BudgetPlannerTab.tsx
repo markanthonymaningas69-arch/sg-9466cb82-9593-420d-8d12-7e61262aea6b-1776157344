@@ -181,11 +181,8 @@ export function BudgetPlannerTab() {
 
   const monthlySavings = useMemo(() => {
     if (!selectedPlan) return 0;
-    const currentMonth = new Date().toISOString().slice(0, 7);
-    const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
-    const currentDay = new Date().getDate();
-    const monthlyAllocation = (Number(selectedPlan.total_budget) / daysInMonth) * currentDay;
-    return Math.max(0, monthlyAllocation - selectedPlan.monthly_spent);
+    const monthlyBudget = Number(selectedPlan.total_budget) / 12;
+    return Math.max(0, monthlyBudget - selectedPlan.monthly_spent);
   }, [selectedPlan]);
 
   async function handleCreatePlan() {
@@ -478,13 +475,13 @@ export function BudgetPlannerTab() {
         </DialogContent>
       </Dialog>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <Card className="lg:col-span-1 lg:order-2">
           <CardHeader>
             <CardTitle className="text-base">Budget Plans</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <ScrollArea className="h-[400px]">
+            <ScrollArea className="h-[500px]">
               {plans.length === 0 ? (
                 <div className="p-6 text-center text-muted-foreground">No budget plans yet.</div>
               ) : (
@@ -527,7 +524,7 @@ export function BudgetPlannerTab() {
           </CardContent>
         </Card>
 
-        <div className="lg:col-span-2 lg:order-1 space-y-6">
+        <div className="lg:col-span-3 lg:order-1 space-y-6">
           {selectedPlan ? (
             <>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
