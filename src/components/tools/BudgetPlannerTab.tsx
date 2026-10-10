@@ -19,22 +19,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  ReferenceLine,
-} from "recharts";
-import {
   createBudgetPlan,
   getBudgetPlans,
   logExpense,
@@ -57,8 +41,6 @@ import {
   Calendar,
   Package,
   ChevronRight,
-  BarChart3,
-  PieChartIcon,
   Wallet,
   PiggyBank,
   Pencil,
@@ -126,58 +108,6 @@ export function BudgetPlannerTab() {
     () => expenses.filter((e) => e.budget_plan_id === selectedPlanId),
     [expenses, selectedPlanId]
   );
-
-  const chartData = useMemo(() => {
-    if (!selectedPlan) return [];
-    return selectedPlan.categories.map((cat) => ({
-      name: cat.category_name,
-      allocated: Number(cat.allocated_amount),
-      spent: Number(cat.total_spent || 0),
-      remaining: Number(cat.remaining || 0),
-    }));
-  }, [selectedPlan]);
-
-  const pieData = useMemo(() => {
-    if (!selectedPlan) return [];
-    return selectedPlan.categories.map((cat) => ({
-      name: cat.category_name,
-      value: Number(cat.total_spent || 0),
-    })).filter((d) => d.value > 0);
-  }, [selectedPlan]);
-
-  const monthlyTrendData = useMemo(() => {
-    if (!selectedPlan || !planExpenses.length) return [];
-    const grouped: Record<string, number> = {};
-    planExpenses.forEach((e) => {
-      const month = e.expense_date.slice(0, 7);
-      grouped[month] = (grouped[month] || 0) + Number(e.amount);
-    });
-    const sorted = Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b));
-    const months = sorted.map(([m]) => m);
-    const amounts = sorted.map(([, a]) => a);
-
-    const firstMonth = months[0];
-    const lastMonth = months[months.length - 1];
-    const allMonths: string[] = [];
-    const [startY, startM] = firstMonth.split("-").map(Number);
-    const [endY, endM] = lastMonth.split("-").map(Number);
-    let cy = startY, cm = startM;
-    while (cy < endY || (cy === endY && cm <= endM)) {
-      allMonths.push(`${cy}-${String(cm).padStart(2, "0")}`);
-      cm++;
-      if (cm > 12) { cm = 1; cy++; }
-    }
-
-    const daysInMonth = (m: string) => new Date(Number(m.split("-")[0]), Number(m.split("-")[1]), 0).getDate();
-    const monthlyBudget = Number(selectedPlan.total_budget) / 12;
-
-    return allMonths.map((m) => ({
-      month: m,
-      spent: grouped[m] || 0,
-      budget: monthlyBudget,
-      savings: (grouped[m] || 0) > 0 ? Math.max(0, monthlyBudget - (grouped[m] || 0)) : 0,
-    }));
-  }, [planExpenses, selectedPlan]);
 
   const isLastDayOfMonth = useMemo(() => {
     const today = new Date();
@@ -544,39 +474,10 @@ export function BudgetPlannerTab() {
                 </Card>
               </div>
 
-              {/* Monthly Spending Trend - Always Visible */}
-              {monthlyTrendData.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4" />
-                      Monthly Spending Trend
-                    </CardTitle>
-                    <CardDescription className="text-xs">
-                      Actual spending vs monthly budget allocation
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={280}>
-                      <BarChart data={monthlyTrendData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-                        <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `₱${(v/1000).toFixed(0)}K`} />
-                        <Tooltip formatter={(value: number, name: string) => [formatCurrency(value), name === "spent" ? "Spent" : "Budget"]} />
-                        <Legend wrapperStyle={{ fontSize: 11 }} />
-                        <ReferenceLine y={monthlyTrendData[0]?.budget || 0} stroke="#0F766E" strokeDasharray="5 5" label={{ value: "Monthly Budget", position: "right", fontSize: 10, fill: "#0F766E" }} />
-                        <Bar dataKey="spent" fill="#E1662A" name="Spent" radius={[2, 2, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-              )}
-
               <Tabs defaultValue="overview">
                 <TabsList>
                   <TabsTrigger value="overview">Overview</TabsTrigger>
                   <TabsTrigger value="expenses">Expenses</TabsTrigger>
-                  <TabsTrigger value="charts">Charts</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="overview" className="space-y-4 mt-4">
@@ -758,106 +659,6 @@ export function BudgetPlannerTab() {
                       </Table>
                     </CardContent>
                   </Card>
-                </TabsContent>
-
-                <TabsContent value="charts" className="space-y-4 mt-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium flex items-center gap-2">
-                          <BarChart3 className="w-4 h-4" />
-                          Budget vs Actual
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ResponsiveContainer width="100%" height={250}>
-                          <BarChart data={chartData}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                            <YAxis tick={{ fontSize: 10 }} />
-                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                            <Legend wrapperStyle={{ fontSize: 11 }} />
-                            <Bar dataKey="allocated" fill="#0F766E" name="Allocated" radius={[2, 2, 0, 0]} />
-                            <Bar dataKey="spent" fill="#E1662A" name="Spent" radius={[2, 2, 0, 0]} />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium flex items-center gap-2">
-                          <PieChartIcon className="w-4 h-4" />
-                          Spending by Category
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {pieData.length === 0 ? (
-                          <div className="h-[250px] flex items-center justify-center text-muted-foreground text-sm">
-                            No spending data yet
-                          </div>
-                        ) : (
-                          <ResponsiveContainer width="100%" height={250}>
-                            <PieChart>
-                              <Pie
-                                data={pieData}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={50}
-                                outerRadius={80}
-                                paddingAngle={4}
-                                dataKey="value"
-                              >
-                                {pieData.map((_, index) => (
-                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                ))}
-                              </Pie>
-                              <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                              <Legend wrapperStyle={{ fontSize: 11 }} />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {monthlyTrendData.length > 0 && (
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium flex items-center gap-2">
-                          <TrendingUp className="w-4 h-4" />
-                          Monthly Spending Trend
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ResponsiveContainer width="100%" height={250}>
-                          <LineChart data={monthlyTrendData}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-                            <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `₱${(v/1000).toFixed(0)}K`} />
-                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                            <Line
-                              type="monotone"
-                              dataKey="spent"
-                              stroke="#E1662A"
-                              strokeWidth={2}
-                              dot={{ r: 4, fill: "#E1662A" }}
-                              name="Expenses"
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="budget"
-                              stroke="#0F766E"
-                              strokeWidth={2}
-                              strokeDasharray="5 5"
-                              dot={false}
-                              name="Monthly Budget"
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </CardContent>
-                    </Card>
-                  )}
                 </TabsContent>
               </Tabs>
 
