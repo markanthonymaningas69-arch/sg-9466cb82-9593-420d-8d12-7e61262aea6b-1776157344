@@ -32,6 +32,7 @@ import {
   ResponsiveContainer,
   LineChart,
   Line,
+  ReferenceLine,
 } from "recharts";
 import {
   createBudgetPlan,
@@ -144,17 +145,39 @@ export function BudgetPlannerTab() {
     })).filter((d) => d.value > 0);
   }, [selectedPlan]);
 
-  const trendData = useMemo(() => {
-    if (!planExpenses.length) return [];
+  const monthlyTrendData = useMemo(() => {
+    if (!selectedPlan || !planExpenses.length) return [];
     const grouped: Record<string, number> = {};
     planExpenses.forEach((e) => {
       const month = e.expense_date.slice(0, 7);
       grouped[month] = (grouped[month] || 0) + Number(e.amount);
     });
-    return Object.entries(grouped)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([month, amount]) => ({ month, amount }));
-  }, [planExpenses]);
+    const sorted = Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b));
+    const months = sorted.map(([m]) => m);
+    const amounts = sorted.map(([, a]) => a);
+
+    const firstMonth = months[0];
+    const lastMonth = months[months.length - 1];
+    const allMonths: string[] = [];
+    const [startY, startM] = firstMonth.split("-").map(Number);
+    const [endY, endM] = lastMonth.split("-").map(Number);
+    let cy = startY, cm = startM;
+    while (cy < endY || (cy === endY && cm <= endM)) {
+      allMonths.push(`${cy}-${String(cm).padStart(2, "0")}`);
+      cm++;
+      if (cm > 12) { cm = 1; cy++; }
+    }
+
+    const daysInMonth = (m: string) => new Date(Number(m.split("-")[0]), Number(m.split("-")[1]), 0).getDate();
+    const monthlyBudget = Number(selectedPlan.total_budget) / 12;
+
+    return allMonths.map((m) => ({
+      month: m,
+      spent: grouped[m] || 0,
+      budget: monthlyBudget,
+      savings: (grouped[m] || 0) > 0 ? Math.max(0, monthlyBudget - (grouped[m] || 0)) : 0,
+    }));
+  }, [planExpenses, selectedPlan]);
 
   const monthlySavings = useMemo(() => {
     if (!selectedPlan) return 0;
@@ -564,6 +587,34 @@ export function BudgetPlannerTab() {
                 </Card>
               </div>
 
+              {/* Monthly Spending Trend - Always Visible */}
+              {monthlyTrendData.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4" />
+                      Monthly Spending Trend
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Actual spending vs monthly budget allocation
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={280}>
+                      <BarChart data={monthlyTrendData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                        <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `₱${(v/1000).toFixed(0)}K`} />
+                        <Tooltip formatter={(value: number, name: string) => [formatCurrency(value), name === "spent" ? "Spent" : "Budget"]} />
+                        <Legend wrapperStyle={{ fontSize: 11 }} />
+                        <ReferenceLine y={monthlyTrendData[0]?.budget || 0} stroke="#0F766E" strokeDasharray="5 5" label={{ value: "Monthly Budget", position: "right", fontSize: 10, fill: "#0F766E" }} />
+                        <Bar dataKey="spent" fill="#E1662A" name="Spent" radius={[2, 2, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              )}
+
               <Tabs defaultValue="overview">
                 <TabsList>
                   <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -813,7 +864,7 @@ export function BudgetPlannerTab() {
                     </Card>
                   </div>
 
-                  {trendData.length > 0 && (
+                  {monthlyTrendData.length > 0 && (
                     <Card>
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -823,18 +874,27 @@ export function BudgetPlannerTab() {
                       </CardHeader>
                       <CardContent>
                         <ResponsiveContainer width="100%" height={250}>
-                          <LineChart data={trendData}>
+                          <LineChart data={monthlyTrendData}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-                            <YAxis tick={{ fontSize: 10 }} />
+                            <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `₱${(v/1000).toFixed(0)}K`} />
                             <Tooltip formatter={(value: number) => formatCurrency(value)} />
                             <Line
                               type="monotone"
-                              dataKey="amount"
+                              dataKey="spent"
                               stroke="#E1662A"
                               strokeWidth={2}
                               dot={{ r: 4, fill: "#E1662A" }}
                               name="Expenses"
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="budget"
+                              stroke="#0F766E"
+                              strokeWidth={2}
+                              strokeDasharray="5 5"
+                              dot={false}
+                              name="Monthly Budget"
                             />
                           </LineChart>
                         </ResponsiveContainer>
