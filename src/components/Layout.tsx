@@ -22,7 +22,8 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
-  UserPlus } from
+  UserPlus,
+  Wrench } from
 "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -60,7 +61,8 @@ const navigation = [
 { name: "Human Resources", href: "/personnel", icon: Users },
 { name: "Team Access", href: "/team-access", icon: UserPlus },
 { name: "Warehouse", href: "/warehouse", icon: Warehouse },
-{ name: "Analytics", href: "/analytics", icon: BarChart3 }];
+{ name: "Analytics", href: "/analytics", icon: BarChart3 },
+{ name: "Tools", href: "/tools", icon: Wrench }];
 
 export function Layout({ children }: LayoutProps) {
   const router = useRouter();
