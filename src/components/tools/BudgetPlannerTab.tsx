@@ -411,6 +411,50 @@ export function BudgetPlannerTab() {
       </Dialog>
 
       <div className="grid grid-cols-3 gap-6">
+        <Card className="col-span-3">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Budget Plans</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {plans.length === 0 ? (
+              <div className="p-6 text-center text-muted-foreground">No budget plans yet.</div>
+            ) : (
+              <div className="flex gap-3 overflow-x-auto pb-2">
+                {plans.map((plan) => (
+                  <button
+                    key={plan.id}
+                    onClick={() => setSelectedPlanId(plan.id)}
+                    className={`shrink-0 w-[220px] text-left p-3 rounded-lg border hover:bg-muted/50 transition-colors ${selectedPlanId === plan.id ? "bg-muted border-primary" : "border-border"}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium text-sm truncate">{plan.name}</p>
+                      <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      {plan.categories.length} categories
+                    </p>
+                    <div className="mt-2">
+                      <div className="flex justify-between text-[10px] mb-1">
+                        <span className="truncate">{formatCurrency(plan.total_spent)}</span>
+                        <span className="truncate">{formatCurrency(Number(plan.total_budget))}</span>
+                      </div>
+                      <Progress value={Math.min(plan.utilization_percent, 100)} className="h-1.5" />
+                    </div>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <Badge variant={plan.status === "active" ? "default" : "secondary"} className="text-[10px]">
+                        {plan.status}
+                      </Badge>
+                      <span className={`text-[10px] ${plan.utilization_percent > 90 ? "text-destructive" : "text-muted-foreground"}`}>
+                        {plan.utilization_percent.toFixed(1)}%
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <div className="col-span-3 row-span-5 space-y-6">
           {selectedPlan ? (
             <>
@@ -485,6 +529,7 @@ export function BudgetPlannerTab() {
                       <CardTitle className="text-base">Categories</CardTitle>
                     </CardHeader>
                     <CardContent>
+                      <ScrollArea className="h-[320px]">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -515,6 +560,7 @@ export function BudgetPlannerTab() {
                           })}
                         </TableBody>
                       </Table>
+                      </ScrollArea>
                     </CardContent>
                   </Card>
                 </TabsContent>
@@ -612,6 +658,7 @@ export function BudgetPlannerTab() {
                   </div>
                   <Card>
                     <CardContent className="p-0">
+                      <ScrollArea className="h-[320px]">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -656,6 +703,7 @@ export function BudgetPlannerTab() {
                           )}
                         </TableBody>
                       </Table>
+                      </ScrollArea>
                     </CardContent>
                   </Card>
                 </TabsContent>
@@ -696,50 +744,6 @@ export function BudgetPlannerTab() {
             </Card>
           )}
         </div>
-
-        <Card className="col-span-3">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Budget Plans</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {plans.length === 0 ? (
-              <div className="p-6 text-center text-muted-foreground">No budget plans yet.</div>
-            ) : (
-              <div className="flex gap-3 overflow-x-auto pb-2">
-                {plans.map((plan) => (
-                  <button
-                    key={plan.id}
-                    onClick={() => setSelectedPlanId(plan.id)}
-                    className={`shrink-0 w-[220px] text-left p-3 rounded-lg border hover:bg-muted/50 transition-colors ${selectedPlanId === plan.id ? "bg-muted border-primary" : "border-border"}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium text-sm truncate">{plan.name}</p>
-                      <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                    </div>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
-                      {plan.categories.length} categories
-                    </p>
-                    <div className="mt-2">
-                      <div className="flex justify-between text-[10px] mb-1">
-                        <span className="truncate">{formatCurrency(plan.total_spent)}</span>
-                        <span className="truncate">{formatCurrency(Number(plan.total_budget))}</span>
-                      </div>
-                      <Progress value={Math.min(plan.utilization_percent, 100)} className="h-1.5" />
-                    </div>
-                    <div className="mt-1.5 flex items-center gap-2">
-                      <Badge variant={plan.status === "active" ? "default" : "secondary"} className="text-[10px]">
-                        {plan.status}
-                      </Badge>
-                      <span className={`text-[10px] ${plan.utilization_percent > 90 ? "text-destructive" : "text-muted-foreground"}`}>
-                        {plan.utilization_percent.toFixed(1)}%
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </div>
     </div>
   );
