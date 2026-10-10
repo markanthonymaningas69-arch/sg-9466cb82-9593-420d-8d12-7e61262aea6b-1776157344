@@ -283,7 +283,7 @@ export function BudgetPlannerTab() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Budget Planner</h2>
@@ -455,12 +455,12 @@ export function BudgetPlannerTab() {
           </CardContent>
         </Card>
 
-        <div className="col-span-3 row-span-5 space-y-6">
+        <div className="col-span-3 row-span-5 space-y-4">
           {selectedPlan ? (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                 <Card>
-                  <CardContent className="p-3">
+                  <CardContent className="p-2.5">
                     <div className="flex items-center gap-2 mb-1">
                       <Wallet className="w-3.5 h-3.5 text-primary shrink-0" />
                       <p className="text-[11px] text-muted-foreground leading-tight">Total Budget</p>
@@ -469,7 +469,7 @@ export function BudgetPlannerTab() {
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardContent className="p-3">
+                  <CardContent className="p-2.5">
                     <div className="flex items-center gap-2 mb-1">
                       <TrendingDown className="w-3.5 h-3.5 text-destructive shrink-0" />
                       <p className="text-[11px] text-muted-foreground leading-tight">Spent</p>
@@ -478,7 +478,7 @@ export function BudgetPlannerTab() {
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardContent className="p-3">
+                  <CardContent className="p-2.5">
                     <div className="flex items-center gap-2 mb-1">
                       <TrendingUp className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                       <p className="text-[11px] text-muted-foreground leading-tight">Remaining</p>
@@ -487,7 +487,7 @@ export function BudgetPlannerTab() {
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardContent className="p-3">
+                  <CardContent className="p-2.5">
                     <div className="flex items-center gap-2 mb-1">
                       <BarChart3 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                       <p className="text-[11px] text-muted-foreground leading-tight">Utilization</p>
@@ -496,7 +496,7 @@ export function BudgetPlannerTab() {
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardContent className="p-3">
+                  <CardContent className="p-2.5">
                     <div className="flex items-center gap-2 mb-1">
                       <Calendar className="w-3.5 h-3.5 text-orange-500 shrink-0" />
                       <p className="text-[11px] text-muted-foreground leading-tight">This Month</p>
@@ -505,7 +505,7 @@ export function BudgetPlannerTab() {
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardContent className="p-3">
+                  <CardContent className="p-2.5">
                     <div className="flex items-center gap-2 mb-1">
                       <PiggyBank className="w-3.5 h-3.5 text-teal-600 shrink-0" />
                       <p className="text-[11px] text-muted-foreground leading-tight">Savings</p>
@@ -523,13 +523,12 @@ export function BudgetPlannerTab() {
                   <TabsTrigger value="expenses">Expenses</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="overview" className="space-y-4 mt-4">
+                <TabsContent value="overview" className="space-y-3 mt-3">
                   <Card>
-                    <CardHeader className="pb-3">
+                    <CardHeader className="pb-2">
                       <CardTitle className="text-base">Categories</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <ScrollArea className="h-[320px]">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -547,11 +546,11 @@ export function BudgetPlannerTab() {
                               : 0;
                             return (
                               <TableRow key={cat.id}>
-                                <TableCell className="font-medium">{cat.category_name}</TableCell>
-                                <TableCell className="text-right">{formatCurrency(Number(cat.allocated_amount))}</TableCell>
-                                <TableCell className="text-right">{formatCurrency(cat.total_spent || 0)}</TableCell>
-                                <TableCell className="text-right">{formatCurrency(cat.remaining || 0)}</TableCell>
-                                <TableCell>
+                                <TableCell className="font-medium py-2">{cat.category_name}</TableCell>
+                                <TableCell className="text-right py-2">{formatCurrency(Number(cat.allocated_amount))}</TableCell>
+                                <TableCell className="text-right py-2">{formatCurrency(cat.total_spent || 0)}</TableCell>
+                                <TableCell className="text-right py-2">{formatCurrency(cat.remaining || 0)}</TableCell>
+                                <TableCell className="py-2">
                                   <Progress value={Math.min(pct, 100)} className="h-1.5" />
                                   <span className="text-[10px] text-muted-foreground">{pct.toFixed(0)}%</span>
                                 </TableCell>
@@ -560,12 +559,11 @@ export function BudgetPlannerTab() {
                           })}
                         </TableBody>
                       </Table>
-                      </ScrollArea>
                     </CardContent>
                   </Card>
                 </TabsContent>
 
-                <TabsContent value="expenses" className="space-y-4 mt-4">
+                <TabsContent value="expenses" className="space-y-3 mt-3">
                   <div className="flex justify-between items-center">
                     <h3 className="text-sm font-medium">Recent Expenses</h3>
                     <Dialog open={expenseOpen} onOpenChange={setExpenseOpen}>
@@ -658,7 +656,6 @@ export function BudgetPlannerTab() {
                   </div>
                   <Card>
                     <CardContent className="p-0">
-                      <ScrollArea className="h-[320px]">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -672,24 +669,24 @@ export function BudgetPlannerTab() {
                         <TableBody>
                           {planExpenses.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                              <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
                                 No expenses logged yet.
                               </TableCell>
                             </TableRow>
                           ) : (
                             planExpenses.map((exp) => (
                               <TableRow key={exp.id}>
-                                <TableCell className="text-xs">{exp.expense_date}</TableCell>
-                                <TableCell className="max-w-[200px] truncate">{exp.description}</TableCell>
-                                <TableCell>
+                                <TableCell className="text-xs py-2">{exp.expense_date}</TableCell>
+                                <TableCell className="max-w-[200px] truncate py-2">{exp.description}</TableCell>
+                                <TableCell className="py-2">
                                   <Badge variant="outline" className="text-[10px]">
                                     {exp.category_name || "Unknown"}
                                   </Badge>
                                 </TableCell>
-                                <TableCell className="text-right font-medium">
+                                <TableCell className="text-right font-medium py-2">
                                   {formatCurrency(Number(exp.amount))}
                                 </TableCell>
-                                <TableCell>
+                                <TableCell className="py-2">
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -703,7 +700,6 @@ export function BudgetPlannerTab() {
                           )}
                         </TableBody>
                       </Table>
-                      </ScrollArea>
                     </CardContent>
                   </Card>
                 </TabsContent>
