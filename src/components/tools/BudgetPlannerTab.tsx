@@ -38,7 +38,7 @@ import {
   type BudgetPlanWithDetails,
   type BudgetExpense,
 } from "@/services/budgetService";
-import { getProjects } from "@/services/projectService";
+import { projectService } from "@/services/projectService";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -95,12 +95,13 @@ export function BudgetPlannerTab() {
   async function loadData() {
     setIsLoading(true);
     try {
-      const [plansData, projectsData] = await Promise.all([
+      const [plansData] = await Promise.all([
         getBudgetPlans(projectFilter === "all" ? undefined : projectFilter),
-        getProjects(),
+        projectService.getAll(),
       ]);
+      const { data } = await projectService.getAll();
+      if (data) setProjects(data);
       setPlans(plansData);
-      setProjects(projectsData);
       if (plansData.length > 0 && !selectedPlanId) {
         setSelectedPlanId(plansData[0].id);
       }
