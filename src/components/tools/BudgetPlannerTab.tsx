@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -38,7 +37,6 @@ import {
   type BudgetPlanWithDetails,
   type BudgetExpense,
 } from "@/services/budgetService";
-import { projectService } from "@/services/projectService";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -53,6 +51,7 @@ import {
   BarChart3,
   PieChartIcon,
   Wallet,
+  PiggyBank,
 } from "lucide-react";
 
 const COLORS = ["#E1662A", "#0F766E", "#1E40AF", "#7C3AED", "#BE185D", "#D97706", "#059669", "#DC2626"];
@@ -61,20 +60,14 @@ export function BudgetPlannerTab() {
   const { toast } = useToast();
   const [plans, setPlans] = useState<BudgetPlanWithDetails[]>([]);
   const [expenses, setExpenses] = useState<BudgetExpense[]>([]);
-  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [expenseOpen, setExpenseOpen] = useState(false);
-  const [projectFilter, setProjectFilter] = useState<string>("all");
 
   const [newPlan, setNewPlan] = useState({
     name: "",
     description: "",
-    totalBudget: "",
-    startDate: new Date().toISOString().split("T")[0],
-    endDate: "",
-    projectId: "",
     categories: [{ category_name: "", allocated_amount: "" }],
   });
 
@@ -90,17 +83,12 @@ export function BudgetPlannerTab() {
 
   useEffect(() => {
     loadData();
-  }, [projectFilter]);
+  }, []);
 
   async function loadData() {
     setIsLoading(true);
     try {
-      const [plansData] = await Promise.all([
-        getBudgetPlans(projectFilter === "all" ? undefined : projectFilter),
-        projectService.getAll(),
-      ]);
-      const { data } = await projectService.getAll();
-      if (data) setProjects(data);
+      const plansData = await getBudgetPlans();
       setPlans(plansData);
       if (plansData.length > 0 && !selectedPlanId) {
         setSelectedPlanId(plansData[0].id);
@@ -151,6 +139,15 @@ export function BudgetPlannerTab() {
       .map(([month, amount]) => ({ month, amount }));
   }, [planExpenses]);
 
+  const monthlySavings = useMemo(() => {
+    if (!selectedPlan) return 0;
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+    const currentDay = new Date().getDate();
+    const monthlyAllocation = (Number(selectedPlan.total_budget) / daysInMonth) * currentDay;
+    return Math.max(0, monthlyAllocation - selectedPlan.monthly_spent);
+  }, [selectedPlan]);
+
   async function handleCreatePlan() {
     try {
       const cats = newPlan.categories
@@ -159,14 +156,10 @@ export function BudgetPlannerTab() {
           category_name: c.category_name,
           allocated_amount: Number(c.allocated_amount),
         }));
-      const total = cats.reduce((s, c) => s + c.allocated_amount, 0);
       await createBudgetPlan(
         newPlan.name,
-        total || Number(newPlan.totalBudget) || 0,
-        newPlan.startDate,
-        newPlan.endDate || null,
+        cats.reduce((s, c) => s + c.allocated_amount, 0),
         newPlan.description || null,
-        newPlan.projectId || null,
         cats
       );
       toast({ title: "Budget plan created" });
@@ -174,10 +167,6 @@ export function BudgetPlannerTab() {
       setNewPlan({
         name: "",
         description: "",
-        totalBudget: "",
-        startDate: new Date().toISOString().split("T")[0],
-        endDate: "",
-        projectId: "",
         categories: [{ category_name: "", allocated_amount: "" }],
       });
       loadData();
@@ -266,105 +255,62 @@ export function BudgetPlannerTab() {
           <h2 className="text-2xl font-semibold tracking-tight">Budget Planner</h2>
           <p className="text-muted-foreground">Create budgets, log expenses, and monitor spending.</p>
         </div>
-        <div className="flex gap-2">
-          <Select value={projectFilter} onValueChange={setProjectFilter}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Filter by project" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Projects</SelectItem>
-              {projects.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                New Budget Plan
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Create Budget Plan</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 pt-2">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Name</Label>
-                    <Input value={newPlan.name} onChange={(e) => setNewPlan((p) => ({ ...p, name: e.target.value }))} placeholder="Q4 Construction Budget" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Project</Label>
-                    <Select value={newPlan.projectId} onValueChange={(v) => setNewPlan((p) => ({ ...p, projectId: v }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select project" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No Project</SelectItem>
-                        {projects.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Description</Label>
-                  <Textarea value={newPlan.description} onChange={(e) => setNewPlan((p) => ({ ...p, description: e.target.value }))} placeholder="Brief description..." rows={2} />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Start Date</Label>
-                    <Input type="date" value={newPlan.startDate} onChange={(e) => setNewPlan((p) => ({ ...p, startDate: e.target.value }))} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>End Date</Label>
-                    <Input type="date" value={newPlan.endDate} onChange={(e) => setNewPlan((p) => ({ ...p, endDate: e.target.value }))} />
-                  </div>
-                </div>
-                <Separator />
-                <div className="space-y-2">
-                  <Label>Budget Categories</Label>
-                  {newPlan.categories.map((cat, i) => (
-                    <div key={i} className="flex gap-2 items-end">
-                      <div className="flex-1">
-                        <Input
-                          value={cat.category_name}
-                          onChange={(e) => updateCategory(i, "category_name", e.target.value)}
-                          placeholder="Category name"
-                          className="mb-1"
-                        />
-                      </div>
-                      <div className="w-32">
-                        <Input
-                          type="number"
-                          value={cat.allocated_amount}
-                          onChange={(e) => updateCategory(i, "allocated_amount", e.target.value)}
-                          placeholder="Amount"
-                        />
-                      </div>
-                      {newPlan.categories.length > 1 && (
-                        <Button variant="ghost" size="sm" onClick={() => removeCategory(i)}>
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                  <Button variant="outline" size="sm" onClick={addCategoryField} className="mt-2">
-                    <Plus className="w-4 h-4 mr-1" /> Add Category
-                  </Button>
-                </div>
-                <Button onClick={handleCreatePlan} className="w-full">Create Plan</Button>
+        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="w-4 h-4 mr-2" />
+              New Budget Plan
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Create Budget Plan</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div className="space-y-2">
+                <Label>Budget Name</Label>
+                <Input value={newPlan.name} onChange={(e) => setNewPlan((p) => ({ ...p, name: e.target.value }))} placeholder="e.g. Office Renovation Budget" />
               </div>
-            </DialogContent>
-          </Dialog>
-        </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea value={newPlan.description} onChange={(e) => setNewPlan((p) => ({ ...p, description: e.target.value }))} placeholder="Brief description..." rows={2} />
+              </div>
+              <Separator />
+              <div className="space-y-2">
+                <Label>Budget Categories</Label>
+                {newPlan.categories.map((cat, i) => (
+                  <div key={i} className="flex gap-2 items-end">
+                    <div className="flex-1">
+                      <Input
+                        value={cat.category_name}
+                        onChange={(e) => updateCategory(i, "category_name", e.target.value)}
+                        placeholder="Category name"
+                        className="mb-1"
+                      />
+                    </div>
+                    <div className="w-32">
+                      <Input
+                        type="number"
+                        value={cat.allocated_amount}
+                        onChange={(e) => updateCategory(i, "allocated_amount", e.target.value)}
+                        placeholder="Amount"
+                      />
+                    </div>
+                    {newPlan.categories.length > 1 && (
+                      <Button variant="ghost" size="sm" onClick={() => removeCategory(i)}>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                <Button variant="outline" size="sm" onClick={addCategoryField} className="mt-2">
+                  <Plus className="w-4 h-4 mr-1" /> Add Category
+                </Button>
+              </div>
+              <Button onClick={handleCreatePlan} className="w-full">Create Plan</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -388,7 +334,7 @@ export function BudgetPlannerTab() {
                         <div>
                           <p className="font-medium text-sm">{plan.name}</p>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            {plan.start_date} {plan.end_date ? `→ ${plan.end_date}` : ""}
+                            {plan.categories.length} categories
                           </p>
                         </div>
                         <ChevronRight className="w-4 h-4 text-muted-foreground" />
@@ -419,7 +365,7 @@ export function BudgetPlannerTab() {
         <div className="lg:col-span-2 space-y-6">
           {selectedPlan ? (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 <Card>
                   <CardContent className="pt-4">
                     <div className="flex items-center gap-2">
@@ -454,6 +400,24 @@ export function BudgetPlannerTab() {
                       <p className="text-xs text-muted-foreground">Utilization</p>
                     </div>
                     <p className="text-xl font-semibold mt-1">{selectedPlan.utilization_percent.toFixed(1)}%</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-orange-500" />
+                      <p className="text-xs text-muted-foreground">This Month</p>
+                    </div>
+                    <p className="text-xl font-semibold mt-1">{formatCurrency(selectedPlan.monthly_spent)}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-2">
+                      <PiggyBank className="w-4 h-4 text-teal-600" />
+                      <p className="text-xs text-muted-foreground">Savings</p>
+                    </div>
+                    <p className="text-xl font-semibold mt-1">{formatCurrency(monthlySavings)}</p>
                   </CardContent>
                 </Card>
               </div>

@@ -45,26 +45,25 @@ export interface BudgetPlanWithDetails extends BudgetPlan {
   total_spent: number;
   total_remaining: number;
   utilization_percent: number;
+  monthly_spent: number;
 }
 
 export async function createBudgetPlan(
   name: string,
   totalBudget: number,
-  startDate: string,
-  endDate: string | null,
   description: string | null,
-  projectId: string | null,
   categories: { category_name: string; allocated_amount: number }[]
 ): Promise<BudgetPlanWithDetails> {
+  const today = new Date().toISOString().split("T")[0];
   const { data: plan, error: planError } = await supabase
     .from("budget_plans")
     .insert({
       name,
       total_budget: totalBudget,
-      start_date: startDate,
-      end_date: endDate,
+      start_date: today,
+      end_date: null,
       description,
-      project_id: projectId,
+      project_id: null,
     })
     .select()
     .single();
@@ -84,11 +83,12 @@ export async function createBudgetPlan(
   return getBudgetPlanById(plan.id);
 }
 
-export async function getBudgetPlans(projectId?: string): Promise<BudgetPlanWithDetails[]> {
-  let query = supabase.from("budget_plans").select("*").order("created_at", { ascending: false });
-  if (projectId) query = query.eq("project_id", projectId);
+export async function getBudgetPlans(): Promise<BudgetPlanWithDetails[]> {
+  const { data: plans, error } = await supabase
+    .from("budget_plans")
+    .select("*")
+    .order("created_at", { ascending: false });
 
-  const { data: plans, error } = await query;
   if (error) throw error;
   if (!plans) return [];
 
@@ -120,6 +120,8 @@ export async function getBudgetPlanById(id: string): Promise<BudgetPlanWithDetai
 
   if (expError) throw expError;
 
+  const currentMonth = new Date().toISOString().slice(0, 7);
+
   const categoriesWithSpent = (categories || []).map((cat) => {
     const catExpenses = (expenses || []).filter((e) => e.budget_category_id === cat.id);
     const total_spent = catExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
@@ -135,12 +137,17 @@ export async function getBudgetPlanById(id: string): Promise<BudgetPlanWithDetai
   const utilization_percent =
     Number(plan.total_budget) > 0 ? (total_spent / Number(plan.total_budget)) * 100 : 0;
 
+  const monthly_spent = (expenses || [])
+    .filter((e) => e.expense_date.startsWith(currentMonth))
+    .reduce((sum, e) => sum + Number(e.amount), 0);
+
   return {
     ...plan,
     categories: categoriesWithSpent,
     total_spent,
     total_remaining,
     utilization_percent: Math.round(utilization_percent * 100) / 100,
+    monthly_spent,
   };
 }
 
