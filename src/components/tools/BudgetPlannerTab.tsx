@@ -529,6 +529,7 @@ export function BudgetPlannerTab() {
                       <CardTitle className="text-base">Categories</CardTitle>
                     </CardHeader>
                     <CardContent>
+                      <ScrollArea className="h-[280px]">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -559,6 +560,7 @@ export function BudgetPlannerTab() {
                           })}
                         </TableBody>
                       </Table>
+                      </ScrollArea>
                     </CardContent>
                   </Card>
                 </TabsContent>
@@ -656,6 +658,7 @@ export function BudgetPlannerTab() {
                   </div>
                   <Card>
                     <CardContent className="p-0">
+                      <ScrollArea className="h-[280px]">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -700,6 +703,7 @@ export function BudgetPlannerTab() {
                           )}
                         </TableBody>
                       </Table>
+                      </ScrollArea>
                     </CardContent>
                   </Card>
                 </TabsContent>
