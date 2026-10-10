@@ -40,6 +40,7 @@ import {
   getBudgetExpenses,
   deleteBudgetExpense,
   deleteBudgetPlan,
+  updateBudgetPlan,
   updateBudgetPlanStatus,
   type BudgetPlanWithDetails,
   type BudgetExpense,
@@ -59,6 +60,7 @@ import {
   PieChartIcon,
   Wallet,
   PiggyBank,
+  Pencil,
 } from "lucide-react";
 
 const COLORS = ["#E1662A", "#0F766E", "#1E40AF", "#7C3AED", "#BE185D", "#D97706", "#059669", "#DC2626"];
@@ -71,12 +73,20 @@ export function BudgetPlannerTab() {
   const [isLoading, setIsLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [expenseOpen, setExpenseOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const [newPlan, setNewPlan] = useState({
     name: "",
     description: "",
     categories: [{ category_name: "", allocated_amount: "" }],
   });
+
+  const [editingPlan, setEditingPlan] = useState<{
+    id: string;
+    name: string;
+    description: string;
+    categories: { category_name: string; allocated_amount: string }[];
+  } | null>(null);
 
   const [newExpense, setNewExpense] = useState({
     budgetCategoryId: "",
@@ -180,6 +190,68 @@ export function BudgetPlannerTab() {
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
+  }
+
+  async function handleUpdatePlan() {
+    if (!editingPlan) return;
+    try {
+      const cats = editingPlan.categories
+        .filter((c) => c.category_name && c.allocated_amount)
+        .map((c) => ({
+          category_name: c.category_name,
+          allocated_amount: Number(c.allocated_amount),
+        }));
+      const totalBudget = cats.reduce((s, c) => s + c.allocated_amount, 0);
+      await updateBudgetPlan(
+        editingPlan.id,
+        editingPlan.name,
+        totalBudget,
+        editingPlan.description || null,
+        cats
+      );
+      toast({ title: "Budget plan updated" });
+      setEditOpen(false);
+      setEditingPlan(null);
+      loadData();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  }
+
+  function openEdit(plan: BudgetPlanWithDetails) {
+    setEditingPlan({
+      id: plan.id,
+      name: plan.name,
+      description: plan.description || "",
+      categories: plan.categories.map((c) => ({
+        category_name: c.category_name,
+        allocated_amount: String(c.allocated_amount),
+      })),
+    });
+    setEditOpen(true);
+  }
+
+  function addEditCategoryField() {
+    if (!editingPlan) return;
+    setEditingPlan({
+      ...editingPlan,
+      categories: [...editingPlan.categories, { category_name: "", allocated_amount: "" }],
+    });
+  }
+
+  function updateEditCategory(index: number, field: string, value: string) {
+    if (!editingPlan) return;
+    const cats = [...editingPlan.categories];
+    cats[index] = { ...cats[index], [field]: value };
+    setEditingPlan({ ...editingPlan, categories: cats });
+  }
+
+  function removeEditCategory(index: number) {
+    if (!editingPlan) return;
+    setEditingPlan({
+      ...editingPlan,
+      categories: editingPlan.categories.filter((_, i) => i !== index),
+    });
   }
 
   async function handleLogExpense() {
@@ -320,6 +392,69 @@ export function BudgetPlannerTab() {
         </Dialog>
       </div>
 
+      {/* Edit Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Budget Plan</DialogTitle>
+          </DialogHeader>
+          {editingPlan && (
+            <div className="space-y-4 pt-2">
+              <div className="space-y-2">
+                <Label>Budget Name</Label>
+                <Input
+                  value={editingPlan.name}
+                  onChange={(e) => setEditingPlan((p) => p && { ...p, name: e.target.value })}
+                  placeholder="e.g. Office Renovation Budget"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea
+                  value={editingPlan.description}
+                  onChange={(e) => setEditingPlan((p) => p && { ...p, description: e.target.value })}
+                  placeholder="Brief description..."
+                  rows={2}
+                />
+              </div>
+              <Separator />
+              <div className="space-y-2">
+                <Label>Budget Categories</Label>
+                {editingPlan.categories.map((cat, i) => (
+                  <div key={i} className="flex gap-2 items-end">
+                    <div className="flex-1">
+                      <Input
+                        value={cat.category_name}
+                        onChange={(e) => updateEditCategory(i, "category_name", e.target.value)}
+                        placeholder="Category name"
+                        className="mb-1"
+                      />
+                    </div>
+                    <div className="w-32">
+                      <Input
+                        type="number"
+                        value={cat.allocated_amount}
+                        onChange={(e) => updateEditCategory(i, "allocated_amount", e.target.value)}
+                        placeholder="Amount"
+                      />
+                    </div>
+                    {editingPlan.categories.length > 1 && (
+                      <Button variant="ghost" size="sm" onClick={() => removeEditCategory(i)}>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                <Button variant="outline" size="sm" onClick={addEditCategoryField} className="mt-2">
+                  <Plus className="w-4 h-4 mr-1" /> Add Category
+                </Button>
+              </div>
+              <Button onClick={handleUpdatePlan} className="w-full">Save Changes</Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-1">
           <CardHeader>
@@ -372,59 +507,59 @@ export function BudgetPlannerTab() {
         <div className="lg:col-span-2 space-y-6">
           {selectedPlan ? (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 <Card>
-                  <CardContent className="pt-4">
-                    <div className="flex items-center gap-2">
-                      <Wallet className="w-4 h-4 text-primary" />
-                      <p className="text-xs text-muted-foreground">Total Budget</p>
+                  <CardContent className="p-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Wallet className="w-3.5 h-3.5 text-primary shrink-0" />
+                      <p className="text-[11px] text-muted-foreground leading-tight">Total Budget</p>
                     </div>
-                    <p className="text-xl font-semibold mt-1">{formatCurrency(Number(selectedPlan.total_budget))}</p>
+                    <p className="text-sm font-semibold leading-tight truncate">{formatCurrency(Number(selectedPlan.total_budget))}</p>
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardContent className="pt-4">
-                    <div className="flex items-center gap-2">
-                      <TrendingDown className="w-4 h-4 text-destructive" />
-                      <p className="text-xs text-muted-foreground">Spent</p>
+                  <CardContent className="p-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <TrendingDown className="w-3.5 h-3.5 text-destructive shrink-0" />
+                      <p className="text-[11px] text-muted-foreground leading-tight">Spent</p>
                     </div>
-                    <p className="text-xl font-semibold mt-1">{formatCurrency(selectedPlan.total_spent)}</p>
+                    <p className="text-sm font-semibold leading-tight truncate">{formatCurrency(selectedPlan.total_spent)}</p>
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardContent className="pt-4">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4 text-emerald-600" />
-                      <p className="text-xs text-muted-foreground">Remaining</p>
+                  <CardContent className="p-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <TrendingUp className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <p className="text-[11px] text-muted-foreground leading-tight">Remaining</p>
                     </div>
-                    <p className="text-xl font-semibold mt-1">{formatCurrency(selectedPlan.total_remaining)}</p>
+                    <p className="text-sm font-semibold leading-tight truncate">{formatCurrency(selectedPlan.total_remaining)}</p>
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardContent className="pt-4">
-                    <div className="flex items-center gap-2">
-                      <BarChart3 className="w-4 h-4 text-muted-foreground" />
-                      <p className="text-xs text-muted-foreground">Utilization</p>
+                  <CardContent className="p-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <BarChart3 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      <p className="text-[11px] text-muted-foreground leading-tight">Utilization</p>
                     </div>
-                    <p className="text-xl font-semibold mt-1">{selectedPlan.utilization_percent.toFixed(1)}%</p>
+                    <p className="text-sm font-semibold leading-tight truncate">{selectedPlan.utilization_percent.toFixed(1)}%</p>
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardContent className="pt-4">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-orange-500" />
-                      <p className="text-xs text-muted-foreground">This Month</p>
+                  <CardContent className="p-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Calendar className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                      <p className="text-[11px] text-muted-foreground leading-tight">This Month</p>
                     </div>
-                    <p className="text-xl font-semibold mt-1">{formatCurrency(selectedPlan.monthly_spent)}</p>
+                    <p className="text-sm font-semibold leading-tight truncate">{formatCurrency(selectedPlan.monthly_spent)}</p>
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardContent className="pt-4">
-                    <div className="flex items-center gap-2">
-                      <PiggyBank className="w-4 h-4 text-teal-600" />
-                      <p className="text-xs text-muted-foreground">Savings</p>
+                  <CardContent className="p-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <PiggyBank className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                      <p className="text-[11px] text-muted-foreground leading-tight">Savings</p>
                     </div>
-                    <p className="text-xl font-semibold mt-1">{formatCurrency(monthlySavings)}</p>
+                    <p className="text-sm font-semibold leading-tight truncate">{formatCurrency(monthlySavings)}</p>
                   </CardContent>
                 </Card>
               </div>
@@ -710,6 +845,14 @@ export function BudgetPlannerTab() {
               </Tabs>
 
               <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => openEdit(selectedPlan)}
+                >
+                  <Pencil className="w-4 h-4 mr-1" />
+                  Edit Plan
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
