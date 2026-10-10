@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -718,6 +718,169 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      budget_categories: {
+        Row: {
+          allocated_amount: number
+          budget_plan_id: string
+          category_name: string
+          company_id: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          allocated_amount?: number
+          budget_plan_id: string
+          category_name: string
+          company_id?: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          allocated_amount?: number
+          budget_plan_id?: string
+          category_name?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_categories_budget_plan_id_fkey"
+            columns: ["budget_plan_id"]
+            isOneToOne: false
+            referencedRelation: "budget_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_categories_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      budget_expenses: {
+        Row: {
+          amount: number
+          budget_category_id: string
+          budget_plan_id: string
+          company_id: string
+          created_at: string
+          description: string
+          expense_date: string
+          id: string
+          notes: string | null
+          receipt_number: string | null
+          vendor: string | null
+        }
+        Insert: {
+          amount: number
+          budget_category_id: string
+          budget_plan_id: string
+          company_id?: string
+          created_at?: string
+          description: string
+          expense_date?: string
+          id?: string
+          notes?: string | null
+          receipt_number?: string | null
+          vendor?: string | null
+        }
+        Update: {
+          amount?: number
+          budget_category_id?: string
+          budget_plan_id?: string
+          company_id?: string
+          created_at?: string
+          description?: string
+          expense_date?: string
+          id?: string
+          notes?: string | null
+          receipt_number?: string | null
+          vendor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_expenses_budget_category_id_fkey"
+            columns: ["budget_category_id"]
+            isOneToOne: false
+            referencedRelation: "budget_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_expenses_budget_plan_id_fkey"
+            columns: ["budget_plan_id"]
+            isOneToOne: false
+            referencedRelation: "budget_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_expenses_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      budget_plans: {
+        Row: {
+          company_id: string
+          created_at: string
+          description: string | null
+          end_date: string | null
+          id: string
+          name: string
+          project_id: string | null
+          start_date: string
+          status: string
+          total_budget: number
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          name: string
+          project_id?: string | null
+          start_date?: string
+          status?: string
+          total_budget?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          name?: string
+          project_id?: string | null
+          start_date?: string
+          status?: string
+          total_budget?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_plans_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_settings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_plans_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
