@@ -226,6 +226,42 @@ export async function deleteBudgetPlan(id: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function updateBudgetPlan(
+  id: string,
+  name: string,
+  totalBudget: number,
+  description: string | null,
+  categories: { category_name: string; allocated_amount: number }[]
+) {
+  const { error: planError } = await supabase
+    .from("budget_plans")
+    .update({
+      name,
+      total_budget: totalBudget,
+      description,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+  if (planError) throw planError;
+
+  const { error: delError } = await supabase
+    .from("budget_categories")
+    .delete()
+    .eq("budget_plan_id", id);
+  if (delError) throw delError;
+
+  if (categories.length > 0) {
+    const { error: catError } = await supabase.from("budget_categories").insert(
+      categories.map((c) => ({
+        budget_plan_id: id,
+        category_name: c.category_name,
+        allocated_amount: c.allocated_amount,
+      }))
+    );
+    if (catError) throw catError;
+  }
+}
+
 export async function updateBudgetPlanStatus(id: string, status: string): Promise<void> {
   const { error } = await supabase
     .from("budget_plans")
