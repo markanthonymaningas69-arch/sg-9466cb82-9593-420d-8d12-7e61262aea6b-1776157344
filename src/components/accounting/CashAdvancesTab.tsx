@@ -64,6 +64,10 @@ export function CashAdvancesTab() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [advanceToDelete, setAdvanceToDelete] = useState<string | null>(null);
 
+  // Delete deduction state
+  const [deleteDeductionConfirmOpen, setDeleteDeductionConfirmOpen] = useState(false);
+  const [deductionToDelete, setDeductionToDelete] = useState<string | null>(null);
+
   // New advance form state
   const [newAdvanceOpen, setNewAdvanceOpen] = useState(false);
   const [newAdvanceForm, setNewAdvanceForm] = useState({
@@ -271,6 +275,32 @@ export function CashAdvancesTab() {
     } catch (error: any) {
       toast({
         title: "Error deleting advance",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteDeduction = async () => {
+    if (!deductionToDelete) return;
+
+    try {
+      await cashAdvancesService.deleteDeduction(deductionToDelete);
+
+      toast({
+        title: "Success",
+        description: "Deduction deleted successfully",
+      });
+
+      setDeleteDeductionConfirmOpen(false);
+      setDeductionToDelete(null);
+      loadData();
+      if (selectedPersonnel) {
+        loadPersonnelAdvances(selectedPersonnel);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error deleting deduction",
         description: error.message,
         variant: "destructive",
       });
@@ -728,6 +758,26 @@ export function CashAdvancesTab() {
         </DialogContent>
       </Dialog>
 
+      {/* Delete Deduction Confirmation Dialog */}
+      <Dialog open={deleteDeductionConfirmOpen} onOpenChange={setDeleteDeductionConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Deduction</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this deduction? This will update the cash advance balance. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setDeleteDeductionConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteDeduction}>
+              Delete
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Main Content */}
       {selectedPersonnel ? (
         <Card>
@@ -815,6 +865,7 @@ export function CashAdvancesTab() {
                               <TableHead>Amount</TableHead>
                               <TableHead>Source</TableHead>
                               <TableHead>Notes</TableHead>
+                              <TableHead className="w-[80px] text-center">Actions</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -824,6 +875,26 @@ export function CashAdvancesTab() {
                                 <TableCell>{formatCurrency(deduction.amount)}</TableCell>
                                 <TableCell className="capitalize">{deduction.deduction_source}</TableCell>
                                 <TableCell className="text-sm text-muted-foreground">{deduction.notes || "-"}</TableCell>
+                                <TableCell>
+                                  <div className="flex justify-center">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                      onClick={() => {
+                                        setDeductionToDelete(deduction.id);
+                                        setDeleteDeductionConfirmOpen(true);
+                                      }}
+                                      title="Delete Deduction"
+                                    >
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M3 6h18"/>
+                                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                                      </svg>
+                                    </Button>
+                                  </div>
+                                </TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
