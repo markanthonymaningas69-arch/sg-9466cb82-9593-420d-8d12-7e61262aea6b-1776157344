@@ -688,6 +688,18 @@ export default function SchedulePage() {
   }, [selectedProject, selectedTask]);
 
   async function handleDeleteTask(taskId: string) {
+    // Check if this is an unsaved task
+    if (!persistedTaskSignaturesRef.current[taskId]) {
+      // Just remove from list, no API call needed
+      setTasks((current) => current.filter((task) => task.id !== taskId));
+      setSelectedTask((current) => current?.id === taskId ? null : current);
+      if (selectedTask?.id === taskId) {
+        setPanelOpen(false);
+      }
+      return;
+    }
+
+    // Existing logic for saved tasks
     try {
       setSaving(true);
       await scheduleService.deleteTask(taskId);
@@ -879,8 +891,17 @@ export default function SchedulePage() {
     const taskToSave = tasks.find(t => t.id === taskId);
     if (!taskToSave) return;
     
+    // Check if this is a new unsaved task (not in persistedTaskSignaturesRef)
+    const isNewTask = !persistedTaskSignaturesRef.current[taskId];
+    
     await persistTask(taskToSave);
     setEditingTaskId(null);
+    
+    // If it was a new task, the persistTask will add it with a new ID
+    // So we need to remove the temporary one to avoid duplication
+    if (isNewTask) {
+      setTasks(current => current.filter(t => t.id !== taskId));
+    }
   };
 
   return (
@@ -1178,7 +1199,7 @@ export default function SchedulePage() {
                                         event.stopPropagation();
                                         if (task.id) void handleDeleteTask(task.id);
                                       }}
-                                      disabled={!task.id || saving}
+                                      disabled={saving}
                                       className="h-7 w-7"
                                     >
                                       <Trash2 className="h-4 w-4 text-destructive" />
