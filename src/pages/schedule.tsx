@@ -874,9 +874,9 @@ export default function SchedulePage() {
       const newTasks = [...current];
       [newTasks[index - 1], newTasks[index]] = [newTasks[index], newTasks[index - 1]];
       
-      // Update display_order for both tasks
-      newTasks[index - 1] = { ...newTasks[index - 1], display_order: index - 1 };
-      newTasks[index] = { ...newTasks[index], display_order: index };
+      // Update sort_order for both tasks
+      newTasks[index - 1] = { ...newTasks[index - 1], sort_order: index - 1 };
+      newTasks[index] = { ...newTasks[index], sort_order: index };
       
       // Persist the order changes
       void persistTask(newTasks[index - 1]);
@@ -894,9 +894,9 @@ export default function SchedulePage() {
       const newTasks = [...current];
       [newTasks[index], newTasks[index + 1]] = [newTasks[index + 1], newTasks[index]];
       
-      // Update display_order for both tasks
-      newTasks[index] = { ...newTasks[index], display_order: index };
-      newTasks[index + 1] = { ...newTasks[index + 1], display_order: index + 1 };
+      // Update sort_order for both tasks
+      newTasks[index] = { ...newTasks[index], sort_order: index };
+      newTasks[index + 1] = { ...newTasks[index + 1], sort_order: index + 1 };
       
       // Persist the order changes
       void persistTask(newTasks[index]);
