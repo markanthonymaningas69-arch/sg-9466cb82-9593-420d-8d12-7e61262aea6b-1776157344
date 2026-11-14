@@ -1337,7 +1337,89 @@ export default function SchedulePage() {
                               )}
                             </td>
                             <td className="px-3 py-2">
-                              {task.end_date || "-"}
+                              {(() => {
+                                const taskConfig = normalizeTaskConfiguration(
+                                  task.task_config || createDefaultTaskConfiguration(),
+                                  {
+                                    quantity: task.bom_scope?.quantity,
+                                    unit: task.bom_scope?.unit,
+                                    assignedTeamName: task.assigned_team,
+                                  }
+                                );
+                                const hasProductivityConfig = 
+                                  taskConfig.productivityOutput > 0 && 
+                                  taskConfig.scopeQuantity > 0;
+                                
+                                if (isEditing || hasProductivityConfig) {
+                                  return (
+                                    <Input
+                                      type="date"
+                                      value={task.end_date || ""}
+                                      onChange={(e) => {
+                                        const newEndDate = e.target.value;
+                                        if (!task.start_date || !newEndDate) {
+                                          handleInlineTaskChange(task.id, 'end_date', newEndDate);
+                                          return;
+                                        }
+                                        
+                                        // Calculate actual duration
+                                        const startDate = new Date(task.start_date);
+                                        const endDate = new Date(newEndDate);
+                                        const diffTime = endDate.getTime() - startDate.getTime();
+                                        const diffDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+                                        
+                                        // If has productivity config, calculate average output
+                                        if (hasProductivityConfig) {
+                                          const avgOutput = taskConfig.scopeQuantity / diffDays;
+                                          
+                                          setTasks((current) =>
+                                            current.map((t) =>
+                                              t.id === task.id
+                                                ? syncTaskWithConfiguration({
+                                                    ...t,
+                                                    end_date: newEndDate,
+                                                    duration_days: diffDays,
+                                                    task_config: normalizeTaskConfiguration(
+                                                      {
+                                                        ...(t.task_config || createDefaultTaskConfiguration()),
+                                                        productivityOutput: avgOutput,
+                                                        autoCalculateDuration: false,
+                                                      },
+                                                      {
+                                                        quantity: t.bom_scope?.quantity,
+                                                        unit: t.bom_scope?.unit,
+                                                        assignedTeamName: t.assigned_team,
+                                                      }
+                                                    ),
+                                                  })
+                                                : t
+                                            )
+                                          );
+                                        } else {
+                                          handleInlineTaskChange(task.id, 'end_date', newEndDate);
+                                          handleInlineTaskChange(task.id, 'duration_days', diffDays);
+                                        }
+                                      }}
+                                      onBlur={async () => {
+                                        const taskToSave = tasks.find(t => t.id === task.id);
+                                        if (taskToSave) {
+                                          await handleSaveInlineTask(task.id);
+                                        }
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          e.currentTarget.blur();
+                                        }
+                                      }}
+                                      className="h-8 text-xs"
+                                      disabled={saving}
+                                      title={hasProductivityConfig ? "Edit end date to auto-calculate average output" : "Edit end date"}
+                                    />
+                                  );
+                                }
+                                
+                                return task.end_date || "-";
+                              })()}
                             </td>
                             <td className="px-3 py-2">
                               {(() => {
