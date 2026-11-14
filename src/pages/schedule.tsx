@@ -1095,9 +1095,14 @@ export default function SchedulePage() {
                         </div>
 
                         <div className="space-y-1">
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Manpower</p>
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Peak Concurrent Manpower</p>
                           {(() => {
-                            const manpowerBreakdown = tasks.reduce((acc, task) => {
+                            // Build a timeline of all project dates and calculate concurrent manpower
+                            const dateManpowerMap = new Map<string, Record<string, number>>();
+                            
+                            tasks.forEach((task) => {
+                              if (!task.start_date || !task.end_date) return;
+                              
                               const taskConfig = normalizeTaskConfiguration(
                                 task.task_config || createDefaultTaskConfiguration(),
                                 {
@@ -1107,23 +1112,50 @@ export default function SchedulePage() {
                                 }
                               );
                               
+                              // Get task's manpower breakdown
+                              const taskManpower: Record<string, number> = {};
                               taskConfig.teams.forEach((team) => {
                                 team.members.forEach((member) => {
                                   const position = member.positionName || "Unassigned";
-                                  acc[position] = (acc[position] || 0) + (member.count || 1) * taskConfig.numberOfTeams;
+                                  taskManpower[position] = (taskManpower[position] || 0) + (member.count || 1) * taskConfig.numberOfTeams;
                                 });
                               });
                               
-                              return acc;
-                            }, {} as Record<string, number>);
-
-                            const totalPersonnel = Object.values(manpowerBreakdown).reduce((sum, count) => sum + count, 0);
+                              // Add this task's manpower to every date it's active
+                              const startDate = new Date(task.start_date);
+                              const endDate = new Date(task.end_date);
+                              
+                              for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                                const dateKey = d.toISOString().split('T')[0];
+                                
+                                if (!dateManpowerMap.has(dateKey)) {
+                                  dateManpowerMap.set(dateKey, {});
+                                }
+                                
+                                const dayManpower = dateManpowerMap.get(dateKey)!;
+                                Object.entries(taskManpower).forEach(([position, count]) => {
+                                  dayManpower[position] = (dayManpower[position] || 0) + count;
+                                });
+                              }
+                            });
+                            
+                            // Find the peak day (highest total manpower)
+                            let peakManpowerBreakdown: Record<string, number> = {};
+                            let peakTotal = 0;
+                            
+                            dateManpowerMap.forEach((dayManpower) => {
+                              const dayTotal = Object.values(dayManpower).reduce((sum, count) => sum + count, 0);
+                              if (dayTotal > peakTotal) {
+                                peakTotal = dayTotal;
+                                peakManpowerBreakdown = { ...dayManpower };
+                              }
+                            });
 
                             return (
                               <>
-                                <p className="text-3xl font-bold text-primary">{totalPersonnel}</p>
+                                <p className="text-3xl font-bold text-primary">{peakTotal}</p>
                                 <div className="space-y-0.5 text-xs text-muted-foreground max-h-16 overflow-y-auto">
-                                  {Object.entries(manpowerBreakdown)
+                                  {Object.entries(peakManpowerBreakdown)
                                     .sort(([, a], [, b]) => b - a)
                                     .map(([position, count]) => (
                                       <div key={position} className="flex justify-between items-center">
@@ -1131,6 +1163,9 @@ export default function SchedulePage() {
                                         <span className="font-semibold">{count}</span>
                                       </div>
                                     ))}
+                                  {peakTotal === 0 && (
+                                    <p className="text-xs text-muted-foreground">No scheduled tasks yet</p>
+                                  )}
                                 </div>
                               </>
                             );
