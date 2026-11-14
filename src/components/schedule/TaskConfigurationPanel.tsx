@@ -472,7 +472,7 @@ export function TaskConfigurationPanel({
 
   return (
     <Card className={containerClassName}>
-      <CardHeader className="border-b bg-muted/10 px-4 py-3">
+      <CardHeader className="border-b bg-gradient-to-r from-primary/10 to-primary/5 px-4 py-3">
         <CardTitle className="flex items-center text-sm">
           <Settings2 className="mr-2 h-4 w-4 text-primary" />
           Task Configuration
@@ -495,7 +495,7 @@ export function TaskConfigurationPanel({
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="space-y-4 p-3">
             <TabsContent value="parameters" className="mt-0 space-y-4">
-              <section className="space-y-3 rounded-md border p-3">
+              <section className="space-y-3 rounded-md border border-blue-200 bg-blue-50/50 p-3">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1 flex-1">
                     <h3 className="text-sm font-semibold text-foreground">Basic Info</h3>
@@ -518,7 +518,7 @@ export function TaskConfigurationPanel({
                 {showBasicInfo && (
                   <>
                     <div className="space-y-2">
-                      <Label className="text-xs">Task Name</Label>
+                      <Label className="text-xs font-semibold">Task Name</Label>
                       <Input 
                         value={task.bom_scope?.name || task.name || ""} 
                         onChange={(event) => {
@@ -527,12 +527,12 @@ export function TaskConfigurationPanel({
                           }
                         }}
                         readOnly={Boolean(task.bom_scope)} 
-                        className={`h-8 text-sm ${task.bom_scope ? 'bg-muted/50' : ''}`}
+                        className={`h-8 text-sm ${task.bom_scope ? 'bg-white/70' : 'bg-white'}`}
                         placeholder="Enter task name"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-xs">Scope Quantity</Label>
+                      <Label className="text-xs font-semibold">Scope Quantity</Label>
                       <div className="grid grid-cols-[1fr_140px] gap-2">
                         <Input 
                           type="number"
@@ -547,7 +547,7 @@ export function TaskConfigurationPanel({
                             }
                           }}
                           readOnly={Boolean(task.bom_scope)} 
-                          className={`h-8 text-sm ${task.bom_scope ? 'bg-muted/50' : ''}`}
+                          className={`h-8 text-sm ${task.bom_scope ? 'bg-white/70' : 'bg-white'}`}
                           placeholder="0"
                         />
                         <div className="space-y-1">
@@ -562,7 +562,7 @@ export function TaskConfigurationPanel({
                             }}
                             disabled={Boolean(task.bom_scope)}
                           >
-                            <SelectTrigger className={`h-8 text-sm ${task.bom_scope ? 'bg-muted/50' : ''}`}>
+                            <SelectTrigger className={`h-8 text-sm ${task.bom_scope ? 'bg-white/70' : 'bg-white'}`}>
                               <SelectValue placeholder="Unit" />
                             </SelectTrigger>
                             <SelectContent>
@@ -582,7 +582,7 @@ export function TaskConfigurationPanel({
                                 });
                               }}
                               placeholder="Specify unit"
-                              className="h-7 text-xs"
+                              className="h-7 text-xs bg-white"
                             />
                           )}
                         </div>
@@ -592,7 +592,7 @@ export function TaskConfigurationPanel({
                 )}
               </section>
 
-              <section className="space-y-3 rounded-md border p-3">
+              <section className="space-y-3 rounded-md border border-green-200 bg-green-50/50 p-3">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1 flex-1">
                     <h3 className="text-sm font-semibold text-foreground">Productivity</h3>
@@ -615,7 +615,7 @@ export function TaskConfigurationPanel({
                   <>
                     <div className="grid grid-cols-[1fr_auto_auto] gap-2">
                       <div className="space-y-2">
-                        <Label className="text-xs">
+                        <Label className="text-xs font-semibold">
                           Productivity of one team
                         </Label>
                         <Input
@@ -628,17 +628,17 @@ export function TaskConfigurationPanel({
                               productivityOutput: Number(event.target.value) || 0,
                             })
                           }
-                          className="h-8 text-sm"
+                          className="h-8 text-sm bg-white"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-xs">Unit</Label>
-                        <div className="flex h-8 items-center rounded-md border bg-muted/50 px-3 text-sm text-foreground min-w-[80px]">
+                        <Label className="text-xs font-semibold">Unit</Label>
+                        <div className="flex h-8 items-center rounded-md border bg-white px-3 text-sm text-foreground min-w-[80px]">
                           {taskConfig.scopeUnit || "unit"}
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-xs">Per</Label>
+                        <Label className="text-xs font-semibold">Per</Label>
                         <Select
                           value={taskConfig.productivityUnit}
                           onValueChange={(value) =>
@@ -647,7 +647,7 @@ export function TaskConfigurationPanel({
                             })
                           }
                         >
-                          <SelectTrigger className="h-8 text-sm w-[100px]">
+                          <SelectTrigger className="h-8 text-sm w-[100px] bg-white">
                             <SelectValue placeholder="Period" />
                           </SelectTrigger>
                           <SelectContent>
@@ -667,7 +667,7 @@ export function TaskConfigurationPanel({
                 )}
               </section>
 
-              <section className="space-y-3 rounded-md border p-3">
+              <section className="space-y-3 rounded-md border border-purple-200 bg-purple-50/50 p-3">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex-1">
                     <h3 className="text-sm font-semibold text-foreground">Team Composition</h3>
@@ -723,7 +723,7 @@ export function TaskConfigurationPanel({
                       <p className="text-[11px] text-destructive">Number of Teams must be at least 1 for every team setup.</p>
                     ) : null}
 
-                    <div className="rounded-md border bg-primary/5 p-3 space-y-1">
+                    <div className="rounded-md border border-purple-300 bg-purple-100/70 p-3 space-y-1">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-semibold text-foreground">Estimated Duration</span>
                         <Badge>{estimatedDuration} days</Badge>
@@ -732,7 +732,7 @@ export function TaskConfigurationPanel({
                       <p className="text-xs text-muted-foreground">Output per team: {productivitySummary.perTeamOutputLabel}</p>
                       <p className="text-xs text-muted-foreground">Total output with configured teams: {totalDailyOutput} {taskConfig.scopeUnit} per day</p>
                       <p className="text-xs text-muted-foreground">Total manpower: {totalTeamMembers} personnel</p>
-                      <p className="text-xs text-muted-foreground">Total daily labor cost: AED {totalDailyLaborCost.toFixed(2)}</p>
+                      <p className="text-xs text-muted-foreground">Total daily labor cost: ₱ {totalDailyLaborCost.toFixed(2)}</p>
                     </div>
                   </>
                 )}
@@ -740,30 +740,30 @@ export function TaskConfigurationPanel({
             </TabsContent>
 
             <TabsContent value="schedule" className="space-y-4 mt-0">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 rounded-md border border-amber-200 bg-amber-50/50 p-3">
                 <div className="space-y-2">
-                  <Label className="text-xs">Start Date</Label>
+                  <Label className="text-xs font-semibold">Start Date</Label>
                   <Input
                     type="date"
                     value={task.start_date || ""}
                     onChange={(event) => onTaskChange({ ...task, start_date: event.target.value })}
-                    className="h-8 text-xs"
+                    className="h-8 text-xs bg-white"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs">End Date</Label>
-                  <Input type="date" value={task.end_date || ""} readOnly className="h-8 text-xs bg-muted/50" />
+                  <Label className="text-xs font-semibold">End Date</Label>
+                  <Input type="date" value={task.end_date || ""} readOnly className="h-8 text-xs bg-white/70" />
                 </div>
               </div>
 
-              <div className="space-y-2 rounded-md border p-3">
+              <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50/50 p-3">
                 <Label className="text-xs font-semibold">Calculated Duration</Label>
-                <Input type="number" value={estimatedDuration} readOnly className="h-8 text-sm bg-muted/50" />
+                <Input type="number" value={estimatedDuration} readOnly className="h-8 text-sm bg-white/70" />
                 <p className="text-xs text-muted-foreground">Duration updates automatically from scope quantity, productivity, and number of teams.</p>
               </div>
 
-              <div className="space-y-2 rounded-md border p-3">
-                <Label className="text-xs flex items-center">
+              <div className="space-y-2 rounded-md border border-cyan-200 bg-cyan-50/50 p-3">
+                <Label className="text-xs font-semibold flex items-center">
                   <Clock className="h-3 w-3 mr-1" />
                   Dependencies
                 </Label>
@@ -775,7 +775,7 @@ export function TaskConfigurationPanel({
                       const selectedDependency = dependencies.find((item) => item.taskId === dependencyTask.id);
 
                       return (
-                        <div key={dependencyTask.id} className="rounded-md border p-3 space-y-3">
+                        <div key={dependencyTask.id} className="rounded-md border border-cyan-300 bg-white p-3 space-y-3">
                           <label className="flex items-center gap-2 text-xs font-medium">
                             <Checkbox
                               checked={Boolean(selectedDependency)}
@@ -787,7 +787,7 @@ export function TaskConfigurationPanel({
                           {selectedDependency ? (
                             <div className="grid grid-cols-2 gap-3">
                               <div className="space-y-2">
-                                <Label className="text-[11px]">Dependency Type</Label>
+                                <Label className="text-[11px] font-semibold">Dependency Type</Label>
                                 <Select
                                   value={selectedDependency.type}
                                   onValueChange={(value) =>
@@ -796,7 +796,7 @@ export function TaskConfigurationPanel({
                                     })
                                   }
                                 >
-                                  <SelectTrigger className="h-8 text-xs">
+                                  <SelectTrigger className="h-8 text-xs bg-white">
                                     <SelectValue placeholder="Select type" />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -810,7 +810,7 @@ export function TaskConfigurationPanel({
                               </div>
 
                               <div className="space-y-2">
-                                <Label className="text-[11px]">Lag Days</Label>
+                                <Label className="text-[11px] font-semibold">Lag Days</Label>
                                 <Input
                                   type="number"
                                   min="0"
@@ -821,7 +821,7 @@ export function TaskConfigurationPanel({
                                       lagDays: Math.max(0, Math.round(Number(event.target.value) || 0)),
                                     })
                                   }
-                                  className="h-8 text-xs"
+                                  className="h-8 text-xs bg-white"
                                 />
                               </div>
                             </div>
@@ -839,7 +839,7 @@ export function TaskConfigurationPanel({
             </TabsContent>
 
             <TabsContent value="resources" className="space-y-4 mt-0">
-              <section className="space-y-3 rounded-md border p-3">
+              <section className="space-y-3 rounded-md border border-orange-200 bg-orange-50/50 p-3">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <h3 className="text-sm font-semibold text-foreground">Task Materials</h3>
@@ -939,7 +939,7 @@ export function TaskConfigurationPanel({
                                     />
                                   </td>
                                   <td className="p-2 text-right font-medium">
-                                    AED {material.totalCost.toFixed(2)}
+                                    ₱ {material.totalCost.toFixed(2)}
                                   </td>
                                   <td className="p-2 text-center">
                                     <Button
@@ -961,7 +961,7 @@ export function TaskConfigurationPanel({
                                   Total Material Cost:
                                 </td>
                                 <td className="p-2 text-right font-bold text-sm">
-                                  AED {totalMaterialCost.toFixed(2)}
+                                  ₱ {totalMaterialCost.toFixed(2)}
                                 </td>
                                 <td></td>
                               </tr>
@@ -1018,7 +1018,7 @@ export function TaskConfigurationPanel({
                                   {team.members.reduce((sum, m) => sum + (m.count || 1), 0) * team.numberOfTeams} total personnel
                                 </p>
                                 <p className="text-muted-foreground">
-                                  Daily subtotal AED {calculateTotalTeamDailyCost({ ...taskConfig, teams: [team] }).toFixed(2)}
+                                  Daily subtotal ₱ {calculateTotalTeamDailyCost({ ...taskConfig, teams: [team] }).toFixed(2)}
                                 </p>
                               </div>
                             </div>
@@ -1034,10 +1034,10 @@ export function TaskConfigurationPanel({
                                   </div>
                                   <div className="text-right">
                                     <p className="text-foreground">
-                                      AED {Number(member.rate || 0).toFixed(2)}/{member.unit === "hour" ? "hr" : "day"}
+                                      ₱ {Number(member.rate || 0).toFixed(2)}/{member.unit === "hour" ? "hr" : "day"}
                                     </p>
                                     <p className="text-muted-foreground">
-                                      Daily equivalent AED {getMemberDailyRate(member, taskConfig.workHoursPerDay).toFixed(2)}
+                                      Daily equivalent ₱ {getMemberDailyRate(member, taskConfig.workHoursPerDay).toFixed(2)}
                                     </p>
                                   </div>
                                 </div>
@@ -1149,7 +1149,7 @@ export function TaskConfigurationPanel({
                               <Badge variant="outline">{plan.unit}</Badge>
                               {unitCost > 0 && (
                                 <Badge variant="secondary" className="text-[10px]">
-                                  AED {unitCost.toFixed(2)}/{plan.unit}
+                                  ₱ {unitCost.toFixed(2)}/{plan.unit}
                                 </Badge>
                               )}
                             </div>
@@ -1348,7 +1348,7 @@ export function TaskConfigurationPanel({
                               <div>
                                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Total Cost</p>
                                 <p className="mt-1 text-sm font-semibold text-primary">
-                                  AED {totalCost.toFixed(2)}
+                                  ₱ {totalCost.toFixed(2)}
                                 </p>
                               </div>
                             )}
@@ -1381,7 +1381,7 @@ export function TaskConfigurationPanel({
                                       </div>
                                       {unitCost > 0 && (
                                         <span className="text-primary font-medium">
-                                          AED {deliveryCost.toFixed(2)}
+                                          ₱ {deliveryCost.toFixed(2)}
                                         </span>
                                       )}
                                     </div>
@@ -1394,7 +1394,7 @@ export function TaskConfigurationPanel({
                                   <div className="flex items-center justify-between text-xs">
                                     <span className="text-muted-foreground">Cost per delivery:</span>
                                     <span className="font-semibold text-foreground">
-                                      AED {costPerDelivery.toFixed(2)}
+                                      ₱ {costPerDelivery.toFixed(2)}
                                     </span>
                                   </div>
                                 </div>
@@ -1421,7 +1421,7 @@ export function TaskConfigurationPanel({
                             </p>
                           </div>
                           <p className="text-lg font-bold text-primary">
-                            AED {resourceMaterialPlans.reduce((sum, plan) => {
+                            ₱ {resourceMaterialPlans.reduce((sum, plan) => {
                               const material = taskMaterials.find(m => m.materialId === plan.materialId);
                               return sum + (Number(plan.totalQuantity || 0) * (material?.unitCost || 0));
                             }, 0).toFixed(2)}
@@ -1433,7 +1433,7 @@ export function TaskConfigurationPanel({
                 )}
               </section>
 
-              <section className="space-y-3 rounded-md border p-3">
+              <section className="space-y-3 rounded-md border border-indigo-200 bg-indigo-50/50 p-3">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <h3 className="text-sm font-semibold text-foreground">Labor Cost Summary</h3>
@@ -1458,16 +1458,16 @@ export function TaskConfigurationPanel({
                 {showLaborCost && (
                   <>
                     <div className="grid gap-3 md:grid-cols-2">
-                      <div className="rounded-md border bg-primary/5 p-3">
+                      <div className="rounded-md border border-indigo-300 bg-indigo-100/70 p-3">
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Daily Labor Cost</p>
                         <p className="mt-1 text-lg font-semibold text-foreground">
-                          AED {Number(laborCostSummary?.dailyCost || 0).toFixed(2)}
+                          ₱ {Number(laborCostSummary?.dailyCost || 0).toFixed(2)}
                         </p>
                       </div>
-                      <div className="rounded-md border bg-primary/5 p-3">
+                      <div className="rounded-md border border-indigo-300 bg-indigo-100/70 p-3">
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Total Labor Cost</p>
                         <p className="mt-1 text-lg font-semibold text-foreground">
-                          AED {Number(laborCostSummary?.totalCost || 0).toFixed(2)}
+                          ₱ {Number(laborCostSummary?.totalCost || 0).toFixed(2)}
                         </p>
                       </div>
                     </div>
@@ -1475,15 +1475,15 @@ export function TaskConfigurationPanel({
                     {laborCostSummary?.rateSnapshot?.length ? (
                       <div className="space-y-2">
                         {laborCostSummary.rateSnapshot.map((rate) => (
-                          <div key={`${rate.role}-${rate.count}`} className="rounded-md border bg-muted/20 p-3 text-xs">
+                          <div key={`${rate.role}-${rate.count}`} className="rounded-md border border-indigo-300 bg-white p-3 text-xs">
                             <div className="flex items-center justify-between">
                               <div>
                                 <p className="font-semibold text-foreground">{rate.role}</p>
                                 <p className="text-muted-foreground">{rate.count} personnel assigned</p>
                               </div>
                               <div className="text-right">
-                                <p className="text-foreground">AED {Number(rate.dailyRate || 0).toFixed(2)}/day</p>
-                                <p className="text-muted-foreground">OT AED {Number(rate.overtimeRate || 0).toFixed(2)}</p>
+                                <p className="text-foreground">₱ {Number(rate.dailyRate || 0).toFixed(2)}/day</p>
+                                <p className="text-muted-foreground">OT ₱ {Number(rate.overtimeRate || 0).toFixed(2)}</p>
                               </div>
                             </div>
                           </div>
@@ -1498,13 +1498,13 @@ export function TaskConfigurationPanel({
                 )}
               </section>
 
-              <div className="space-y-2">
-                <Label className="text-xs flex items-center">
+              <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50/50 p-3">
+                <Label className="text-xs font-semibold flex items-center">
                   <Wrench className="h-3 w-3 mr-1" />
                   Tools & Equipment
                 </Label>
                 <Textarea
-                  className="min-h-[110px] text-sm"
+                  className="min-h-[110px] text-sm bg-white"
                   placeholder="Enter one tool or equipment item per line..."
                   value={equipmentValue}
                   onChange={(event) =>
@@ -1523,10 +1523,10 @@ export function TaskConfigurationPanel({
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-xs">Execution Notes / Constraints</Label>
+              <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50/50 p-3">
+                <Label className="text-xs font-semibold">Execution Notes / Constraints</Label>
                 <Textarea
-                  className="min-h-[120px] text-sm"
+                  className="min-h-[120px] text-sm bg-white"
                   placeholder="Enter schedule constraints, weather risks, or execution notes..."
                   value={task.description || ""}
                   onChange={(event) => onTaskChange({ ...task, description: event.target.value })}
