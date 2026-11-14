@@ -406,6 +406,7 @@ export default function SchedulePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editingDurationTaskId, setEditingDurationTaskId] = useState<string | null>(null);
   const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const planningSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const laborCostSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1029,6 +1030,7 @@ export default function SchedulePage() {
                       {sortedTasks.map((task) => {
                         const isCritical = task.id ? criticalPathTaskIdSet.has(task.id) : false;
                         const isEditing = editingTaskId === task.id;
+                        const isEditingDuration = editingDurationTaskId === task.id;
 
                         return (
                           <tr
@@ -1080,16 +1082,37 @@ export default function SchedulePage() {
                               {task.end_date || "-"}
                             </td>
                             <td className="px-3 py-2">
-                              {isEditing ? (
-                                <Input
-                                  type="number"
-                                  min="1"
-                                  value={task.duration_days || 1}
-                                  onChange={(e) => handleInlineTaskChange(task.id, 'duration_days', Number(e.target.value))}
-                                  className="h-8 text-xs w-20"
-                                />
+                              {isEditing || isEditingDuration ? (
+                                <div className="flex items-center gap-1">
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    value={task.duration_days || 1}
+                                    onChange={(e) => handleInlineTaskChange(task.id, 'duration_days', Number(e.target.value))}
+                                    onBlur={async () => {
+                                      if (isEditingDuration) {
+                                        await handleSaveInlineTask(task.id);
+                                        setEditingDurationTaskId(null);
+                                      }
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' && isEditingDuration) {
+                                        e.currentTarget.blur();
+                                      }
+                                    }}
+                                    className="h-8 text-xs w-20"
+                                    autoFocus={isEditingDuration}
+                                  />
+                                  <span className="text-xs text-muted-foreground">days</span>
+                                </div>
                               ) : (
-                                `${task.duration_days || 0} day(s)`
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingDurationTaskId(task.id)}
+                                  className="text-left hover:text-primary transition-colors cursor-pointer"
+                                >
+                                  {task.duration_days || 0} day(s)
+                                </button>
                               )}
                             </td>
                             <td className="px-3 py-2 text-xs">
