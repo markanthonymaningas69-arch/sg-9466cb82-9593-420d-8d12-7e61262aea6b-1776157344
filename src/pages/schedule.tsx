@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Trash2, X } from "lucide-react";
+import { Plus, Trash2, X, ChevronUp, ChevronDown, ArrowUp, ArrowDown } from "lucide-react";
 import { Layout } from "@/components/Layout";
 import { CalendarView } from "@/components/schedule/CalendarView";
 import { GanttView } from "@/components/schedule/GanttView";
@@ -866,6 +866,46 @@ export default function SchedulePage() {
     setEditingTaskId(newTask.id);
   };
 
+  const handleMoveTaskUp = (taskId: string) => {
+    setTasks((current) => {
+      const index = current.findIndex(t => t.id === taskId);
+      if (index <= 0) return current; // Already at top or not found
+      
+      const newTasks = [...current];
+      [newTasks[index - 1], newTasks[index]] = [newTasks[index], newTasks[index - 1]];
+      
+      // Update display_order for both tasks
+      newTasks[index - 1] = { ...newTasks[index - 1], display_order: index - 1 };
+      newTasks[index] = { ...newTasks[index], display_order: index };
+      
+      // Persist the order changes
+      void persistTask(newTasks[index - 1]);
+      void persistTask(newTasks[index]);
+      
+      return newTasks;
+    });
+  };
+
+  const handleMoveTaskDown = (taskId: string) => {
+    setTasks((current) => {
+      const index = current.findIndex(t => t.id === taskId);
+      if (index === -1 || index >= current.length - 1) return current; // Already at bottom or not found
+      
+      const newTasks = [...current];
+      [newTasks[index], newTasks[index + 1]] = [newTasks[index + 1], newTasks[index]];
+      
+      // Update display_order for both tasks
+      newTasks[index] = { ...newTasks[index], display_order: index };
+      newTasks[index + 1] = { ...newTasks[index + 1], display_order: index + 1 };
+      
+      // Persist the order changes
+      void persistTask(newTasks[index]);
+      void persistTask(newTasks[index + 1]);
+      
+      return newTasks;
+    });
+  };
+
   const handleInlineTaskChange = (taskId: string, field: keyof EditableProjectTask, value: string | number) => {
     setTasks((current) =>
       current.map((task) => {
@@ -1039,6 +1079,7 @@ export default function SchedulePage() {
                   <table className="w-full text-sm min-w-[900px]">
                     <thead className="sticky top-0 z-10 bg-background">
                       <tr className="border-b text-left text-muted-foreground">
+                        <th className="px-3 py-2 font-medium w-[80px]">Order</th>
                         <th className="px-3 py-2 font-medium w-[200px]">Task Name</th>
                         <th className="px-3 py-2 font-medium w-[120px]">Start Date</th>
                         <th className="px-3 py-2 font-medium w-[120px]">End Date</th>
@@ -1048,7 +1089,7 @@ export default function SchedulePage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {sortedTasks.map((task) => {
+                      {sortedTasks.map((task, index) => {
                         const isCritical = task.id ? criticalPathTaskIdSet.has(task.id) : false;
                         const isEditing = editingTaskId === task.id;
                         const isEditingDuration = editingDurationTaskId === task.id;
@@ -1064,6 +1105,30 @@ export default function SchedulePage() {
                                   : "hover:bg-muted/30"
                             }`}
                           >
+                            <td className="px-3 py-2">
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  type="button"
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => handleMoveTaskUp(task.id)}
+                                  disabled={index === 0 || saving}
+                                  className="h-6 w-6"
+                                >
+                                  <ArrowUp className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => handleMoveTaskDown(task.id)}
+                                  disabled={index === sortedTasks.length - 1 || saving}
+                                  className="h-6 w-6"
+                                >
+                                  <ArrowDown className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </td>
                             <td className="px-3 py-2">
                               {isEditing ? (
                                 <Input
