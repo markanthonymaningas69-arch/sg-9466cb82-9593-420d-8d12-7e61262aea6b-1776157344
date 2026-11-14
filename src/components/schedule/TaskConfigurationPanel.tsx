@@ -473,7 +473,7 @@ export function TaskConfigurationPanel({
   return (
     <Card className={containerClassName}>
       <CardHeader className="border-b bg-gradient-to-r from-primary/10 to-primary/5 px-4 py-3">
-        <CardTitle className="flex items-center text-sm">
+        <CardTitle className="flex items-center text-sm text-foreground">
           <Settings2 className="mr-2 h-4 w-4 text-primary" />
           Task Configuration
         </CardTitle>
@@ -498,11 +498,11 @@ export function TaskConfigurationPanel({
               <section className="space-y-3 rounded-md border border-blue-200 bg-blue-50/50 p-3">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1 flex-1">
-                    <h3 className="text-sm font-semibold text-foreground">Basic Info</h3>
+                    <h3 className="text-sm font-semibold text-blue-900">Basic Info</h3>
                     {task.bom_scope ? (
-                      <p className="text-[11px] text-muted-foreground">These values are synced from the linked BOM scope and can only be changed in the BOM module.</p>
+                      <p className="text-[11px] text-blue-700">These values are synced from the linked BOM scope and can only be changed in the BOM module.</p>
                     ) : (
-                      <p className="text-[11px] text-muted-foreground">Enter task details manually. These values will be synced if you later link this task to a BOM scope.</p>
+                      <p className="text-[11px] text-blue-700">Enter task details manually. These values will be synced if you later link this task to a BOM scope.</p>
                     )}
                   </div>
                   <Button
@@ -518,7 +518,7 @@ export function TaskConfigurationPanel({
                 {showBasicInfo && (
                   <>
                     <div className="space-y-2">
-                      <Label className="text-xs font-semibold">Task Name</Label>
+                      <Label className="text-xs font-semibold text-blue-900">Task Name</Label>
                       <Input 
                         value={task.bom_scope?.name || task.name || ""} 
                         onChange={(event) => {
@@ -532,7 +532,7 @@ export function TaskConfigurationPanel({
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-xs font-semibold">Scope Quantity</Label>
+                      <Label className="text-xs font-semibold text-blue-900">Scope Quantity</Label>
                       <div className="grid grid-cols-[1fr_140px] gap-2">
                         <Input 
                           type="number"
@@ -595,8 +595,8 @@ export function TaskConfigurationPanel({
               <section className="space-y-3 rounded-md border border-green-200 bg-green-50/50 p-3">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1 flex-1">
-                    <h3 className="text-sm font-semibold text-foreground">Productivity</h3>
-                    <p className="text-[11px] text-muted-foreground">
+                    <h3 className="text-sm font-semibold text-green-900">Productivity</h3>
+                    <p className="text-[11px] text-green-700">
                       Set the output of one team per working day or per working hour. Calculated duration uses scope quantity,
                       productivity unit, work hours per day, and the configured number of teams.
                     </p>
@@ -615,7 +615,7 @@ export function TaskConfigurationPanel({
                   <>
                     <div className="grid grid-cols-[1fr_auto_auto] gap-2">
                       <div className="space-y-2">
-                        <Label className="text-xs font-semibold">
+                        <Label className="text-xs font-semibold text-green-900">
                           Productivity of one team
                         </Label>
                         <Input
@@ -632,13 +632,13 @@ export function TaskConfigurationPanel({
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-xs font-semibold">Unit</Label>
+                        <Label className="text-xs font-semibold text-green-900">Unit</Label>
                         <div className="flex h-8 items-center rounded-md border bg-white px-3 text-sm text-foreground min-w-[80px]">
                           {taskConfig.scopeUnit || "unit"}
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-xs font-semibold">Per</Label>
+                        <Label className="text-xs font-semibold text-green-900">Per</Label>
                         <Select
                           value={taskConfig.productivityUnit}
                           onValueChange={(value) =>
@@ -657,7 +657,7 @@ export function TaskConfigurationPanel({
                         </Select>
                       </div>
                     </div>
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-[11px] text-green-700">
                       {taskConfig.productivityUnit === "hour"
                         ? `Total daily output = productivity × ${taskConfig.workHoursPerDay} work hour(s) × ${Math.max(1, taskConfig.numberOfTeams)} team(s).`
                         : `Total daily output = productivity × ${Math.max(1, taskConfig.numberOfTeams)} team(s).`}
@@ -670,7 +670,7 @@ export function TaskConfigurationPanel({
               <section className="space-y-3 rounded-md border border-purple-200 bg-purple-50/50 p-3">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex-1">
-                    <h3 className="text-sm font-semibold text-foreground">Team Composition</h3>
+                    <h3 className="text-sm font-semibold text-purple-900">Team Composition</h3>
                   </div>
                   <Button
                     type="button"
@@ -725,14 +725,14 @@ export function TaskConfigurationPanel({
 
                     <div className="rounded-md border border-purple-300 bg-purple-100/70 p-3 space-y-1">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold text-foreground">Estimated Duration</span>
+                        <span className="text-sm font-semibold text-purple-900">Estimated Duration</span>
                         <Badge>{estimatedDuration} days</Badge>
                       </div>
-                      <p className="text-xs text-muted-foreground">{productivitySummary.teamLabel || "No teams configured yet"}</p>
-                      <p className="text-xs text-muted-foreground">Output per team: {productivitySummary.perTeamOutputLabel}</p>
-                      <p className="text-xs text-muted-foreground">Total output with configured teams: {totalDailyOutput} {taskConfig.scopeUnit} per day</p>
-                      <p className="text-xs text-muted-foreground">Total manpower: {totalTeamMembers} personnel</p>
-                      <p className="text-xs text-muted-foreground">Total daily labor cost: ₱ {totalDailyLaborCost.toFixed(2)}</p>
+                      <p className="text-xs text-purple-700">{productivitySummary.teamLabel || "No teams configured yet"}</p>
+                      <p className="text-xs text-purple-700">Output per team: {productivitySummary.perTeamOutputLabel}</p>
+                      <p className="text-xs text-purple-700">Total output with configured teams: {totalDailyOutput} {taskConfig.scopeUnit} per day</p>
+                      <p className="text-xs text-purple-700">Total manpower: {totalTeamMembers} personnel</p>
+                      <p className="text-xs text-purple-700">Total daily labor cost: ₱ {totalDailyLaborCost.toFixed(2)}</p>
                     </div>
                   </>
                 )}
@@ -742,7 +742,7 @@ export function TaskConfigurationPanel({
             <TabsContent value="schedule" className="space-y-4 mt-0">
               <div className="grid grid-cols-2 gap-3 rounded-md border border-amber-200 bg-amber-50/50 p-3">
                 <div className="space-y-2">
-                  <Label className="text-xs font-semibold">Start Date</Label>
+                  <Label className="text-xs font-semibold text-amber-900">Start Date</Label>
                   <Input
                     type="date"
                     value={task.start_date || ""}
@@ -751,24 +751,24 @@ export function TaskConfigurationPanel({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs font-semibold">End Date</Label>
+                  <Label className="text-xs font-semibold text-amber-900">End Date</Label>
                   <Input type="date" value={task.end_date || ""} readOnly className="h-8 text-xs bg-white/70" />
                 </div>
               </div>
 
               <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50/50 p-3">
-                <Label className="text-xs font-semibold">Calculated Duration</Label>
+                <Label className="text-xs font-semibold text-amber-900">Calculated Duration</Label>
                 <Input type="number" value={estimatedDuration} readOnly className="h-8 text-sm bg-white/70" />
-                <p className="text-xs text-muted-foreground">Duration updates automatically from scope quantity, productivity, and number of teams.</p>
+                <p className="text-xs text-amber-700">Duration updates automatically from scope quantity, productivity, and number of teams.</p>
               </div>
 
               <div className="space-y-2 rounded-md border border-cyan-200 bg-cyan-50/50 p-3">
-                <Label className="text-xs font-semibold flex items-center">
+                <Label className="text-xs font-semibold flex items-center text-cyan-900">
                   <Clock className="h-3 w-3 mr-1" />
                   Dependencies
                 </Label>
                 {otherTasks.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">Add more tasks to set predecessor dependencies.</p>
+                  <p className="text-xs text-cyan-700">Add more tasks to set predecessor dependencies.</p>
                 ) : (
                   <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
                     {otherTasks.map((dependencyTask) => {
@@ -776,7 +776,7 @@ export function TaskConfigurationPanel({
 
                       return (
                         <div key={dependencyTask.id} className="rounded-md border border-cyan-300 bg-white p-3 space-y-3">
-                          <label className="flex items-center gap-2 text-xs font-medium">
+                          <label className="flex items-center gap-2 text-xs font-medium text-foreground">
                             <Checkbox
                               checked={Boolean(selectedDependency)}
                               onCheckedChange={() => toggleDependency(dependencyTask.id)}
@@ -787,7 +787,7 @@ export function TaskConfigurationPanel({
                           {selectedDependency ? (
                             <div className="grid grid-cols-2 gap-3">
                               <div className="space-y-2">
-                                <Label className="text-[11px] font-semibold">Dependency Type</Label>
+                                <Label className="text-[11px] font-semibold text-foreground">Dependency Type</Label>
                                 <Select
                                   value={selectedDependency.type}
                                   onValueChange={(value) =>
@@ -810,7 +810,7 @@ export function TaskConfigurationPanel({
                               </div>
 
                               <div className="space-y-2">
-                                <Label className="text-[11px] font-semibold">Lag Days</Label>
+                                <Label className="text-[11px] font-semibold text-foreground">Lag Days</Label>
                                 <Input
                                   type="number"
                                   min="0"
@@ -826,7 +826,7 @@ export function TaskConfigurationPanel({
                               </div>
                             </div>
                           ) : (
-                            <p className="text-[11px] text-muted-foreground">
+                            <p className="text-[11px] text-cyan-700">
                               Enable this predecessor to configure link type and lag time.
                             </p>
                           )}
@@ -840,12 +840,9 @@ export function TaskConfigurationPanel({
 
             <TabsContent value="resources" className="space-y-4 mt-0">
               <section className="space-y-3 rounded-md border border-orange-200 bg-orange-50/50 p-3">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-3">
                   <div className="flex-1">
-                    <h3 className="text-sm font-semibold text-foreground">Task Materials</h3>
-                    <p className="text-[11px] text-muted-foreground">
-                      Manually assign materials from BOM database for cost tracking and forecasting.
-                    </p>
+                    <h3 className="text-sm font-semibold text-orange-900">Task Materials</h3>
                   </div>
                   <div className="flex items-center gap-2">
                     <Button type="button" size="sm" variant="outline" onClick={handleAddMaterial} disabled={loadingMaterials}>
@@ -1434,39 +1431,33 @@ export function TaskConfigurationPanel({
               </section>
 
               <section className="space-y-3 rounded-md border border-indigo-200 bg-indigo-50/50 p-3">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-3">
                   <div className="flex-1">
-                    <h3 className="text-sm font-semibold text-foreground">Labor Cost Summary</h3>
-                    <p className="text-[11px] text-muted-foreground">
-                      Costs update automatically whenever team composition, duration, or HR rates change.
-                    </p>
+                    <h3 className="text-sm font-semibold text-indigo-900">Labor Cost Summary</h3>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline">{laborCostSummary?.durationDays || estimatedDuration} days</Badge>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setShowLaborCost(!showLaborCost)}
-                      className="h-7 w-7 p-0"
-                    >
-                      {showLaborCost ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    </Button>
-                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setShowLaborCost(!showLaborCost)}
+                    className="h-7 w-7 p-0"
+                  >
+                    {showLaborCost ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </Button>
                 </div>
 
                 {showLaborCost && (
                   <>
                     <div className="grid gap-3 md:grid-cols-2">
                       <div className="rounded-md border border-indigo-300 bg-indigo-100/70 p-3">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Daily Labor Cost</p>
-                        <p className="mt-1 text-lg font-semibold text-foreground">
+                        <p className="text-[11px] uppercase tracking-wide text-indigo-700">Daily Labor Cost</p>
+                        <p className="mt-1 text-lg font-semibold text-indigo-900">
                           ₱ {Number(laborCostSummary?.dailyCost || 0).toFixed(2)}
                         </p>
                       </div>
                       <div className="rounded-md border border-indigo-300 bg-indigo-100/70 p-3">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Total Labor Cost</p>
-                        <p className="mt-1 text-lg font-semibold text-foreground">
+                        <p className="text-[11px] uppercase tracking-wide text-indigo-700">Total Labor Cost</p>
+                        <p className="mt-1 text-lg font-semibold text-indigo-900">
                           ₱ {Number(laborCostSummary?.totalCost || 0).toFixed(2)}
                         </p>
                       </div>
@@ -1490,7 +1481,7 @@ export function TaskConfigurationPanel({
                         ))}
                       </div>
                     ) : (
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-indigo-700">
                         No labor rate snapshot available yet. Add manpower rates in HR to populate this summary.
                       </p>
                     )}
@@ -1499,7 +1490,7 @@ export function TaskConfigurationPanel({
               </section>
 
               <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50/50 p-3">
-                <Label className="text-xs font-semibold flex items-center">
+                <Label className="text-xs font-semibold flex items-center text-slate-900">
                   <Wrench className="h-3 w-3 mr-1" />
                   Tools & Equipment
                 </Label>
@@ -1524,7 +1515,7 @@ export function TaskConfigurationPanel({
               </div>
 
               <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50/50 p-3">
-                <Label className="text-xs font-semibold">Execution Notes / Constraints</Label>
+                <Label className="text-xs font-semibold text-slate-900">Execution Notes / Constraints</Label>
                 <Textarea
                   className="min-h-[120px] text-sm bg-white"
                   placeholder="Enter schedule constraints, weather risks, or execution notes..."
