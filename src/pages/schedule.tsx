@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -70,6 +71,31 @@ function addDays(dateValue: string, days: number) {
   const date = new Date(`${dateValue}T00:00:00.000Z`);
   date.setUTCDate(date.getUTCDate() + Math.max(days - 1, 0));
   return toDateOnly(date);
+}
+
+function calculateProjectDuration(tasks: EditableProjectTask[]): { startDate: string | null; endDate: string | null; totalDays: number } {
+  if (tasks.length === 0) {
+    return { startDate: null, endDate: null, totalDays: 0 };
+  }
+  
+  const validTasks = tasks.filter(t => t.start_date && t.end_date);
+  if (validTasks.length === 0) {
+    return { startDate: null, endDate: null, totalDays: 0 };
+  }
+  
+  const startDate = validTasks.reduce((earliest, task) => {
+    return !earliest || task.start_date < earliest ? task.start_date : earliest;
+  }, validTasks[0].start_date);
+  
+  const endDate = validTasks.reduce((latest, task) => {
+    return !latest || task.end_date > latest ? task.end_date : latest;
+  }, validTasks[0].end_date);
+  
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  
+  return { startDate, endDate, totalDays };
 }
 
 function extractTaskDependencies(value: unknown): TaskDependency[] {
@@ -379,6 +405,7 @@ export default function SchedulePage() {
   const [laborCostSummaries, setLaborCostSummaries] = useState<Record<string, ComputedTaskLaborCostSummary | null>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const planningSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const laborCostSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -417,6 +444,8 @@ export default function SchedulePage() {
           : viewMode === "catalog"
             ? "Manpower Catalog"
             : "Task List";
+
+  const projectDuration = useMemo(() => calculateProjectDuration(sortedTasks), [sortedTasks]);
 
   useEffect(() => {
     void loadProjects();
@@ -819,9 +848,38 @@ export default function SchedulePage() {
 
   const handleCreateTask = () => {
     if (!selectedProject) return;
-    lastSavedSignatureRef.current = "";
-    setSelectedTask(createNewTask(selectedProject));
-    setPanelOpen(true);
+    const newTask = createNewTask(selectedProject);
+    setTasks((current) => [...current, newTask]);
+    setEditingTaskId(newTask.id);
+  };
+
+  const handleInlineTaskChange = (taskId: string, field: keyof EditableProjectTask, value: string | number) => {
+    setTasks((current) =>
+      current.map((task) => {
+        if (task.id !== taskId) return task;
+        
+        const updated = { ...task, [field]: value };
+        
+        // Recalculate end date if start date or duration changes
+        if (field === 'start_date' || field === 'duration_days') {
+          const startDate = field === 'start_date' ? String(value) : task.start_date;
+          const duration = field === 'duration_days' ? Number(value) : task.duration_days;
+          if (startDate && duration > 0) {
+            updated.end_date = addDays(startDate, duration);
+          }
+        }
+        
+        return syncTaskWithConfiguration(updated);
+      })
+    );
+  };
+
+  const handleSaveInlineTask = async (taskId: string) => {
+    const taskToSave = tasks.find(t => t.id === taskId);
+    if (!taskToSave) return;
+    
+    await persistTask(taskToSave);
+    setEditingTaskId(null);
   };
 
   return (
@@ -939,61 +997,172 @@ export default function SchedulePage() {
                 </div>
               ) : viewMode === "list" ? (
                 <div className="h-full overflow-auto -mx-3 px-3 sm:mx-0 sm:px-0">
-                  <table className="w-full text-sm min-w-[700px]">
+                  {projectDuration.startDate && projectDuration.endDate && (
+                    <div className="mb-4 rounded-lg border-2 border-primary/20 bg-primary/5 p-4 sticky top-0 z-10 backdrop-blur-sm">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-sm font-semibold text-foreground mb-1">Total Project Duration</h3>
+                          <p className="text-xs text-muted-foreground">
+                            {projectDuration.startDate} → {projectDuration.endDate}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-3xl font-bold text-primary">{projectDuration.totalDays}</div>
+                          <div className="text-xs text-muted-foreground uppercase tracking-wide">Days</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <table className="w-full text-sm min-w-[900px]">
                     <thead className="sticky top-0 z-10 bg-background">
                       <tr className="border-b text-left text-muted-foreground">
-                        <th className="px-3 py-2 font-medium">Task</th>
-                        <th className="px-3 py-2 font-medium">Start</th>
-                        <th className="px-3 py-2 font-medium">Duration</th>
-                        <th className="px-3 py-2 font-medium">Dependencies</th>
-                        <th className="px-3 py-2 text-right font-medium">Action</th>
+                        <th className="px-3 py-2 font-medium w-[200px]">Task Name</th>
+                        <th className="px-3 py-2 font-medium w-[120px]">Start Date</th>
+                        <th className="px-3 py-2 font-medium w-[120px]">End Date</th>
+                        <th className="px-3 py-2 font-medium w-[100px]">Duration</th>
+                        <th className="px-3 py-2 font-medium w-[150px]">Dependencies</th>
+                        <th className="px-3 py-2 text-right font-medium w-[120px]">Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {sortedTasks.map((task) => {
                         const isCritical = task.id ? criticalPathTaskIdSet.has(task.id) : false;
+                        const isEditing = editingTaskId === task.id;
 
                         return (
                           <tr
                             key={task.id || task.name}
-                            className={`cursor-pointer border-b ${
+                            className={`border-b ${
                               selectedTask?.id === task.id
                                 ? "bg-primary/5"
                                 : isCritical
                                   ? "bg-amber-500/5 hover:bg-amber-500/10"
                                   : "hover:bg-muted/30"
                             }`}
-                            onClick={() => handleTaskSelect(task)}
                           >
-                            <td className="px-3 py-3 font-medium">
-                              {task.name}
-                              <div className="mt-1 flex flex-wrap gap-1.5">
-                                <Badge variant="outline">{task.dependencies.length} predecessor(s)</Badge>
-                                {isCritical ? (
-                                  <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-700">
-                                    Critical path
-                                  </Badge>
-                                ) : null}
-                              </div>
+                            <td className="px-3 py-2">
+                              {isEditing ? (
+                                <Input
+                                  value={task.name}
+                                  onChange={(e) => handleInlineTaskChange(task.id, 'name', e.target.value)}
+                                  className="h-8 text-sm"
+                                  placeholder="Task name"
+                                  autoFocus
+                                />
+                              ) : (
+                                <div>
+                                  <div className="font-medium">{task.name}</div>
+                                  <div className="mt-1 flex flex-wrap gap-1.5">
+                                    <Badge variant="outline" className="text-xs">{task.dependencies.length} predecessor(s)</Badge>
+                                    {isCritical ? (
+                                      <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-700 text-xs">
+                                        Critical path
+                                      </Badge>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              )}
                             </td>
-                            <td className="px-3 py-3">{task.start_date || "-"}</td>
-                            <td className="px-3 py-3">{task.duration_days || 0} day(s)</td>
-                            <td className="px-3 py-3">
+                            <td className="px-3 py-2">
+                              {isEditing ? (
+                                <Input
+                                  type="date"
+                                  value={task.start_date || ""}
+                                  onChange={(e) => handleInlineTaskChange(task.id, 'start_date', e.target.value)}
+                                  className="h-8 text-xs"
+                                />
+                              ) : (
+                                task.start_date || "-"
+                              )}
+                            </td>
+                            <td className="px-3 py-2">
+                              {task.end_date || "-"}
+                            </td>
+                            <td className="px-3 py-2">
+                              {isEditing ? (
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  value={task.duration_days || 1}
+                                  onChange={(e) => handleInlineTaskChange(task.id, 'duration_days', Number(e.target.value))}
+                                  className="h-8 text-xs w-20"
+                                />
+                              ) : (
+                                `${task.duration_days || 0} day(s)`
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-xs">
                               {task.dependencies.map((dependency) => `${dependency.type}${dependency.lagDays ? ` +${dependency.lagDays}` : ""}`).join(", ") || "-"}
                             </td>
-                            <td className="px-3 py-3 text-right">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  if (task.id) void handleDeleteTask(task.id);
-                                }}
-                                disabled={!task.id || saving}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
+                            <td className="px-3 py-2">
+                              <div className="flex items-center justify-end gap-1">
+                                {isEditing ? (
+                                  <>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="default"
+                                      onClick={() => handleSaveInlineTask(task.id)}
+                                      disabled={!task.name || saving}
+                                      className="h-7 text-xs"
+                                    >
+                                      Save
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => {
+                                        if (!task.id || persistedTaskSignaturesRef.current[task.id]) {
+                                          setEditingTaskId(null);
+                                        } else {
+                                          // Remove unsaved new task
+                                          setTasks(current => current.filter(t => t.id !== task.id));
+                                          setEditingTaskId(null);
+                                        }
+                                      }}
+                                      className="h-7 text-xs"
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => setEditingTaskId(task.id)}
+                                      className="h-7 text-xs"
+                                    >
+                                      Edit
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleTaskSelect(task)}
+                                      className="h-7 text-xs"
+                                    >
+                                      Configure
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        if (task.id) void handleDeleteTask(task.id);
+                                      }}
+                                      disabled={!task.id || saving}
+                                      className="h-7 w-7"
+                                    >
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );
