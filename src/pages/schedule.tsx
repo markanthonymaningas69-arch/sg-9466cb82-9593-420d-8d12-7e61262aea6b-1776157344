@@ -860,7 +860,7 @@ export default function SchedulePage() {
   };
 
   const handleAddTask = () => {
-    if (!selectedProject?.id) {
+    if (!selectedProject) {
       toast({ title: "Error", description: "No project selected", variant: "destructive" });
       return;
     }
@@ -872,9 +872,9 @@ export default function SchedulePage() {
     
     const newSortOrder = maxSortOrder + 1;
 
-    const newTask: ScheduleTask = {
+    const newTask: EditableProjectTask = {
       id: `temp-${Date.now()}`,
-      project_id: selectedProject.id,
+      project_id: selectedProject,
       name: "",
       start_date: null,
       end_date: null,
