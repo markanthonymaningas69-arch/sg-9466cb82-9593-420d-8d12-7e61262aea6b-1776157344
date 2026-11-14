@@ -1109,7 +1109,7 @@ export default function SchedulePage() {
                               
                               taskConfig.teams.forEach((team) => {
                                 team.members.forEach((member) => {
-                                  const position = member.position || "Unassigned";
+                                  const position = member.positionName || "Unassigned";
                                   acc[position] = (acc[position] || 0) + (member.count || 1) * taskConfig.numberOfTeams;
                                 });
                               });
@@ -1141,16 +1141,7 @@ export default function SchedulePage() {
                           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Labor Cost</p>
                           {(() => {
                             const totalLaborCost = tasks.reduce((sum, task) => {
-                              const taskConfig = normalizeTaskConfiguration(
-                                task.task_config || createDefaultTaskConfiguration(),
-                                {
-                                  quantity: task.bom_scope?.quantity,
-                                  unit: task.bom_scope?.unit,
-                                  assignedTeamName: task.assigned_team,
-                                }
-                              );
-                              
-                              const laborCostSummary = calculateTaskLaborCostSummary(task, taskConfig, manpowerCatalogItems);
+                              const laborCostSummary = calculateTaskLaborCostSummary(task, manpowerCatalogItems);
                               return sum + (laborCostSummary?.totalCost || 0);
                             }, 0);
 
