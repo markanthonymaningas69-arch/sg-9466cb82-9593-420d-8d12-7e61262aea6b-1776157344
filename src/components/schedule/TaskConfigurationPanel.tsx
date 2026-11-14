@@ -527,7 +527,7 @@ export function TaskConfigurationPanel({
                           }
                         }}
                         readOnly={Boolean(task.bom_scope)} 
-                        className={`h-8 text-sm ${task.bom_scope ? 'bg-white/70' : 'bg-white'}`}
+                        className={`h-8 text-sm text-foreground ${task.bom_scope ? 'bg-white/70' : 'bg-white'}`}
                         placeholder="Enter task name"
                       />
                     </div>
@@ -547,7 +547,7 @@ export function TaskConfigurationPanel({
                             }
                           }}
                           readOnly={Boolean(task.bom_scope)} 
-                          className={`h-8 text-sm ${task.bom_scope ? 'bg-white/70' : 'bg-white'}`}
+                          className={`h-8 text-sm text-foreground ${task.bom_scope ? 'bg-white/70' : 'bg-white'}`}
                           placeholder="0"
                         />
                         <div className="space-y-1">
@@ -562,7 +562,7 @@ export function TaskConfigurationPanel({
                             }}
                             disabled={Boolean(task.bom_scope)}
                           >
-                            <SelectTrigger className={`h-8 text-sm ${task.bom_scope ? 'bg-white/70' : 'bg-white'}`}>
+                            <SelectTrigger className={`h-8 text-sm text-foreground ${task.bom_scope ? 'bg-white/70' : 'bg-white'}`}>
                               <SelectValue placeholder="Unit" />
                             </SelectTrigger>
                             <SelectContent>
@@ -582,7 +582,7 @@ export function TaskConfigurationPanel({
                                 });
                               }}
                               placeholder="Specify unit"
-                              className="h-7 text-xs bg-white"
+                              className="h-7 text-xs text-foreground bg-white"
                             />
                           )}
                         </div>
@@ -628,7 +628,7 @@ export function TaskConfigurationPanel({
                               productivityOutput: Number(event.target.value) || 0,
                             })
                           }
-                          className="h-8 text-sm bg-white"
+                          className="h-8 text-sm text-foreground bg-white"
                         />
                       </div>
                       <div className="space-y-2">
@@ -647,7 +647,7 @@ export function TaskConfigurationPanel({
                             })
                           }
                         >
-                          <SelectTrigger className="h-8 text-sm w-[100px] bg-white">
+                          <SelectTrigger className="h-8 text-sm text-foreground w-[100px] bg-white">
                             <SelectValue placeholder="Period" />
                           </SelectTrigger>
                           <SelectContent>
@@ -747,18 +747,18 @@ export function TaskConfigurationPanel({
                     type="date"
                     value={task.start_date || ""}
                     onChange={(event) => onTaskChange({ ...task, start_date: event.target.value })}
-                    className="h-8 text-xs bg-white"
+                    className="h-8 text-xs text-foreground bg-white"
                   />
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs font-semibold text-amber-900">End Date</Label>
-                  <Input type="date" value={task.end_date || ""} readOnly className="h-8 text-xs bg-white/70" />
+                  <Input type="date" value={task.end_date || ""} readOnly className="h-8 text-xs text-foreground bg-white/70" />
                 </div>
               </div>
 
               <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50/50 p-3">
                 <Label className="text-xs font-semibold text-amber-900">Calculated Duration</Label>
-                <Input type="number" value={estimatedDuration} readOnly className="h-8 text-sm bg-white/70" />
+                <Input type="number" value={estimatedDuration} readOnly className="h-8 text-sm text-foreground bg-white/70" />
                 <p className="text-xs text-amber-700">Duration updates automatically from scope quantity, productivity, and number of teams.</p>
               </div>
 
@@ -796,7 +796,7 @@ export function TaskConfigurationPanel({
                                     })
                                   }
                                 >
-                                  <SelectTrigger className="h-8 text-xs bg-white">
+                                  <SelectTrigger className="h-8 text-xs text-foreground bg-white">
                                     <SelectValue placeholder="Select type" />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -821,7 +821,7 @@ export function TaskConfigurationPanel({
                                       lagDays: Math.max(0, Math.round(Number(event.target.value) || 0)),
                                     })
                                   }
-                                  className="h-8 text-xs bg-white"
+                                  className="h-8 text-xs text-foreground bg-white"
                                 />
                               </div>
                             </div>
@@ -1495,7 +1495,7 @@ export function TaskConfigurationPanel({
                   Tools & Equipment
                 </Label>
                 <Textarea
-                  className="min-h-[110px] text-sm bg-white"
+                  className="min-h-[110px] text-sm text-foreground bg-white"
                   placeholder="Enter one tool or equipment item per line..."
                   value={equipmentValue}
                   onChange={(event) =>
@@ -1517,7 +1517,7 @@ export function TaskConfigurationPanel({
               <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50/50 p-3">
                 <Label className="text-xs font-semibold text-slate-900">Execution Notes / Constraints</Label>
                 <Textarea
-                  className="min-h-[120px] text-sm bg-white"
+                  className="min-h-[120px] text-sm text-foreground bg-white"
                   placeholder="Enter schedule constraints, weather risks, or execution notes..."
                   value={task.description || ""}
                   onChange={(event) => onTaskChange({ ...task, description: event.target.value })}
