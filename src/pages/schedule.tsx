@@ -1169,13 +1169,18 @@ export default function SchedulePage() {
                             </td>
                             <td className="px-3 py-2">
                               {(() => {
-                                const taskConfig = task.task_config || {};
+                                const taskConfig = normalizeTaskConfiguration(
+                                  task.task_config || createDefaultTaskConfiguration(),
+                                  {
+                                    quantity: task.bom_scope?.quantity,
+                                    unit: task.bom_scope?.unit,
+                                    assignedTeamName: task.assigned_team,
+                                  }
+                                );
                                 const hasProductivityConfig = 
-                                  taskConfig.productivityOutput && 
                                   taskConfig.productivityOutput > 0 && 
-                                  taskConfig.scopeQuantity && 
                                   taskConfig.scopeQuantity > 0;
-                                const isAutoCalculated = taskConfig.autoCalculateDuration !== false && hasProductivityConfig;
+                                const isAutoCalculated = taskConfig.autoCalculateDuration && hasProductivityConfig;
                                 
                                 return (
                                   <div className="flex items-center gap-1">
@@ -1191,14 +1196,21 @@ export default function SchedulePage() {
                                           setTasks((current) =>
                                             current.map((t) =>
                                               t.id === task.id
-                                                ? {
+                                                ? syncTaskWithConfiguration({
                                                     ...t,
                                                     duration_days: newDuration,
-                                                    task_config: {
-                                                      ...(t.task_config || {}),
-                                                      autoCalculateDuration: false,
-                                                    },
-                                                  }
+                                                    task_config: normalizeTaskConfiguration(
+                                                      {
+                                                        ...(t.task_config || createDefaultTaskConfiguration()),
+                                                        autoCalculateDuration: false,
+                                                      },
+                                                      {
+                                                        quantity: t.bom_scope?.quantity,
+                                                        unit: t.bom_scope?.unit,
+                                                        assignedTeamName: t.assigned_team,
+                                                      }
+                                                    ),
+                                                  })
                                                 : t
                                             )
                                           );
