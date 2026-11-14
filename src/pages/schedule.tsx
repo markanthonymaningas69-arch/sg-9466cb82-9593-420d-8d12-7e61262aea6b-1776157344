@@ -1072,22 +1072,127 @@ export default function SchedulePage() {
                 </div>
               ) : viewMode === "list" ? (
                 <div className="h-full overflow-auto -mx-3 px-3 sm:mx-0 sm:px-0">
-                  {projectDuration.startDate && projectDuration.endDate && (
-                    <div className="mb-4 rounded-lg border-2 border-primary/20 bg-primary/5 p-4 sticky top-0 z-10 backdrop-blur-sm">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="text-sm font-semibold text-foreground mb-1">Total Project Duration</h3>
+                  {/* Total Project Duration Summary Card */}
+                  <Card className="mb-4 border-2 border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10 sticky top-0 z-20 shadow-md">
+                    <CardContent className="p-4">
+                      <div className="grid gap-4 md:grid-cols-4">
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Project Duration</p>
+                          <p className="text-3xl font-bold text-primary">
+                            {projectDuration.totalDays} days
+                          </p>
                           <p className="text-xs text-muted-foreground">
-                            {projectDuration.startDate} → {projectDuration.endDate}
+                            {projectDuration.startDate && projectDuration.endDate ? (
+                              <>
+                                {new Date(projectDuration.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                {" → "}
+                                {new Date(projectDuration.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                              </>
+                            ) : (
+                              "No tasks scheduled"
+                            )}
                           </p>
                         </div>
-                        <div className="text-right">
-                          <div className="text-3xl font-bold text-primary">{projectDuration.totalDays}</div>
-                          <div className="text-xs text-muted-foreground uppercase tracking-wide">Days</div>
+
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Manpower</p>
+                          {(() => {
+                            const manpowerBreakdown = tasks.reduce((acc, task) => {
+                              const taskConfig = normalizeTaskConfiguration(
+                                task.task_config || createDefaultTaskConfiguration(),
+                                {
+                                  quantity: task.bom_scope?.quantity,
+                                  unit: task.bom_scope?.unit,
+                                  assignedTeamName: task.assigned_team,
+                                }
+                              );
+                              
+                              taskConfig.teams.forEach((team) => {
+                                team.members.forEach((member) => {
+                                  const position = member.position || "Unassigned";
+                                  acc[position] = (acc[position] || 0) + (member.count || 1) * taskConfig.numberOfTeams;
+                                });
+                              });
+                              
+                              return acc;
+                            }, {} as Record<string, number>);
+
+                            const totalPersonnel = Object.values(manpowerBreakdown).reduce((sum, count) => sum + count, 0);
+
+                            return (
+                              <>
+                                <p className="text-3xl font-bold text-primary">{totalPersonnel}</p>
+                                <div className="space-y-0.5 text-xs text-muted-foreground max-h-16 overflow-y-auto">
+                                  {Object.entries(manpowerBreakdown)
+                                    .sort(([, a], [, b]) => b - a)
+                                    .map(([position, count]) => (
+                                      <div key={position} className="flex justify-between items-center">
+                                        <span>{position}:</span>
+                                        <span className="font-semibold">{count}</span>
+                                      </div>
+                                    ))}
+                                </div>
+                              </>
+                            );
+                          })()}
+                        </div>
+
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Labor Cost</p>
+                          {(() => {
+                            const totalLaborCost = tasks.reduce((sum, task) => {
+                              const taskConfig = normalizeTaskConfiguration(
+                                task.task_config || createDefaultTaskConfiguration(),
+                                {
+                                  quantity: task.bom_scope?.quantity,
+                                  unit: task.bom_scope?.unit,
+                                  assignedTeamName: task.assigned_team,
+                                }
+                              );
+                              
+                              const laborCostSummary = calculateTaskLaborCostSummary(task, taskConfig, manpowerCatalogItems);
+                              return sum + (laborCostSummary?.totalCost || 0);
+                            }, 0);
+
+                            return (
+                              <>
+                                <p className="text-3xl font-bold text-primary">₱ {totalLaborCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  For entire project
+                                </p>
+                              </>
+                            );
+                          })()}
+                        </div>
+
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Tasks Overview</p>
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-muted-foreground">Total Tasks:</span>
+                              <span className="font-semibold text-foreground">{tasks.length}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-muted-foreground">Critical Path:</span>
+                              <span className="font-semibold text-amber-700">{criticalPathTaskIdSet.size}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-muted-foreground">With Config:</span>
+                              <span className="font-semibold text-foreground">
+                                {tasks.filter(t => {
+                                  const config = normalizeTaskConfiguration(
+                                    t.task_config || createDefaultTaskConfiguration(),
+                                    { quantity: t.bom_scope?.quantity, unit: t.bom_scope?.unit, assignedTeamName: t.assigned_team }
+                                  );
+                                  return config.productivityOutput > 0 && config.scopeQuantity > 0;
+                                }).length}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    </CardContent>
+                  </Card>
                   
                   <table className="w-full text-sm min-w-[900px]">
                     <thead className="sticky top-0 z-10 bg-background">
