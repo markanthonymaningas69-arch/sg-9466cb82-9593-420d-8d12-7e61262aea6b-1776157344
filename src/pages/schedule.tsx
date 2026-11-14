@@ -859,9 +859,39 @@ export default function SchedulePage() {
     void persistTaskOrder(reorderedTasks, sortedTasks, currentSelectedTaskId);
   };
 
-  const handleCreateTask = () => {
-    if (!selectedProject) return;
-    const newTask = createNewTask(selectedProject);
+  const handleAddTask = () => {
+    if (!selectedProject?.id) {
+      toast({ title: "Error", description: "No project selected", variant: "destructive" });
+      return;
+    }
+
+    // Calculate the highest sort_order to place new task at the end
+    const maxSortOrder = tasks.length > 0 
+      ? Math.max(...tasks.map(t => t.sort_order ?? 0))
+      : -1;
+    
+    const newSortOrder = maxSortOrder + 1;
+
+    const newTask: ScheduleTask = {
+      id: `temp-${Date.now()}`,
+      project_id: selectedProject.id,
+      name: "",
+      start_date: null,
+      end_date: null,
+      duration_days: 1,
+      dependencies: [],
+      assigned_team: null,
+      number_of_teams: 1,
+      equipment: [],
+      description: null,
+      bom_scope_id: null,
+      bom_scope: null,
+      task_config: createDefaultTaskConfiguration(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      sort_order: newSortOrder,
+    };
+
     setTasks((current) => [...current, newTask]);
     setEditingTaskId(newTask.id);
   };
@@ -993,7 +1023,7 @@ export default function SchedulePage() {
                   </SelectContent>
                 </Select>
 
-                <Button type="button" size="sm" onClick={handleCreateTask} disabled={!selectedProject}>
+                <Button type="button" size="sm" onClick={handleAddTask} disabled={!selectedProject}>
                   <Plus className="mr-2 h-4 w-4" />
                   Add Task
                 </Button>
