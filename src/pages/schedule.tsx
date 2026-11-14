@@ -1168,38 +1168,28 @@ export default function SchedulePage() {
                               {task.end_date || "-"}
                             </td>
                             <td className="px-3 py-2">
-                              {isEditing || isEditingDuration ? (
-                                <div className="flex items-center gap-1">
-                                  <Input
-                                    type="number"
-                                    min="1"
-                                    value={task.duration_days || 1}
-                                    onChange={(e) => handleInlineTaskChange(task.id, 'duration_days', Number(e.target.value))}
-                                    onBlur={async () => {
-                                      if (isEditingDuration) {
-                                        await handleSaveInlineTask(task.id);
-                                        setEditingDurationTaskId(null);
-                                      }
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter' && isEditingDuration) {
-                                        e.currentTarget.blur();
-                                      }
-                                    }}
-                                    className="h-8 text-xs w-20"
-                                    autoFocus={isEditingDuration}
-                                  />
-                                  <span className="text-xs text-muted-foreground">days</span>
-                                </div>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => setEditingDurationTaskId(task.id)}
-                                  className="text-left hover:text-primary transition-colors cursor-pointer"
-                                >
-                                  {task.duration_days || 0} day(s)
-                                </button>
-                              )}
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  value={task.duration_days || 1}
+                                  onChange={(e) => handleInlineTaskChange(task.id, 'duration_days', Number(e.target.value))}
+                                  onBlur={async () => {
+                                    const taskToSave = tasks.find(t => t.id === task.id);
+                                    if (taskToSave) {
+                                      await handleSaveInlineTask(task.id);
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.currentTarget.blur();
+                                    }
+                                  }}
+                                  className="h-8 text-xs w-20 text-gray-900"
+                                  disabled={isEditing || saving}
+                                />
+                                <span className="text-xs text-muted-foreground">days</span>
+                              </div>
                             </td>
                             <td className="px-3 py-2 text-xs">
                               {task.dependencies.map((dependency) => `${dependency.type}${dependency.lagDays ? ` +${dependency.lagDays}` : ""}`).join(", ") || "-"}
