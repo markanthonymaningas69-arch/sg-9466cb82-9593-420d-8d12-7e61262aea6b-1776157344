@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Trash2, X, ChevronUp, ChevronDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Trash2, X, ChevronUp, ChevronDown, ArrowUp, ArrowDown, Eye, EyeOff } from "lucide-react";
 import { Layout } from "@/components/Layout";
 import { CalendarView } from "@/components/schedule/CalendarView";
 import { GanttView } from "@/components/schedule/GanttView";
@@ -407,6 +407,7 @@ export default function SchedulePage() {
   const [saving, setSaving] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingDurationTaskId, setEditingDurationTaskId] = useState<string | null>(null);
+  const [showLaborCost, setShowLaborCost] = useState(false);
   const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const planningSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const laborCostSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1178,7 +1179,23 @@ export default function SchedulePage() {
                         </div>
 
                         <div className="space-y-1">
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Labor Cost</p>
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Labor Cost</p>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setShowLaborCost(!showLaborCost)}
+                              className="h-5 w-5"
+                              title={showLaborCost ? "Hide labor cost" : "Show labor cost"}
+                            >
+                              {showLaborCost ? (
+                                <EyeOff className="h-3 w-3" />
+                              ) : (
+                                <Eye className="h-3 w-3" />
+                              )}
+                            </Button>
+                          </div>
                           {(() => {
                             const totalLaborCost = tasks.reduce((sum, task) => {
                               const laborCostSummary = calculateTaskLaborCostSummary(task, manpowerCatalogItems);
@@ -1187,7 +1204,13 @@ export default function SchedulePage() {
 
                             return (
                               <>
-                                <p className="text-3xl font-bold text-primary">₱ {totalLaborCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                <p className="text-3xl font-bold text-primary">
+                                  {showLaborCost ? (
+                                    `₱ ${totalLaborCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                  ) : (
+                                    "₱ •••••••"
+                                  )}
+                                </p>
                                 <p className="text-xs text-muted-foreground">
                                   For entire project
                                 </p>
