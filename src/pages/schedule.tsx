@@ -1168,28 +1168,69 @@ export default function SchedulePage() {
                               {task.end_date || "-"}
                             </td>
                             <td className="px-3 py-2">
-                              <div className="flex items-center gap-1">
-                                <Input
-                                  type="number"
-                                  min="1"
-                                  value={task.duration_days || 1}
-                                  onChange={(e) => handleInlineTaskChange(task.id, 'duration_days', Number(e.target.value))}
-                                  onBlur={async () => {
-                                    const taskToSave = tasks.find(t => t.id === task.id);
-                                    if (taskToSave) {
-                                      await handleSaveInlineTask(task.id);
-                                    }
-                                  }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      e.currentTarget.blur();
-                                    }
-                                  }}
-                                  className="h-8 text-xs w-20 text-gray-900"
-                                  disabled={isEditing || saving}
-                                />
-                                <span className="text-xs text-muted-foreground">days</span>
-                              </div>
+                              {(() => {
+                                const taskConfig = task.task_config || {};
+                                const hasProductivityConfig = 
+                                  taskConfig.productivityOutput && 
+                                  taskConfig.productivityOutput > 0 && 
+                                  taskConfig.scopeQuantity && 
+                                  taskConfig.scopeQuantity > 0;
+                                const isAutoCalculated = taskConfig.autoCalculateDuration !== false && hasProductivityConfig;
+                                
+                                return (
+                                  <div className="flex items-center gap-1">
+                                    <Input
+                                      type="number"
+                                      min="1"
+                                      value={task.duration_days || 1}
+                                      onChange={(e) => {
+                                        const newDuration = Number(e.target.value);
+                                        handleInlineTaskChange(task.id, 'duration_days', newDuration);
+                                        // If manually setting duration, mark as manual mode
+                                        if (!isEditing) {
+                                          setTasks((current) =>
+                                            current.map((t) =>
+                                              t.id === task.id
+                                                ? {
+                                                    ...t,
+                                                    duration_days: newDuration,
+                                                    task_config: {
+                                                      ...(t.task_config || {}),
+                                                      autoCalculateDuration: false,
+                                                    },
+                                                  }
+                                                : t
+                                            )
+                                          );
+                                        }
+                                      }}
+                                      onBlur={async () => {
+                                        const taskToSave = tasks.find(t => t.id === task.id);
+                                        if (taskToSave) {
+                                          await handleSaveInlineTask(task.id);
+                                        }
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          e.currentTarget.blur();
+                                        }
+                                      }}
+                                      className="h-8 text-xs w-20 text-gray-900"
+                                      disabled={isEditing || saving || isAutoCalculated}
+                                      title={isAutoCalculated ? "Duration is auto-calculated. Configure productivity/scope to change it." : "Enter duration manually"}
+                                    />
+                                    <span className="text-xs text-muted-foreground">
+                                      {isAutoCalculated ? (
+                                        <span className="text-blue-600" title="Auto-calculated from configuration">
+                                          days ⚙️
+                                        </span>
+                                      ) : (
+                                        "days"
+                                      )}
+                                    </span>
+                                  </div>
+                                );
+                              })()}
                             </td>
                             <td className="px-3 py-2 text-xs">
                               {task.dependencies.map((dependency) => `${dependency.type}${dependency.lagDays ? ` +${dependency.lagDays}` : ""}`).join(", ") || "-"}
