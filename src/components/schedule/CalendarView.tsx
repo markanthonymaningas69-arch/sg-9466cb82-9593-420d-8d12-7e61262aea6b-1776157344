@@ -41,7 +41,8 @@ function getStatusClasses(status: string) {
   return "bg-slate-400";
 }
 
-export function CalendarView({ tasks, projectName }: CalendarViewProps) {
+export function CalendarView({ tasks, onTaskClick, projectStart, projectEnd }: CalendarViewProps) {
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [calendarMode, setCalendarMode] = useState<CalendarViewMode>("month");
   const [anchorDate, setAnchorDate] = useState(INITIAL_ANCHOR_DATE);
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
