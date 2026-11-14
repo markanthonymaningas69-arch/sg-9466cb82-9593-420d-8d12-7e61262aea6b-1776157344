@@ -1139,7 +1139,7 @@ export default function SchedulePage() {
                               }
                             });
                             
-                            // Find the peak day (highest total manpower)
+                            // Find the peak day (highest total manpower) - this accounts for overlaps
                             let peakManpowerBreakdown: Record<string, number> = {};
                             let peakTotal = 0;
                             
@@ -1158,15 +1158,20 @@ export default function SchedulePage() {
                                   {Object.entries(peakManpowerBreakdown)
                                     .sort(([, a], [, b]) => b - a)
                                     .map(([position, count]) => (
-                                      <div key={position} className="flex justify-between items-center">
-                                        <span>{position}:</span>
-                                        <span className="font-semibold">{count}</span>
+                                      <div key={position} className="flex justify-between items-center gap-2">
+                                        <span className="truncate">{position}:</span>
+                                        <span className="font-semibold whitespace-nowrap">{count}</span>
                                       </div>
                                     ))}
                                   {peakTotal === 0 && (
-                                    <p className="text-xs text-muted-foreground">No scheduled tasks yet</p>
+                                    <p className="text-xs text-muted-foreground italic">No scheduled tasks yet</p>
                                   )}
                                 </div>
+                                {peakTotal > 0 && (
+                                  <p className="text-[10px] text-muted-foreground italic mt-1">
+                                    Maximum workers needed simultaneously
+                                  </p>
+                                )}
                               </>
                             );
                           })()}
