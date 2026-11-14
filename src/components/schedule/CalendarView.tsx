@@ -21,6 +21,9 @@ import { CalendarDays, ChevronLeft, ChevronRight, Package, Users, Wrench } from 
 interface CalendarViewProps {
   tasks: CalendarTaskLike[];
   projectName: string;
+  onTaskClick?: (task: CalendarTaskLike) => void;
+  projectStart?: string | null;
+  projectEnd?: string | null;
 }
 
 const INITIAL_ANCHOR_DATE = new Date("2026-04-23T00:00:00.000Z");
@@ -41,10 +44,10 @@ function getStatusClasses(status: string) {
   return "bg-slate-400";
 }
 
-export function CalendarView({ tasks, onTaskClick, projectStart, projectEnd }: CalendarViewProps) {
+export function CalendarView({ tasks, projectName, onTaskClick, projectStart, projectEnd }: CalendarViewProps) {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [calendarMode, setCalendarMode] = useState<CalendarViewMode>("month");
-  const [anchorDate, setAnchorDate] = useState(INITIAL_ANCHOR_DATE);
+  const [anchorDate, setAnchorDate] = useState(currentDate);
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
   const [phaseFilter, setPhaseFilter] = useState("all");
   const [teamFilter, setTeamFilter] = useState("all");
