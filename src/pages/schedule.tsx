@@ -872,28 +872,11 @@ export default function SchedulePage() {
     
     const newSortOrder = maxSortOrder + 1;
 
-    const newTask: EditableProjectTask = {
-      id: `temp-${Date.now()}`,
-      project_id: selectedProject,
-      name: "",
-      start_date: null,
-      end_date: null,
-      duration_days: 1,
-      dependencies: [],
-      assigned_team: null,
-      number_of_teams: 1,
-      equipment: [],
-      description: null,
-      bom_scope_id: null,
-      bom_scope: null,
-      task_config: createDefaultTaskConfiguration(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      sort_order: newSortOrder,
-    };
+    const newTask = createNewTask(selectedProject);
+    const taskWithOrder = { ...newTask, sort_order: newSortOrder };
 
-    setTasks((current) => [...current, newTask]);
-    setEditingTaskId(newTask.id);
+    setTasks((current) => [...current, taskWithOrder]);
+    setEditingTaskId(taskWithOrder.id);
   };
 
   const handleMoveTaskUp = (taskId: string) => {
